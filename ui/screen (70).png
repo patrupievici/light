@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT Settings - Appearance</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "outline": "#84948e",
+                        "on-secondary-container": "#e0e8ff",
+                        "surface-container-lowest": "#0d0e11",
+                        "secondary-container": "#0264d4",
+                        "on-surface-variant": "#bacac3",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#121316",
+                        "primary-fixed-dim": "#21dfb8",
+                        "on-primary-fixed-variant": "#005141",
+                        "on-background": "#e3e2e6",
+                        "surface-tint": "#21dfb8",
+                        "primary-container": "#00d7b0",
+                        "on-surface": "#e3e2e6",
+                        "on-primary-container": "#005847",
+                        "surface-container-highest": "#343538",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "on-tertiary-fixed": "#001f26",
+                        "surface-container-low": "#1b1b1f",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#2f3034",
+                        "primary-fixed": "#52fcd3",
+                        "primary": "#46f4cb",
+                        "tertiary-container": "#35cfef",
+                        "error-container": "#93000a",
+                        "on-tertiary": "#003640",
+                        "surface-container-high": "#292a2d",
+                        "on-secondary-fixed-variant": "#004494",
+                        "on-secondary": "#002e69",
+                        "on-primary-fixed": "#002019",
+                        "secondary-fixed": "#d8e2ff",
+                        "background": "#121316",
+                        "secondary": "#adc6ff",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "outline-variant": "#3b4a44",
+                        "on-secondary-fixed": "#001a41",
+                        "inverse-primary": "#006b57",
+                        "on-error": "#690005",
+                        "tertiary": "#8ee7ff",
+                        "surface-container": "#1f1f23",
+                        "surface-bright": "#38393c",
+                        "on-tertiary-container": "#005564",
+                        "surface-variant": "#343538",
+                        "surface": "#121316",
+                        "tertiary-fixed": "#acedff",
+                        "on-primary": "#00382c",
+                        "inverse-surface": "#e3e2e6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal-gradient {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .glass-panel {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim text-on-surface font-body selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<button class="text-[#00D7B0] hover:text-[#46f4cb] transition-colors duration-200 active:scale-95">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</h1>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-8">
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200" href="#">Dashboard</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200" href="#">Activity</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200" href="#">Premium</a>
+<a class="text-[#46f4cb] font-semibold transition-colors duration-200" href="#">Profile</a>
+</nav>
+<div class="h-8 w-8 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="close-up portrait of a professional woman with neutral expression in soft cinematic studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwhn-i_y34KgsHQjYFMOhH13t0iBdk7YAzGtgzQQ6uZkNvFy4meG0Yo7DoF2o1Fs1X4wW6Qdx1JlRZiTIUCqsC-2zG3Mp4GWt2eJi5-OAIufnsEPtHDu850HG5oIYMRVHj8-bMxQ5zYAll3nVHI70-STX0aqUfcKpTjBte2L7b3zm2v0dHE_66nWQFjj-qA7gTd5bSR_2ihB8io1sWh8-5zIpNZfZbyC6P4SL7WXfFu-DlajytqYCgv6TyEB4XQO5Jk-Xy78hn0N0"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-5xl mx-auto">
+<!-- Breadcrumb / Section Header -->
+<div class="mb-12">
+<div class="flex items-center gap-2 mb-2">
+<span class="text-[0.6875rem] uppercase tracking-[0.1em] text-on-surface-variant font-label">Settings</span>
+<span class="material-symbols-outlined text-sm text-outline-variant">chevron_right</span>
+<span class="text-[0.6875rem] uppercase tracking-[0.1em] text-primary font-label">Appearance</span>
+</div>
+<h2 class="text-4xl font-extrabold tracking-tight font-headline text-on-surface">Visual Identity</h2>
+<p class="text-on-surface-variant mt-2 max-w-xl body-md">Calibrate the precision interface to match your environment and technical preferences.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Left Column: Theme & Mode -->
+<div class="md:col-span-7 space-y-6">
+<!-- Theme Selection Bento -->
+<section class="bg-surface-container-low rounded-xl p-6 relative overflow-hidden">
+<div class="flex justify-between items-start mb-8">
+<div>
+<h3 class="text-lg font-bold font-headline mb-1">Interface Mode</h3>
+<p class="text-xs text-on-surface-variant font-label tracking-wide">Sync with system or force manual override</p>
+</div>
+<span class="material-symbols-outlined text-primary/40">dark_mode</span>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<!-- Dark Mode Option -->
+<div class="relative group cursor-pointer border-2 border-primary bg-surface-container rounded-lg p-4 transition-all">
+<div class="aspect-video bg-surface-dim rounded mb-3 overflow-hidden flex items-center justify-center">
+<div class="w-full h-full p-3 space-y-2">
+<div class="h-1.5 w-2/3 bg-surface-container-highest rounded-full"></div>
+<div class="h-1.5 w-full bg-surface-container-high rounded-full"></div>
+<div class="flex gap-1 pt-1">
+<div class="h-4 w-4 rounded-sm bg-primary/20 border border-primary/40"></div>
+<div class="h-4 w-4 rounded-sm bg-surface-container-highest"></div>
+</div>
+</div>
+</div>
+<span class="text-sm font-semibold text-primary">Precision Dark</span>
+<div class="absolute top-3 right-3 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px] text-on-primary font-bold">check</span>
+</div>
+</div>
+<!-- Light Mode Option -->
+<div class="relative group cursor-pointer border-2 border-transparent bg-surface-container-high/30 hover:border-outline-variant rounded-lg p-4 transition-all">
+<div class="aspect-video bg-zinc-100 rounded mb-3 overflow-hidden flex items-center justify-center">
+<div class="w-full h-full p-3 space-y-2">
+<div class="h-1.5 w-2/3 bg-zinc-300 rounded-full"></div>
+<div class="h-1.5 w-full bg-zinc-200 rounded-full"></div>
+<div class="flex gap-1 pt-1">
+<div class="h-4 w-4 rounded-sm bg-zinc-300"></div>
+<div class="h-4 w-4 rounded-sm bg-zinc-200"></div>
+</div>
+</div>
+</div>
+<span class="text-sm font-medium text-on-surface-variant">Technical Light</span>
+</div>
+</div>
+</section>
+<!-- Accessibility Section -->
+<section class="bg-surface-container-low rounded-xl p-6">
+<div class="flex items-center gap-3 mb-6">
+<span class="material-symbols-outlined text-tertiary">text_fields</span>
+<h3 class="text-lg font-bold font-headline">Information Density</h3>
+</div>
+<div class="space-y-8">
+<!-- Text Sizing Slider -->
+<div class="space-y-4">
+<div class="flex justify-between items-end">
+<label class="text-[0.6875rem] uppercase tracking-widest text-on-surface-variant font-label">Global Text Scale</label>
+<span class="text-sm font-mono text-tertiary">100%</span>
+</div>
+<div class="relative h-1 bg-surface-container-highest rounded-full">
+<div class="absolute top-0 left-0 h-full w-1/2 bg-tertiary rounded-full"></div>
+<div class="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 h-4 w-4 bg-tertiary rounded-full shadow-[0_0_12px_rgba(142,231,255,0.4)] cursor-pointer"></div>
+</div>
+<div class="flex justify-between text-[10px] text-on-surface-variant font-label uppercase">
+<span>Compact</span>
+<span>Standard</span>
+<span>Expanded</span>
+</div>
+</div>
+<!-- Accessibility Toggles -->
+<div class="space-y-4">
+<div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container transition-colors group">
+<div>
+<p class="text-sm font-semibold">High Contrast Metrics</p>
+<p class="text-xs text-on-surface-variant">Increases visibility for data-heavy charts</p>
+</div>
+<div class="w-10 h-5 bg-primary/20 rounded-full relative cursor-pointer border border-primary/30">
+<div class="absolute right-0.5 top-0.5 h-[14px] w-[14px] bg-primary rounded-full transition-all"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container transition-colors">
+<div>
+<p class="text-sm font-semibold">Motion Reduction</p>
+<p class="text-xs text-on-surface-variant">Minimizes parallax and transitional shifts</p>
+</div>
+<div class="w-10 h-5 bg-surface-container-highest rounded-full relative cursor-pointer border border-outline-variant/30">
+<div class="absolute left-0.5 top-0.5 h-[14px] w-[14px] bg-on-surface-variant rounded-full transition-all"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Visualization Settings -->
+<div class="md:col-span-5 space-y-6">
+<!-- Chart Density Section -->
+<section class="bg-surface-container-low rounded-xl p-6 border-l-4 border-tertiary-container/30">
+<h3 class="text-lg font-bold font-headline mb-6">Chart Granularity</h3>
+<div class="space-y-6">
+<!-- Density Selector -->
+<div class="grid grid-cols-3 gap-2 p-1 bg-surface-container-lowest rounded-lg border border-outline-variant/10">
+<button class="py-2 text-[10px] font-bold uppercase tracking-tighter bg-surface-container-high text-tertiary rounded shadow-sm">Low</button>
+<button class="py-2 text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant hover:text-on-surface">Medium</button>
+<button class="py-2 text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant hover:text-on-surface">High</button>
+</div>
+<!-- Visualization Preview -->
+<div class="bg-surface-container-lowest rounded-lg p-4 aspect-square flex flex-col justify-end gap-1 relative group">
+<div class="absolute top-4 left-4">
+<span class="text-[0.6875rem] font-mono text-tertiary-fixed-dim/60">LIVE PREVIEW</span>
+</div>
+<!-- Mock Visualization Lines -->
+<div class="flex items-end gap-1.5 h-32 px-2">
+<div class="flex-1 bg-tertiary/20 rounded-t h-[40%] transition-all hover:bg-tertiary/40"></div>
+<div class="flex-1 bg-tertiary/20 rounded-t h-[65%] transition-all hover:bg-tertiary/40"></div>
+<div class="flex-1 bg-tertiary/20 rounded-t h-[55%] transition-all hover:bg-tertiary/40"></div>
+<div class="flex-1 bg-tertiary/20 rounded-t h-[80%] transition-all hover:bg-tertiary/40"></div>
+<div class="flex-1 bg-tertiary/40 rounded-t h-[95%] transition-all hover:bg-tertiary/60 border-t-2 border-tertiary"></div>
+<div class="flex-1 bg-tertiary/20 rounded-t h-[70%] transition-all hover:bg-tertiary/40"></div>
+<div class="flex-1 bg-tertiary/20 rounded-t h-[60%] transition-all hover:bg-tertiary/40"></div>
+</div>
+<div class="flex justify-between px-1 border-t border-outline-variant/20 pt-2">
+<span class="text-[8px] font-label text-on-surface-variant">MON</span>
+<span class="text-[8px] font-label text-on-surface-variant">WED</span>
+<span class="text-[8px] font-label text-on-surface-variant">FRI</span>
+<span class="text-[8px] font-label text-on-surface-variant">SUN</span>
+</div>
+</div>
+<p class="text-xs text-on-surface-variant leading-relaxed italic">
+                            * Low density prioritizes trend clarity over individual data point precision.
+                        </p>
+</div>
+</section>
+<!-- Color Accent Selection -->
+<section class="bg-surface-container-low rounded-xl p-6">
+<h3 class="text-lg font-bold font-headline mb-4">Color DNA</h3>
+<div class="flex flex-wrap gap-4">
+<div class="h-10 w-10 rounded-full border-2 border-primary bg-primary flex items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(70,244,203,0.3)]">
+<span class="material-symbols-outlined text-on-primary text-lg" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="h-10 w-10 rounded-full border-2 border-transparent bg-tertiary hover:scale-105 transition-transform cursor-pointer"></div>
+<div class="h-10 w-10 rounded-full border-2 border-transparent bg-secondary-container hover:scale-105 transition-transform cursor-pointer"></div>
+<div class="h-10 w-10 rounded-full border-2 border-transparent bg-[#FF6B6B] hover:scale-105 transition-transform cursor-pointer"></div>
+</div>
+</section>
+<!-- Save / Reset Actions -->
+<div class="flex flex-col gap-3 pt-4">
+<button class="liquid-metal-gradient text-on-primary-container font-bold py-3 rounded-lg text-sm transition-all active:scale-[0.98]">
+                        Apply Configuration
+                    </button>
+<button class="bg-transparent border border-outline-variant text-on-surface-variant hover:bg-surface-container-high font-semibold py-3 rounded-lg text-sm transition-all">
+                        Reset to Defaults
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-zinc-950/60 backdrop-blur-xl rounded-t-xl shadow-[0px_-12px_32px_rgba(0,0,0,0.4)]">
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="speed">speed</span>
+<span class="text-[10px] font-label mt-1 tracking-wider uppercase">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="text-[10px] font-label mt-1 tracking-wider uppercase">Activity</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="workspace_premium">workspace_premium</span>
+<span class="text-[10px] font-label mt-1 tracking-wider uppercase">Premium</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#46f4cb] bg-zinc-900/80 rounded-xl px-4 py-1.5 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="person" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="text-[10px] font-label mt-1 tracking-wider uppercase font-semibold">Profile</span>
+</a>
+</nav>
+</body></html>

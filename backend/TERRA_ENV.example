@@ -1,0 +1,19 @@
+# Terra wearable aggregator config.
+# Copy these into backend/.env when Terra account credentials are available.
+
+WEARABLE_AGGREGATOR_PROVIDER=terra
+TERRA_DEV_ID=
+TERRA_API_KEY=
+TERRA_API_BASE_URL=https://api.tryterra.co/v2
+# Post-consent redirects. LEAVE EMPTY until the `zvelt://` URL scheme is
+# registered + handled in the app (Android intent-filter, iOS CFBundleURLSchemes,
+# Flutter app_links listener). While empty, integrations.ts skips them and Terra
+# shows its own default success page — sync still works (it is webhook-driven).
+# To enable deep-link return, wire the scheme in the app first, then set:
+#   TERRA_AUTH_SUCCESS_REDIRECT_URL=zvelt://integrations/terra/success
+#   TERRA_AUTH_FAILURE_REDIRECT_URL=zvelt://integrations/terra/failure
+TERRA_AUTH_SUCCESS_REDIRECT_URL=
+TERRA_AUTH_FAILURE_REDIRECT_URL=
+# Webhook signing secret from Terra Dashboard > Connections > Webhook
+# (NOT the API key). Required in staging/prod or the webhook is unauthenticated.
+TERRA_WEBHOOK_SECRET=

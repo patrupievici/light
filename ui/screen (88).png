@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "outline": "#84948e",
+                    "on-secondary-container": "#e0e8ff",
+                    "surface-container-lowest": "#0d0e11",
+                    "secondary-container": "#0264d4",
+                    "on-surface-variant": "#bacac3",
+                    "error": "#ffb4ab",
+                    "surface-dim": "#121316",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-primary-fixed-variant": "#005141",
+                    "on-background": "#e3e2e6",
+                    "surface-tint": "#21dfb8",
+                    "primary-container": "#00d7b0",
+                    "on-surface": "#e3e2e6",
+                    "on-primary-container": "#005847",
+                    "surface-container-highest": "#343538",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "on-tertiary-fixed": "#001f26",
+                    "surface-container-low": "#1b1b1f",
+                    "on-error-container": "#ffdad6",
+                    "inverse-on-surface": "#2f3034",
+                    "primary-fixed": "#52fcd3",
+                    "primary": "#46f4cb",
+                    "tertiary-container": "#35cfef",
+                    "error-container": "#93000a",
+                    "on-tertiary": "#003640",
+                    "surface-container-high": "#292a2d",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-secondary": "#002e69",
+                    "on-primary-fixed": "#002019",
+                    "secondary-fixed": "#d8e2ff",
+                    "background": "#121316",
+                    "secondary": "#adc6ff",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "outline-variant": "#3b4a44",
+                    "on-secondary-fixed": "#001a41",
+                    "inverse-primary": "#006b57",
+                    "on-error": "#690005",
+                    "tertiary": "#8ee7ff",
+                    "surface-container": "#1f1f23",
+                    "surface-bright": "#38393c",
+                    "on-tertiary-container": "#005564",
+                    "surface-variant": "#343538",
+                    "surface": "#121316",
+                    "tertiary-fixed": "#acedff",
+                    "on-primary": "#00382c",
+                    "inverse-surface": "#e3e2e6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        }
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        display: inline-block;
+        line-height: 1;
+      }
+      .liquid-metal {
+        background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim text-on-surface font-body selection:bg-primary/30 selection:text-primary min-h-screen pb-24">
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center overflow-hidden">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="Close up portrait of a fit man with a modern haircut in a high-tech athletic environment, moody lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9FajnJsBd1efBSlg6p_hS1Wc2KC79ro8TzLg3ndzr7FG4swjWnnqVQr8zwZjUyn3JXmIza3wY9FwUrWncJHQCPiU-gtyG9GTesmxIDwvN-uDHkxKKe8RCOdeYMJWWbUeM04KmF_Xdi1HhuCbtyPQKHjTd8jg9MTZqdvFVgF2ET5YmrgUBYjouoJ6UtWyMxjd9cYK3O0cEiebpGuG4fJfqIQ6WLiwjjD1Tm1jwxcSgg66KbKwqGqRYiGV5jL6dpeH6rZlwfT0mRaI"/>
+</div>
+</div>
+</header>
+<main class="pt-24 px-6 max-w-4xl mx-auto">
+<!-- Editorial Header -->
+<div class="mb-12">
+<span class="text-[0.6875rem] tracking-[0.05em] font-label text-on-surface-variant uppercase font-semibold">System Configuration</span>
+<h2 class="text-4xl md:text-5xl font-headline font-extrabold text-on-surface mt-2 tracking-tight">Notification Settings</h2>
+<div class="w-12 h-1 bg-primary mt-4"></div>
+</div>
+<!-- Settings Grid -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+<!-- Category: Performance & Workouts -->
+<section class="md:col-span-12">
+<div class="flex items-center gap-2 mb-6 border-l-4 border-primary pl-4">
+<h3 class="text-lg font-headline font-bold uppercase tracking-wide">Performance &amp; Workouts</h3>
+</div>
+<div class="space-y-4">
+<!-- Toggle Card -->
+<div class="bg-surface-container-low p-5 rounded-xl flex items-center justify-between group transition-all duration-300 hover:bg-surface-container">
+<div class="flex gap-4 items-start">
+<div class="mt-1 text-primary">
+<span class="material-symbols-outlined" data-icon="fitness_center">fitness_center</span>
+</div>
+<div>
+<h4 class="font-semibold text-on-surface leading-tight">Workout Reminders</h4>
+<p class="text-sm text-on-surface-variant mt-1">Receive alerts based on your scheduled training blocks and activity windows.</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- Toggle Card -->
+<div class="bg-surface-container-low p-5 rounded-xl flex items-center justify-between group transition-all duration-300 hover:bg-surface-container">
+<div class="flex gap-4 items-start">
+<div class="mt-1 text-tertiary">
+<span class="material-symbols-outlined" data-icon="biotech">biotech</span>
+</div>
+<div>
+<h4 class="font-semibold text-on-surface leading-tight">Biometric Thresholds</h4>
+<p class="text-sm text-on-surface-variant mt-1">Alerts when HR zones or oxygen saturation deviate from targeted training parameters.</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+</div>
+</section>
+<!-- Category: Milestones & Challenges -->
+<section class="md:col-span-12">
+<div class="flex items-center gap-2 mb-6 border-l-4 border-tertiary pl-4">
+<h3 class="text-lg font-headline font-bold uppercase tracking-wide">Milestones &amp; Challenges</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Bento Style Card Small -->
+<div class="bg-surface-container-low p-5 rounded-xl border border-transparent hover:border-outline-variant/30 transition-all">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-primary" data-icon="workspace_premium" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+<label class="relative inline-flex items-center cursor-pointer scale-90">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<h4 class="font-bold text-on-surface tracking-tight">Personal Records</h4>
+<p class="text-xs text-on-surface-variant mt-2 leading-relaxed">Immediate feedback when a technical milestone or PR is achieved during session analysis.</p>
+</div>
+<!-- Bento Style Card Small -->
+<div class="bg-surface-container-low p-5 rounded-xl border border-transparent hover:border-outline-variant/30 transition-all">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-secondary" data-icon="rocket_launch">rocket_launch</span>
+<label class="relative inline-flex items-center cursor-pointer scale-90">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<h4 class="font-bold text-on-surface tracking-tight">Active Challenges</h4>
+<p class="text-xs text-on-surface-variant mt-2 leading-relaxed">Status updates on global leaderboards and squad-based competitive cycles.</p>
+</div>
+</div>
+</section>
+<!-- Category: Social & Ecosystem -->
+<section class="md:col-span-12">
+<div class="flex items-center gap-2 mb-6 border-l-4 border-on-surface-variant pl-4">
+<h3 class="text-lg font-headline font-bold uppercase tracking-wide text-on-surface-variant">Social &amp; Ecosystem</h3>
+</div>
+<div class="bg-surface-container-low rounded-xl overflow-hidden">
+<!-- List Item -->
+<div class="px-6 py-4 flex items-center justify-between border-b border-outline-variant/10">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="groups">groups</span>
+<div>
+<span class="block font-medium text-sm">Squad Updates</span>
+<span class="block text-[0.6875rem] text-on-surface-variant font-label tracking-wide">+5% Letter Spacing</span>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- List Item -->
+<div class="px-6 py-4 flex items-center justify-between border-b border-outline-variant/10">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chat_bubble">chat_bubble</span>
+<span class="block font-medium text-sm">Technical Feedback &amp; Messages</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- List Item -->
+<div class="px-6 py-4 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="mail">mail</span>
+<span class="block font-medium text-sm">Weekly Performance Digest</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+</div>
+</section>
+</div>
+<!-- Quiet Mode Section -->
+<div class="mt-12 bg-surface-container-high/40 p-6 rounded-2xl border border-outline-variant/10">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container flex items-center justify-center rounded-xl text-primary">
+<span class="material-symbols-outlined" data-icon="notifications_off">notifications_off</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">Precision Focus Mode</h4>
+<p class="text-sm text-on-surface-variant">Suppress all non-critical biometric alerts during active sessions.</p>
+</div>
+</div>
+<button class="liquid-metal px-6 py-2 rounded-md font-bold text-on-primary-container text-xs transition-transform active:scale-95">
+                    CONFIGURE
+                </button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar Shell -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-zinc-950/60 backdrop-blur-xl rounded-t-xl" style="box-shadow: 0px 12px 32px rgba(0,0,0,0.4);">
+<!-- Dashboard -->
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="speed">speed</span>
+<span class="text-[10px] font-label tracking-wider mt-1 uppercase font-semibold">Dashboard</span>
+</a>
+<!-- Activity -->
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="text-[10px] font-label tracking-wider mt-1 uppercase font-semibold">Activity</span>
+</a>
+<!-- Premium -->
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="workspace_premium">workspace_premium</span>
+<span class="text-[10px] font-label tracking-wider mt-1 uppercase font-semibold">Premium</span>
+</a>
+<!-- Profile (Active) -->
+<a class="flex flex-col items-center justify-center text-[#46f4cb] bg-zinc-900/80 rounded-xl px-4 py-1.5 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-[10px] font-label tracking-wider mt-1 uppercase font-semibold">Profile</span>
+</a>
+</nav>
+</body></html>

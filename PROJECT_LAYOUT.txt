@@ -1,0 +1,320 @@
+Zvelt / proiect — directory layout
+Generated: 2026-03-28 13:58:10 +00:00
+
+Excluded from recursion (large, cache, or machine-local):
+  node_modules, .git, build, .dart_tool, .idea, .gradle
+
+c:\proiect\
+
+|-- .git\  [EXCLUDED — contents not listed]
+|-- app\
+|   |-- .idea\  [EXCLUDED — contents not listed]
+|   |-- android\
+|   |   |-- .gradle\  [EXCLUDED — contents not listed]
+|   |   |-- .kotlin\
+|   |   |   `-- sessions\
+|   |   |-- app\
+|   |   |   |-- src\
+|   |   |   |   |-- debug\
+|   |   |   |   |   `-- AndroidManifest.xml
+|   |   |   |   |-- main\
+|   |   |   |   |   |-- java\
+|   |   |   |   |   |   `-- io\
+|   |   |   |   |   |       `-- flutter\
+|   |   |   |   |   |           `-- plugins\
+|   |   |   |   |   |               `-- GeneratedPluginRegistrant.java
+|   |   |   |   |   |-- kotlin\
+|   |   |   |   |   |   `-- com\
+|   |   |   |   |   |       `-- example\
+|   |   |   |   |   |           `-- zvelt_app\
+|   |   |   |   |   |               `-- MainActivity.kt
+|   |   |   |   |   |-- res\
+|   |   |   |   |   |   |-- drawable\
+|   |   |   |   |   |   |   `-- launch_background.xml
+|   |   |   |   |   |   |-- drawable-v21\
+|   |   |   |   |   |   |   `-- launch_background.xml
+|   |   |   |   |   |   |-- mipmap-hdpi\
+|   |   |   |   |   |   |   `-- ic_launcher.png
+|   |   |   |   |   |   |-- mipmap-mdpi\
+|   |   |   |   |   |   |   `-- ic_launcher.png
+|   |   |   |   |   |   |-- mipmap-xhdpi\
+|   |   |   |   |   |   |   `-- ic_launcher.png
+|   |   |   |   |   |   |-- mipmap-xxhdpi\
+|   |   |   |   |   |   |   `-- ic_launcher.png
+|   |   |   |   |   |   |-- mipmap-xxxhdpi\
+|   |   |   |   |   |   |   `-- ic_launcher.png
+|   |   |   |   |   |   |-- values\
+|   |   |   |   |   |   |   `-- styles.xml
+|   |   |   |   |   |   `-- values-night\
+|   |   |   |   |   |       `-- styles.xml
+|   |   |   |   |   `-- AndroidManifest.xml
+|   |   |   |   `-- profile\
+|   |   |   |       `-- AndroidManifest.xml
+|   |   |   `-- build.gradle.kts
+|   |   |-- gradle\
+|   |   |   `-- wrapper\
+|   |   |       |-- gradle-wrapper.jar
+|   |   |       `-- gradle-wrapper.properties
+|   |   |-- .gitignore
+|   |   |-- build.gradle.kts
+|   |   |-- zvelt_app_android.iml
+|   |   |-- gradle.properties
+|   |   |-- gradlew
+|   |   |-- gradlew.bat
+|   |   |-- local.properties
+|   |   `-- settings.gradle.kts
+|   |-- assets\
+|   |   `-- foods.db
+|   |-- ios\
+|   |   |-- Flutter\
+|   |   |   |-- AppFrameworkInfo.plist
+|   |   |   |-- Debug.xcconfig
+|   |   |   `-- Release.xcconfig
+|   |   |-- Runner\
+|   |   |   |-- Assets.xcassets\
+|   |   |   |   |-- AppIcon.appiconset\
+|   |   |   |   |   |-- Contents.json
+|   |   |   |   |   |-- Icon-App-1024x1024@1x.png
+|   |   |   |   |   |-- Icon-App-20x20@1x.png
+|   |   |   |   |   |-- Icon-App-20x20@2x.png
+|   |   |   |   |   |-- Icon-App-20x20@3x.png
+|   |   |   |   |   |-- Icon-App-29x29@1x.png
+|   |   |   |   |   |-- Icon-App-29x29@2x.png
+|   |   |   |   |   |-- Icon-App-29x29@3x.png
+|   |   |   |   |   |-- Icon-App-40x40@1x.png
+|   |   |   |   |   |-- Icon-App-40x40@2x.png
+|   |   |   |   |   |-- Icon-App-40x40@3x.png
+|   |   |   |   |   |-- Icon-App-60x60@2x.png
+|   |   |   |   |   |-- Icon-App-60x60@3x.png
+|   |   |   |   |   |-- Icon-App-76x76@1x.png
+|   |   |   |   |   |-- Icon-App-76x76@2x.png
+|   |   |   |   |   `-- Icon-App-83.5x83.5@2x.png
+|   |   |   |   `-- LaunchImage.imageset\
+|   |   |   |       |-- Contents.json
+|   |   |   |       |-- LaunchImage.png
+|   |   |   |       |-- LaunchImage@2x.png
+|   |   |   |       |-- LaunchImage@3x.png
+|   |   |   |       `-- README.md
+|   |   |   |-- Base.lproj\
+|   |   |   |   |-- LaunchScreen.storyboard
+|   |   |   |   `-- Main.storyboard
+|   |   |   |-- AppDelegate.swift
+|   |   |   |-- GeneratedPluginRegistrant.h
+|   |   |   |-- GeneratedPluginRegistrant.m
+|   |   |   |-- Info.plist
+|   |   |   |-- Runner-Bridging-Header.h
+|   |   |   `-- SceneDelegate.swift
+|   |   |-- Runner.xcodeproj\
+|   |   |   |-- project.xcworkspace\
+|   |   |   |   |-- xcshareddata\
+|   |   |   |   |   |-- IDEWorkspaceChecks.plist
+|   |   |   |   |   `-- WorkspaceSettings.xcsettings
+|   |   |   |   `-- contents.xcworkspacedata
+|   |   |   |-- xcshareddata\
+|   |   |   |   `-- xcschemes\
+|   |   |   |       `-- Runner.xcscheme
+|   |   |   `-- project.pbxproj
+|   |   |-- Runner.xcworkspace\
+|   |   |   |-- xcshareddata\
+|   |   |   |   |-- IDEWorkspaceChecks.plist
+|   |   |   |   `-- WorkspaceSettings.xcsettings
+|   |   |   `-- contents.xcworkspacedata
+|   |   |-- RunnerTests\
+|   |   |   `-- RunnerTests.swift
+|   |   `-- .gitignore
+|   |-- lib\
+|   |   |-- config\
+|   |   |   |-- api_config.dart
+|   |   |   |-- platform_info_io.dart
+|   |   |   |-- platform_info_web.dart
+|   |   |   `-- platform_info.dart
+|   |   |-- l10n\
+|   |   |   |-- app_strings.dart
+|   |   |   `-- auth_error_messages.dart
+|   |   |-- models\
+|   |   |   `-- onboarding_models.dart
+|   |   |-- screens\
+|   |   |   |-- avatar\
+|   |   |   |   |-- avatar_confirm_screen.dart
+|   |   |   |   |-- avatar_flow.dart
+|   |   |   |   |-- avatar_intro_screen.dart
+|   |   |   |   `-- avatar_selection_screen.dart
+|   |   |   |-- entry\
+|   |   |   |   `-- welcome_screen.dart
+|   |   |   |-- health\
+|   |   |   |   `-- health_screen.dart
+|   |   |   |-- nutrition\
+|   |   |   |   `-- nutrition_tab.dart
+|   |   |   |-- onboarding\
+|   |   |   |   |-- onboarding_concept_flow.dart
+|   |   |   |   |-- onboarding_concept_screen.dart
+|   |   |   |   `-- onboarding_questionnaire.dart
+|   |   |   |-- skeleton\
+|   |   |   |   |-- skeleton_home_tab.dart
+|   |   |   |   |-- skeleton_nutrition_tab.dart
+|   |   |   |   |-- skeleton_profile_tab.dart
+|   |   |   |   |-- skeleton_ranks_tab.dart
+|   |   |   |   |-- skeleton_social_tab.dart
+|   |   |   |   `-- skeleton_workouts_tab.dart
+|   |   |   |-- workouts\
+|   |   |   |   |-- workout_tracker_screen.dart
+|   |   |   |   |-- workouts_tab.dart
+|   |   |   |   `-- xp_complete_screen.dart
+|   |   |   |-- login_screen.dart
+|   |   |   |-- main_screen.dart
+|   |   |   `-- profile_screen.dart
+|   |   |-- services\
+|   |   |   |-- auth_service.dart
+|   |   |   |-- health_service.dart
+|   |   |   |-- muscle_recovery_service.dart
+|   |   |   |-- nutrition_service.dart
+|   |   |   |-- onboarding_service.dart
+|   |   |   |-- profile_service.dart
+|   |   |   `-- workout_service.dart
+|   |   |-- theme\
+|   |   |   `-- app_theme.dart
+|   |   |-- widgets\
+|   |   |   |-- character_stats_card.dart
+|   |   |   `-- muscle_map_widget.dart
+|   |   `-- main.dart
+|   |-- linux\
+|   |   |-- flutter\
+|   |   |   |-- CMakeLists.txt
+|   |   |   |-- generated_plugin_registrant.cc
+|   |   |   |-- generated_plugin_registrant.h
+|   |   |   `-- generated_plugins.cmake
+|   |   |-- runner\
+|   |   |   |-- CMakeLists.txt
+|   |   |   |-- main.cc
+|   |   |   |-- my_application.cc
+|   |   |   `-- my_application.h
+|   |   |-- .gitignore
+|   |   `-- CMakeLists.txt
+|   |-- macos\
+|   |   |-- Flutter\
+|   |   |   |-- Flutter-Debug.xcconfig
+|   |   |   |-- Flutter-Release.xcconfig
+|   |   |   `-- GeneratedPluginRegistrant.swift
+|   |   |-- Runner\
+|   |   |   |-- Assets.xcassets\
+|   |   |   |   `-- AppIcon.appiconset\
+|   |   |   |       |-- app_icon_1024.png
+|   |   |   |       |-- app_icon_128.png
+|   |   |   |       |-- app_icon_16.png
+|   |   |   |       |-- app_icon_256.png
+|   |   |   |       |-- app_icon_32.png
+|   |   |   |       |-- app_icon_512.png
+|   |   |   |       |-- app_icon_64.png
+|   |   |   |       `-- Contents.json
+|   |   |   |-- Base.lproj\
+|   |   |   |   `-- MainMenu.xib
+|   |   |   |-- Configs\
+|   |   |   |   |-- AppInfo.xcconfig
+|   |   |   |   |-- Debug.xcconfig
+|   |   |   |   |-- Release.xcconfig
+|   |   |   |   `-- Warnings.xcconfig
+|   |   |   |-- AppDelegate.swift
+|   |   |   |-- DebugProfile.entitlements
+|   |   |   |-- Info.plist
+|   |   |   |-- MainFlutterWindow.swift
+|   |   |   `-- Release.entitlements
+|   |   |-- Runner.xcodeproj\
+|   |   |   |-- project.xcworkspace\
+|   |   |   |   `-- xcshareddata\
+|   |   |   |       `-- IDEWorkspaceChecks.plist
+|   |   |   |-- xcshareddata\
+|   |   |   |   `-- xcschemes\
+|   |   |   |       `-- Runner.xcscheme
+|   |   |   `-- project.pbxproj
+|   |   |-- Runner.xcworkspace\
+|   |   |   |-- xcshareddata\
+|   |   |   |   `-- IDEWorkspaceChecks.plist
+|   |   |   `-- contents.xcworkspacedata
+|   |   |-- RunnerTests\
+|   |   |   `-- RunnerTests.swift
+|   |   `-- .gitignore
+|   |-- test\
+|   |   `-- widget_test.dart
+|   |-- web\
+|   |   |-- icons\
+|   |   |   |-- Icon-192.png
+|   |   |   |-- Icon-512.png
+|   |   |   |-- Icon-maskable-192.png
+|   |   |   `-- Icon-maskable-512.png
+|   |   |-- favicon.png
+|   |   |-- index.html
+|   |   `-- manifest.json
+|   |-- windows\
+|   |   |-- flutter\
+|   |   |   |-- CMakeLists.txt
+|   |   |   |-- generated_plugin_registrant.cc
+|   |   |   |-- generated_plugin_registrant.h
+|   |   |   `-- generated_plugins.cmake
+|   |   |-- runner\
+|   |   |   |-- resources\
+|   |   |   |   `-- app_icon.ico
+|   |   |   |-- CMakeLists.txt
+|   |   |   |-- flutter_window.cpp
+|   |   |   |-- flutter_window.h
+|   |   |   |-- main.cpp
+|   |   |   |-- resource.h
+|   |   |   |-- runner.exe.manifest
+|   |   |   |-- Runner.rc
+|   |   |   |-- utils.cpp
+|   |   |   |-- utils.h
+|   |   |   |-- win32_window.cpp
+|   |   |   `-- win32_window.h
+|   |   |-- .gitignore
+|   |   `-- CMakeLists.txt
+|   |-- .gitignore
+|   |-- .metadata
+|   |-- analysis_options.yaml
+|   |-- zvelt_app.iml
+|   |-- pubspec.lock
+|   |-- pubspec.yaml
+|   `-- README.md
+|-- backend\
+|   |-- node_modules\  [EXCLUDED — contents not listed]
+|   |-- prisma\
+|   |   |-- APPLY_SCHEMA_MANUALLY.md
+|   |   |-- schema_for_supabase.sql
+|   |   |-- schema.prisma
+|   |   `-- seed.ts
+|   |-- src\
+|   |   |-- lib\
+|   |   |   `-- prisma.ts
+|   |   |-- middleware\
+|   |   |   `-- auth.ts
+|   |   |-- routes\
+|   |   |   |-- achievements.ts
+|   |   |   |-- auth.ts
+|   |   |   |-- exercises.ts
+|   |   |   |-- posts.ts
+|   |   |   |-- profile.ts
+|   |   |   |-- ranks.ts
+|   |   |   |-- stats.ts
+|   |   |   `-- workouts.ts
+|   |   |-- services\
+|   |   |   |-- achievement.service.ts
+|   |   |   |-- ranking.service.ts
+|   |   |   `-- streak.service.ts
+|   |   |-- types\
+|   |   |   `-- index.ts
+|   |   `-- server.ts
+|   |-- .env
+|   |-- package-lock.json
+|   |-- package.json
+|   `-- tsconfig.json
+|-- docs\
+|   |-- APP_NAVIGATION_AND_STRUCTURE.md
+|   |-- FEATURE_STRUCTURE.md
+|   |-- HEALTH_CONNECT_EMULATOR.md
+|   |-- PLAN_BEASTPACK_PARTEA1.md
+|   |-- RECONFIGURE_AUTH.md
+|   |-- RESEARCH_WORKOUT_SCIENCE.md
+|   `-- SKELETON_SPEC.md
+|-- .gitignore
+|-- CLAUDE.md
+|-- PROJECT_LAYOUT.txt
+|-- README.md
+`-- schema.prisma

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@300;400;600&amp;family=Space+Mono:wght@400;700&amp;family=Space+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-tertiary": "#003640",
+                        "on-primary-container": "#005847",
+                        "inverse-surface": "#e3e2e6",
+                        "background": "#121316",
+                        "tertiary-container": "#35cfef",
+                        "surface-container-low": "#1b1b1f",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-secondary-fixed": "#001a41",
+                        "on-surface": "#e3e2e6",
+                        "surface-container": "#1f1f23",
+                        "on-error": "#690005",
+                        "tertiary": "#8ee7ff",
+                        "surface-container-highest": "#343538",
+                        "on-primary-fixed": "#002019",
+                        "on-secondary-container": "#e0e8ff",
+                        "on-primary-fixed-variant": "#005141",
+                        "primary": "#46f4cb",
+                        "secondary-container": "#0264d4",
+                        "error-container": "#93000a",
+                        "tertiary-fixed": "#acedff",
+                        "outline-variant": "#3b4a44",
+                        "surface-variant": "#343538",
+                        "surface-container-lowest": "#0d0e11",
+                        "primary-fixed-dim": "#21dfb8",
+                        "on-surface-variant": "#bacac3",
+                        "surface-dim": "#121316",
+                        "surface-bright": "#38393c",
+                        "on-tertiary-fixed": "#001f26",
+                        "primary-container": "#00d7b0",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "on-background": "#e3e2e6",
+                        "secondary": "#adc6ff",
+                        "on-secondary": "#002e69",
+                        "outline": "#84948e",
+                        "inverse-primary": "#006b57",
+                        "inverse-on-surface": "#2f3034",
+                        "error": "#ffb4ab",
+                        "primary-fixed": "#52fcd3",
+                        "surface": "#121316",
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "on-secondary-fixed-variant": "#004494",
+                        "on-primary": "#00382c",
+                        "surface-tint": "#21dfb8",
+                        "on-tertiary-container": "#005564",
+                        "surface-container-high": "#292a2d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr
+    }
+.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCpQDX_UdVgCqrqQ-TuOovJmzaZA1GLci6t4jy0I551nY-Dmr7XugFybI0qs_cY0OAhxlwiZPAV34t_AVidjhBkVu42xfLIPloJQp7SJ80gqbKcZOkZcr2QtiiYfH-UL2tUr2tOv7DKlvUY9cdCpb65OLYkgbEfKV8JO8eo92nY8wlT8J4gZGeF8EdxafHdvi5ngkZR_7IJdmWS4BRQ3-t1l5S-tQXiRcwi9c_aP3EgpI_tvrleEkuiPf-XgiNnFPJfpjRdrCxZQ9k);
+    opacity: 0.05;
+    pointer-events: none
+    }
+.text-gradient-primary {
+    background: linear-gradient(to right, #4A8DFF, #00D7B0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-primary/30 min-h-screen overflow-x-hidden">
+<!-- Grain Overlay -->
+<div class="fixed inset-0 grain-overlay z-[60]"></div>
+<!-- Background Atmospeheric Glow -->
+<div class="fixed top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-primary/10 blur-[120px] pointer-events-none"></div>
+<div class="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-secondary-container/10 blur-[100px] pointer-events-none"></div>
+<!-- Top Navigation (Shell Implementation) -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#121316]/80 backdrop-blur-lg border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#00D7B0] active:scale-95 transition-transform cursor-pointer" data-icon="arrow_back">arrow_back</span>
+</div>
+<div class="text-2xl font-[800] tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0]">ZVELT</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-slate-500 hover:opacity-80 transition-opacity cursor-pointer" data-icon="settings">settings</span>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="relative pt-24 pb-32 px-6 max-w-xl mx-auto flex flex-col items-center min-h-screen">
+<!-- Hero Section -->
+<div class="w-full text-center space-y-4 mb-12">
+<p class="font-['Space_Mono'] font-bold text-xs tracking-[0.3em] text-[#00D7B0] uppercase">
+                YOUR ZVELT SCORE
+            </p>
+<div class="relative inline-block">
+<!-- Outer Ring Glow -->
+<div class="absolute inset-0 scale-150 bg-primary/5 rounded-full blur-3xl"></div>
+<h1 class="text-[120px] font-headline font-extrabold leading-none tracking-tighter text-gradient-primary">
+                    742
+                </h1>
+</div>
+<div class="flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-['Space_Mono'] text-sm text-on-surface-variant">Top 4% Elite Tier Performance</span>
+</div>
+</div>
+<!-- 2x2 Glass Bento Grid -->
+<div class="grid grid-cols-2 gap-4 w-full">
+<!-- Fitness Pillar -->
+<div class="bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] p-6 rounded-xl space-y-4 flex flex-col justify-between aspect-square">
+<div class="flex justify-between items-start">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="fitness_center">fitness_center</span>
+</div>
+<span class="font-['Space_Mono'] text-xs font-bold text-on-surface-variant">FITNESS</span>
+</div>
+<div>
+<h3 class="text-4xl font-headline font-extrabold text-on-surface">188</h3>
+<div class="w-full h-1 bg-white/10 rounded-full mt-2 overflow-hidden">
+<div class="h-full w-[85%] bg-primary shadow-[0_0_10px_rgba(70,244,203,0.5)]"></div>
+</div>
+</div>
+</div>
+<!-- Nutrition Pillar -->
+<div class="bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] p-6 rounded-xl space-y-4 flex flex-col justify-between aspect-square">
+<div class="flex justify-between items-start">
+<div class="w-10 h-10 rounded-full bg-tertiary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary text-xl" data-icon="restaurant">restaurant</span>
+</div>
+<span class="font-['Space_Mono'] text-xs font-bold text-on-surface-variant">NUTRITION</span>
+</div>
+<div>
+<h3 class="text-4xl font-headline font-extrabold text-on-surface">164</h3>
+<div class="w-full h-1 bg-white/10 rounded-full mt-2 overflow-hidden">
+<div class="h-full w-[72%] bg-tertiary shadow-[0_0_10px_rgba(142,231,255,0.5)]"></div>
+</div>
+</div>
+</div>
+<!-- Sleep Pillar -->
+<div class="bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] p-6 rounded-xl space-y-4 flex flex-col justify-between aspect-square">
+<div class="flex justify-between items-start">
+<div class="w-10 h-10 rounded-full bg-secondary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary text-xl" data-icon="bedtime">bedtime</span>
+</div>
+<span class="font-['Space_Mono'] text-xs font-bold text-on-surface-variant">SLEEP</span>
+</div>
+<div>
+<h3 class="text-4xl font-headline font-extrabold text-on-surface">195</h3>
+<div class="w-full h-1 bg-white/10 rounded-full mt-2 overflow-hidden">
+<div class="h-full w-[94%] bg-secondary shadow-[0_0_10px_rgba(173,198,255,0.5)]"></div>
+</div>
+</div>
+</div>
+<!-- Wellness Pillar -->
+<div class="bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] p-6 rounded-xl space-y-4 flex flex-col justify-between aspect-square">
+<div class="flex justify-between items-start">
+<div class="w-10 h-10 rounded-full bg-on-tertiary-fixed-variant/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-xl" data-icon="self_improvement">self_improvement</span>
+</div>
+<span class="font-['Space_Mono'] text-xs font-bold text-on-surface-variant">WELLNESS</span>
+</div>
+<div>
+<h3 class="text-4xl font-headline font-extrabold text-on-surface">195</h3>
+<div class="w-full h-1 bg-white/10 rounded-full mt-2 overflow-hidden">
+<div class="h-full w-[94%] bg-tertiary-fixed-dim shadow-[0_0_10px_rgba(66,215,248,0.5)]"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Metric Insights HUD Strip -->
+<div class="w-full mt-12 mb-8 flex justify-between items-center px-4 py-4 border-y border-white/5">
+<div class="flex flex-col items-center">
+<span class="font-['Space_Mono'] text-[10px] text-on-surface-variant uppercase tracking-widest">Recovery</span>
+<span class="font-headline font-extrabold text-primary text-lg">92%</span>
+</div>
+<div class="h-8 w-[1px] bg-tertiary/20"></div>
+<div class="flex flex-col items-center">
+<span class="font-['Space_Mono'] text-[10px] text-on-surface-variant uppercase tracking-widest">Strain</span>
+<span class="font-headline font-extrabold text-secondary text-lg">High</span>
+</div>
+<div class="h-8 w-[1px] bg-tertiary/20"></div>
+<div class="flex flex-col items-center">
+<span class="font-['Space_Mono'] text-[10px] text-on-surface-variant uppercase tracking-widest">Vitals</span>
+<span class="font-headline font-extrabold text-tertiary text-lg">Stable</span>
+</div>
+</div>
+<!-- Action Area -->
+<div class="w-full mt-auto">
+<button class="w-full bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0] text-on-primary-fixed py-5 rounded-full font-headline font-bold text-lg active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,215,176,0.3)] hover:shadow-[0_0_20px_rgba(74,141,255,0.4)]">
+                Continue
+            </button>
+</div>
+</main>
+<!-- Bottom Navigation Shell -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 bg-[#121316]/90 backdrop-blur-xl border-t border-white/5 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+<div class="flex flex-col items-center justify-center text-[#00D7B0] bg-gradient-to-b from-[#00D7B0]/10 to-transparent p-3 relative after:content-[''] after:absolute after:top-0 after:w-1/2 after:h-[2px] after:bg-[#00D7B0] active:scale-90 transition-all duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="bolt">bolt</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors active:scale-90 duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors active:scale-90 duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="emoji_events">emoji_events</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors active:scale-90 duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+</div>
+</nav>
+</body></html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT Premium | Advanced Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "outline": "#84948e",
+                        "on-secondary-container": "#e0e8ff",
+                        "surface-container-lowest": "#0d0e11",
+                        "secondary-container": "#0264d4",
+                        "on-surface-variant": "#bacac3",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#121316",
+                        "primary-fixed-dim": "#21dfb8",
+                        "on-primary-fixed-variant": "#005141",
+                        "on-background": "#e3e2e6",
+                        "surface-tint": "#21dfb8",
+                        "primary-container": "#00d7b0",
+                        "on-surface": "#e3e2e6",
+                        "on-primary-container": "#005847",
+                        "surface-container-highest": "#343538",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "on-tertiary-fixed": "#001f26",
+                        "surface-container-low": "#1b1b1f",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#2f3034",
+                        "primary-fixed": "#52fcd3",
+                        "primary": "#46f4cb",
+                        "tertiary-container": "#35cfef",
+                        "error-container": "#93000a",
+                        "on-tertiary": "#003640",
+                        "surface-container-high": "#292a2d",
+                        "on-secondary-fixed-variant": "#004494",
+                        "on-secondary": "#002e69",
+                        "on-primary-fixed": "#002019",
+                        "secondary-fixed": "#d8e2ff",
+                        "background": "#121316",
+                        "secondary": "#adc6ff",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "outline-variant": "#3b4a44",
+                        "on-secondary-fixed": "#001a41",
+                        "inverse-primary": "#006b57",
+                        "on-error": "#690005",
+                        "tertiary": "#8ee7ff",
+                        "surface-container": "#1f1f23",
+                        "surface-bright": "#38393c",
+                        "on-tertiary-container": "#005564",
+                        "surface-variant": "#343538",
+                        "surface": "#121316",
+                        "tertiary-fixed": "#acedff",
+                        "on-primary": "#00382c",
+                        "inverse-surface": "#e3e2e6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .data-glow-primary {
+            filter: drop-shadow(0 0 8px rgba(70, 244, 203, 0.3));
+        }
+        .data-glow-tertiary {
+            filter: drop-shadow(0 0 8px rgba(142, 231, 255, 0.3));
+        }
+        body {
+            background-color: #121316;
+            color: #e3e2e6;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#00D7B0]">menu</span>
+<span class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</span>
+</div>
+<nav class="hidden md:flex gap-8 items-center">
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 font-label text-sm tracking-wider" href="#">DASHBOARD</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 font-label text-sm tracking-wider" href="#">ACTIVITY</a>
+<a class="text-[#46f4cb] font-semibold font-label text-sm tracking-wider" href="#">PREMIUM</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 font-label text-sm tracking-wider" href="#">PROFILE</a>
+</nav>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="professional athlete portrait with dramatic lighting and dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWbOhZgsum1kcPIGvt49u819pquJ631fy4UcbquTas4nCtT8jHxaZbU69LYduyGwuvpx4RkZb1wKzqUNamGhqwnSk18ntindm84szcQu3lcykzobVFJimExx4fB640lE685Gc4DAkcBQtGrw4xfZJEypsrwLNz7EJ_1EaYW8DKvKEjMps5hRtaOkq5wr0ZLCbZ2_0NrIExKEnwxowL49t99hgkqp8GhQmG6F-e2jG-_TC3DPD0JTbPs1_kR6Kyjku3rxubul9uMV8"/>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-7xl mx-auto">
+<!-- Editorial Header -->
+<section class="mb-16">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div class="max-w-2xl">
+<span class="text-primary font-label text-xs tracking-[0.2em] font-bold">PREMIUM ACCESS</span>
+<h1 class="font-headline text-5xl md:text-6xl font-extrabold tracking-tighter mt-2 leading-none">Advanced Analytics</h1>
+<p class="text-on-surface-variant mt-6 text-lg max-w-xl leading-relaxed">
+                        Engineered for elite performance. Decipher your physiological limits with high-fidelity historical data and predictive modeling.
+                    </p>
+</div>
+<div class="flex gap-4">
+<button class="liquid-metal px-6 py-3 rounded-md text-on-primary font-semibold text-sm tracking-tight transition-transform active:scale-[0.98]">
+                        EXPORT DATA .CSV
+                    </button>
+</div>
+</div>
+</section>
+<!-- Bento Grid: Main Analytics -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Metric Monolith: Performance Score -->
+<div class="md:col-span-4 bg-surface-container-low p-8 rounded-xl flex flex-col justify-between min-h-[320px] relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+<div>
+<div class="flex items-center gap-2 mb-8">
+<span class="w-2 h-2 rounded-full bg-primary data-glow-primary"></span>
+<span class="font-label text-xs font-bold tracking-widest text-on-surface-variant">Z-SCORE INDEX</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-headline text-7xl font-extrabold text-primary">84.2</span>
+<span class="font-label text-sm text-on-surface-variant">+2.4% vs L30D</span>
+</div>
+</div>
+<div class="mt-auto">
+<p class="text-sm text-on-surface-variant leading-snug">Predictive recovery indicates peak capacity within 48 hours based on current load balancing.</p>
+</div>
+</div>
+<!-- Training Load Balancing Chart -->
+<div class="md:col-span-8 bg-surface-container-low p-8 rounded-xl overflow-hidden">
+<div class="flex justify-between items-start mb-12">
+<div>
+<h3 class="font-headline text-xl font-bold">Training Load Balancing</h3>
+<p class="font-label text-xs text-on-surface-variant tracking-wider mt-1 uppercase">Chronic vs Acute Workload (CTL/ATL)</p>
+</div>
+<div class="flex gap-6">
+<div class="flex items-center gap-2">
+<span class="w-3 h-[2px] bg-primary"></span>
+<span class="text-[10px] font-bold text-on-surface-variant">FITNESS</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-[2px] bg-tertiary"></span>
+<span class="text-[10px] font-bold text-on-surface-variant">FATIGUE</span>
+</div>
+</div>
+</div>
+<!-- Mock Chart Area -->
+<div class="h-48 w-full relative flex items-end justify-between gap-1 mt-4">
+<!-- Lines and Areas (Simplified Visual) -->
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none" viewbox="0 0 100 100">
+<path class="data-glow-primary" d="M0,80 Q10,75 20,60 T40,65 T60,40 T80,30 T100,25" fill="none" stroke="#46f4cb" stroke-width="1"></path>
+<path class="data-glow-tertiary" d="M0,90 Q10,85 20,70 T40,55 T60,65 T80,45 T100,50" fill="none" stroke="#8ee7ff" stroke-width="1"></path>
+<lineargradient id="grad-p" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#46f4cb" stop-opacity="0.1"></stop>
+<stop offset="100%" stop-color="#46f4cb" stop-opacity="0"></stop>
+</lineargradient>
+<path d="M0,80 Q10,75 20,60 T40,65 T60,40 T80,30 T100,25 V100 H0 Z" fill="url(#grad-p)"></path>
+</svg>
+<!-- Y-Axis Grid -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
+<div class="border-t border-outline"></div>
+<div class="border-t border-outline"></div>
+<div class="border-t border-outline"></div>
+<div class="border-t border-outline"></div>
+</div>
+</div>
+<div class="flex justify-between mt-4 font-label text-[10px] text-zinc-600 tracking-tighter uppercase font-bold">
+<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+</div>
+</div>
+<!-- Deep Historical Correlation -->
+<div class="md:col-span-7 bg-surface-container p-8 rounded-xl">
+<div class="flex items-center justify-between mb-8">
+<h3 class="font-headline text-xl font-bold">Biometric Correlation</h3>
+<span class="material-symbols-outlined text-zinc-500">info</span>
+</div>
+<div class="space-y-6">
+<div class="flex items-center justify-between py-4 border-b border-outline-variant/30">
+<div class="flex flex-col">
+<span class="font-label text-xs text-on-surface-variant font-bold tracking-widest uppercase">Sleep Quality vs HRV</span>
+<span class="text-sm mt-1">Strong Correlation (0.88)</span>
+</div>
+<div class="text-right">
+<span class="font-headline text-lg font-bold text-primary">OPTIMAL</span>
+</div>
+</div>
+<div class="flex items-center justify-between py-4 border-b border-outline-variant/30">
+<div class="flex flex-col">
+<span class="font-label text-xs text-on-surface-variant font-bold tracking-widest uppercase">Caloric Burn vs Strain</span>
+<span class="text-sm mt-1">High Efficiency (0.92)</span>
+</div>
+<div class="text-right">
+<span class="font-headline text-lg font-bold text-tertiary">PEAK</span>
+</div>
+</div>
+<div class="flex items-center justify-between py-4">
+<div class="flex flex-col">
+<span class="font-label text-xs text-on-surface-variant font-bold tracking-widest uppercase">Recovery vs Intensity</span>
+<span class="text-sm mt-1">Moderating (-0.12)</span>
+</div>
+<div class="text-right">
+<span class="font-headline text-lg font-bold text-error">AT RISK</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Predictive Load Simulation -->
+<div class="md:col-span-5 bg-surface-container p-8 rounded-xl flex flex-col">
+<h3 class="font-headline text-xl font-bold mb-2">Predictive Load</h3>
+<p class="text-xs text-on-surface-variant mb-8 uppercase tracking-widest font-bold">Simulation: Next 7 Days</p>
+<div class="flex-grow flex flex-col justify-center space-y-8">
+<div class="relative pt-1">
+<div class="flex mb-2 items-center justify-between">
+<div>
+<span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary bg-primary/10">
+                                    Projected Fatigue
+                                </span>
+</div>
+<div class="text-right">
+<span class="text-xs font-semibold inline-block text-primary">
+                                    74%
+                                </span>
+</div>
+</div>
+<div class="overflow-hidden h-1.5 mb-4 text-xs flex rounded bg-surface-container-high">
+<div class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary" style="width:74%"></div>
+</div>
+</div>
+<div class="relative pt-1">
+<div class="flex mb-2 items-center justify-between">
+<div>
+<span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-tertiary bg-tertiary/10">
+                                    Aerobic Capacity
+                                </span>
+</div>
+<div class="text-right">
+<span class="text-xs font-semibold inline-block text-tertiary">
+                                    91%
+                                </span>
+</div>
+</div>
+<div class="overflow-hidden h-1.5 mb-4 text-xs flex rounded bg-surface-container-high">
+<div class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-tertiary" style="width:91%"></div>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant/30">
+<p class="text-[10px] text-zinc-500 italic">Predictive models are updated every 4 hours based on real-time biometric ingest.</p>
+</div>
+</div>
+</div>
+<!-- Premium Feature Cards -->
+<section class="mt-24 grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="group">
+<div class="h-48 w-full rounded-xl overflow-hidden mb-6 bg-surface-container-high relative">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 opacity-40 group-hover:opacity-100" data-alt="close-up of biometric sensor glowing on skin in a dark environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxzmroSV8CEtV4c2STKFku6XnumI3U3CzgiWQPLg3gyWxfzSC9EKBU7t1HZXr1QUyR3UiP6Ve2M0tcARLpfCPPReeSP7V1L1JuFxmfWTjd_vUivdMg7oY6IRhYF9S4k5_6_kkqmzhQPUra2o4l2ZdvXcV6jJ0qH1O8LYbeyJgoMc69ZrTlZo4ny3cTksEmcIHCadTpyi9z_Od9PrBEjYL2lcHHp4_L73TwdWcZ8EMQrAaav63xxHmssiij5cGj861CE-CYIuf_mb4"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim to-transparent"></div>
+</div>
+<h4 class="font-headline text-lg font-bold">Lab-Grade Metrics</h4>
+<p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Access VO2 Max estimates, lactate threshold shifts, and sweat composition tracking with compatible sensors.</p>
+</div>
+<div class="group">
+<div class="h-48 w-full rounded-xl overflow-hidden mb-6 bg-surface-container-high relative">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 opacity-40 group-hover:opacity-100" data-alt="complex digital data dashboard with dark theme and neon green accent lines" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5iH3QAlMbom24ZUC9YQxkINkGpawPcumNOkY1Mrvc1j9RiJx0FH6O7Hs8c-47mgfhhk0LkcyF12k6dpME1GBdE7ymsmb_PHQA8yP0Toka4EcB2MAIVWmyVETbnDL_aOd_j7xazC3ZfDctohfXY-8E6CJ0nBX1QCMholn8f5wcaB6EduXZkAANHDokNGQr2OVJA6Oy09Y2Aa4q1Bca1s_u9gCi95wGKoNFXp7vFmZkiKNjX6dI6wwoTbpKSy_bgawEFG5P5shOG4M"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim to-transparent"></div>
+</div>
+<h4 class="font-headline text-lg font-bold">Cohort Benchmarking</h4>
+<p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Anonymized comparison against elite athletes in your age and weight class. See where you truly stand.</p>
+</div>
+<div class="group">
+<div class="h-48 w-full rounded-xl overflow-hidden mb-6 bg-surface-container-high relative">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 opacity-40 group-hover:opacity-100" data-alt="abstract neural network visualization representing predictive artificial intelligence algorithms" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBK8bfYY4LFHqy-ZCzmiO-OCe5TMegZ-gwRLPrDJgQNfLP_uBwCONYnbnHclFJtWSCZEDQW0AiSVIX85xwTIbDUccAUK0VrM1ZBsGG8HT_5mvOZ06EGvUYizmQIdm5L30-YKJtNt8hv_t2mqTLUuUoL0phSvvbLSMxZmI4jZxz5_9dzr6spwALakEJvypwuuG4DfWwBP67UWk0JNTRqgKK6oJJl2G70juewyTIOBQfsgdC-9WWovJOq28rZ0e-zb_xl2ho9bhysMs"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim to-transparent"></div>
+</div>
+<h4 class="font-headline text-lg font-bold">Injury Prediction</h4>
+<p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Our AI identifies movement fatigue patterns before you feel them, reducing downtime by up to 34%.</p>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-zinc-950/60 backdrop-blur-xl rounded-t-xl md:hidden">
+<div class="flex flex-col items-center justify-center text-zinc-500 opacity-70">
+<span class="material-symbols-outlined">speed</span>
+<span class="text-[10px] mt-1 font-bold tracking-widest font-label">DASHBOARD</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-500 opacity-70">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="text-[10px] mt-1 font-bold tracking-widest font-label">ACTIVITY</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#46f4cb] bg-zinc-900/80 rounded-xl px-4 py-1.5 transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+<span class="text-[10px] mt-1 font-bold tracking-widest font-label">PREMIUM</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-500 opacity-70">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] mt-1 font-bold tracking-widest font-label">PROFILE</span>
+</div>
+</nav>
+</body></html>

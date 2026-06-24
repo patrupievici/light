@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PULSE | Social Interaction</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-primary": "#006b57",
+                        "surface-container-high": "#292a2d",
+                        "outline-variant": "#3b4a44",
+                        "secondary": "#adc6ff",
+                        "on-primary": "#00382c",
+                        "tertiary": "#8ee7ff",
+                        "error": "#ffb4ab",
+                        "surface-container-low": "#1b1b1f",
+                        "surface-bright": "#38393c",
+                        "primary-fixed-dim": "#21dfb8",
+                        "surface": "#121316",
+                        "on-primary-container": "#005847",
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "primary-fixed": "#52fcd3",
+                        "inverse-surface": "#e3e2e6",
+                        "surface-container-highest": "#343538",
+                        "on-primary-fixed": "#002019",
+                        "surface-dim": "#121316",
+                        "on-error": "#690005",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "surface-container-lowest": "#0d0e11",
+                        "on-surface-variant": "#bacac3",
+                        "on-secondary-fixed-variant": "#004494",
+                        "inverse-on-surface": "#2f3034",
+                        "tertiary-container": "#35cfef",
+                        "on-tertiary-fixed": "#001f26",
+                        "surface-variant": "#343538",
+                        "on-surface": "#e3e2e6",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-tertiary-container": "#005564",
+                        "on-error-container": "#ffdad6",
+                        "surface-tint": "#21dfb8",
+                        "outline": "#84948e",
+                        "on-secondary-container": "#e0e8ff",
+                        "on-primary-fixed-variant": "#005141",
+                        "on-secondary": "#002e69",
+                        "on-background": "#e3e2e6",
+                        "error-container": "#93000a",
+                        "background": "#121316",
+                        "primary": "#46f4cb",
+                        "surface-container": "#1f1f23",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "secondary-container": "#0264d4",
+                        "primary-container": "#00d7b0",
+                        "on-tertiary": "#003640",
+                        "tertiary-fixed": "#acedff",
+                        "on-secondary-fixed": "#001a41"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30 selection:text-primary">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex items-center justify-between px-6 h-16 bg-slate-950/60 backdrop-blur-xl no-border bg-slate-900/40">
+<div class="flex items-center gap-4">
+<button class="flex items-center justify-center p-2 text-slate-400 hover:text-[#46f4cb] transition-colors scale-95 active:opacity-80 transition-transform">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</button>
+<h1 class="font-['Manrope'] font-black tracking-[0.2em] text-[#F5F7FA]">PULSE</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex items-center justify-center p-2 text-slate-400 hover:text-[#46f4cb] transition-colors scale-95 active:opacity-80 transition-transform">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</header>
+<main class="pt-20 pb-32 min-h-screen px-4 max-w-2xl mx-auto">
+<!-- Post Summary Section -->
+<section class="mb-8 p-6 rounded-xl bg-surface-container-low">
+<div class="flex items-center gap-4 mb-4">
+<img alt="" class="w-12 h-12 rounded-full object-cover ring-2 ring-primary/20" data-alt="close-up portrait of a professional marathon runner with intense focus and sweat beads on brow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkfgRGWsuKL2Gc6Mew9qJPU-j2BJnRdVVi6NeGw7Np7ktXnzZluc4iCUXGMs5vXCuJ0XUHGSjKhyZ5uo8r5r1YLktUNrhK2NacF7kGPCmzze_97zPS0CjU3xbsmztNtHOLAgQ143CRoE_t7L0VnkbCy1RKv3wh9CcRQRSQR0QnaownFVPYjQ8IqNSowfmWiuzoYRflhCFvjjpv6R_283qoa9q1YVxhXVShMNO3JCU9Uyx1tJ6-VqIlguFVo_Hw8tbeVZBzbPYs9nY"/>
+<div>
+<h2 class="font-headline font-bold text-on-surface">Marcus Thorne</h2>
+<p class="text-xs font-label uppercase tracking-widest text-on-surface-variant">Morning Tempo Run • 12.4km</p>
+</div>
+<div class="ml-auto text-right">
+<p class="text-lg font-headline font-bold text-primary">03:45</p>
+<p class="text-[10px] font-label uppercase tracking-tighter text-on-surface-variant">Avg Pace</p>
+</div>
+</div>
+<p class="text-on-surface-variant leading-relaxed text-sm mb-4 italic">
+                "Testing the new carbon plates today. The energy return on the final 2km was surgical."
+            </p>
+<div class="flex items-center gap-2 overflow-x-auto hide-scrollbar py-2">
+<span class="px-3 py-1 rounded-sm bg-surface-container-highest text-[10px] font-label font-semibold text-primary uppercase tracking-widest">Zone 4 Peak</span>
+<span class="px-3 py-1 rounded-sm bg-surface-container-highest text-[10px] font-label font-semibold text-tertiary uppercase tracking-widest">Aero Efficiency</span>
+<span class="px-3 py-1 rounded-sm bg-surface-container-highest text-[10px] font-label font-semibold text-on-surface-variant uppercase tracking-widest">Vaporfly Next%</span>
+</div>
+</section>
+<!-- High-Fives / Reactions List -->
+<section class="mb-8">
+<div class="flex items-center justify-between mb-4 px-2">
+<h3 class="text-xs font-label font-bold uppercase tracking-widest text-on-surface-variant">High-Fives (24)</h3>
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">front_hand</span>
+</div>
+<div class="flex -space-x-2 overflow-hidden px-2">
+<img alt="" class="inline-block h-10 w-10 rounded-full ring-2 ring-surface object-cover" data-alt="professional male swimmer avatar in black and white high contrast lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNRQXlUkKPo-plRLInxGdpu-DM9qfCmnuuh8bvjo77vO0BOBMhEATtHpbSVYCH5O9LtD2iDMCObonrcNAOv8Aa-V5rNuoNFshlZyljCybRCALinmKHhuSuNlgtvDy3OhkWFKd9-6ZyPAm9VAU_BwWTjMHCsW4PJW7AEprvYY1JDfPdGNJx37oJIEAezoSyCHpzpsA5uQPX8MTCEoe4xgC-V997H3pvfJ8xhB3ThRwKWVBao3HsnZkJy6PVrSSoLu1VBpGwhRvpyFE"/>
+<img alt="" class="inline-block h-10 w-10 rounded-full ring-2 ring-surface object-cover" data-alt="female endurance athlete with sleek hair and confident expression studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDG1Pt5MuoZCZhvBaCt6a_xZGycSDLey1lHZlPAoCyHERI4X7InD_yieK96VT7QPyioPkgt8hVA6NH4qGi0rJuf7oRPZGFZ0kLsGl_BUmOaOycwicBbDSLNED37FWqTfW2IZYZlj47aj_C-_lBRniMZ_ZwomygRV01MOt5cxiBdyZdNeF6ZUOMLQ7-vXsoZExwcRk-ADdh1jho7qFxOlmi2_nbTIat0an7xOtS3ph_Spud0Mh67IEO2RbNeyEcNVzRzXkI8KrAUF5A"/>
+<img alt="" class="inline-block h-10 w-10 rounded-full ring-2 ring-surface object-cover" data-alt="muscular athletic man looking down thoughtfully moody dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDFttiaVrEJd_TKFovnE166v2qxZvNBxcavBFGwcPiziOZrjlBC4tqPVNE4pUHjGU3gG5Hfq58v9md7rw6HnZSQCuOXskK0l5ctSJq2miYZxQuSVWCeRpu-r6__WbSzL5MrA8o2TkgvbdqTdh6NSPnykzmmWXOZIcDJIvtY7C1e7vRmBeA0jQEP_joN16Do-b9NXVNT7ZYW5ChDFvw9_jO3nyLtROmLPIw7Bo5P0sV6mWDIl86K14xugfOvIYSH9KTjV5wGVgkADPs"/>
+<img alt="" class="inline-block h-10 w-10 rounded-full ring-2 ring-surface object-cover" data-alt="woman cyclist avatar with sunlight filtering through soft focus background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrA7MLjkNCiO5rC6cYVpIxf_djC5Sn6R1UfB-spf28TYqhfLSTE8q8oXV4GS9YOyx2ffKH03HVDGwWFtT-AfmARHGr0htJRqZjr5Pg-HMJDPiPNi-JuzCvpydz-mMdsAvvt27pnvhLDyqgQ96K4ylobWR-u-ANS531qnPiQdiYoB2WHFEdX9qisJeO_vjLwncPiksaUyAA2SG6xuX8ensY1hatwctsaAFpcN3x0aDlxN2CD9Xl6U7KXnicpkNltGylxQ19hAtS2Ng"/>
+<div class="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-highest ring-2 ring-surface text-[10px] font-bold text-primary-fixed">
+                    +20
+                </div>
+</div>
+</section>
+<!-- Comments List -->
+<section class="space-y-4 mb-24">
+<div class="flex items-center gap-2 mb-6 px-2">
+<h3 class="text-xs font-label font-bold uppercase tracking-widest text-on-surface-variant">Performance Feed</h3>
+<div class="flex-grow h-[1px] bg-outline-variant/30 ml-2"></div>
+</div>
+<!-- Comment 1 -->
+<div class="group relative flex gap-4 p-4 rounded-xl transition-all duration-300 hover:bg-surface-container">
+<img alt="" class="w-10 h-10 rounded-full object-cover" data-alt="close-up profile of a male sprinter with sweat and focused gaze" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgpgW24BmhD-H5Qg1ViSF657EtyeBmJfiNMgnGwaE9sdLirZOaWpNMt3Yy_T0KtoJ6JldF8Svt49pl9GoWy2hb7GuMeM3MwUQYL7gNLMLlvnqZZCm3CQSMT0E5M0jF_HASGhXjkxZSL_JP6CALbCf88pBrUPxaWJwKH1uzcasj5RK6Yx8jm2_65ujY_P3MUPtMx7K4dBITk29l_kUwOKAfwnn7lNZjHv7kMQPJeZCmrbzTYxJhIWwSjPqW--CGXGFQkm_M1xwJmc4"/>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-1">
+<span class="text-sm font-bold text-on-surface">Leo Chen</span>
+<span class="text-[10px] font-label text-slate-500">2h ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed">
+                        Those splits are clinical. What was the recovery heart rate between sets?
+                    </p>
+<div class="mt-2 flex gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-primary/10 border border-primary/20 text-[9px] font-bold text-primary uppercase tracking-tighter">
+<span class="material-symbols-outlined text-[12px]">analytics</span> Clean split!
+                        </span>
+</div>
+</div>
+</div>
+<!-- Comment 2 -->
+<div class="group relative flex gap-4 p-4 rounded-xl transition-all duration-300 hover:bg-surface-container">
+<img alt="" class="w-10 h-10 rounded-full object-cover" data-alt="woman doing a yoga pose on a mountain top during sunset silhouette style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2jr0AkrgoGe4RTpHRzQyjfoJ77106HXOxiRv4CRvvvoUqAMZN-vMIUaF_7EruovWrFPD55iIKxC11UUnSG3LwbbEhtubHrWutE64G56P70zcdHlpfDUYGp2H6oCcPgZK3j8wXUiwehnJf5hQ-Rjc6-bJ4QrSq9PT3DiQe7MMe-ZDJsOlLchjZH8-9pW4jq2vnp7A7m5d972mIwfoMidbjYAC5-gPCCeKekWVjVG6UVF2ZqOPfCjg9uXB2k75WHdkLzj56O0hfNo8"/>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-1">
+<span class="text-sm font-bold text-on-surface">Sarah J.</span>
+<span class="text-[10px] font-label text-slate-500">4h ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed">
+                        Solid recovery after that uphill grind. Form looks ultra-efficient in the telemetry.
+                    </p>
+<div class="mt-2 flex gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-tertiary/10 border border-tertiary/20 text-[9px] font-bold text-tertiary uppercase tracking-tighter">
+<span class="material-symbols-outlined text-[12px]">rebase_edit</span> Solid recovery
+                        </span>
+</div>
+</div>
+</div>
+<!-- Comment 3 -->
+<div class="group relative flex gap-4 p-4 rounded-xl transition-all duration-300 hover:bg-surface-container">
+<img alt="" class="w-10 h-10 rounded-full object-cover" data-alt="fitness model man in sportswear looking ahead on a gray background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGABbWqLSSIQt4hZyAv7j1VZQc_UqMiAzvoT0ts3Den4OnN2fMiATeh-iXXtqfRz5_KH-w-O4c8zTBftyp46LG400-y14awer1iQlTvwtXdM4bgOlHbe5wEYO72_9e8QZ9IAgbPHiwdYaRi6m7PjK-pfK9JgCZn8ds_JaDxIDhX0Ua1ar98sVa4yrTupev2RuG_XJarJbfaArtjgbhPfj8-0HpRELDr9okcBWoXa9-i57znsVgm4LD_P47G_Yyqp3-uvu35BdklGw"/>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-1">
+<span class="text-sm font-bold text-on-surface">Erik Volkov</span>
+<span class="text-[10px] font-label text-slate-500">6h ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed">
+                        The cadence is remarkably consistent. Engineering perfection.
+                    </p>
+<div class="mt-2 flex gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-outline-variant/20 text-[9px] font-bold text-on-surface-variant uppercase tracking-tighter">
+<span class="material-symbols-outlined text-[12px]">precision_manufacturing</span> Technical Peak
+                        </span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Reaction & Input Field -->
+<div class="fixed bottom-20 left-0 w-full px-4 z-50">
+<div class="max-w-2xl mx-auto bg-slate-950/80 backdrop-blur-2xl rounded-xl p-4 border border-outline-variant/10 shadow-2xl">
+<!-- Quick Performance Reactions -->
+<div class="flex gap-2 overflow-x-auto hide-scrollbar mb-4 pb-1">
+<button class="shrink-0 px-3 py-1.5 rounded-lg bg-surface-container text-[10px] font-bold text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">bolt</span> PURE POWER
+                </button>
+<button class="shrink-0 px-3 py-1.5 rounded-lg bg-surface-container text-[10px] font-bold text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">compress</span> CLEAN SPLIT
+                </button>
+<button class="shrink-0 px-3 py-1.5 rounded-lg bg-surface-container text-[10px] font-bold text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">air</span> AERO FLOW
+                </button>
+<button class="shrink-0 px-3 py-1.5 rounded-lg bg-surface-container text-[10px] font-bold text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">favorite</span> MAX BPM
+                </button>
+</div>
+<div class="flex items-center gap-3">
+<div class="relative flex-1">
+<input class="w-full bg-surface-container-lowest border-none border-b-2 border-outline-variant focus:border-primary focus:ring-0 text-sm py-3 px-4 rounded-lg placeholder:text-slate-600 transition-colors" placeholder="Add technical insight..." type="text"/>
+</div>
+<button class="liquid-metal p-3 rounded-lg shadow-lg active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-on-primary font-bold">send</span>
+</button>
+</div>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe bg-slate-950/60 backdrop-blur-xl no-border bg-slate-900/40">
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all Active: scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all Active: scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="fitness_center">fitness_center</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Workout</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all Active: scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="insights">insights</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Progress</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#46f4cb] font-bold hover:text-slate-200 transition-all Active: scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Social</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all Active: scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Profile</span>
+</a>
+</nav>
+</body></html>

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT | Manage Subscription</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "outline": "#84948e",
+                    "on-secondary-container": "#e0e8ff",
+                    "surface-container-lowest": "#0d0e11",
+                    "secondary-container": "#0264d4",
+                    "on-surface-variant": "#bacac3",
+                    "error": "#ffb4ab",
+                    "surface-dim": "#121316",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-primary-fixed-variant": "#005141",
+                    "on-background": "#e3e2e6",
+                    "surface-tint": "#21dfb8",
+                    "primary-container": "#00d7b0",
+                    "on-surface": "#e3e2e6",
+                    "on-primary-container": "#005847",
+                    "surface-container-highest": "#343538",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "on-tertiary-fixed": "#001f26",
+                    "surface-container-low": "#1b1b1f",
+                    "on-error-container": "#ffdad6",
+                    "inverse-on-surface": "#2f3034",
+                    "primary-fixed": "#52fcd3",
+                    "primary": "#46f4cb",
+                    "tertiary-container": "#35cfef",
+                    "error-container": "#93000a",
+                    "on-tertiary": "#003640",
+                    "surface-container-high": "#292a2d",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-secondary": "#002e69",
+                    "on-primary-fixed": "#002019",
+                    "secondary-fixed": "#d8e2ff",
+                    "background": "#121316",
+                    "secondary": "#adc6ff",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "outline-variant": "#3b4a44",
+                    "on-secondary-fixed": "#001a41",
+                    "inverse-primary": "#006b57",
+                    "on-error": "#690005",
+                    "tertiary": "#8ee7ff",
+                    "surface-container": "#1f1f23",
+                    "surface-bright": "#38393c",
+                    "on-tertiary-container": "#005564",
+                    "surface-variant": "#343538",
+                    "surface": "#121316",
+                    "tertiary-fixed": "#acedff",
+                    "on-primary": "#00382c",
+                    "inverse-surface": "#e3e2e6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .liquid-metal-gradient {
+        background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+      }
+      .data-glow-line {
+        filter: drop-shadow(0 0 4px rgba(70, 244, 203, 0.3));
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface hover:text-[#46f4cb] transition-colors duration-200">menu</button>
+<span class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="hidden md:block text-zinc-500 font-medium text-sm">Premium Member</span>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant/30 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of an athletic man with stubble looking thoughtfully away in high-end moody studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDWPFzd2w5gRRa35ibaG8zhFnxdAdIDKm81Dt93otyJEfz5Pvw3R7wVPuQnEY9L2AloaTnaAidjTnPfhM_vVtnXTgULfo9FgOlS4-5X17DOxg1qFFMHsKV_Ua1bYsvueF3SiHf9w7dLr-X2d8bMUP2BhqfdaL7RS7r_yxH3fmXAuwoLfAfBJ4Jkk3peVZl_B_pQN1qEApVMFhPB4ENKRut2mKbv2yeRISTLGW_Sj2VNbKvaRGFKnNo_MdthiNy6MtILAO9ZNj7Uk3M"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-5xl mx-auto">
+<!-- Editorial Header Area -->
+<section class="mb-12">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<p class="font-label text-xs uppercase tracking-widest text-primary mb-2">Account Settings</p>
+<h1 class="font-headline text-4xl font-extrabold tracking-tighter text-on-surface">Manage Subscription</h1>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-xs font-label font-semibold text-primary uppercase tracking-wider">Active Status</span>
+</div>
+</div>
+</section>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Main Plan Card -->
+<div class="md:col-span-8 bg-surface-container-low p-8 rounded-xl relative overflow-hidden flex flex-col justify-between min-h-[320px]">
+<!-- Background decorative glow -->
+<div class="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-[100px]"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-12">
+<div>
+<h2 class="font-headline text-3xl font-bold text-on-surface">Annual Elite</h2>
+<p class="text-on-surface-variant font-body mt-1">High-performance tracking and biometric analysis.</p>
+</div>
+<div class="material-symbols-outlined text-primary-fixed-dim text-4xl" style="font-variation-settings: 'FILL' 1;">workspace_premium</div>
+</div>
+<div class="grid grid-cols-2 gap-8">
+<div>
+<p class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-1">Renewal Date</p>
+<p class="font-headline text-xl font-semibold text-on-surface">October 24, 2024</p>
+</div>
+<div>
+<p class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-1">Billing Cycle</p>
+<p class="font-headline text-xl font-semibold text-on-surface">$149.00 / Year</p>
+</div>
+</div>
+</div>
+<div class="relative z-10 flex gap-4 mt-8">
+<button class="liquid-metal-gradient text-on-primary font-label text-sm font-semibold px-6 py-3 rounded-md hover:scale-[0.98] transition-transform">
+                        Upgrade Plan
+                    </button>
+<button class="bg-surface-container-high text-on-surface font-label text-sm font-semibold px-6 py-3 rounded-md hover:bg-surface-variant transition-colors">
+                        View Benefits
+                    </button>
+</div>
+</div>
+<!-- Billing Shortcut Card -->
+<div class="md:col-span-4 bg-surface-container p-8 rounded-xl flex flex-col justify-between">
+<div>
+<h3 class="font-headline text-xl font-bold mb-4">Billing History</h3>
+<div class="space-y-4">
+<div class="flex justify-between items-center pb-4 border-b border-outline-variant/10">
+<div>
+<p class="text-sm font-medium">Invoice #ZV-8821</p>
+<p class="text-xs text-on-surface-variant">Oct 24, 2023</p>
+</div>
+<span class="text-xs font-mono text-primary">$149.00</span>
+</div>
+<div class="flex justify-between items-center pb-4 border-b border-outline-variant/10">
+<div>
+<p class="text-sm font-medium">Invoice #ZV-7412</p>
+<p class="text-xs text-on-surface-variant">Oct 24, 2022</p>
+</div>
+<span class="text-xs font-mono text-primary">$149.00</span>
+</div>
+</div>
+</div>
+<button class="group flex items-center justify-center gap-2 w-full py-3 mt-6 border border-outline-variant/30 rounded-md text-sm font-medium hover:border-primary/50 hover:text-primary transition-all">
+<span>Download All Invoices</span>
+<span class="material-symbols-outlined text-sm group-hover:translate-y-0.5 transition-transform">download</span>
+</button>
+</div>
+<!-- Payment Method Card -->
+<div class="md:col-span-6 bg-surface-container-low p-6 rounded-xl flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-zinc-900 rounded flex items-center justify-center border border-outline-variant/20">
+<span class="material-symbols-outlined text-on-surface-variant">credit_card</span>
+</div>
+<div>
+<p class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-0.5">Primary Payment</p>
+<p class="font-medium">Mastercard ending in •••• 8812</p>
+</div>
+</div>
+<button class="text-primary text-sm font-semibold hover:underline">Update</button>
+</div>
+<!-- Quick Actions -->
+<div class="md:col-span-6 flex gap-4">
+<div class="flex-1 bg-surface-container-low p-6 rounded-xl group cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex justify-between items-start mb-2">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">swap_horiz</span>
+<span class="material-symbols-outlined text-sm text-zinc-700">chevron_right</span>
+</div>
+<p class="font-semibold text-on-surface">Change Plan</p>
+<p class="text-xs text-on-surface-variant">Switch to Monthly or Pro</p>
+</div>
+<div class="flex-1 bg-surface-container-low p-6 rounded-xl group cursor-pointer hover:bg-error-container/10 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-error transition-colors">cancel</span>
+<span class="material-symbols-outlined text-sm text-zinc-700">chevron_right</span>
+</div>
+<p class="font-semibold text-on-surface">Cancel Plan</p>
+<p class="text-xs text-on-surface-variant">End your subscription</p>
+</div>
+</div>
+</div>
+<!-- Metric Monolith (Visual Interest) -->
+<section class="mt-12 bg-surface-container-lowest p-8 rounded-xl border-l-4 border-primary/40 relative overflow-hidden">
+<div class="absolute right-0 top-0 h-full w-1/3 opacity-20 pointer-events-none">
+<svg class="h-full w-full" preserveaspectratio="none" viewbox="0 0 100 100">
+<path class="data-glow-line" d="M0,80 Q25,60 50,70 T100,40" fill="none" stroke="#46f4cb" stroke-width="0.5"></path>
+</svg>
+</div>
+<div class="relative z-10">
+<p class="font-label text-xs uppercase tracking-widest text-on-surface-variant mb-4">Total Training Time with Elite</p>
+<div class="flex items-baseline gap-3">
+<span class="font-headline text-6xl font-extrabold tracking-tighter text-on-surface">1,284</span>
+<span class="font-label text-lg text-primary">Hours</span>
+</div>
+<p class="text-sm text-on-surface-variant mt-2 max-w-md">Your Elite subscription has fueled over 452 sessions since 2022. Keep the momentum going.</p>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-zinc-950/60 backdrop-blur-xl rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="speed">speed</span>
+<span class="text-[10px] font-label mt-1 tracking-wider uppercase">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="text-[10px] font-label mt-1 tracking-wider uppercase">Activity</span>
+</a>
+<!-- Active State: Premium -->
+<a class="flex flex-col items-center justify-center text-[#46f4cb] bg-zinc-900/80 rounded-xl px-4 py-1.5 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="workspace_premium" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+<span class="text-[10px] font-label mt-1 tracking-wider uppercase font-semibold">Premium</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-[10px] font-label mt-1 tracking-wider uppercase">Profile</span>
+</a>
+</nav>
+</body></html>

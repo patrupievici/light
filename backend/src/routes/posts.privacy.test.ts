@@ -1,0 +1,235 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import Fastify from 'fastify'
+
+// ── Mocks ───────────────────────────────────────────────────────────────────
+// Mock the prisma client. The route's privacy gate (`canViewerSeePost`) and the
+// friendship lib both read through this, so mocking prisma alone exercises the
+// REAL gate logic end-to-end (no friendship-lib stub needed).
+const postFindUnique = vi.fn()
+const postFindMany = vi.fn()
+const userProfileFindUnique = vi.fn()
+const userProfileFindMany = vi.fn()
+const friendshipFindFirst = vi.fn()
+const friendshipFindMany = vi.fn()
+const postHideFindMany = vi.fn()
+
+vi.mock('../lib/prisma', () => ({
+  prisma: {
+    post: {
+      findUnique: (...a: unknown[]) => postFindUnique(...a),
+      findMany: (...a: unknown[]) => postFindMany(...a),
+    },
+    userProfile: {
+      findUnique: (...a: unknown[]) => userProfileFindUnique(...a),
+      findMany: (...a: unknown[]) => userProfileFindMany(...a),
+    },
+    friendship: {
+      findFirst: (...a: unknown[]) => friendshipFindFirst(...a),
+      findMany: (...a: unknown[]) => friendshipFindMany(...a),
+    },
+    postHide: { findMany: (...a: unknown[]) => postHideFindMany(...a) },
+  },
+}))
+
+// authenticate is replaced per-test via a module-level holder so we can flip
+// between "authed as viewer" and "unauthenticated → 401". MUST be async — a
+// Fastify preHandler that is neither async nor calls `done` hangs the request.
+let authImpl: (req: { user?: { userId: string; email: string } }, reply: {
+  code: (c: number) => { send: (b: unknown) => unknown }
+}) => Promise<unknown>
+vi.mock('../middleware/auth', () => ({
+  authenticate: async (req: never, reply: never) => authImpl(req, reply),
+}))
+
+import { postRoutes } from './posts'
+
+const FRIENDS_ONLY_POST = {
+  id: 'p1',
+  userId: 'owner',
+  visibility: 'friends',
+  caption: 'private gainz',
+  privacySettings: null,
+  workout: null,
+  _count: { likes: 0, comments: 0 },
+}
+
+function authedAs(userId: string) {
+  authImpl = async (req) => {
+    req.user = { userId, email: `${userId}@t.dev` }
+  }
+}
+function unauthenticated() {
+  authImpl = async (_req, reply) => reply.code(401).send({ error: 'UNAUTHORIZED', message: 'no token' })
+}
+
+async function buildApp() {
+  const app = Fastify()
+  await app.register(postRoutes, { prefix: '/v1/posts' })
+  await app.ready()
+  return app
+}
+
+beforeEach(() => {
+  postFindUnique.mockReset()
+  postFindMany.mockReset()
+  userProfileFindUnique.mockReset()
+  userProfileFindMany.mockReset()
+  friendshipFindFirst.mockReset()
+  friendshipFindMany.mockReset()
+  postHideFindMany.mockReset()
+  // Owner has activity feed shared (the gate's first lookup).
+  userProfileFindUnique.mockResolvedValue({ showActivityFeed: true })
+})
+
+describe('GET /v1/posts/:id — privacy gate on a FRIENDS-ONLY post', () => {
+  it('a NON-friend viewer gets 404 (existence not leaked), not shown the post', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue(null) // not friends
+    authedAs('stranger')
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/p1' })
+
+    // 404 (not 403): a forbidden post must be indistinguishable from a missing
+    // one so a stranger can't infer the post exists by probing IDs.
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toMatchObject({ error: 'NOT_FOUND' })
+    // The post body must NOT leak through the gate.
+    expect(res.payload).not.toContain('private gainz')
+    expect(friendshipFindFirst).toHaveBeenCalledOnce()
+    await app.close()
+  })
+
+  it('the 404 body for a forbidden post is byte-identical to a truly-missing post (no enumeration)', async () => {
+    // Forbidden case: post exists but the stranger can't see it.
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue(null)
+    authedAs('stranger')
+    const app1 = await buildApp()
+    const forbidden = await app1.inject({ method: 'GET', url: '/v1/posts/p1' })
+    await app1.close()
+
+    // Missing case: post does not exist at all.
+    postFindUnique.mockResolvedValue(null)
+    authedAs('stranger')
+    const app2 = await buildApp()
+    const missing = await app2.inject({ method: 'GET', url: '/v1/posts/p1' })
+    await app2.close()
+
+    expect(forbidden.statusCode).toBe(missing.statusCode)
+    // Same error code + message → the two cases are indistinguishable to a probe.
+    expect(forbidden.json().error).toBe(missing.json().error)
+    expect(forbidden.json().message).toBe(missing.json().message)
+  })
+
+  it('an accepted FRIEND can see the FRIENDS-ONLY post (200 + body)', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue({ id: 'f1', status: 'accepted' }) // friends
+    authedAs('buddy')
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/p1' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().data).toMatchObject({ id: 'p1', caption: 'private gainz' })
+    await app.close()
+  })
+
+  it('the OWNER always sees their own post without a friendship check', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    authedAs('owner')
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/p1' })
+
+    expect(res.statusCode).toBe(200)
+    // Self-view short-circuits before any friendship/profile lookup.
+    expect(friendshipFindFirst).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('a post from an owner who DISABLED activity-feed sharing is hidden even from friends', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    userProfileFindUnique.mockResolvedValue({ showActivityFeed: false })
+    friendshipFindFirst.mockResolvedValue({ id: 'f1', status: 'accepted' })
+    authedAs('buddy')
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/p1' })
+
+    expect(res.statusCode).toBe(404)
+    // showActivityFeed=false short-circuits before the friendship check.
+    expect(friendshipFindFirst).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('an unauthenticated request is rejected with 401 before any DB read', async () => {
+    unauthenticated()
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/p1' })
+
+    expect(res.statusCode).toBe(401)
+    expect(postFindUnique).not.toHaveBeenCalled()
+    await app.close()
+  })
+})
+
+describe('GET /v1/posts/feed — friend-scoped, no private/stranger leakage', () => {
+  it('scopes the feed query to the viewer + accepted-friend IDs and excludes private posts', async () => {
+    // Viewer `me` is friends with `friendA` only; `stranger` is NOT a friend.
+    friendshipFindMany.mockResolvedValue([
+      { userId: 'me', friendUserId: 'friendA', status: 'accepted' },
+    ])
+    postHideFindMany.mockResolvedValue([]) // nothing hidden
+    userProfileFindMany.mockResolvedValue([]) // no friend has activity-feed disabled
+    postFindMany.mockResolvedValue([])
+
+    authedAs('me')
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/feed' })
+
+    expect(res.statusCode).toBe(200)
+    expect(postFindMany).toHaveBeenCalledOnce()
+    const where = (postFindMany.mock.calls[0][0] as {
+      where: { OR: Array<{ userId?: unknown; visibility?: { in: string[] } }> }
+    }).where
+
+    // The friend-scoped branch only admits accepted friends...
+    const friendBranch = where.OR.find((c) => c.visibility !== undefined)!
+    expect(friendBranch.userId).toEqual({ in: ['friendA'] })
+    // ...and a stranger never appears in the allowed id set.
+    expect(JSON.stringify(friendBranch.userId)).not.toContain('stranger')
+    // ...and only non-private visibilities are surfaced.
+    expect(friendBranch.visibility).toEqual({ in: ['friends', 'public'] })
+    expect(friendBranch.visibility!.in).not.toContain('private')
+
+    // The viewer's own posts are always included (separate OR branch).
+    expect(where.OR.some((c) => c.userId === 'me')).toBe(true)
+    await app.close()
+  })
+
+  it('drops a friend who disabled activity-feed sharing from the feed scope', async () => {
+    friendshipFindMany.mockResolvedValue([
+      { userId: 'me', friendUserId: 'friendA', status: 'accepted' },
+      { userId: 'me', friendUserId: 'friendB', status: 'accepted' },
+    ])
+    postHideFindMany.mockResolvedValue([])
+    // friendB hid their activity feed → must be removed from the visible set.
+    userProfileFindMany.mockResolvedValue([{ userId: 'friendB' }])
+    postFindMany.mockResolvedValue([])
+
+    authedAs('me')
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/feed' })
+
+    expect(res.statusCode).toBe(200)
+    const where = (postFindMany.mock.calls[0][0] as {
+      where: { OR: Array<{ userId?: { in: string[] }; visibility?: unknown }> }
+    }).where
+    const friendBranch = where.OR.find((c) => c.visibility !== undefined)!
+    expect(friendBranch.userId).toEqual({ in: ['friendA'] })
+    expect(friendBranch.userId!.in).not.toContain('friendB')
+    await app.close()
+  })
+})

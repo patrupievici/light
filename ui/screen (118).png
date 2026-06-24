@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT | Activity Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface": "#121316",
+                    "surface-bright": "#38393c",
+                    "error-container": "#93000a",
+                    "error": "#ffb4ab",
+                    "secondary": "#adc6ff",
+                    "on-surface": "#e3e2e6",
+                    "on-tertiary-fixed": "#001f26",
+                    "tertiary-container": "#35cfef",
+                    "on-primary-fixed": "#002019",
+                    "on-secondary-fixed": "#001a41",
+                    "surface-container-low": "#1b1b1f",
+                    "on-tertiary": "#003640",
+                    "inverse-surface": "#e3e2e6",
+                    "tertiary-fixed": "#acedff",
+                    "surface-container": "#1f1f23",
+                    "inverse-on-surface": "#2f3034",
+                    "secondary-fixed": "#d8e2ff",
+                    "background": "#121316",
+                    "on-surface-variant": "#bacac3",
+                    "primary-fixed": "#52fcd3",
+                    "surface-variant": "#343538",
+                    "outline-variant": "#3b4a44",
+                    "on-primary-fixed-variant": "#005141",
+                    "on-primary": "#00382c",
+                    "primary-container": "#00d7b0",
+                    "on-error-container": "#ffdad6",
+                    "surface-tint": "#21dfb8",
+                    "on-background": "#e3e2e6",
+                    "primary": "#46f4cb",
+                    "on-tertiary-container": "#005564",
+                    "tertiary": "#8ee7ff",
+                    "surface-container-lowest": "#0d0e11",
+                    "primary-fixed-dim": "#21dfb8",
+                    "secondary-container": "#0264d4",
+                    "surface-container-high": "#292a2d",
+                    "on-primary-container": "#005847",
+                    "outline": "#84948e",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "inverse-primary": "#006b57",
+                    "on-error": "#690005",
+                    "surface-container-highest": "#343538",
+                    "on-secondary-container": "#e0e8ff",
+                    "on-secondary": "#002e69",
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "surface-dim": "#121316",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-tertiary-fixed-variant": "#004e5c"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(27, 27, 31, 0.7);
+            backdrop-filter: blur(12px);
+        }
+        .liquid-metal {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-[#121316]/80 backdrop-blur-lg dark:bg-[#121316]/80 flex justify-between items-center px-6 py-4 w-full">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant/30">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Close up portrait of a young woman with a confident expression, natural lighting, soft professional aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1cHFj8nU_humvIH8hPyRfq_VxRxBKbMuiHQotwKEwNxD8tohEGVA7LMhHG_nWJkrjNKMGcz8t6tWvtLdf-ZzBIF0tStt6ujzYt_bxNebVZab9TlWymBxf-puTEuaLMtm3U979aBIhej-Pxlge29BTIPXgC9frItgdJ4_fbP14x9xNZm0-5BTN93KS5-8-RGHWzdsZ29Vz4geP1jkzSUj_SxKDi1lp5cZ888Frs5YlZd4XgeZb3GgnmQYyo_IgOKH4CNhx3whlYag"/>
+</div>
+<h1 class="font-manrope font-extrabold tracking-tighter text-[#F5F7FA] text-2xl">ZVELT</h1>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-8">
+<span class="font-manrope font-bold tracking-tight text-lg text-[#A7B0BC] hover:text-[#F5F7FA] cursor-pointer transition-colors">Home</span>
+<span class="font-manrope font-bold tracking-tight text-lg text-[#A7B0BC] hover:text-[#F5F7FA] cursor-pointer transition-colors">Workout</span>
+<span class="font-manrope font-bold tracking-tight text-lg text-[#A7B0BC] hover:text-[#F5F7FA] cursor-pointer transition-colors">Progress</span>
+<span class="font-manrope font-bold tracking-tight text-lg text-[#F5F7FA] cursor-pointer">Social</span>
+<span class="font-manrope font-bold tracking-tight text-lg text-[#A7B0BC] hover:text-[#F5F7FA] cursor-pointer transition-colors">Profile</span>
+</nav>
+<span class="material-symbols-outlined text-[#00D7B0] cursor-pointer scale-95 active:duration-150 transition-transform">settings</span>
+</div>
+<div class="bg-[#1b1b1f] h-[2px] w-1/3 absolute bottom-0 left-0"></div>
+</header>
+<main class="pt-20 pb-32 max-w-6xl mx-auto px-4 md:px-8">
+<!-- Hero Section: Premium Activity Display -->
+<section class="relative rounded-xl overflow-hidden aspect-[16/9] md:aspect-[21/9] mb-8 group">
+<img alt="Workout Hero" class="w-full h-full object-cover" data-alt="A fit athlete running on a misty coastal road at dawn, cool blue and teal morning light, cinematic atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBeSc3qBfDfaE-cNa9BKTO1qD-0X_xyeYwrFKOViSqZvAasn9hdaiuUZ4psG7jEAuugFghoqgAEndIyzfOqg8CTiAtvxlezYoNaRFab_YzYL049HCCr7gRdEsmRPMWDqv8AkBhYRPM1kRa-GubX5Utslwn-ieDzt8BIaihY4TH_Zi1mgmF6uHeGY5ix1GLKAIiHmtKOLkE8i01p3HzA399ytB1N43Ykc1yahZA6ZsjSqE-MbQx0hcViHeHhWGwq-k1Mp4wVuR9qUbY"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim via-transparent to-transparent opacity-90"></div>
+<!-- User Info Overlay -->
+<div class="absolute top-6 left-6 flex items-center gap-3">
+<div class="w-12 h-12 rounded-full border-2 border-primary overflow-hidden">
+<img alt="Friend Avatar" class="w-full h-full object-cover" data-alt="Portrait of a male runner, athletic build, outdoor lighting, high quality fitness photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAIQEr1hehDHrQTPI4XA1_IQgAULV3PrAQorDLupOdLI5sp3E0oUgx7n4c-EYg0Z69ai0pPDbX7f4pYXpd13Vd09OZdEGRb4b96mFuiVWYSWzQ-9Ebrf6zo9Ab_VEvTiVZZF6_NeREXbCevYkYOJsJsagUuIWE6mRAynnAnWhCOn7LnOu7qngvJxEQNmifOxDCwidNPOf3wJ0paIQ_c1xFV0XXAYVb5eu93dBtIpchTQZWpNsWrvzdy9axDTyC9ay6iYrUTnr4NA7E"/>
+</div>
+<div>
+<p class="font-headline font-bold text-[#F5F7FA]">Marcus Chen</p>
+<p class="font-label text-xs text-on-surface-variant tracking-wider uppercase">Morning Trail Run • 6:42 AM</p>
+</div>
+</div>
+<!-- Metric Monoliths Overlay -->
+<div class="absolute bottom-6 left-6 right-6 flex flex-wrap gap-8 items-end justify-between">
+<div class="flex gap-12">
+<div class="flex flex-col">
+<span class="font-label text-[10px] uppercase tracking-[0.2em] text-primary/80 font-semibold mb-1">Distance</span>
+<div class="flex items-baseline gap-1">
+<span class="font-headline text-5xl font-extrabold text-[#F5F7FA]">12.4</span>
+<span class="font-label text-sm text-on-surface-variant">KM</span>
+</div>
+</div>
+<div class="flex flex-col border-l border-outline-variant/30 pl-8">
+<span class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant font-semibold mb-1">Avg Pace</span>
+<div class="flex items-baseline gap-1">
+<span class="font-headline text-5xl font-extrabold text-[#F5F7FA]">4'52"</span>
+<span class="font-label text-sm text-on-surface-variant">/KM</span>
+</div>
+</div>
+<div class="hidden md:flex flex-col border-l border-outline-variant/30 pl-8">
+<span class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant font-semibold mb-1">Heart Rate</span>
+<div class="flex items-baseline gap-1">
+<span class="font-headline text-5xl font-extrabold text-[#F5F7FA]">164</span>
+<span class="font-label text-sm text-on-surface-variant">BPM</span>
+<div class="w-2 h-2 rounded-full bg-primary ml-2 animate-pulse shadow-[0_0_8px_#46f4cb]"></div>
+</div>
+</div>
+</div>
+<div class="hidden lg:block glass-panel px-6 py-4 rounded-lg">
+<p class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-2">Elevation Gain</p>
+<p class="font-headline text-2xl font-bold text-[#F5F7FA]">342 <span class="text-sm font-normal opacity-60">M</span></p>
+</div>
+</div>
+</section>
+<!-- Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Left Column: Workout Breakdown -->
+<div class="lg:col-span-8 space-y-8">
+<!-- Activity Description -->
+<div class="bg-surface-container-low p-8 rounded-xl relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">exercise</span>
+</div>
+<h2 class="font-headline text-2xl font-bold mb-4 text-[#F5F7FA]">The Sunrise Ridge Loop</h2>
+<p class="text-on-surface-variant leading-relaxed mb-6 font-light">
+                        Pushed hard on the vertical climb today. The humidity was high but the views at the summit made it worth every drop of sweat. Heart rate stayed consistent through the technical descent. Feeling strong for the upcoming marathon.
+                    </p>
+<div class="flex gap-2">
+<span class="bg-surface-container-high px-3 py-1 rounded text-[10px] font-bold uppercase tracking-tighter border border-outline-variant/20">Endurance</span>
+<span class="bg-surface-container-high px-3 py-1 rounded text-[10px] font-bold uppercase tracking-tighter border border-outline-variant/20">Trail Run</span>
+<span class="bg-surface-container-high px-3 py-1 rounded text-[10px] font-bold uppercase tracking-tighter border border-outline-variant/20 text-primary">PB: Distance</span>
+</div>
+</div>
+<!-- Splits Table -->
+<div class="bg-surface-container p-8 rounded-xl">
+<div class="flex justify-between items-center mb-8">
+<h3 class="font-headline text-lg font-bold">Split Performance</h3>
+<span class="font-label text-xs text-primary font-medium tracking-widest uppercase">View Trends</span>
+</div>
+<div class="space-y-4">
+<!-- Split Header -->
+<div class="grid grid-cols-4 pb-2 border-b border-outline-variant/20">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">KM</span>
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Pace</span>
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Elev</span>
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant text-right">Heart Rate</span>
+</div>
+<!-- Split Items -->
+<div class="grid grid-cols-4 items-center group cursor-default">
+<span class="font-headline font-bold text-on-surface-variant group-hover:text-primary transition-colors">1</span>
+<span class="font-body text-sm">5'04"</span>
+<span class="font-body text-sm text-on-surface-variant">+2m</span>
+<span class="font-body text-sm text-right">142</span>
+</div>
+<div class="grid grid-cols-4 items-center group cursor-default">
+<span class="font-headline font-bold text-on-surface-variant group-hover:text-primary transition-colors">2</span>
+<span class="font-body text-sm">4'58"</span>
+<span class="font-body text-sm text-on-surface-variant">+12m</span>
+<span class="font-body text-sm text-right">155</span>
+</div>
+<div class="grid grid-cols-4 items-center group cursor-default py-2 bg-primary/5 -mx-4 px-4 rounded">
+<span class="font-headline font-bold text-primary">3</span>
+<span class="font-body text-sm font-semibold text-primary">4'42"</span>
+<span class="font-body text-sm text-on-surface-variant">+24m</span>
+<span class="font-body text-sm text-right font-semibold">168</span>
+</div>
+<div class="grid grid-cols-4 items-center group cursor-default">
+<span class="font-headline font-bold text-on-surface-variant group-hover:text-primary transition-colors">4</span>
+<span class="font-body text-sm">5'12"</span>
+<span class="font-body text-sm text-on-surface-variant">+84m</span>
+<span class="font-body text-sm text-right">174</span>
+</div>
+<div class="grid grid-cols-4 items-center group cursor-default">
+<span class="font-headline font-bold text-on-surface-variant group-hover:text-primary transition-colors">5</span>
+<span class="font-body text-sm">4'55"</span>
+<span class="font-body text-sm text-on-surface-variant">-15m</span>
+<span class="font-body text-sm text-right">162</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Stats & Map -->
+<div class="lg:col-span-4 space-y-8">
+<!-- Map Module -->
+<div class="bg-surface-container rounded-xl overflow-hidden h-64 relative">
+<img alt="Route Map" class="w-full h-full object-cover grayscale brightness-50 contrast-125" data-alt="Top down satellite view of a hiking trail through a forest with a teal line tracing the path" data-location="San Francisco" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMx7l6jYEau5XE21Z8DV1fck-Yqjdln4uVGFoTlUetC2lOFthuQuAKbfjaBoTp6wxfLPl8U-xUgnzqCN1F9IQ8Q7Y9_10C5GxqiSvTH-FeMUWE2lQOzwCrC0Pu-vyBh4ZrtpP8WkX3UpJ1glcwH1tyRS_Y9nd_zukPw0CCGeoFLQoQ1-GeNWj9nVaKQaJtVFMYZq29exNXpaLoLUrgeGjycAMROV7QyGPANwFl2lJkRrY3072ZKTEFMeUVSBPi0-u3-B8ITsS4u2c"/>
+<div class="absolute inset-0 bg-primary/10 mix-blend-overlay"></div>
+<div class="absolute bottom-4 left-4 glass-panel px-3 py-1.5 rounded-lg border border-outline-variant/30">
+<span class="font-label text-[10px] font-bold text-primary uppercase tracking-widest">Coastal Ridge, CA</span>
+</div>
+</div>
+<!-- Secondary Metrics Bento -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-5 rounded-xl border-l-2 border-primary">
+<p class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">Calories</p>
+<p class="font-headline text-xl font-bold">842</p>
+</div>
+<div class="bg-surface-container-low p-5 rounded-xl">
+<p class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">Effort</p>
+<p class="font-headline text-xl font-bold">High</p>
+</div>
+<div class="bg-surface-container-low p-5 rounded-xl">
+<p class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">Temp</p>
+<p class="font-headline text-xl font-bold">18°C</p>
+</div>
+<div class="bg-surface-container-low p-5 rounded-xl">
+<p class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">Cadence</p>
+<p class="font-headline text-xl font-bold">172</p>
+</div>
+</div>
+<!-- Interaction Bar -->
+<div class="flex items-center justify-between bg-surface-container-high p-4 rounded-xl">
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-label text-sm font-semibold">24</span>
+</button>
+<button class="flex items-center gap-2 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">mode_comment</span>
+<span class="font-label text-sm font-semibold">8</span>
+</button>
+</div>
+<button class="liquid-metal px-4 py-2 rounded-lg font-headline text-xs font-bold text-on-primary-fixed uppercase tracking-wider">
+                        High Five
+                    </button>
+</div>
+</div>
+</div>
+<!-- Comment Section -->
+<section class="mt-12 pt-8 border-t border-outline-variant/20">
+<h3 class="font-headline text-xl font-bold mb-8">Comments</h3>
+<div class="space-y-8">
+<!-- Comment Item -->
+<div class="flex gap-4">
+<img alt="Friend" class="w-10 h-10 rounded-full object-cover" data-alt="Portrait of a smiling man in activewear, urban setting, soft focus" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdHSiIB-cjhgohkiN11efxo6fhH29oHPsT_puamwwr5R681tMFmGpvPbvs3W56YLTzKBj6g6b6O6TdL-DKn80Lh5FM37vmI4g__sE_zNl65_UyaAkLxGD71U6FRVv90TfGEuTLlp-doOFdAJdEJMz-vDaOtCgo5qnOLDg5eJOAgLukRbibFQ3vzJpfphoshkyqfU-M6phn3HhFxIPc-RsWs1Lieaw8lA9YytEbzWMiRP8S6fUvgT672hAEFIY6nCjyD6HMicc-8HQ"/>
+<div class="flex-1">
+<div class="flex items-baseline gap-3 mb-1">
+<span class="font-headline text-sm font-bold text-[#F5F7FA]">David Miller</span>
+<span class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest">2h ago</span>
+</div>
+<p class="text-sm text-on-surface-variant font-light leading-relaxed">Absolute beast mode on that split 3! I need to know what you've been eating for breakfast lately.</p>
+<button class="mt-2 text-[10px] font-bold text-primary uppercase tracking-widest">Reply</button>
+</div>
+</div>
+<!-- Comment Item -->
+<div class="flex gap-4">
+<img alt="Friend" class="w-10 h-10 rounded-full object-cover" data-alt="Modern professional headshot of a woman, soft studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDLA_LaQGVyClifCCIxDrZ9rhooqJuwLr7p8HIo4RX_YVrdTN44ec0N4vQZyqq4V7s43krb5ldUdZuYyCplrPINOGnY-bZ-YjRKBICKao7Oj5mwQzqy26hxrKOkT2-ZZKbhi3PfXT47PiPK7FqCRCytSsIYzY-i3deFvtPjhFd0qDHSMyYW_E9f5A8vrmZZHA76-dvaH8VNf8Xb0mCbTK88LSbLbxsAyZm97csOSANSBinG7trVntGiwCxwHPVGYRt-7g5RQ4Nm27o"/>
+<div class="flex-1">
+<div class="flex items-baseline gap-3 mb-1">
+<span class="font-headline text-sm font-bold text-[#F5F7FA]">Sarah Jenkins</span>
+<span class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest">4h ago</span>
+</div>
+<p class="text-sm text-on-surface-variant font-light leading-relaxed">That ridge is no joke. The elevation gain looks brutal on paper but you made it look easy.</p>
+<button class="mt-2 text-[10px] font-bold text-primary uppercase tracking-widest">Reply</button>
+</div>
+</div>
+<!-- Add Comment -->
+<div class="flex gap-4 items-start pt-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center border border-outline-variant/30">
+<span class="material-symbols-outlined text-on-surface-variant">person</span>
+</div>
+<div class="flex-1 relative">
+<textarea class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant focus:ring-0 focus:border-primary text-sm p-3 transition-colors min-h-[80px] rounded-t-lg" placeholder="Write a comment..."></textarea>
+<div class="absolute bottom-2 right-2">
+<button class="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-[#1b1b1f]/90 backdrop-blur-2xl dark:bg-[#1b1b1f]/90 z-50 rounded-t-xl" style="box-shadow: 0px 12px 32px rgba(0, 0, 0, 0.4);">
+<a class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:text-[#F5F7FA] transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:text-[#F5F7FA] transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="exercise">exercise</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Workout</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:text-[#F5F7FA] transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Progress</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#46f4cb] bg-[#292a2d] rounded-lg px-3 py-1 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="group" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Social</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:text-[#F5F7FA] transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Profile</span>
+</a>
+</nav>
+</body></html>

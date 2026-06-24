@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "outline": "#84948e",
+                    "on-secondary-container": "#e0e8ff",
+                    "surface-container-lowest": "#0d0e11",
+                    "secondary-container": "#0264d4",
+                    "on-surface-variant": "#bacac3",
+                    "error": "#ffb4ab",
+                    "surface-dim": "#121316",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-primary-fixed-variant": "#005141",
+                    "on-background": "#e3e2e6",
+                    "surface-tint": "#21dfb8",
+                    "primary-container": "#00d7b0",
+                    "on-surface": "#e3e2e6",
+                    "on-primary-container": "#005847",
+                    "surface-container-highest": "#343538",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "on-tertiary-fixed": "#001f26",
+                    "surface-container-low": "#1b1b1f",
+                    "on-error-container": "#ffdad6",
+                    "inverse-on-surface": "#2f3034",
+                    "primary-fixed": "#52fcd3",
+                    "primary": "#46f4cb",
+                    "tertiary-container": "#35cfef",
+                    "error-container": "#93000a",
+                    "on-tertiary": "#003640",
+                    "surface-container-high": "#292a2d",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-secondary": "#002e69",
+                    "on-primary-fixed": "#002019",
+                    "secondary-fixed": "#d8e2ff",
+                    "background": "#121316",
+                    "secondary": "#adc6ff",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "outline-variant": "#3b4a44",
+                    "on-secondary-fixed": "#001a41",
+                    "inverse-primary": "#006b57",
+                    "on-error": "#690005",
+                    "tertiary": "#8ee7ff",
+                    "surface-container": "#1f1f23",
+                    "surface-bright": "#38393c",
+                    "on-tertiary-container": "#005564",
+                    "surface-variant": "#343538",
+                    "surface": "#121316",
+                    "tertiary-fixed": "#acedff",
+                    "on-primary": "#00382c",
+                    "inverse-surface": "#e3e2e6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal-gradient {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .glass-panel {
+            background: rgba(52, 53, 56, 0.6);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim text-on-surface font-body selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-zinc-500 cursor-pointer" data-icon="menu">menu</span>
+<span class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</span>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-8 text-sm font-medium">
+<a class="text-zinc-500 hover:text-[#46f4cb] transition-colors duration-200" href="#">Dashboard</a>
+<a class="text-zinc-500 hover:text-[#46f4cb] transition-colors duration-200" href="#">Activity</a>
+<a class="text-[#46f4cb] font-semibold" href="#">Premium</a>
+</nav>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a high-performance athlete in soft dramatic lighting with dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtO0iBGnmuOGWBdWLAELmLmAZlERIPij7S2zDHRtoDsQOqsMe7vlsPJSSgrlSAgiMBnrJsnm-ZyksyMDVSRP4lSEMAlfr29An3K4qXUu6KT26-GhY7XVQkfWH42PllMwtMneLuONgWaYXPMw_PZMXPQjXztEHsarVUBhKnBplNNrdX42RLaCdzcMxDeD6VxNEqXPh0GmKoLwimNuVtLVAjczOOvcBXZJRk1wbUeUZIFG_LCZ95Ff60udCuySF9BCXZkeZED_9b8lM"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-5xl mx-auto">
+<!-- Success State Header -->
+<section class="mb-12">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div class="space-y-2">
+<span class="text-primary font-label text-xs uppercase tracking-[0.2em] font-semibold">Transaction Secured</span>
+<h1 class="text-4xl md:text-5xl font-extrabold font-headline tracking-tight text-on-surface">Welcome to Elite.</h1>
+<p class="text-on-surface-variant max-w-md">Your ZVELT Premium subscription is now active. Access to laboratory-grade analytics and personalized coaching protocols is unlocked.</p>
+</div>
+<div class="flex items-center gap-3 bg-surface-container-low p-4 rounded-xl border-l-4 border-primary">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="verified_user">verified_user</span>
+<div>
+<p class="text-xs font-label text-on-surface-variant uppercase tracking-wider">Status</p>
+<p class="font-bold text-on-surface">Tier: Elite Athlete</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+<!-- Plan Summary Module -->
+<div class="md:col-span-7 bg-surface-container-low rounded-xl p-8 flex flex-col justify-between min-h-[320px] relative overflow-hidden">
+<div class="absolute top-0 right-0 p-8 opacity-10">
+<span class="material-symbols-outlined text-[120px]" data-icon="workspace_premium">workspace_premium</span>
+</div>
+<div>
+<h2 class="text-xs font-label text-on-surface-variant uppercase tracking-[0.2em] mb-6">Plan Summary</h2>
+<div class="space-y-4">
+<div class="flex justify-between items-baseline border-b border-outline-variant/30 pb-4">
+<span class="text-xl font-headline font-bold">ZVELT Annual Elite</span>
+<span class="text-2xl font-headline font-extrabold text-primary">$199.99<span class="text-xs text-on-surface-variant font-normal">/yr</span></span>
+</div>
+<ul class="space-y-3 pt-2">
+<li class="flex items-center gap-3 text-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle">check_circle</span>
+                                Biometric AI Protocols
+                            </li>
+<li class="flex items-center gap-3 text-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle">check_circle</span>
+                                High-Precision Recovery Tracking
+                            </li>
+<li class="flex items-center gap-3 text-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="check_circle">check_circle</span>
+                                Unlimited Device Synchronization
+                            </li>
+</ul>
+</div>
+</div>
+<div class="mt-8 flex gap-4">
+<button class="liquid-metal-gradient px-6 py-3 rounded-md text-on-primary font-semibold text-sm transition-transform active:scale-95">Go to Dashboard</button>
+<button class="px-6 py-3 rounded-md border border-outline-variant text-on-surface font-semibold text-sm hover:bg-surface-container-high transition-colors">Manage Billing</button>
+</div>
+</div>
+<!-- Payment & Security Module -->
+<div class="md:col-span-5 space-y-4">
+<!-- Payment Method -->
+<div class="bg-surface-container rounded-xl p-6 border-b-2 border-outline-variant/10">
+<h2 class="text-xs font-label text-on-surface-variant uppercase tracking-wider mb-4">Payment Method</h2>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-8 bg-zinc-900 rounded flex items-center justify-center border border-outline-variant/20">
+<span class="material-symbols-outlined text-zinc-400" data-icon="credit_card">credit_card</span>
+</div>
+<div>
+<p class="text-sm font-semibold">Visa Ending in 8842</p>
+<p class="text-xs text-on-surface-variant">Expires 12/26</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Next Billing Date -->
+<div class="bg-surface-container rounded-xl p-6">
+<h2 class="text-xs font-label text-on-surface-variant uppercase tracking-wider mb-4">Renewal Information</h2>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-tertiary" data-icon="calendar_today">calendar_today</span>
+<div>
+<p class="text-sm font-semibold">October 24, 2025</p>
+<p class="text-xs text-on-surface-variant">Auto-renews at $199.99/year</p>
+</div>
+</div>
+</div>
+<!-- Trust Message -->
+<div class="bg-primary/5 rounded-xl p-6 border border-primary/10">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="shield">shield</span>
+<p class="text-xs leading-relaxed text-on-surface-variant">
+                            Your transaction is encrypted and secured by bank-grade protocols. You can cancel your subscription at any time in the settings menu without penalty.
+                        </p>
+</div>
+</div>
+</div>
+<!-- Full Width Content Callout -->
+<div class="md:col-span-12 mt-8">
+<div class="relative rounded-2xl overflow-hidden h-64 md:h-80 group">
+<img class="w-full h-full object-cover grayscale transition-transform duration-700 group-hover:scale-105" data-alt="minimalist high-tech gym interior with dark moody lighting and subtle neon accents on equipment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDvqo-5DqPzPpMO3Q0jqWy7atb5gAzfyyjz0A7rXwa91zy0UTj8wzzUP0Q9jWE0VZV39q2JuViKDZZBAmt3qRX0LWbWWq6WmGrOxPHIppRY-1oLDr0vyweWhXiuGnvxzHxTbRjwGlWYRt0X1iS_HZLzHQfU01x4zLiNqtOZjtrqVL14nICyfrRmtAIyHQi7YEtwHvSDF5sOCKAOHyCuSgihbTdT1rHDgvMN4yxnV39zOu8PBfPwLragtYH14uXTrqmS4ABTzZsVPM"/>
+<div class="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/40 to-transparent flex items-center p-12">
+<div class="max-w-md space-y-4">
+<div class="inline-flex items-center gap-2 bg-primary/20 px-3 py-1 rounded-full border border-primary/30">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-[10px] font-bold text-primary uppercase tracking-widest">New Content Unlocked</span>
+</div>
+<h3 class="text-3xl font-headline font-extrabold text-on-surface">The Kinetic Protocol.</h3>
+<p class="text-on-surface-variant text-sm">A 12-week advanced conditioning cycle designed for elite-tier endurance athletes. Start your first session now.</p>
+<a class="inline-flex items-center gap-2 text-primary font-semibold text-sm hover:gap-4 transition-all" href="#">
+                                Launch Program <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only Responsive Pivot) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-zinc-950/60 backdrop-blur-xl rounded-t-xl shadow-[0px_12px_32px_rgba(0,0,0,0.4)]">
+<div class="flex flex-col items-center justify-center text-zinc-500 opacity-70">
+<span class="material-symbols-outlined" data-icon="speed">speed</span>
+<span class="text-[10px] font-label tracking-wider mt-1">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-500 opacity-70">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="text-[10px] font-label tracking-wider mt-1">Activity</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#46f4cb] bg-zinc-900/80 rounded-xl px-4 py-1.5 transition-all">
+<span class="material-symbols-outlined" data-icon="workspace_premium">workspace_premium</span>
+<span class="text-[10px] font-label tracking-wider mt-1">Premium</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-500 opacity-70">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-[10px] font-label tracking-wider mt-1">Profile</span>
+</div>
+</nav>
+</body></html>

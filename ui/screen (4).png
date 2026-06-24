@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;family=Inter:wght@300;400;500;600&amp;family=Space+Mono:wght@400;700&amp;family=Space+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-tertiary": "#003640",
+                        "on-primary-container": "#005847",
+                        "inverse-surface": "#e3e2e6",
+                        "background": "#121316",
+                        "tertiary-container": "#35cfef",
+                        "surface-container-low": "#1b1b1f",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-secondary-fixed": "#001a41",
+                        "on-surface": "#e3e2e6",
+                        "surface-container": "#1f1f23",
+                        "on-error": "#690005",
+                        "tertiary": "#8ee7ff",
+                        "surface-container-highest": "#343538",
+                        "on-primary-fixed": "#002019",
+                        "on-secondary-container": "#e0e8ff",
+                        "on-primary-fixed-variant": "#005141",
+                        "primary": "#46f4cb",
+                        "secondary-container": "#0264d4",
+                        "error-container": "#93000a",
+                        "tertiary-fixed": "#acedff",
+                        "outline-variant": "#3b4a44",
+                        "surface-variant": "#343538",
+                        "surface-container-lowest": "#0d0e11",
+                        "primary-fixed-dim": "#21dfb8",
+                        "on-surface-variant": "#bacac3",
+                        "surface-dim": "#121316",
+                        "surface-bright": "#38393c",
+                        "on-tertiary-fixed": "#001f26",
+                        "primary-container": "#00d7b0",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "on-background": "#e3e2e6",
+                        "secondary": "#adc6ff",
+                        "on-secondary": "#002e69",
+                        "outline": "#84948e",
+                        "inverse-primary": "#006b57",
+                        "inverse-on-surface": "#2f3034",
+                        "error": "#ffb4ab",
+                        "primary-fixed": "#52fcd3",
+                        "surface": "#121316",
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "on-secondary-fixed-variant": "#004494",
+                        "on-primary": "#00382c",
+                        "surface-tint": "#21dfb8",
+                        "on-tertiary-container": "#005564",
+                        "surface-container-high": "#292a2d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCAsxObsazgabCorckuX263mU02GS4J14CdXD1bU3vtemukBAIUN5hae6eaM8j5FvglA-ycmBfI5bEwz2P46Q-NvvC5zFb8k3OmOn3L3S5Icoufbehjw5JyopazO-Z0PVM7je_gIlLACsVL43vXY5dLuj7PkkNNsdOd65bwEWkeb17naAjkR1Xm9oCkUlMnFo3V16m5lfo374r4aHp4KKxaUKASjpVza_w0IMkoxEAIQXwMNxXXVP2wfN8q1X41GHZaSkUc_Q1V0fo);
+    opacity: 0.03;
+    pointer-events: none
+    }
+.bg-faint-amber {
+    background: radial-gradient(circle at top right, rgba(255, 191, 0, 0.05) 0%, transparent 60%)
+    }
+.sparkline-teal-blue {
+    background: linear-gradient(90deg, #00D7B0 0%, #4A8DFF 100%);
+    mask-image: url("data:image/svg+xml,%3Csvg width='100' height='40' viewBox='0 0 100 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 35 L10 32 L25 38 L40 20 L55 25 L70 5 L85 15 L100 0 L100 40 L0 40 Z' fill='black'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='100' height='40' viewBox='0 0 100 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 35 L10 32 L25 38 L40 20 L55 25 L70 5 L85 15 L100 0 L100 40 L0 40 Z' fill='black'/%3E%3C/svg%3E")
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-primary/30 min-h-screen pb-24">
+<div class="fixed inset-0 grain-overlay z-0"></div>
+<div class="fixed inset-0 bg-faint-amber z-0"></div>
+<!-- Top Navigation -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#121316]/80 backdrop-blur-lg border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<button class="active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[#00D7B0]">arrow_back</span>
+</button>
+<div class="font-['Manrope'] font-extrabold uppercase tracking-widest text-sm text-transparent bg-clip-text bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0] text-2xl font-[800] tracking-tighter">ZVELT</div>
+<button class="active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-slate-500">settings</span>
+</button>
+</header>
+<main class="relative z-10 pt-24 px-6 max-w-lg mx-auto">
+<!-- Header Section -->
+<div class="mb-8">
+<div class="inline-flex items-center gap-2 bg-surface-container-highest px-3 py-1 rounded-full border border-white/5 mb-4">
+<span class="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(70,244,203,0.5)]"></span>
+<span class="font-['Space_Mono'] text-[10px] font-bold tracking-wider text-on-surface-variant">🥗 MODULE 02</span>
+</div>
+<h1 class="text-[40px] font-headline font-extrabold leading-none tracking-tight">Nutrition</h1>
+</div>
+<!-- Food Scan Card -->
+<div class="bg-surface-container-low rounded-xl overflow-hidden mb-6 relative group">
+<div class="h-48 relative">
+<img class="w-full h-full object-cover" data-alt="close-up of a perfectly sliced ripe watermelon with vibrant red pulp and black seeds on a dark textured background with dramatic studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDPxVwev6Cn41olqe4rPoLlojb_LONsv_neBYoI63MZgs5fMzQUfMTI8k5RoPFSyoi249n9RwSS5oJk_DAGnazkZNKuNPta0Vki1mp5GudQQZ-96ilDIOxE2vjPJbzaec2tNBokGi_foc6_ZAOxacRomFpDT54wMvbGQu9cWumkus60TqyjG3ZyM150VlUkNsUl4kg6A9U_B1Zc7V6uvO2iSppFj2Z9EHVq1Sh_DH7aUXU54yX09mjg9BpXDQnprbkBol_NBWDJnq8"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low via-transparent to-transparent"></div>
+<div class="absolute top-4 left-4 flex gap-2">
+<div class="bg-black/60 backdrop-blur-md border border-white/10 rounded-full px-3 py-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px] text-primary" style="font-variation-settings: 'FILL' 1;">scan</span>
+<span class="font-label text-[10px] font-bold text-on-surface">DETECTED</span>
+</div>
+</div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-end mb-4">
+<div>
+<h2 class="text-2xl font-headline font-bold">Watermelon</h2>
+<p class="font-label text-sm text-on-surface-variant">250g • Serving Size</p>
+</div>
+<div class="text-right">
+<span class="font-['Space_Mono'] text-3xl font-bold">75</span>
+<span class="font-label text-xs text-on-surface-variant block uppercase tracking-tighter">kcal</span>
+</div>
+</div>
+<!-- Macro HUD Strips -->
+<div class="flex justify-between border-t border-white/5 pt-4">
+<div class="text-center flex-1">
+<p class="font-['Space_Mono'] text-[10px] text-on-surface-variant mb-1 uppercase">Carbs</p>
+<p class="font-headline font-bold text-amber-400">18.8g</p>
+</div>
+<div class="w-[1px] h-8 bg-white/5"></div>
+<div class="text-center flex-1">
+<p class="font-['Space_Mono'] text-[10px] text-on-surface-variant mb-1 uppercase">Protein</p>
+<p class="font-headline font-bold text-primary">1.5g</p>
+</div>
+<div class="w-[1px] h-8 bg-white/5"></div>
+<div class="text-center flex-1">
+<p class="font-['Space_Mono'] text-[10px] text-on-surface-variant mb-1 uppercase">Fat</p>
+<p class="font-headline font-bold text-secondary">0.4g</p>
+</div>
+</div>
+</div>
+</div>
+<!-- 2-col Metrics Grid -->
+<div class="grid grid-cols-2 gap-4 mb-6">
+<!-- Macro Bars Card -->
+<div class="bg-surface-container-high p-5 rounded-xl border border-white/5 flex flex-col justify-between">
+<p class="font-['Space_Mono'] text-[10px] text-on-surface-variant uppercase tracking-widest mb-4">Daily Balance</p>
+<div class="space-y-4">
+<div class="space-y-1">
+<div class="flex justify-between font-['Space_Mono'] text-[10px]">
+<span class="text-amber-400">CARBS</span>
+<span class="text-on-surface">65%</span>
+</div>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-amber-400 w-[65%]"></div>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between font-['Space_Mono'] text-[10px]">
+<span class="text-primary">PROT</span>
+<span class="text-on-surface">20%</span>
+</div>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[20%]"></div>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between font-['Space_Mono'] text-[10px]">
+<span class="text-secondary">FAT</span>
+<span class="text-on-surface">15%</span>
+</div>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[15%]"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Burned kcal Card -->
+<div class="bg-surface-container-high p-5 rounded-xl border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-primary/10 to-transparent"></div>
+<span class="material-symbols-outlined text-primary mb-2 text-3xl" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<p class="font-['Space_Mono'] text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">Burned</p>
+<p class="font-headline font-extrabold text-4xl leading-tight">1,240</p>
+<p class="font-['Space_Mono'] text-[10px] text-primary mt-1">+12% vs avg</p>
+</div>
+</div>
+<!-- Live Glucose Glass Card -->
+<div class="relative rounded-xl overflow-hidden bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] p-6 mb-8">
+<div class="flex justify-between items-start mb-6">
+<div>
+<h3 class="font-['Space_Mono'] text-[12px] font-bold text-primary flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                        LIVE GLUCOSE
+                    </h3>
+<div class="flex items-baseline gap-2 mt-2">
+<span class="font-headline font-extrabold text-4xl">104</span>
+<span class="font-label text-sm text-on-surface-variant uppercase">mg/dL</span>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<div class="flex items-center text-primary">
+<span class="material-symbols-outlined text-lg">trending_up</span>
+<span class="font-['Space_Mono'] font-bold text-xs ml-1">RISING</span>
+</div>
+<p class="font-label text-[10px] text-on-surface-variant mt-1">Updated 2m ago</p>
+</div>
+</div>
+<!-- Sparkline Visual -->
+<div class="h-20 w-full relative">
+<div class="absolute inset-0 sparkline-teal-blue opacity-30"></div>
+<div class="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#00D7B0] to-[#4A8DFF]"></div>
+<!-- Interactive dots -->
+<div class="absolute top-[20%] left-[40%] w-3 h-3 rounded-full bg-white shadow-[0_0_10px_white]"></div>
+</div>
+</div>
+<!-- CTA Section -->
+<button class="w-full h-16 rounded-full bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0] text-on-primary font-headline font-bold text-lg active:scale-95 transition-all shadow-[0_0_20px_rgba(0,215,176,0.2)]">
+            Continue
+        </button>
+</main>
+<!-- Bottom Navigation -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 bg-[#121316]/90 backdrop-blur-xl border-t border-white/5 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+<div class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">bolt</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#00D7B0] bg-gradient-to-b from-[#00D7B0]/10 to-transparent p-3 relative after:content-[''] after:absolute after:top-0 after:w-1/2 after:h-[2px] after:bg-[#00D7B0] active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">query_stats</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">emoji_events</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">person</span>
+</div>
+</nav>
+</body></html>

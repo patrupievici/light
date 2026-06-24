@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&amp;family=Manrope:wght@700;800&amp;family=Space+Mono:wght@400;700&amp;family=Space+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-tertiary": "#003640",
+                        "on-primary-container": "#005847",
+                        "inverse-surface": "#e3e2e6",
+                        "background": "#121316",
+                        "tertiary-container": "#35cfef",
+                        "surface-container-low": "#1b1b1f",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-secondary-fixed": "#001a41",
+                        "on-surface": "#e3e2e6",
+                        "surface-container": "#1f1f23",
+                        "on-error": "#690005",
+                        "tertiary": "#8ee7ff",
+                        "surface-container-highest": "#343538",
+                        "on-primary-fixed": "#002019",
+                        "on-secondary-container": "#e0e8ff",
+                        "on-primary-fixed-variant": "#005141",
+                        "primary": "#46f4cb",
+                        "secondary-container": "#0264d4",
+                        "error-container": "#93000a",
+                        "tertiary-fixed": "#acedff",
+                        "outline-variant": "#3b4a44",
+                        "surface-variant": "#343538",
+                        "surface-container-lowest": "#0d0e11",
+                        "primary-fixed-dim": "#21dfb8",
+                        "on-surface-variant": "#bacac3",
+                        "surface-dim": "#121316",
+                        "surface-bright": "#38393c",
+                        "on-tertiary-fixed": "#001f26",
+                        "primary-container": "#00d7b0",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "on-background": "#e3e2e6",
+                        "secondary": "#adc6ff",
+                        "on-secondary": "#002e69",
+                        "outline": "#84948e",
+                        "inverse-primary": "#006b57",
+                        "inverse-on-surface": "#2f3034",
+                        "error": "#ffb4ab",
+                        "primary-fixed": "#52fcd3",
+                        "surface": "#121316",
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "on-secondary-fixed-variant": "#004494",
+                        "on-primary": "#00382c",
+                        "surface-tint": "#21dfb8",
+                        "on-tertiary-container": "#005564",
+                        "surface-container-high": "#292a2d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Space Grotesk"],
+                        "data": ["Space Mono"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuBxGLwCDn0ljKGtTx2CfBWH3VygzAtTN_uizhqOTVr-wjVZRZk_RyvjYAWtMRG_S7EXeG4gftAswWAeIwHz6nk7iq4OwaMfnfIjN8dhkuS6MxVb24mHw-HCD-ckQGdrVFJZEEacypvANeODNuhj0zq2olmRYJoLZB77brtSYdyKKxQuDuvf_95CVApiNn_Oloq0JW2T_zUwBDzeHA7pPvTUqYiR9Vryu66aV4lfRVx_BSh5wo7FsayxJYpZbtgDpCaYkxDzYCYouzA);
+    opacity: 0.05
+    }
+.bg-glow-teal {
+    background: radial-gradient(circle at 50% 35%, rgba(0, 215, 176, 0.12) 0%, transparent 70%)
+    }
+.bg-glow-blue {
+    background: radial-gradient(circle at 0% 100%, rgba(74, 141, 255, 0.08) 0%, transparent 50%)
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-primary/30 min-h-screen overflow-hidden">
+<!-- Grain Overlay for texture -->
+<div class="fixed inset-0 grain-overlay pointer-events-none z-0"></div>
+<!-- Atmospheric Glows -->
+<div class="fixed inset-0 bg-glow-teal pointer-events-none z-0"></div>
+<div class="fixed inset-0 bg-glow-blue pointer-events-none z-0"></div>
+<main class="relative z-10 flex flex-col items-center justify-between min-h-screen px-8 py-20">
+<!-- Top Empty Space for Balance -->
+<div class="h-12"></div>
+<!-- Center Branding Section -->
+<div class="flex flex-col items-center text-center">
+<!-- Glass Logo Container -->
+<div class="w-[76px] h-[76px] rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl flex items-center justify-center mb-10 shadow-[0_0_40px_rgba(0,215,176,0.15)]">
+<svg fill="none" height="40" viewbox="0 0 40 40" width="40" xmlns="http://www.w3.org/2000/svg">
+<path d="M8 8H32L8 32H32" stroke="#00D7B0" stroke-linecap="round" stroke-linejoin="round" stroke-width="6"></path>
+</svg>
+</div>
+<!-- Title -->
+<h1 class="font-headline font-extrabold text-[52px] tracking-tighter leading-none mb-4 text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
+                ZVELT
+            </h1>
+<!-- Subtitle -->
+<div class="flex items-center gap-3">
+<span class="font-data text-xs tracking-[0.2em] uppercase text-outline">Train</span>
+<span class="text-tertiary/40">|</span>
+<span class="font-data text-xs tracking-[0.2em] uppercase text-outline">Evolve</span>
+<span class="text-tertiary/40">|</span>
+<span class="font-data text-xs tracking-[0.2em] uppercase text-outline">Dominate</span>
+</div>
+</div>
+<!-- Bottom Controls -->
+<div class="w-full max-w-sm flex flex-col items-center gap-12">
+<!-- Progress Dots -->
+<div class="flex items-center gap-3">
+<div class="h-1.5 w-8 rounded-full bg-primary shadow-[0_0_10px_rgba(70,244,203,0.5)]"></div>
+<div class="h-1.5 w-1.5 rounded-full bg-surface-container-highest"></div>
+<div class="h-1.5 w-1.5 rounded-full bg-surface-container-highest"></div>
+<div class="h-1.5 w-1.5 rounded-full bg-surface-container-highest"></div>
+<div class="h-1.5 w-1.5 rounded-full bg-surface-container-highest"></div>
+</div>
+<!-- CTA Button -->
+<button class="group relative w-full h-16 rounded-full bg-primary text-on-primary font-headline font-bold text-lg tracking-tight active:scale-95 transition-all duration-200 shadow-[0_8px_32px_rgba(0,215,176,0.25)] hover:shadow-[0_8px_48px_rgba(0,215,176,0.4)]">
+<span class="relative z-10 flex items-center justify-center gap-2">
+                    Get Started
+                    <span class="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</span>
+<!-- Internal Glow -->
+<div class="absolute inset-0 rounded-full bg-gradient-to-t from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</button>
+</div>
+</main>
+<!-- Decoration Element (Asymmetric Depth) -->
+<div class="fixed -right-20 top-1/4 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none"></div>
+<div class="fixed -left-40 bottom-1/4 w-80 h-80 bg-secondary-container/10 rounded-full blur-[120px] pointer-events-none"></div>
+<!-- HUD Style Background Imagery (Subtle) -->
+<div class="fixed inset-0 z-[-1] opacity-20 grayscale pointer-events-none">
+<img alt="Professional athlete training in dark high-tech gym atmosphere" class="w-full h-full object-cover" data-alt="dramatic close-up of a professional athlete in a dark tech-focused training environment with cyan neon highlights and motion blur" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8FF9_azkR0B_eBxrL0WTFbDlL3SPu2ThC_3lw9nLq5EsoBcgplRMFLfMn1wdCDkUJWtjXnm88bg9MbJ7MnN5VUABZnUWRonJP3KKdSLi16zH1by6tUPYQ-sMddmECUv_9_DyDIVRXflCGLCzeM6IDs8HaxDaPJj-F2w3hurUKfjovK-FfGHwPv5d8UQrvLLg7GSOUfgZl5QBTL9gP5D-TC_lzzK3NqQt2U6s0nYyAR3FuEDGmLH_u0qlzJXPU9a7GklDd8_UdOd0"/>
+</div>
+</body></html>

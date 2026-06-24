@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT — Wearable Selector</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;family=Inter:wght@300;400;500;600&amp;family=Space+Grotesk:wght@400;700&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-fixed-dim": "#adc6ff",
+                    "on-tertiary": "#003640",
+                    "on-primary-container": "#005847",
+                    "inverse-surface": "#e3e2e6",
+                    "background": "#121316",
+                    "tertiary-container": "#35cfef",
+                    "surface-container-low": "#1b1b1f",
+                    "secondary-fixed": "#d8e2ff",
+                    "on-secondary-fixed": "#001a41",
+                    "on-surface": "#e3e2e6",
+                    "surface-container": "#1f1f23",
+                    "on-error": "#690005",
+                    "tertiary": "#8ee7ff",
+                    "surface-container-highest": "#343538",
+                    "on-primary-fixed": "#002019",
+                    "on-secondary-container": "#e0e8ff",
+                    "on-primary-fixed-variant": "#005141",
+                    "primary": "#46f4cb",
+                    "secondary-container": "#0264d4",
+                    "error-container": "#93000a",
+                    "tertiary-fixed": "#acedff",
+                    "outline-variant": "#3b4a44",
+                    "surface-variant": "#343538",
+                    "surface-container-lowest": "#0d0e11",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-surface-variant": "#bacac3",
+                    "surface-dim": "#121316",
+                    "surface-bright": "#38393c",
+                    "on-tertiary-fixed": "#001f26",
+                    "primary-container": "#00d7b0",
+                    "on-error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "on-background": "#e3e2e6",
+                    "secondary": "#adc6ff",
+                    "on-secondary": "#002e69",
+                    "outline": "#84948e",
+                    "inverse-primary": "#006b57",
+                    "inverse-on-surface": "#2f3034",
+                    "error": "#ffb4ab",
+                    "primary-fixed": "#52fcd3",
+                    "surface": "#121316",
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-primary": "#00382c",
+                    "surface-tint": "#21dfb8",
+                    "on-tertiary-container": "#005564",
+                    "surface-container-high": "#292a2d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Space Grotesk"],
+                    "mono": ["Space Mono"]
+            }
+          },
+        },
+      }
+    </script>
+<style>.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuAfPOweajOpnxQTa11ryRFi5qOQ8A5n5juNi6VaJuo0U7KU9ZOggykuH9_4iboBpXtEypXluU-p8of2MoSOdyBAklc-S3wRLtasPeqQEpAX5EhSPkPk98S6WL5oycifBZhBJqeLwxLSaKTLeN9qEjEi6nIgdXRzEmpFcJBRoGWJCPkUPogE2UWqLk48C1MlAqyagMUpvfOvtJ1uC2loLobK0T_U5uRtPpR6Pm7KaepCw9DNIDjCvy2xK1DQtP52WuEI1_B5Sj_glZk);
+    opacity: 0.03;
+    pointer-events: none
+    }
+.glass-card {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08)
+    }
+.glass-card-selected {
+    background: rgba(0, 215, 176, 0.1);
+    backdrop-filter: blur(16px);
+    border: 1px solid #00D7B0
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container overflow-x-hidden min-h-screen">
+<div class="fixed inset-0 grain-overlay z-[100]"></div>
+<!-- TopAppBar Shell -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#121316]/80 backdrop-blur-lg border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<div class="flex items-center gap-4">
+<button class="active:scale-95 transition-transform text-[#00D7B0] hover:opacity-80">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+</div>
+<div class="font-['Manrope'] font-extrabold uppercase tracking-widest text-sm text-[#00D7B0]">
+<span class="text-2xl font-[800] tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0]">ZVELT</span>
+</div>
+<div class="flex items-center">
+<button class="active:scale-95 transition-transform text-slate-500 hover:opacity-80">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</nav>
+<main class="pt-24 pb-32 px-6 max-w-2xl mx-auto flex flex-col min-h-screen">
+<!-- Hero Header -->
+<header class="mb-12">
+<div class="inline-flex items-center gap-2 mb-4">
+<span class="h-[2px] w-8 bg-primary"></span>
+<span class="font-mono text-xs font-bold uppercase tracking-[0.2em] text-primary">Device Sync</span>
+</div>
+<h1 class="font-headline font-extrabold text-4xl md:text-5xl tracking-tight leading-[1.1] mb-4 text-on-surface">
+                Which wearable <br/>do you use?
+            </h1>
+<p class="text-on-surface-variant font-light max-w-sm">Connect your high-performance tracking instruments to sync your Kinetic Command Center.</p>
+</header>
+<!-- Wearable Selector Rows -->
+<section class="space-y-4">
+<!-- Selected State: Apple Watch -->
+<div class="glass-card-selected rounded-xl p-5 flex items-center justify-between group cursor-pointer active:scale-[0.98] transition-all duration-200">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 rounded-full bg-[#00D7B0]/20 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(0,215,176,0.2)]">
+                        ⌚
+                    </div>
+<div>
+<h3 class="font-headline font-bold text-lg text-on-surface">Apple Watch</h3>
+<p class="font-mono text-[10px] text-primary uppercase tracking-wider">Syncing via Apple Health</p>
+</div>
+</div>
+<div class="text-[#00D7B0]">
+<span class="material-symbols-outlined text-2xl" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Garmin -->
+<div class="glass-card rounded-xl p-5 flex items-center justify-between group cursor-pointer hover:border-white/20 active:scale-[0.98] transition-all duration-200">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-2xl">
+                        🏃‍♂️
+                    </div>
+<div>
+<h3 class="font-headline font-bold text-lg text-on-surface">Garmin</h3>
+<p class="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Connect Garmin Connect</p>
+</div>
+</div>
+<div class="text-on-surface-variant group-hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-2xl" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- WHOOP -->
+<div class="glass-card rounded-xl p-5 flex items-center justify-between group cursor-pointer hover:border-white/20 active:scale-[0.98] transition-all duration-200">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-2xl">
+                        🧬
+                    </div>
+<div>
+<h3 class="font-headline font-bold text-lg text-on-surface">WHOOP</h3>
+<p class="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Authorize WHOOP Data</p>
+</div>
+</div>
+<div class="text-on-surface-variant group-hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-2xl" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Oura -->
+<div class="glass-card rounded-xl p-5 flex items-center justify-between group cursor-pointer hover:border-white/20 active:scale-[0.98] transition-all duration-200">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-2xl">
+                        💍
+                    </div>
+<div>
+<h3 class="font-headline font-bold text-lg text-on-surface">Oura</h3>
+<p class="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Cloud Sync Enabled</p>
+</div>
+</div>
+<div class="text-on-surface-variant group-hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-2xl" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Apple Health -->
+<div class="glass-card rounded-xl p-5 flex items-center justify-between group cursor-pointer hover:border-white/20 active:scale-[0.98] transition-all duration-200">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-2xl">
+                        ❤️
+                    </div>
+<div>
+<h3 class="font-headline font-bold text-lg text-on-surface">Apple Health</h3>
+<p class="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Global Repository Sync</p>
+</div>
+</div>
+<div class="text-on-surface-variant group-hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-2xl" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- No Device -->
+<div class="glass-card rounded-xl p-5 flex items-center justify-between group cursor-pointer hover:border-white/20 active:scale-[0.98] transition-all duration-200">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-2xl">
+                        ✖️
+                    </div>
+<div>
+<h3 class="font-headline font-bold text-lg text-on-surface">No device</h3>
+<p class="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Manual Entry Mode</p>
+</div>
+</div>
+<div class="text-on-surface-variant group-hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-2xl" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<footer class="mt-auto pt-12">
+<button class="w-full bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0] py-5 rounded-full font-headline font-bold text-on-primary-container tracking-wider flex items-center justify-center gap-2 hover:shadow-[0_0_30px_rgba(74,141,255,0.4)] transition-all duration-300 active:scale-95 group">
+                Continue
+                <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<p class="text-center font-mono text-[10px] text-on-surface-variant/40 mt-6 uppercase tracking-widest">
+                System: Encrypted | Protocol: v2.4.0
+            </p>
+</footer>
+</main>
+<!-- Background Atmospheric Elements -->
+<div class="fixed bottom-0 left-0 w-full h-[500px] bg-gradient-to-t from-[#00D7B0]/5 to-transparent pointer-events-none -z-10"></div>
+<div class="fixed -top-40 -right-40 w-96 h-96 bg-secondary-container/10 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+<!-- BottomNavBar Suppressed as per "Destination Rule" (Onboarding context) -->
+</body></html>

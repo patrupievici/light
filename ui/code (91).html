@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT | Edit Profile</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "outline": "#84948e",
+                        "on-secondary-container": "#e0e8ff",
+                        "surface-container-lowest": "#0d0e11",
+                        "secondary-container": "#0264d4",
+                        "on-surface-variant": "#bacac3",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#121316",
+                        "primary-fixed-dim": "#21dfb8",
+                        "on-primary-fixed-variant": "#005141",
+                        "on-background": "#e3e2e6",
+                        "surface-tint": "#21dfb8",
+                        "primary-container": "#00d7b0",
+                        "on-surface": "#e3e2e6",
+                        "on-primary-container": "#005847",
+                        "surface-container-highest": "#343538",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "on-tertiary-fixed": "#001f26",
+                        "surface-container-low": "#1b1b1f",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#2f3034",
+                        "primary-fixed": "#52fcd3",
+                        "primary": "#46f4cb",
+                        "tertiary-container": "#35cfef",
+                        "error-container": "#93000a",
+                        "on-tertiary": "#003640",
+                        "surface-container-high": "#292a2d",
+                        "on-secondary-fixed-variant": "#004494",
+                        "on-secondary": "#002e69",
+                        "on-primary-fixed": "#002019",
+                        "secondary-fixed": "#d8e2ff",
+                        "background": "#121316",
+                        "secondary": "#adc6ff",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "outline-variant": "#3b4a44",
+                        "on-secondary-fixed": "#001a41",
+                        "inverse-primary": "#006b57",
+                        "on-error": "#690005",
+                        "tertiary": "#8ee7ff",
+                        "surface-container": "#1f1f23",
+                        "surface-bright": "#38393c",
+                        "on-tertiary-container": "#005564",
+                        "surface-variant": "#343538",
+                        "surface": "#121316",
+                        "tertiary-fixed": "#acedff",
+                        "on-primary": "#00382c",
+                        "inverse-surface": "#e3e2e6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        body {
+            background-color: #121316;
+            color: #e3e2e6;
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+<h1 class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="liquid-metal text-on-primary-container px-5 py-1.5 rounded-xl font-semibold text-sm transition-transform active:scale-95 shadow-lg shadow-primary/10">
+                Save Changes
+            </button>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-2xl mx-auto">
+<!-- Header Strategy: Asymmetric Information Density -->
+<header class="mb-12">
+<h2 class="font-headline text-3xl font-extrabold tracking-tight mb-2">Edit Profile</h2>
+<p class="text-on-surface-variant text-sm font-label tracking-wide uppercase">User Metadata &amp; Preferences</p>
+</header>
+<!-- Profile Image Upload Area -->
+<section class="mb-12 flex items-center gap-8 group">
+<div class="relative">
+<div class="w-32 h-32 rounded-full overflow-hidden bg-surface-container-high ring-2 ring-outline-variant/30 group-hover:ring-primary/50 transition-all">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Close-up portrait of a fit woman with athletic gear in a modern gym setting, cinematic moody lighting, tech aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOzP9mbzKWfQf0Z9yejoSlYLYHh8SDDPPk9E2aCyeOZ7QmyeeybcaQEzsuGtQbkcrrS-1otWWSk7pCiudt9BiBtbFH50FZoXALRUbEX8V8pCVeBBKWhQKY4poEPWUhwbHt35kOqKIF-imdvGSUVTH1fFPWrxcIx7eGuETp52MUiI99Ut2sq2EmsHmweBwKzzVmlh1uXMLJLq9PgYh4Y_oA5ci6j7ZFw_pV1doxZ7Sx2yMG6ufWBaJKy7-vtSRtArV90EfUnGhrUEQ"/>
+</div>
+<button class="absolute bottom-0 right-0 bg-primary text-on-primary p-2 rounded-full shadow-xl hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-sm">photo_camera</span>
+</button>
+</div>
+<div class="flex-1">
+<h3 class="font-headline font-bold text-lg mb-1">Profile Photo</h3>
+<p class="text-on-surface-variant text-sm mb-3">Upload a high-resolution headshot for your athlete profile. (Max 5MB)</p>
+<div class="flex gap-2">
+<button class="bg-surface-container-high px-4 py-2 rounded-lg text-xs font-semibold hover:bg-surface-container-highest transition-colors">Change Image</button>
+<button class="bg-surface-dim border border-error/20 text-error px-4 py-2 rounded-lg text-xs font-semibold hover:bg-error/10 transition-colors">Remove</button>
+</div>
+</div>
+</section>
+<!-- Form Layout: Tonal Layering No-Line Rule -->
+<form class="space-y-8">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Name Field -->
+<div class="space-y-2">
+<label class="block text-xs font-label uppercase tracking-widest text-on-surface-variant ml-1">Legal Name</label>
+<input class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 text-on-surface py-3 px-4 transition-all rounded-t-lg font-medium" placeholder="Your full name" type="text" value="Elena Rodriguez"/>
+</div>
+<!-- Username Field -->
+<div class="space-y-2">
+<label class="block text-xs font-label uppercase tracking-widest text-on-surface-variant ml-1">Username</label>
+<div class="relative">
+<span class="absolute left-4 top-3 text-on-surface-variant">@</span>
+<input class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 text-on-surface py-3 pl-8 pr-4 transition-all rounded-t-lg font-medium" placeholder="username" type="text" value="elena_rod"/>
+</div>
+</div>
+</div>
+<!-- Bio Field -->
+<div class="space-y-2">
+<label class="block text-xs font-label uppercase tracking-widest text-on-surface-variant ml-1">Biography</label>
+<textarea class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 text-on-surface py-3 px-4 transition-all rounded-t-lg font-medium resize-none" placeholder="Share your fitness philosophy..." rows="4">Ultra-endurance athlete based in the PNW. Focusing on trail running and metabolic efficiency. Always chasing the next peak.</textarea>
+</div>
+<!-- Location Field -->
+<div class="space-y-2">
+<label class="block text-xs font-label uppercase tracking-widest text-on-surface-variant ml-1">Location</label>
+<div class="relative">
+<span class="absolute left-4 top-3 material-symbols-outlined text-on-surface-variant text-lg">location_on</span>
+<input class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 text-on-surface py-3 pl-12 pr-4 transition-all rounded-t-lg font-medium" placeholder="City, Country" type="text" value="Seattle, WA"/>
+</div>
+</div>
+<!-- Preferred Sports Chips: The Data-Glow aesthetic -->
+<div class="space-y-4 pt-4">
+<div class="flex justify-between items-end">
+<label class="block text-xs font-label uppercase tracking-widest text-on-surface-variant ml-1">Preferred Sports</label>
+<span class="text-[10px] text-primary font-bold">4 SELECTED</span>
+</div>
+<div class="flex flex-wrap gap-2">
+<!-- Active Sport Chip -->
+<button class="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/30 rounded-full text-primary transition-all hover:bg-primary/20" type="button">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">directions_run</span>
+<span class="text-xs font-bold uppercase tracking-tight">Running</span>
+<span class="material-symbols-outlined text-xs">close</span>
+</button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/30 rounded-full text-primary transition-all hover:bg-primary/20" type="button">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">directions_bike</span>
+<span class="text-xs font-bold uppercase tracking-tight">Cycling</span>
+<span class="material-symbols-outlined text-xs">close</span>
+</button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/30 rounded-full text-primary transition-all hover:bg-primary/20" type="button">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">pool</span>
+<span class="text-xs font-bold uppercase tracking-tight">Swimming</span>
+<span class="material-symbols-outlined text-xs">close</span>
+</button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/30 rounded-full text-primary transition-all hover:bg-primary/20" type="button">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">fitness_center</span>
+<span class="text-xs font-bold uppercase tracking-tight">HIIT</span>
+<span class="material-symbols-outlined text-xs">close</span>
+</button>
+<!-- Inactive Chip -->
+<button class="flex items-center gap-2 px-4 py-2 bg-surface-container-high border border-outline-variant/30 rounded-full text-on-surface-variant transition-all hover:bg-surface-container-highest hover:text-on-surface" type="button">
+<span class="material-symbols-outlined text-lg">add</span>
+<span class="text-xs font-bold uppercase tracking-tight">Add Sport</span>
+</button>
+</div>
+</div>
+</form>
+<!-- Advanced Account Security Module (Bento Grid Style) -->
+<section class="mt-16 pt-8 border-t border-outline-variant/20">
+<h3 class="font-headline font-bold text-lg mb-6">Account Connectivity</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center justify-between group cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-[#FC4C02]/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-[#FC4C02]">monitoring</span>
+</div>
+<div>
+<p class="text-sm font-bold">Strava</p>
+<p class="text-xs text-on-surface-variant">Connected since 2022</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">sync</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center justify-between group cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-tertiary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary">watch</span>
+</div>
+<div>
+<p class="text-sm font-bold">Apple Health</p>
+<p class="text-xs text-on-surface-variant">Active syncing</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">settings</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Suppressed as it's a sub-page/task-focused screen with a Close/Save action) -->
+<!-- The BottomNavBar is intentionally excluded here to prioritize the focused task flow of 'Editing Profile' -->
+</body></html>

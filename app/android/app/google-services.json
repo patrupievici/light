@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "715817017339",
+    "project_id": "zvelt-3998a",
+    "storage_bucket": "zvelt-3998a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:715817017339:android:27b404694ea74b9f77b55e",
+        "android_client_info": {
+          "package_name": "com.lunaoscar.zvelt"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcRFbT_cR2BrzREyvcQ00PsMKNX_U05rs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

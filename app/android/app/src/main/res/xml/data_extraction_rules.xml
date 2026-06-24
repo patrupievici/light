@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Data extraction rules — controls what gets backed up to Google Cloud
+   and what gets transferred during device-to-device migration.
+
+   For Zvelt, we EXCLUDE auth tokens, health caches, and any encrypted prefs
+   so that a stolen backup can't be used to impersonate the user.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Exclude credential and PII caches from cloud backup -->
+        <exclude domain="sharedpref" path="FlutterSecureStorage" />
+        <exclude domain="sharedpref" path="auth_tokens.xml" />
+        <exclude domain="file" path="health_cache/" />
+        <exclude domain="database" path="zvelt_offline.db" />
+    </cloud-backup>
+    <device-transfer>
+        <!-- Same exclusions for device-to-device transfer -->
+        <exclude domain="sharedpref" path="FlutterSecureStorage" />
+        <exclude domain="sharedpref" path="auth_tokens.xml" />
+        <exclude domain="file" path="health_cache/" />
+        <exclude domain="database" path="zvelt_offline.db" />
+    </device-transfer>
+</data-extraction-rules>

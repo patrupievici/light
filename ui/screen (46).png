@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&amp;family=Inter:wght@300;400;600&amp;family=Space+Mono:wght@400;700&amp;family=Space+Grotesk:wght@500;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-tertiary": "#003640",
+                        "on-primary-container": "#005847",
+                        "inverse-surface": "#e3e2e6",
+                        "background": "#121316",
+                        "tertiary-container": "#35cfef",
+                        "surface-container-low": "#1b1b1f",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-secondary-fixed": "#001a41",
+                        "on-surface": "#e3e2e6",
+                        "surface-container": "#1f1f23",
+                        "on-error": "#690005",
+                        "tertiary": "#8ee7ff",
+                        "surface-container-highest": "#343538",
+                        "on-primary-fixed": "#002019",
+                        "on-secondary-container": "#e0e8ff",
+                        "on-primary-fixed-variant": "#005141",
+                        "primary": "#46f4cb",
+                        "secondary-container": "#0264d4",
+                        "error-container": "#93000a",
+                        "tertiary-fixed": "#acedff",
+                        "outline-variant": "#3b4a44",
+                        "surface-variant": "#343538",
+                        "surface-container-lowest": "#0d0e11",
+                        "primary-fixed-dim": "#21dfb8",
+                        "on-surface-variant": "#bacac3",
+                        "surface-dim": "#121316",
+                        "surface-bright": "#38393c",
+                        "on-tertiary-fixed": "#001f26",
+                        "primary-container": "#00d7b0",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "on-background": "#e3e2e6",
+                        "secondary": "#adc6ff",
+                        "on-secondary": "#002e69",
+                        "outline": "#84948e",
+                        "inverse-primary": "#006b57",
+                        "inverse-on-surface": "#2f3034",
+                        "error": "#ffb4ab",
+                        "primary-fixed": "#52fcd3",
+                        "surface": "#121316",
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "on-secondary-fixed-variant": "#004494",
+                        "on-primary": "#00382c",
+                        "surface-tint": "#21dfb8",
+                        "on-tertiary-container": "#005564",
+                        "surface-container-high": "#292a2d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuBm1DkfOyrB8rlzMlWIuaNSd0enCb5-Ya_TwocvRA9n1LwSWs1anvurC8HOWdrmACJjiuuBmoAiuonh46vKQz-wnboT0AbdZZZD83nGNTtiKyJ-W-VM-JuK04V_OUIgiaEUgjcmGQeIFdgKytRpILLyVDLqPdVrBHTWw0O2iRad9j2Cl1plOCAkixjLu8ySdy7RdO7yrgi6UnI4AGtbJS3Fgxja0YNcIJgV9FdDLgn8LxYIP18xpk-Ib24ZVPsLFwkimfil-vBGJgA);
+    opacity: 0.05;
+    pointer-events: none
+    }
+.hud-glass {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08)
+    }
+.brand-gradient-text {
+    background: linear-gradient(to right, #4A8DFF, #00D7B0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent
+    }
+.brand-gradient-bg {
+    background: linear-gradient(to right, #4A8DFF, #00D7B0)
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-on-primary overflow-x-hidden">
+<div class="fixed inset-0 grain-overlay z-50"></div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#121316]/80 backdrop-blur-lg border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#00D7B0] active:scale-95 transition-transform cursor-pointer" data-icon="arrow_back">arrow_back</span>
+</div>
+<div class="text-2xl font-[800] tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0]">ZVELT</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-500 hover:opacity-80 transition-opacity cursor-pointer" data-icon="settings">settings</span>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="pt-24 pb-32 px-6 max-w-lg mx-auto relative min-h-screen">
+<!-- Faint Teal Glow Background Element -->
+<div class="absolute top-1/4 -left-20 w-64 h-64 bg-primary/5 rounded-full blur-[100px] -z-10"></div>
+<div class="absolute bottom-1/4 -right-20 w-80 h-80 bg-secondary-container/10 rounded-full blur-[120px] -z-10"></div>
+<!-- Header Section -->
+<section class="mb-8">
+<div class="inline-flex items-center px-3 py-1 rounded-full bg-surface-container-highest mb-4">
+<span class="font-['Space_Mono'] font-bold text-[10px] tracking-widest text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]" data-icon="bolt" style="font-variation-settings: 'FILL' 1;">bolt</span>
+                    ⚡ MODULE 01
+                </span>
+</div>
+<h1 class="font-headline font-[800] text-[40px] leading-tight text-on-background">Fitness</h1>
+</section>
+<!-- Hero Glass Card -->
+<section class="hud-glass rounded-xl p-8 mb-6 relative overflow-hidden">
+<div class="flex justify-between items-start mb-12">
+<div>
+<p class="font-['Space_Mono'] text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">Session Duration</p>
+<div class="flex gap-2">
+<div class="bg-surface-container-lowest px-3 py-2 rounded-lg border border-white/5 font-['Space_Mono'] font-bold text-lg text-on-surface tracking-tighter">00</div>
+<div class="text-on-surface-variant self-center">:</div>
+<div class="bg-surface-container-lowest px-3 py-2 rounded-lg border border-white/5 font-['Space_Mono'] font-bold text-lg text-on-surface tracking-tighter text-primary">09</div>
+<div class="text-on-surface-variant self-center">:</div>
+<div class="bg-surface-container-lowest px-3 py-2 rounded-lg border border-white/5 font-['Space_Mono'] font-bold text-lg text-on-surface tracking-tighter">05</div>
+</div>
+</div>
+<div class="text-right">
+<p class="font-['Space_Mono'] text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">Status</p>
+<div class="flex items-center justify-end gap-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(70,244,203,0.8)]"></span>
+<span class="font-['Space_Mono'] font-bold text-[10px] text-on-surface">ACTIVE</span>
+</div>
+</div>
+</div>
+<!-- Pulsing BPM Visualizer -->
+<div class="mb-4">
+<div class="flex justify-between items-end mb-2">
+<div class="flex items-baseline gap-2">
+<span class="material-symbols-outlined text-error text-xl" data-icon="favorite" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-headline font-extrabold text-4xl text-on-surface">123</span>
+<span class="font-['Space_Mono'] text-xs text-on-surface-variant">BPM</span>
+</div>
+<div class="font-['Space_Mono'] text-[10px] text-on-surface-variant">PEAK ZONE</div>
+</div>
+<div class="h-3 w-full bg-surface-container-lowest rounded-full overflow-hidden flex items-center px-1">
+<div class="h-1.5 w-[72%] brand-gradient-bg rounded-full shadow-[0_0_15px_rgba(74,141,255,0.4)]"></div>
+</div>
+</div>
+<div class="flex justify-between items-center py-4 border-t border-white/5 mt-8">
+<div class="flex gap-4">
+<div class="flex flex-col">
+<span class="font-['Space_Mono'] text-[9px] text-on-surface-variant uppercase tracking-tight">Avg HR</span>
+<span class="font-headline font-bold text-sm">114</span>
+</div>
+<div class="flex flex-col">
+<span class="font-['Space_Mono'] text-[9px] text-on-surface-variant uppercase tracking-tight">KCAL</span>
+<span class="font-headline font-bold text-sm">248</span>
+</div>
+</div>
+<div class="brand-gradient-text font-['Space_Mono'] font-bold text-[10px] tracking-widest">PERFORMANCE SYNCED</div>
+</div>
+</section>
+<!-- Mini Cards Grid -->
+<div class="grid grid-cols-2 gap-4 mb-8">
+<!-- Deadlift Card -->
+<div class="hud-glass rounded-lg p-5">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="fitness_center">fitness_center</span>
+<span class="font-['Space_Mono'] font-bold text-[10px] text-on-surface-variant">02/05</span>
+</div>
+<h3 class="font-headline font-bold text-lg mb-1 text-on-surface">Deadlift</h3>
+<p class="font-['Space_Mono'] text-[10px] text-on-surface-variant mb-4 uppercase">Set Progress</p>
+<div class="h-1 w-full bg-surface-container-lowest rounded-full mb-2">
+<div class="h-full w-[35%] bg-primary rounded-full"></div>
+</div>
+<div class="flex justify-between items-center font-['Space_Mono'] text-[10px]">
+<span class="text-primary">35%</span>
+<span class="text-on-surface-variant">120kg</span>
+</div>
+</div>
+<!-- Load Card -->
+<div class="hud-glass rounded-lg p-5">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-secondary text-xl" data-icon="monitoring">monitoring</span>
+<span class="font-['Space_Mono'] font-bold text-[10px] text-on-surface-variant">LVL 08</span>
+</div>
+<h3 class="font-headline font-bold text-lg mb-1 text-on-surface">Load</h3>
+<p class="font-['Space_Mono'] text-[10px] text-on-surface-variant mb-4 uppercase">Neural Output</p>
+<!-- Custom Sparkline Visual -->
+<div class="h-6 w-full flex items-end gap-[2px] mb-2">
+<div class="h-[40%] w-full bg-secondary-container/40 rounded-t-[1px]"></div>
+<div class="h-[60%] w-full bg-secondary-container/50 rounded-t-[1px]"></div>
+<div class="h-[50%] w-full bg-secondary-container/60 rounded-t-[1px]"></div>
+<div class="h-[80%] w-full brand-gradient-bg rounded-t-[1px]"></div>
+<div class="h-[65%] w-full bg-primary/50 rounded-t-[1px]"></div>
+<div class="h-[90%] w-full bg-primary rounded-t-[1px]"></div>
+<div class="h-[75%] w-full bg-primary/40 rounded-t-[1px]"></div>
+</div>
+<div class="flex justify-between items-center font-['Space_Mono'] text-[10px]">
+<span class="text-secondary">Optimal</span>
+<span class="text-on-surface-variant">+12%</span>
+</div>
+</div>
+</div>
+<!-- Data Strips Section -->
+<section class="space-y-4 mb-12">
+<div class="flex items-center justify-between hud-glass rounded-lg px-5 py-3">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="timer">timer</span>
+<span class="font-headline font-bold text-sm">Rest Timer</span>
+</div>
+<div class="font-['Space_Mono'] font-bold text-primary">01:30</div>
+</div>
+<div class="flex items-center justify-between hud-glass rounded-lg px-5 py-3">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="water_drop">water_drop</span>
+<span class="font-headline font-bold text-sm">Hydration</span>
+</div>
+<div class="font-['Space_Mono'] font-bold text-on-surface">650ml</div>
+</div>
+</section>
+<!-- CTA Action -->
+<button class="w-full py-5 rounded-full brand-gradient-bg shadow-[0_8px_30px_rgba(74,141,255,0.3)] hover:shadow-[0_12px_40px_rgba(0,215,176,0.4)] active:scale-[0.98] transition-all group overflow-hidden relative">
+<div class="relative z-10 flex items-center justify-center gap-3">
+<span class="font-headline font-[800] text-lg text-on-background tracking-tight">Continue</span>
+<span class="material-symbols-outlined text-on-background group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</button>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 bg-[#121316]/90 backdrop-blur-xl border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+<div class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors cursor-pointer active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined" data-icon="bolt">bolt</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#00D7B0] bg-gradient-to-b from-[#00D7B0]/10 to-transparent p-3 relative after:content-[''] after:absolute after:top-0 after:w-1/2 after:h-[2px] after:bg-[#00D7B0] active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined" data-icon="query_stats" style="font-variation-settings: 'FILL' 1;">query_stats</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors cursor-pointer active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined" data-icon="emoji_events">emoji_events</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors cursor-pointer active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+</div>
+</nav>
+</body></html>

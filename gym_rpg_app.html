@@ -1,0 +1,838 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap');
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: rgba(255,255,255,0.08);
+    --accent: #e8ff47;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #6b6b7e;
+    --danger: #ff4444;
+    --success: #47ffb4;
+  }
+  
+  #app {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 600px;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .screen { display: none; padding: 28px 24px; }
+  .screen.active { display: block; }
+  
+  .bebas { font-family: 'Bebas Neue', cursive; }
+  
+  .btn {
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    padding: 14px 28px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 12px;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: 0.02em;
+  }
+  .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn:active { transform: scale(0.98); }
+  .btn.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    margin-top: 8px;
+  }
+  .btn.secondary:hover { background: var(--surface2); }
+  
+  .tag {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 2px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all 0.15s;
+    margin: 4px;
+  }
+  .tag.selected { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.08); }
+  
+  .progress-bar-wrap { background: var(--surface2); border-radius: 2px; height: 6px; width: 100%; margin: 8px 0; }
+  .progress-bar { height: 6px; border-radius: 2px; background: var(--accent); transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+  
+  .xp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(232,255,71,0.12);
+    border: 1px solid rgba(232,255,71,0.3);
+    color: var(--accent);
+    padding: 4px 10px;
+    border-radius: 2px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface2);
+    outline: none;
+    margin: 8px 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+  
+  .exercise-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+  .exercise-card:hover { border-color: rgba(255,255,255,0.15); }
+  .exercise-card.done { border-color: var(--accent); }
+  
+  .fatigue-ring {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 3px solid var(--surface2);
+    font-family: 'Bebas Neue', cursive;
+    font-size: 20px;
+    position: relative;
+  }
+  
+  .level-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+  }
+  
+  .ticker {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  
+  .glow { text-shadow: 0 0 20px rgba(232,255,71,0.5); }
+  
+  .world-record-bar {
+    position: relative;
+    height: 24px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 6px 0;
+  }
+  .world-record-bar .fill {
+    height: 100%;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #0a0a0f;
+    transition: width 0.5s cubic-bezier(.4,0,.2,1), background 0.3s;
+  }
+  
+  .notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 12px 18px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+  .notification.show { opacity: 1; transform: translateY(0); }
+  
+  .separator { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  
+  .stat-row { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
+  
+  select, input[type=number] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    width: 100%;
+    outline: none;
+    margin: 4px 0;
+  }
+  select:focus, input[type=number]:focus { border-color: var(--accent); }
+  select option { background: #1c1c28; }
+  
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  
+  .muscle-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  
+  .xp-popup {
+    position: absolute;
+    font-family: 'Bebas Neue', cursive;
+    font-size: 28px;
+    color: var(--accent);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 100;
+  }
+  
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
+</style>
+
+<div id="app">
+
+<div id="notif" class="notification"></div>
+
+<!-- SCREEN 0: Welcome -->
+<div class="screen active" id="s0">
+  <div style="text-align:center; padding: 40px 0 20px;">
+    <div class="bebas glow" style="font-size: 56px; color: var(--accent); line-height:1;">IRON</div>
+    <div class="bebas" style="font-size: 22px; color: var(--muted); letter-spacing: 0.15em;">PROTOCOL</div>
+    <div style="margin: 20px 0; font-size: 13px; color: var(--muted); line-height: 1.7;">
+      Antrenamentul tău. Gamificat.<br>XP bazat pe recorduri mondiale.
+    </div>
+    <div style="display:flex; gap:8px; justify-content:center; margin: 16px 0;">
+      <div style="background:var(--surface2); border-radius:4px; padding:10px 16px; font-size:12px; color:var(--muted);">
+        <div class="bebas" style="font-size:20px; color:var(--text);">∞</div>
+        exerciții
+      </div>
+      <div style="background:var(--surface2); border-radius:4px; padding:10px 16px; font-size:12px; color:var(--muted);">
+        <div class="bebas" style="font-size:20px; color:var(--accent);">XP</div>
+        real-time
+      </div>
+      <div style="background:var(--surface2); border-radius:4px; padding:10px 16px; font-size:12px; color:var(--muted);">
+        <div class="bebas" style="font-size:20px; color:var(--success);">WR</div>
+        rankings
+      </div>
+    </div>
+  </div>
+  <button class="btn" onclick="goTo('s1')">ÎNCEPE ACUM →</button>
+</div>
+
+<!-- SCREEN 1: Onboarding - goal -->
+<div class="screen" id="s1">
+  <div class="ticker">Pasul 1 / 4</div>
+  <div class="bebas" style="font-size:32px; margin: 8px 0 4px; color:var(--accent);">OBIECTIVUL TĂU</div>
+  <p style="color:var(--muted); font-size:13px; margin-bottom:20px;">Ce vrei să obții?</p>
+  <div id="goals" class="chip-row" style="gap:8px;">
+    <span class="tag" onclick="selectTag(this,'goal')">Forță maximă</span>
+    <span class="tag" onclick="selectTag(this,'goal')">Masă musculară</span>
+    <span class="tag" onclick="selectTag(this,'goal')">Slăbit</span>
+    <span class="tag" onclick="selectTag(this,'goal')">Rezistență</span>
+    <span class="tag" onclick="selectTag(this,'goal')">Fitness general</span>
+  </div>
+  <hr class="separator">
+  <div class="ticker">Nivelul tău actual</div>
+  <div style="margin-top:8px;" class="chip-row">
+    <span class="tag" onclick="selectTag(this,'level')">Începător</span>
+    <span class="tag" onclick="selectTag(this,'level')">Intermediar</span>
+    <span class="tag" onclick="selectTag(this,'level')">Avansat</span>
+    <span class="tag" onclick="selectTag(this,'level')">Atlet</span>
+  </div>
+  <button class="btn" onclick="nextOnboard1()">CONTINUĂ →</button>
+</div>
+
+<!-- SCREEN 2: Onboarding - equipment & days -->
+<div class="screen" id="s2">
+  <div class="ticker">Pasul 2 / 4</div>
+  <div class="bebas" style="font-size:32px; margin: 8px 0 4px; color:var(--accent);">SETUP ANTRENAMENT</div>
+  <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">Echipament disponibil</p>
+  <div id="equipment" class="chip-row">
+    <span class="tag" onclick="selectTagMulti(this,'equip')">Sală completă</span>
+    <span class="tag" onclick="selectTagMulti(this,'equip')">Acasă (haltere)</span>
+    <span class="tag" onclick="selectTagMulti(this,'equip')">Acasă (greutatea corpului)</span>
+    <span class="tag" onclick="selectTagMulti(this,'equip')">Benzi elastice</span>
+  </div>
+  <hr class="separator">
+  <div class="ticker">Zile pe săptămână</div>
+  <div style="display:flex; align-items:center; gap:16px; margin:12px 0;">
+    <input type="range" min="2" max="6" value="3" id="daysSlider" oninput="document.getElementById('daysVal').textContent=this.value" style="flex:1;">
+    <span class="bebas" id="daysVal" style="font-size:28px; color:var(--accent); min-width:32px;">3</span>
+  </div>
+  <hr class="separator">
+  <div class="ticker">Greutatea corporală (kg)</div>
+  <input type="number" id="bodyWeight" placeholder="ex: 80" value="80" style="margin-top:8px;">
+  <button class="btn" onclick="nextOnboard2()">CONTINUĂ →</button>
+  <button class="btn secondary" onclick="goTo('s1')">← ÎNAPOI</button>
+</div>
+
+<!-- SCREEN 3: Onboarding - muscles -->
+<div class="screen" id="s3">
+  <div class="ticker">Pasul 3 / 4</div>
+  <div class="bebas" style="font-size:32px; margin: 8px 0 4px; color:var(--accent);">ZONE PRIORITARE</div>
+  <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">Pe ce vrei să te focusezi? (max 3)</p>
+  <div id="muscles" class="chip-row">
+    <span class="tag" onclick="selectTagMulti(this,'muscle',3)">Piept</span>
+    <span class="tag" onclick="selectTagMulti(this,'muscle',3)">Spate</span>
+    <span class="tag" onclick="selectTagMulti(this,'muscle',3)">Umeri</span>
+    <span class="tag" onclick="selectTagMulti(this,'muscle',3)">Biceps</span>
+    <span class="tag" onclick="selectTagMulti(this,'muscle',3)">Triceps</span>
+    <span class="tag" onclick="selectTagMulti(this,'muscle',3)">Picioare</span>
+    <span class="tag" onclick="selectTagMulti(this,'muscle',3)">Core</span>
+    <span class="tag" onclick="selectTagMulti(this,'muscle',3)">Total body</span>
+  </div>
+  <hr class="separator">
+  <div class="ticker">Durata sesiunii</div>
+  <div class="chip-row" style="margin-top:8px;">
+    <span class="tag" onclick="selectTag(this,'duration')">30 min</span>
+    <span class="tag" onclick="selectTag(this,'duration')">45 min</span>
+    <span class="tag" onclick="selectTag(this,'duration')">60 min</span>
+    <span class="tag" onclick="selectTag(this,'duration')">90 min</span>
+  </div>
+  <button class="btn" onclick="generateWorkout()">GENEREAZĂ PLANUL →</button>
+  <button class="btn secondary" onclick="goTo('s2')">← ÎNAPOI</button>
+</div>
+
+<!-- SCREEN 4: Loading -->
+<div class="screen" id="s4" style="text-align:center; padding-top:80px;">
+  <div class="bebas glow" style="font-size:48px; color:var(--accent);" id="loadText">LOADING...</div>
+  <div style="color:var(--muted); font-size:13px; margin-top:8px;" id="loadSub">Se calculează programul optim</div>
+  <div style="margin:24px auto; max-width:200px;">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="loadBar" style="width:0%"></div></div>
+  </div>
+  <div style="color:var(--muted); font-size:11px; letter-spacing:0.08em;" id="loadStep">Analizând recorduri mondiale...</div>
+</div>
+
+<!-- SCREEN 5: Workout -->
+<div class="screen" id="s5">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+    <div>
+      <div class="ticker">Antrenament de azi</div>
+      <div class="bebas" style="font-size:28px; color:var(--accent);" id="workoutTitle">PUSH DAY</div>
+    </div>
+    <div id="levelDisplay" class="xp-badge">LVL 1 — 0 XP</div>
+  </div>
+  
+  <div class="level-badge">
+    <div style="flex:1;">
+      <div style="display:flex; justify-content:space-between;">
+        <span style="font-size:12px; color:var(--muted);">Progres spre LVL <span id="nextLvlNum">2</span></span>
+        <span style="font-size:12px; color:var(--accent);" id="xpFraction">0 / 500 XP</span>
+      </div>
+      <div class="progress-bar-wrap" style="margin-top:6px;"><div class="progress-bar" id="xpBar" style="width:0%"></div></div>
+    </div>
+  </div>
+  
+  <div id="exerciseList"></div>
+  
+  <hr class="separator">
+  <div style="display:flex; gap:10px; margin-bottom:8px;">
+    <div style="flex:1; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:12px; text-align:center;">
+      <div class="ticker">Oboseală</div>
+      <div class="bebas" id="fatigueVal" style="font-size:32px; color:var(--success);">0%</div>
+    </div>
+    <div style="flex:1; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:12px; text-align:center;">
+      <div class="ticker">XP câștigat azi</div>
+      <div class="bebas" id="sessionXp" style="font-size:32px; color:var(--accent);">0</div>
+    </div>
+    <div style="flex:1; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:12px; text-align:center;">
+      <div class="ticker">Exerciții</div>
+      <div class="bebas" id="doneCount" style="font-size:32px; color:var(--text);">0/0</div>
+    </div>
+  </div>
+  <button class="btn secondary" onclick="goTo('s0'); resetAll();" style="margin-top:4px; font-size:12px; padding:10px;">↩ RESET</button>
+</div>
+
+<!-- SCREEN 6: Log exercise -->
+<div class="screen" id="s6">
+  <div class="ticker" id="logTicker">Logheaza exercitiu</div>
+  <div class="bebas" style="font-size:28px; color:var(--accent); margin: 8px 0 4px;" id="logTitle">DEADLIFT</div>
+  
+  <div style="background:var(--surface2); border-radius:6px; padding:12px; margin-bottom:16px; font-size:13px;">
+    <div class="stat-row">
+      <span style="color:var(--muted);">Recordul mondial</span>
+      <span class="bebas" style="font-size:18px; color:var(--text);" id="wrDisplay">501 kg</span>
+    </div>
+    <div class="stat-row">
+      <span style="color:var(--muted);">Baza XP per rep</span>
+      <span class="xp-badge" id="baseXpDisplay">10 XP</span>
+    </div>
+  </div>
+  
+  <div class="ticker">Greutatea (kg)</div>
+  <input type="number" id="logWeight" placeholder="ex: 100" style="margin:6px 0;">
+  
+  <div id="wrPercentSection" style="margin: 8px 0;">
+    <div class="world-record-bar">
+      <div class="fill" id="wrFill" style="width:0%; background:var(--accent);">0%</div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted);">
+      <span>0%</span><span>Record mondial: <span id="wrRef">501kg</span></span>
+    </div>
+  </div>
+  
+  <div style="display:flex; gap:10px; margin-top:12px;">
+    <div style="flex:1;">
+      <div class="ticker">Seturi</div>
+      <input type="number" id="logSets" placeholder="3" value="3" min="1" max="10" style="margin:6px 0;">
+    </div>
+    <div style="flex:1;">
+      <div class="ticker">Repetări</div>
+      <input type="number" id="logReps" placeholder="8" value="8" min="1" max="50" style="margin:6px 0;">
+    </div>
+  </div>
+  
+  <div style="background:var(--surface2); border-radius:6px; padding:12px; margin:12px 0;">
+    <div class="stat-row">
+      <span style="color:var(--muted); font-size:13px;">XP estimat</span>
+      <span class="bebas" style="font-size:24px; color:var(--accent);" id="estimatedXp">0</span>
+    </div>
+    <div class="stat-row">
+      <span style="color:var(--muted); font-size:13px;">Multiplicator WR</span>
+      <span style="font-size:13px; color:var(--text);" id="multiplierDisplay">1x</span>
+    </div>
+    <div class="stat-row">
+      <span style="color:var(--muted); font-size:13px;">Oboseală adăugată</span>
+      <span style="font-size:13px;" id="fatigueAdd">+0%</span>
+    </div>
+  </div>
+  
+  <button class="btn" onclick="logExercise()">MARCHEAZĂ CA FINALIZAT ✓</button>
+  <button class="btn secondary" onclick="goTo('s5')">← ÎNAPOI</button>
+</div>
+
+<!-- SCREEN 7: XP Breakdown -->
+<div class="screen" id="s7">
+  <div class="ticker">Sesiune finalizată</div>
+  <div class="bebas glow" style="font-size:42px; color:var(--accent); margin:8px 0;">REZULTATE</div>
+  
+  <div style="background:var(--surface); border:1px solid rgba(232,255,71,0.2); border-radius:8px; padding:20px; margin-bottom:16px; text-align:center;">
+    <div class="ticker">XP total câștigat</div>
+    <div class="bebas" style="font-size:64px; color:var(--accent);" id="finalXp">0</div>
+    <div style="font-size:13px; color:var(--muted);" id="finalLevel">Nivel 1</div>
+  </div>
+  
+  <div id="breakdownList"></div>
+  
+  <hr class="separator">
+  <div style="background:var(--surface2); border-radius:6px; padding:12px; font-size:13px; color:var(--muted);">
+    <div class="bebas" style="font-size:16px; color:var(--text); margin-bottom:8px;">CUM SE CALCULEAZĂ XP</div>
+    <div style="line-height:1.8; font-size:12px;">
+      <b style="color:var(--text);">Formula:</b> BaseXP × WR% Multiplier × Seturi × Reps<br>
+      <b style="color:var(--accent);">0–20% WR</b> → 1x &nbsp; <b style="color:var(--accent);">20–40%</b> → 2x<br>
+      <b style="color:var(--accent);">40–60%</b> → 4x &nbsp; <b style="color:var(--accent);">60–80%</b> → 8x<br>
+      <b style="color:var(--accent);">80–100%</b> → 16x &nbsp; <b style="color:var(--accent);">100%+</b> → 32x 🏆
+    </div>
+  </div>
+  
+  <button class="btn" onclick="startNewSession()" style="margin-top:16px;">ANTRENAMENT NOU →</button>
+</div>
+
+</div>
+
+<script>
+const WORLD_RECORDS = {
+  'Deadlift': { wr: 501, base: 15, muscles: ['Spate','Picioare','Core'], fatigue: 12 },
+  'Squat': { wr: 477, base: 14, muscles: ['Picioare','Core'], fatigue: 11 },
+  'Bench Press': { wr: 349, base: 12, muscles: ['Piept','Triceps','Umeri'], fatigue: 8 },
+  'Overhead Press': { wr: 216, base: 11, muscles: ['Umeri','Triceps'], fatigue: 7 },
+  'Barbell Row': { wr: 260, base: 11, muscles: ['Spate','Biceps'], fatigue: 8 },
+  'Pull-up': { wr: 'BW+1.5x', base: 10, muscles: ['Spate','Biceps'], fatigue: 7, bodyweight: true },
+  'Dip': { wr: 'BW+1.8x', base: 9, muscles: ['Piept','Triceps'], fatigue: 6, bodyweight: true },
+  'Bicep Curl': { wr: 132, base: 8, muscles: ['Biceps'], fatigue: 4 },
+  'Tricep Extension': { wr: 130, base: 8, muscles: ['Triceps'], fatigue: 4 },
+  'Leg Press': { wr: 820, base: 12, muscles: ['Picioare'], fatigue: 9 },
+  'Romanian Deadlift': { wr: 380, base: 12, muscles: ['Picioare','Spate'], fatigue: 9 },
+  'Plank': { wr: 9 * 3600 + 38 * 60, base: 8, muscles: ['Core'], fatigue: 3, time: true },
+  'Push-up': { wr: 'BW', base: 6, muscles: ['Piept','Triceps'], fatigue: 4, bodyweight: true }
+};
+
+const LEVEL_THRESHOLDS = [0, 500, 1500, 3500, 7500, 15000, 30000, 60000, 120000, 250000];
+const LEVEL_NAMES = ['Recruit','Iron I','Iron II','Bronze','Silver','Gold','Platinum','Diamond','Master','Legend'];
+
+let userProfile = { goal: '', level: '', equipment: [], muscles: [], duration: '60 min', bodyWeight: 80 };
+let gameState = { totalXp: 0, currentLevel: 1, sessionXp: 0, fatigue: 0, exercisesDone: 0 };
+let currentWorkout = [];
+let currentExerciseIdx = -1;
+let exerciseLogs = [];
+let selections = {};
+
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function notify(msg) {
+  const n = document.getElementById('notif');
+  n.textContent = msg;
+  n.classList.add('show');
+  setTimeout(() => n.classList.remove('show'), 2500);
+}
+
+function selectTag(el, group) {
+  document.querySelectorAll('.tag').forEach(t => {
+    if(t.dataset.group === group || !t.dataset.group) {/* skip */}
+  });
+  const parent = el.parentElement;
+  parent.querySelectorAll('.tag').forEach(t => {
+    if(t.dataset.group === group) t.classList.remove('selected');
+  });
+  el.dataset.group = group;
+  el.classList.add('selected');
+  selections[group] = el.textContent;
+}
+
+function selectTagMulti(el, group, max) {
+  el.dataset.group = group;
+  const parent = el.parentElement;
+  const selected = [...parent.querySelectorAll('.tag.selected[data-group="'+group+'"]')];
+  if(el.classList.contains('selected')) {
+    el.classList.remove('selected');
+    return;
+  }
+  if(max && selected.length >= max) { notify('Max ' + max + ' selectii!'); return; }
+  el.classList.add('selected');
+}
+
+function getMultiSelected(group) {
+  return [...document.querySelectorAll('.tag.selected[data-group="'+group+'"]')].map(t => t.textContent);
+}
+
+function nextOnboard1() {
+  if(!selections.goal) { notify('Selecteaza un obiectiv!'); return; }
+  if(!selections.level) { notify('Selecteaza nivelul tau!'); return; }
+  userProfile.goal = selections.goal;
+  userProfile.level = selections.level;
+  goTo('s2');
+}
+
+function nextOnboard2() {
+  const equip = getMultiSelected('equip');
+  if(equip.length === 0) { notify('Selecteaza echipamentul!'); return; }
+  userProfile.equipment = equip;
+  userProfile.bodyWeight = parseFloat(document.getElementById('bodyWeight').value) || 80;
+  userProfile.days = parseInt(document.getElementById('daysSlider').value);
+  goTo('s3');
+}
+
+function generateWorkout() {
+  const muscles = getMultiSelected('muscle');
+  const duration = selections.duration || '60 min';
+  userProfile.muscles = muscles;
+  userProfile.duration = duration;
+  
+  goTo('s4');
+  animateLoader(() => {
+    buildWorkout();
+    goTo('s5');
+  });
+}
+
+function animateLoader(cb) {
+  const steps = ['Analizând recorduri mondiale...','Calculând XP multiplicatori...','Selectând exerciții optime...','Calibrând nivelul de oboseală...','Finalizing protocol...'];
+  let p = 0;
+  const bar = document.getElementById('loadBar');
+  const stepEl = document.getElementById('loadStep');
+  const interval = setInterval(() => {
+    p += 20;
+    bar.style.width = p + '%';
+    stepEl.textContent = steps[Math.floor(p/20)-1] || '';
+    if(p >= 100) { clearInterval(interval); setTimeout(cb, 400); }
+  }, 350);
+}
+
+function pickExercises() {
+  const all = Object.keys(WORLD_RECORDS);
+  const muscles = userProfile.muscles;
+  let pool = [];
+  
+  if(muscles.length === 0 || muscles.includes('Total body')) {
+    pool = all;
+  } else {
+    pool = all.filter(ex => {
+      const m = WORLD_RECORDS[ex].muscles;
+      return m.some(mu => muscles.some(sel => sel === mu));
+    });
+    if(pool.length < 4) pool = all;
+  }
+  
+  const duration = parseInt(userProfile.duration) || 60;
+  const count = duration <= 30 ? 4 : duration <= 45 ? 5 : duration <= 60 ? 6 : 8;
+  
+  const bigLifts = ['Deadlift','Squat','Bench Press','Overhead Press','Barbell Row'];
+  let selected = [];
+  
+  const mainPool = pool.filter(e => bigLifts.includes(e));
+  if(mainPool.length > 0) selected.push(mainPool[Math.floor(Math.random()*mainPool.length)]);
+  
+  const remaining = pool.filter(e => !selected.includes(e));
+  while(selected.length < count && remaining.length > 0) {
+    const idx = Math.floor(Math.random()*remaining.length);
+    selected.push(remaining.splice(idx,1)[0]);
+  }
+  
+  return selected;
+}
+
+function buildWorkout() {
+  const exercises = pickExercises();
+  currentWorkout = exercises;
+  exerciseLogs = exercises.map(() => null);
+  gameState.sessionXp = 0;
+  gameState.fatigue = 0;
+  gameState.exercisesDone = 0;
+  
+  const titles = { 'Forță maximă': 'STRENGTH DAY', 'Masă musculară': 'HYPERTROPHY DAY', 'Slăbit': 'BURN DAY', 'Rezistență': 'ENDURANCE DAY', 'Fitness general': 'FULL BODY DAY' };
+  document.getElementById('workoutTitle').textContent = titles[userProfile.goal] || 'WORKOUT DAY';
+  document.getElementById('doneCount').textContent = '0/' + exercises.length;
+  
+  renderExerciseList();
+  updateXpDisplay();
+}
+
+function renderExerciseList() {
+  const list = document.getElementById('exerciseList');
+  list.innerHTML = '';
+  currentWorkout.forEach((name, i) => {
+    const wr = WORLD_RECORDS[name];
+    const done = exerciseLogs[i] !== null;
+    const card = document.createElement('div');
+    card.className = 'exercise-card' + (done ? ' done' : '');
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <div style="font-weight:500; font-size:15px;">${done ? '✓ ' : ''}${name}</div>
+          <div class="chip-row" style="margin-top:4px;">
+            ${wr.muscles.map(m => `<span class="muscle-chip">${m}</span>`).join('')}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          ${done ? `<div class="xp-badge">+${exerciseLogs[i].xp} XP</div>` : `<div style="font-size:11px; color:var(--muted);">WR: ${wr.bodyweight ? 'Bodyweight' : wr.wr+'kg'}</div>`}
+        </div>
+      </div>
+      ${!done ? `<button onclick="openLog(${i})" style="background:transparent; border:1px solid var(--border); color:var(--muted); padding:6px 12px; border-radius:4px; font-size:12px; cursor:pointer; margin-top:8px; font-family:'DM Sans',sans-serif; transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--muted)'">LOGHEAZĂ →</button>` : ''}
+    `;
+    list.appendChild(card);
+  });
+}
+
+function openLog(idx) {
+  currentExerciseIdx = idx;
+  const name = currentWorkout[idx];
+  const wr = WORLD_RECORDS[name];
+  document.getElementById('logTitle').textContent = name;
+  document.getElementById('logTicker').textContent = 'Logheaza exercitiu ' + (idx+1) + ' / ' + currentWorkout.length;
+  const wrText = wr.bodyweight ? 'Bodyweight+' : (wr.wr + ' kg');
+  document.getElementById('wrDisplay').textContent = wrText;
+  document.getElementById('wrRef').textContent = wrText;
+  document.getElementById('baseXpDisplay').textContent = wr.base + ' XP/rep';
+  document.getElementById('logWeight').value = '';
+  document.getElementById('logSets').value = '3';
+  document.getElementById('logReps').value = '8';
+  document.getElementById('wrFill').style.width = '0%';
+  document.getElementById('wrFill').textContent = '0%';
+  document.getElementById('estimatedXp').textContent = '0';
+  document.getElementById('multiplierDisplay').textContent = '1x';
+  document.getElementById('fatigueAdd').textContent = '+0%';
+  document.getElementById('logWeight').oninput = calcPreview;
+  document.getElementById('logSets').oninput = calcPreview;
+  document.getElementById('logReps').oninput = calcPreview;
+  goTo('s6');
+}
+
+function getWrMultiplier(pct) {
+  if(pct < 20) return { mult: 1, label: '1x (Beginner)' };
+  if(pct < 40) return { mult: 2, label: '2x (Novice)' };
+  if(pct < 60) return { mult: 4, label: '4x (Intermediate)' };
+  if(pct < 80) return { mult: 8, label: '8x (Advanced)' };
+  if(pct < 100) return { mult: 16, label: '16x (Elite)' };
+  return { mult: 32, label: '32x (LEGENDARY) 🏆' };
+}
+
+function calcXp(weight, sets, reps, exerciseName) {
+  const wr = WORLD_RECORDS[exerciseName];
+  let pct = 0;
+  if(wr.bodyweight) {
+    pct = (weight / (userProfile.bodyWeight * 1.5)) * 100;
+  } else {
+    pct = (weight / wr.wr) * 100;
+  }
+  pct = Math.min(pct, 110);
+  const { mult } = getWrMultiplier(pct);
+  const rawXp = wr.base * mult * sets * reps;
+  const fatiguePenalty = Math.max(0.5, 1 - gameState.fatigue / 200);
+  return { xp: Math.round(rawXp * fatiguePenalty), pct: Math.round(pct), mult };
+}
+
+function calcPreview() {
+  const w = parseFloat(document.getElementById('logWeight').value) || 0;
+  const s = parseInt(document.getElementById('logSets').value) || 1;
+  const r = parseInt(document.getElementById('logReps').value) || 1;
+  if(!w) return;
+  const name = currentWorkout[currentExerciseIdx];
+  const wr = WORLD_RECORDS[name];
+  const { xp, pct, mult } = calcXp(w, s, r, name);
+  const { label } = getWrMultiplier(pct);
+  
+  const barPct = Math.min(pct, 100);
+  const fill = document.getElementById('wrFill');
+  fill.style.width = barPct + '%';
+  fill.textContent = pct + '%';
+  if(pct < 40) { fill.style.background = '#888'; fill.style.color = '#fff'; }
+  else if(pct < 60) { fill.style.background = '#e8ff47'; fill.style.color = '#0a0a0f'; }
+  else if(pct < 80) { fill.style.background = '#ff9a3c'; fill.style.color = '#0a0a0f'; }
+  else { fill.style.background = '#ff4d4d'; fill.style.color = '#fff'; }
+  
+  document.getElementById('estimatedXp').textContent = xp;
+  document.getElementById('multiplierDisplay').textContent = label;
+  const fatAdd = Math.round(wr.fatigue * (1 + pct/200) * s / 2);
+  document.getElementById('fatigueAdd').textContent = '+' + fatAdd + '%';
+  document.getElementById('fatigueAdd').style.color = fatAdd > 10 ? 'var(--danger)' : 'var(--success)';
+}
+
+function logExercise() {
+  const w = parseFloat(document.getElementById('logWeight').value);
+  const s = parseInt(document.getElementById('logSets').value);
+  const r = parseInt(document.getElementById('logReps').value);
+  
+  if(!w || w <= 0) { notify('Introdu greutatea!'); return; }
+  
+  const name = currentWorkout[currentExerciseIdx];
+  const wr = WORLD_RECORDS[name];
+  const { xp, pct, mult } = calcXp(w, s, r, name);
+  const fatAdd = Math.round(wr.fatigue * (1 + pct/200) * s / 2);
+  
+  exerciseLogs[currentExerciseIdx] = { xp, weight: w, sets: s, reps: r, pct, mult, name };
+  gameState.totalXp += xp;
+  gameState.sessionXp += xp;
+  gameState.fatigue = Math.min(100, gameState.fatigue + fatAdd);
+  gameState.exercisesDone++;
+  
+  updateLevel();
+  renderExerciseList();
+  updateXpDisplay();
+  
+  notify('+' + xp + ' XP! ' + (pct >= 80 ? '🔥 ELITE!' : pct >= 60 ? '💪 AVANSAT!' : ''));
+  
+  const allDone = exerciseLogs.every(l => l !== null);
+  goTo('s5');
+  
+  if(allDone) {
+    setTimeout(() => showResults(), 800);
+  }
+}
+
+function updateLevel() {
+  let lvl = 1;
+  for(let i = 1; i < LEVEL_THRESHOLDS.length; i++) {
+    if(gameState.totalXp >= LEVEL_THRESHOLDS[i]) lvl = i + 1;
+  }
+  gameState.currentLevel = Math.min(lvl, LEVEL_NAMES.length);
+}
+
+function updateXpDisplay() {
+  const lvl = gameState.currentLevel;
+  const curThresh = LEVEL_THRESHOLDS[lvl-1] || 0;
+  const nextThresh = LEVEL_THRESHOLDS[lvl] || LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length-1];
+  const progress = ((gameState.totalXp - curThresh) / (nextThresh - curThresh)) * 100;
+  
+  document.getElementById('levelDisplay').textContent = 'LVL ' + lvl + ' — ' + gameState.totalXp + ' XP';
+  document.getElementById('nextLvlNum').textContent = lvl + 1;
+  document.getElementById('xpFraction').textContent = (gameState.totalXp - curThresh) + ' / ' + (nextThresh - curThresh) + ' XP';
+  document.getElementById('xpBar').style.width = Math.min(progress, 100) + '%';
+  document.getElementById('sessionXp').textContent = gameState.sessionXp;
+  document.getElementById('doneCount').textContent = gameState.exercisesDone + '/' + currentWorkout.length;
+  
+  const fatigue = gameState.fatigue;
+  const fatigueEl = document.getElementById('fatigueVal');
+  fatigueEl.textContent = fatigue + '%';
+  if(fatigue < 30) fatigueEl.style.color = 'var(--success)';
+  else if(fatigue < 60) fatigueEl.style.color = 'var(--accent)';
+  else fatigueEl.style.color = 'var(--danger)';
+}
+
+function showResults() {
+  document.getElementById('finalXp').textContent = gameState.sessionXp;
+  document.getElementById('finalLevel').textContent = LEVEL_NAMES[gameState.currentLevel-1] + ' (LVL ' + gameState.currentLevel + ')';
+  
+  const list = document.getElementById('breakdownList');
+  list.innerHTML = '';
+  exerciseLogs.forEach(log => {
+    if(!log) return;
+    const pctColor = log.pct >= 80 ? 'var(--danger)' : log.pct >= 60 ? 'var(--accent2)' : log.pct >= 40 ? 'var(--accent)' : 'var(--muted)';
+    list.innerHTML += `
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:12px; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-weight:500; font-size:14px;">${log.name}</div>
+            <div style="font-size:12px; color:var(--muted); margin-top:2px;">${log.sets} seturi × ${log.reps} reps @ ${log.weight}kg</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="xp-badge">+${log.xp} XP</div>
+            <div style="font-size:11px; margin-top:4px; color:${pctColor};">${log.pct}% WR · ${log.mult}x</div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  
+  goTo('s7');
+}
+
+function startNewSession() {
+  gameState.sessionXp = 0;
+  gameState.fatigue = 0;
+  gameState.exercisesDone = 0;
+  buildWorkout();
+  goTo('s5');
+}
+
+function resetAll() {
+  gameState = { totalXp: 0, currentLevel: 1, sessionXp: 0, fatigue: 0, exercisesDone: 0 };
+  selections = {};
+  document.querySelectorAll('.tag.selected').forEach(t => t.classList.remove('selected'));
+}
+</script>

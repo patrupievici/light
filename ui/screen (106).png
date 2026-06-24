@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT | Profile</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface": "#121316",
+                    "surface-bright": "#38393c",
+                    "error-container": "#93000a",
+                    "error": "#ffb4ab",
+                    "secondary": "#adc6ff",
+                    "on-surface": "#e3e2e6",
+                    "on-tertiary-fixed": "#001f26",
+                    "tertiary-container": "#35cfef",
+                    "on-primary-fixed": "#002019",
+                    "on-secondary-fixed": "#001a41",
+                    "surface-container-low": "#1b1b1f",
+                    "on-tertiary": "#003640",
+                    "inverse-surface": "#e3e2e6",
+                    "tertiary-fixed": "#acedff",
+                    "surface-container": "#1f1f23",
+                    "inverse-on-surface": "#2f3034",
+                    "secondary-fixed": "#d8e2ff",
+                    "background": "#121316",
+                    "on-surface-variant": "#bacac3",
+                    "primary-fixed": "#52fcd3",
+                    "surface-variant": "#343538",
+                    "outline-variant": "#3b4a44",
+                    "on-primary-fixed-variant": "#005141",
+                    "on-primary": "#00382c",
+                    "primary-container": "#00d7b0",
+                    "on-error-container": "#ffdad6",
+                    "surface-tint": "#21dfb8",
+                    "on-background": "#e3e2e6",
+                    "primary": "#46f4cb",
+                    "on-tertiary-container": "#005564",
+                    "tertiary": "#8ee7ff",
+                    "surface-container-lowest": "#0d0e11",
+                    "primary-fixed-dim": "#21dfb8",
+                    "secondary-container": "#0264d4",
+                    "surface-container-high": "#292a2d",
+                    "on-primary-container": "#005847",
+                    "outline": "#84948e",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "inverse-primary": "#006b57",
+                    "on-error": "#690005",
+                    "surface-container-highest": "#343538",
+                    "on-secondary-container": "#e0e8ff",
+                    "on-secondary": "#002e69",
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "surface-dim": "#121316",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-tertiary-fixed-variant": "#004e5c"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { background-color: #121316; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal-bg {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body text-on-surface">
+<!-- Top Navigation -->
+<nav class="fixed top-0 w-full z-50 bg-[#121316]/80 backdrop-blur-lg flex justify-between items-center px-6 py-4 w-full">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary cursor-pointer" style="font-variation-settings: 'wght' 600;">arrow_back</span>
+<span class="font-manrope font-extrabold tracking-tighter text-[#F5F7FA] text-2xl">ZVELT</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#A7B0BC] hover:bg-[#1f1f23] transition-colors p-2 rounded-full cursor-pointer">settings</span>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="User profile avatar of a professional athlete in high-key studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3f-3yDsQ4k-5x5MMEo8lz3g0wf6VsQnyZ7X7DcZZG7MO6Ix4YAheqAKVmxtJyKliC8zj9PX5eCBxE8SmVT7rmjDvyAnJN_wcJrEqnPAxATO2ubT2Ar2Md1TEDanAa8Lkpp6OeEOA2z3g3rAutyMkdx9fswSM7nBH5AkPH8Hf6MIhbPxp6_I_klYANEyMGjtj8Yyq4QZ-fRtvph7tDQq3qtDpedHEhYOEDfsUHVPbXYCrS5tCm8Dw516eyQPWomwwhOCnk20vk1WY"/>
+</div>
+</div>
+<div class="bg-[#1b1b1f] h-[2px] w-1/3 absolute bottom-0 left-0"></div>
+</nav>
+<main class="pt-24 pb-32 px-6 max-w-2xl mx-auto">
+<!-- Athlete Profile Header -->
+<header class="flex flex-col gap-6 mb-12">
+<div class="flex items-end justify-between">
+<div class="relative">
+<div class="w-24 h-24 rounded-xl overflow-hidden bg-surface-container-highest border-2 border-primary">
+<img class="w-full h-full object-cover" data-alt="Portrait of a serious male athlete with short hair and intense gaze against dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR_q7vGod73DVEhe8j8Pxv-PshWK5jPlLE4Wv1a3xhXSZ39jtBLccFXaXj5St2Yj3WmjDOp8F7pWwUIutVPkzXHVh3FPavCRkDR_IdtCgOqGwyKK7q2IpWmVduHpcqYl5aPwYrLUXNj8_jjWHbjDl_UsHtv20mAmHTqdUokMPIXikfj_O6-mEJNDOJsTwwJBW9qW6F91WCankgs36nXk9Taw4SSaoZc1HFSiJXfg6l1qXsIador38QhVuWYDrD5kXGl9H5SD8X1Yk"/>
+</div>
+<div class="absolute -bottom-2 -right-2 bg-primary w-6 h-6 rounded-full flex items-center justify-center border-2 border-surface shadow-[0_0_8px_rgba(70,244,203,0.5)]">
+<span class="material-symbols-outlined text-surface text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-container-high px-6 py-2 rounded-lg text-primary font-semibold text-sm border border-outline-variant/30 hover:bg-surface-container-highest transition-all duration-300">
+                        Challenge
+                    </button>
+<button class="liquid-metal-bg px-8 py-2 rounded-lg text-on-primary font-bold text-sm shadow-lg shadow-primary/10 active:scale-95 transition-transform">
+                        Follow
+                    </button>
+</div>
+</div>
+<div class="space-y-1">
+<h1 class="font-headline font-extrabold text-3xl tracking-tight text-on-surface">Alex Rivera</h1>
+<p class="text-on-surface-variant font-medium text-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-xs">location_on</span>
+                    San Francisco, CA
+                </p>
+</div>
+<!-- Mutual Sports -->
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container-low border border-outline-variant/20 px-3 py-1 rounded-sm text-[10px] font-label font-bold tracking-widest text-primary uppercase">Mutual Sports</span>
+<div class="flex items-center gap-3 px-1">
+<div class="flex items-center gap-1 group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-lg" style="font-variation-settings: 'FILL' 1;">directions_run</span>
+<span class="text-xs text-on-surface-variant font-medium">Running</span>
+</div>
+<div class="w-[1px] h-3 bg-outline-variant/40"></div>
+<div class="flex items-center gap-1 group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-lg" style="font-variation-settings: 'FILL' 1;">pedal_bike</span>
+<span class="text-xs text-on-surface-variant font-medium">Cycling</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Stats Section: Bento Grid Pattern -->
+<section class="grid grid-cols-2 gap-4 mb-12">
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-primary/20">
+<p class="text-[10px] font-label text-on-surface-variant uppercase tracking-[0.2em] mb-4">Monthly Volume</p>
+<div class="flex items-baseline gap-2">
+<span class="font-headline font-bold text-4xl text-on-surface tracking-tighter">142.8</span>
+<span class="text-on-surface-variant text-sm font-label uppercase">km</span>
+</div>
+<div class="mt-4 h-1 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[72%] shadow-[0_0_4px_rgba(70,244,203,0.3)]"></div>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl border-r-4 border-tertiary-container/20">
+<p class="text-[10px] font-label text-on-surface-variant uppercase tracking-[0.2em] mb-4">Active Streak</p>
+<div class="flex items-baseline gap-2">
+<span class="font-headline font-bold text-4xl text-on-surface tracking-tighter">14</span>
+<span class="text-on-surface-variant text-sm font-label uppercase">days</span>
+</div>
+<div class="mt-4 flex gap-1 items-end h-8">
+<div class="w-1 h-3 bg-tertiary-container/40 rounded-full"></div>
+<div class="w-1 h-5 bg-tertiary-container/60 rounded-full"></div>
+<div class="w-1 h-2 bg-tertiary-container/40 rounded-full"></div>
+<div class="w-1 h-8 bg-tertiary-container rounded-full"></div>
+<div class="w-1 h-6 bg-tertiary-container/80 rounded-full"></div>
+<div class="w-1 h-7 bg-tertiary-container rounded-full shadow-[0_0_4px_rgba(53,207,239,0.3)]"></div>
+</div>
+</div>
+</section>
+<!-- Activity Feed -->
+<section class="space-y-6">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-headline font-bold text-lg text-on-surface">Activity Moments</h3>
+<span class="text-[10px] text-on-surface-variant font-bold tracking-widest uppercase cursor-pointer hover:text-primary transition-colors">View All</span>
+</div>
+<!-- Activity Card 1 -->
+<article class="bg-surface-container-low rounded-xl overflow-hidden group">
+<div class="relative h-56 w-full">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="Wide shot of a lone athlete running on a coastal road during blue hour with misty mountains" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdWBEAPs31XMAzJdYWdG9NWh_riHa8TcHKec_omOcxiLJPBGFllpVKeHtV4RRI2hOU-v5FKJyK1Gct6u_jhhULBeAgNOuAu0wsDIjDuDmQ_RnxG_01RRS0Ti7AaWsqC-Uo8w1vIiIHKWtbKm-lpNdte3K4xZ14mPQr3VYpe8rqNpNhYqGWGXNIJ0okVoBIYLtMltrNJl1COjhA6HysvHWzIuBto9Oub3oQ-SPDAYq4xSYb5sEagedyt7EYce2zFqSOFWhFaVRjrSM"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest/90 to-transparent"></div>
+<div class="absolute bottom-4 left-6 flex items-center gap-4">
+<div class="flex flex-col">
+<span class="text-white font-headline font-extrabold text-xl">Sunset Tempo Run</span>
+<span class="text-white/60 text-[10px] uppercase tracking-widest">Yesterday • 18:42</span>
+</div>
+</div>
+<div class="absolute top-4 right-4 bg-surface/60 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">timer</span>
+<span class="text-[11px] font-bold text-on-surface uppercase">52:14</span>
+</div>
+</div>
+<div class="p-6 flex items-center justify-between">
+<div class="flex items-center gap-6">
+<div class="flex flex-col">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant mb-1 font-bold">Distance</span>
+<span class="text-sm font-headline font-bold text-on-surface">12.4 km</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant mb-1 font-bold">Pace</span>
+<span class="text-sm font-headline font-bold text-on-surface">4:12 /km</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant mb-1 font-bold">Elevation</span>
+<span class="text-sm font-headline font-bold text-on-surface">+182 m</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface-container-low overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Avatar of a friend who liked the activity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCR5NpcjdTDP6jhtne0yFShwmbARI1sPpz-MYfodvn5bGgEHQlBJFSix5Ng3xw8NjgOxEZ9w5BO2pf7lSvIDSVJ3Nsqt416K3B3jDICeoHMP3diC9VqUhxekB_zwwcJsDuExoWRTT-sd9yL6kpU0iHGsl5_hoC_5wAsoFpRdLF8Qdj64mGszFglKi6DQvFB5vNb1iBPom5JCrHSG_UNEoeFO5hr5WUjtIsEbeJ8PsbmHCuEsUyLWFExOE_2GjruhrP6nk1xR6O8As"/>
+</div>
+<div class="w-6 h-6 rounded-full border-2 border-surface-container-low overflow-hidden bg-primary flex items-center justify-center">
+<span class="text-[8px] font-bold text-on-primary">+8</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary cursor-pointer transition-transform active:scale-125" style="font-variation-settings: 'FILL' 0;">favorite</span>
+</div>
+</div>
+</article>
+<!-- Activity Card 2 -->
+<article class="bg-surface-container-low rounded-xl overflow-hidden group">
+<div class="relative h-48 w-full bg-surface-container flex items-center justify-center overflow-hidden">
+<!-- Map Graphic Simulation -->
+<div class="absolute inset-0 opacity-20" data-alt="Abstract topographic map lines on dark textured paper with glowing cyan accents" data-location="San Francisco" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAA-y_nCS3ha1L_Ve6Wqt6a9eS_8A0jCJI5XKG8FP9oeZ8NCAEDhj1-NXSZEeG89rxx2qo7kmx4P4xpGis5_JUt0teH6Ix0QIRulgNmoEcwHXBEAoSY5UyruwK8e29MXXKRx9wwOm06C-6PySNrKI_M-KmgcWoGRMGt0pl2MqypkQExqVnBWJZzZjbc9pcIkxxaMxnpris4f_2zvf0KtfM-R3UHsXQm2b_IgHVeiNr01fJiZ70sLqylZXDtPLAIMZFmkIC49zSXq6s'); background-size: cover;"></div>
+<svg class="relative z-10 w-2/3 h-2/3 drop-shadow-[0_0_15px_rgba(70,244,203,0.5)]" viewbox="0 0 100 100">
+<path d="M10,80 Q30,20 50,50 T90,30" fill="none" stroke="#46f4cb" stroke-linecap="round" stroke-width="2.5"></path>
+<circle cx="10" cy="80" fill="#46f4cb" r="2.5"></circle>
+<circle cx="90" cy="30" fill="#46f4cb" r="4"></circle>
+<circle class="animate-pulse" cx="90" cy="30" fill="none" r="8" stroke="#46f4cb" stroke-width="1"></circle>
+</svg>
+<div class="absolute top-4 left-6 bg-surface-container-highest/80 backdrop-blur-md px-3 py-1 rounded-sm border border-outline-variant/30">
+<span class="text-[10px] text-on-surface font-label uppercase font-bold tracking-widest">Morning Ride</span>
+</div>
+</div>
+<div class="p-6">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-8">
+<div class="flex flex-col">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant mb-1 font-bold">Speed</span>
+<span class="text-sm font-headline font-bold text-on-surface">32.8 km/h</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[9px] uppercase tracking-tighter text-on-surface-variant mb-1 font-bold">Energy</span>
+<span class="text-sm font-headline font-bold text-on-surface">840 kcal</span>
+</div>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">chat_bubble</span>
+<span class="text-xs font-bold">12</span>
+</div>
+</div>
+</div>
+</article>
+</section>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-[#1b1b1f]/90 backdrop-blur-2xl z-50 rounded-t-xl" style="box-shadow: 0px 12px 32px rgba(0, 0, 0, 0.4);">
+<div class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:text-[#F5F7FA] transition-all duration-300 ease-out cursor-pointer">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:text-[#F5F7FA] transition-all duration-300 ease-out cursor-pointer">
+<span class="material-symbols-outlined mb-1">exercise</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Workout</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:text-[#F5F7FA] transition-all duration-300 ease-out cursor-pointer">
+<span class="material-symbols-outlined mb-1">monitoring</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Progress</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#46f4cb] bg-[#292a2d] rounded-lg px-3 py-1 transition-all duration-300 ease-out cursor-pointer">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Social</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:text-[#F5F7FA] transition-all duration-300 ease-out cursor-pointer">
+<span class="material-symbols-outlined mb-1">person</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-medium">Profile</span>
+</div>
+</nav>
+</body></html>

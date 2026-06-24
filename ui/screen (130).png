@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-primary": "#006b57",
+                        "surface-container-high": "#292a2d",
+                        "outline-variant": "#3b4a44",
+                        "secondary": "#adc6ff",
+                        "on-primary": "#00382c",
+                        "tertiary": "#8ee7ff",
+                        "error": "#ffb4ab",
+                        "surface-container-low": "#1b1b1f",
+                        "surface-bright": "#38393c",
+                        "primary-fixed-dim": "#21dfb8",
+                        "surface": "#121316",
+                        "on-primary-container": "#005847",
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "primary-fixed": "#52fcd3",
+                        "inverse-surface": "#e3e2e6",
+                        "surface-container-highest": "#343538",
+                        "on-primary-fixed": "#002019",
+                        "surface-dim": "#121316",
+                        "on-error": "#690005",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "surface-container-lowest": "#0d0e11",
+                        "on-surface-variant": "#bacac3",
+                        "on-secondary-fixed-variant": "#004494",
+                        "inverse-on-surface": "#2f3034",
+                        "tertiary-container": "#35cfef",
+                        "on-tertiary-fixed": "#001f26",
+                        "surface-variant": "#343538",
+                        "on-surface": "#e3e2e6",
+                        "secondary-fixed": "#d8e2ff",
+                        "on-tertiary-container": "#005564",
+                        "on-error-container": "#ffdad6",
+                        "surface-tint": "#21dfb8",
+                        "outline": "#84948e",
+                        "on-secondary-container": "#e0e8ff",
+                        "on-primary-fixed-variant": "#005141",
+                        "on-secondary": "#002e69",
+                        "on-background": "#e3e2e6",
+                        "error-container": "#93000a",
+                        "background": "#121316",
+                        "primary": "#46f4cb",
+                        "surface-container": "#1f1f23",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "secondary-container": "#0264d4",
+                        "primary-container": "#00d7b0",
+                        "on-tertiary": "#003640",
+                        "tertiary-fixed": "#acedff",
+                        "on-secondary-fixed": "#001a41"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .technical-mask {
+            mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+        }
+        .glow-metric {
+            text-shadow: 0 0 20px rgba(70, 244, 203, 0.3);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim text-on-surface font-body selection:bg-primary selection:text-on-primary">
+<!-- TopAppBar -->
+<nav class="fixed top-0 w-full z-50 flex items-center justify-between px-6 h-16 bg-slate-950/60 backdrop-blur-xl no-border bg-slate-900/40">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#00D7B0] cursor-pointer scale-95 active:opacity-80 transition-transform">search</span>
+</div>
+<div class="font-['Manrope'] font-black tracking-[0.2em] text-[#F5F7FA]">PULSE</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#00D7B0] cursor-pointer scale-95 active:opacity-80 transition-transform">settings</span>
+</div>
+</nav>
+<main class="pt-24 pb-32 px-6 max-w-2xl mx-auto">
+<!-- Editorial Header -->
+<header class="mb-12">
+<div class="flex items-baseline gap-3 mb-2">
+<span class="font-label text-xs uppercase tracking-[0.2em] text-primary">Live Session</span>
+<div class="w-2 h-2 rounded-full bg-primary-fixed shadow-[0_0_8px_rgba(82,252,211,0.6)]"></div>
+</div>
+<h1 class="font-headline text-4xl font-extrabold tracking-tight text-on-surface mb-2">Technical Excellence</h1>
+<p class="font-label text-sm text-on-surface-variant max-w-md">Your peak performance captured with precision-machined metrics and professional-grade telemetry.</p>
+</header>
+<!-- The Activity Moment Card (Export Ready) -->
+<section class="relative aspect-[4/5] w-full rounded-xl overflow-hidden bg-surface-container-lowest shadow-2xl">
+<!-- Hero Photo -->
+<div class="absolute inset-0 z-0">
+<img alt="" class="w-full h-full object-cover technical-mask opacity-80" data-alt="Intense close-up of a runner's legs in motion on a dark asphalt road at twilight, moody atmospheric lighting with cool tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDz-0hZEn9R9SzNgZhghXdP_lXPP13PYrJDiveMom-4ToHY3DxMX2Vocjv-ayHDXSCXfrqKrqQ9c_q24QcMmbyRZtJ759SFjXALootgHHb52bQGyuDi9THXPVDf7-fr9LIhBSnkUw1vt29FSoLXMR-giv1DQG_wVPw0B5vJCwfoijIyx51EVvMERMgT5zBm7wamyba-ceLzk6_nA5WbjQ1H6k7j_CUJGIedkcWtCRC0dQaxkY7B9LBNd6jwyl322gXn7UkAGyox4Vo"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim via-transparent to-transparent opacity-90"></div>
+</div>
+<!-- Content Overlay -->
+<div class="absolute inset-0 z-10 p-8 flex flex-col justify-between">
+<!-- Top Row: Branding & Date -->
+<div class="flex justify-between items-start">
+<div>
+<p class="font-headline font-black tracking-[0.3em] text-xs text-on-surface mb-1">PULSE / MOMENT</p>
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">24 OCT 2023 — 07:14 AM</p>
+</div>
+<div class="bg-surface-container-high/40 backdrop-blur-md px-3 py-1 rounded-sm border-l-2 border-primary">
+<p class="font-label text-[10px] font-bold text-primary tracking-widest uppercase">Performance Tier A</p>
+</div>
+</div>
+<!-- Middle: Route Trace Overlay (Asymmetric) -->
+<div class="flex justify-end pr-4">
+<div class="w-32 h-32 relative opacity-60">
+<svg class="w-full h-full stroke-primary/40 fill-none" stroke-width="1.5" viewbox="0 0 100 100">
+<path d="M20,80 Q40,20 60,50 T90,30" stroke-linecap="round" stroke-linejoin="round"></path>
+<circle cx="20" cy="80" fill="#46f4cb" r="2"></circle>
+<circle cx="90" cy="30" fill="#8ee7ff" r="2"></circle>
+</svg>
+<span class="absolute top-0 right-0 font-label text-[9px] text-on-surface-variant uppercase tracking-tighter">Route Trace // GPS-01</span>
+</div>
+</div>
+<!-- Bottom: The Metric Monoliths -->
+<div class="space-y-6">
+<div class="grid grid-cols-2 gap-8 items-end">
+<!-- Major Metric -->
+<div class="flex flex-col">
+<span class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-1">Distance Total</span>
+<div class="flex items-baseline gap-1">
+<span class="font-headline text-6xl font-extrabold tracking-tighter text-on-surface glow-metric">12.4</span>
+<span class="font-headline text-xl font-bold text-primary">KM</span>
+</div>
+</div>
+<!-- Secondary Metrics -->
+<div class="grid grid-cols-1 gap-4">
+<div class="flex flex-col border-l border-outline-variant/30 pl-4">
+<span class="font-label text-[9px] uppercase tracking-widest text-on-surface-variant">Avg Pace</span>
+<span class="font-headline text-xl font-bold text-on-surface">4'12" <span class="text-xs font-normal text-on-surface-variant">/km</span></span>
+</div>
+<div class="flex flex-col border-l border-outline-variant/30 pl-4">
+<span class="font-label text-[9px] uppercase tracking-widest text-on-surface-variant">Energy Burn</span>
+<span class="font-headline text-xl font-bold text-on-surface">842 <span class="text-xs font-normal text-on-surface-variant">KCAL</span></span>
+</div>
+</div>
+</div>
+<!-- Footer Branding Bar -->
+<div class="pt-6 border-t-2 border-surface-container-highest flex justify-between items-center">
+<div class="flex gap-4">
+<div class="flex flex-col">
+<span class="font-label text-[8px] uppercase tracking-widest text-on-surface-variant">Heart Rate Peak</span>
+<span class="font-label text-sm font-semibold text-tertiary">174 BPM</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label text-[8px] uppercase tracking-widest text-on-surface-variant">Elevation Gain</span>
+<span class="font-label text-sm font-semibold text-on-surface">142 M</span>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline font-black text-xs text-on-surface opacity-40 italic">ZVELT_LABS</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Share Actions -->
+<div class="mt-8 flex flex-col gap-4">
+<button class="liquid-metal w-full py-4 rounded-md flex items-center justify-center gap-3 transition-transform active:scale-[0.98]">
+<span class="material-symbols-outlined text-on-primary">share</span>
+<span class="font-label font-bold text-on-primary uppercase tracking-widest text-sm">Export to Story</span>
+</button>
+<div class="grid grid-cols-2 gap-4">
+<button class="bg-surface-container py-3 rounded-md flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">download</span>
+<span class="font-label text-xs font-semibold text-on-surface uppercase tracking-wider">Save Image</span>
+</button>
+<button class="bg-surface-container py-3 rounded-md flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">content_copy</span>
+<span class="font-label text-xs font-semibold text-on-surface uppercase tracking-wider">Copy Link</span>
+</button>
+</div>
+</div>
+<!-- Session Details Bento -->
+<div class="mt-16 grid grid-cols-4 gap-4">
+<div class="col-span-4 mb-4">
+<h3 class="font-headline text-lg font-bold">Session Telemetry</h3>
+</div>
+<div class="col-span-2 bg-surface-container-low p-6 rounded-lg">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant block mb-4">Split Times</span>
+<div class="space-y-3">
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant">KM 01</span>
+<span class="font-mono font-bold text-primary">04:15</span>
+</div>
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant">KM 02</span>
+<span class="font-mono font-bold text-primary">04:08</span>
+</div>
+<div class="flex justify-between items-center text-xs">
+<span class="text-on-surface-variant">KM 03</span>
+<span class="font-mono font-bold text-primary">04:11</span>
+</div>
+</div>
+</div>
+<div class="col-span-2 bg-surface-container p-6 rounded-lg flex flex-col justify-between">
+<div>
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant block mb-1">Recovery Score</span>
+<span class="font-headline text-3xl font-extrabold text-tertiary">88%</span>
+</div>
+<p class="font-label text-[10px] text-on-surface-variant leading-relaxed mt-4">Optimal recovery window: 14h until next high intensity block.</p>
+</div>
+<div class="col-span-4 bg-surface-container-high p-6 rounded-lg flex items-center gap-6">
+<div class="w-16 h-16 rounded-full border-4 border-primary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-3xl">bolt</span>
+</div>
+<div>
+<h4 class="font-headline text-sm font-bold text-on-surface">VO2 Max Improvement</h4>
+<p class="font-label text-xs text-on-surface-variant mt-1">This session contributed +0.4 to your estimated aerobic capacity.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe bg-slate-950/60 backdrop-blur-xl no-border bg-slate-900/40">
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all cursor-pointer">
+<span class="material-symbols-outlined">home</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all cursor-pointer">
+<span class="material-symbols-outlined">fitness_center</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Workout</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all cursor-pointer">
+<span class="material-symbols-outlined">insights</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Progress</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#46f4cb] font-bold hover:text-slate-200 transition-all cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Social</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all cursor-pointer">
+<span class="material-symbols-outlined">person</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Profile</span>
+</div>
+</nav>
+</body></html>

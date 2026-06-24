@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "outline": "#84948e",
+                    "on-secondary-container": "#e0e8ff",
+                    "surface-container-lowest": "#0d0e11",
+                    "secondary-container": "#0264d4",
+                    "on-surface-variant": "#bacac3",
+                    "error": "#ffb4ab",
+                    "surface-dim": "#121316",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-primary-fixed-variant": "#005141",
+                    "on-background": "#e3e2e6",
+                    "surface-tint": "#21dfb8",
+                    "primary-container": "#00d7b0",
+                    "on-surface": "#e3e2e6",
+                    "on-primary-container": "#005847",
+                    "surface-container-highest": "#343538",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "on-tertiary-fixed": "#001f26",
+                    "surface-container-low": "#1b1b1f",
+                    "on-error-container": "#ffdad6",
+                    "inverse-on-surface": "#2f3034",
+                    "primary-fixed": "#52fcd3",
+                    "primary": "#46f4cb",
+                    "tertiary-container": "#35cfef",
+                    "error-container": "#93000a",
+                    "on-tertiary": "#003640",
+                    "surface-container-high": "#292a2d",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-secondary": "#002e69",
+                    "on-primary-fixed": "#002019",
+                    "secondary-fixed": "#d8e2ff",
+                    "background": "#121316",
+                    "secondary": "#adc6ff",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "outline-variant": "#3b4a44",
+                    "on-secondary-fixed": "#001a41",
+                    "inverse-primary": "#006b57",
+                    "on-error": "#690005",
+                    "tertiary": "#8ee7ff",
+                    "surface-container": "#1f1f23",
+                    "surface-bright": "#38393c",
+                    "on-tertiary-container": "#005564",
+                    "surface-variant": "#343538",
+                    "surface": "#121316",
+                    "tertiary-fixed": "#acedff",
+                    "on-primary": "#00382c",
+                    "inverse-surface": "#e3e2e6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .holographic-glow {
+            background: linear-gradient(180deg, rgba(70, 244, 203, 0.1) 0%, rgba(70, 244, 203, 0) 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<button class="text-[#00D7B0] active:scale-95 transition-transform">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</h1>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-8">
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 font-label" href="#">Dashboard</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 font-label" href="#">Activity</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 font-label" href="#">Premium</a>
+<a class="text-[#46f4cb] font-semibold font-label" href="#">Profile</a>
+</nav>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/30">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="Close-up portrait of a determined athletic woman with soft cinematic lighting against a dark studio background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5NELC3fixWPmDFn4JNMv6FjGXrYwAigWFzLx2rSQmKcm-v9MwG0x46lRKJhxb_EtBXiFAutg4KmvCM4chJsrINg-2fSP-901S5fQonql5uf9oKmSHQX86ywRNdGgcjnK9C7gOM1A_CJYcnhC-c8Qepu-q0HIj2ccJfK6tNJuFj_7rk0B4hS-84xwgNQn8-_FvcXgzVxVjt-lV2FWpaFavfzgRG61yXHZwjnPeStLjWI-w3dvWdnLRqsQ6caSZFjzI4bLT4cX4b7w"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-7xl mx-auto">
+<!-- Header Section: Asymmetric Editorial Layout -->
+<section class="mb-12 grid grid-cols-1 md:grid-cols-12 gap-8">
+<div class="md:col-span-8">
+<p class="text-primary font-label text-[0.6875rem] uppercase tracking-[0.15em] mb-2">Performance Legacy</p>
+<h2 class="text-4xl md:text-5xl font-extrabold font-headline tracking-tight text-on-surface mb-4">Achievements</h2>
+<p class="text-on-surface-variant max-w-xl leading-relaxed">Your journey quantified through precision milestones. Every streak, every badge, and every completion is a testament to technical excellence.</p>
+</div>
+<div class="md:col-span-4 flex flex-col justify-end items-start md:items-end">
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-primary w-full md:w-auto">
+<p class="text-on-surface-variant text-[0.6875rem] font-label uppercase tracking-wider mb-1">Current Streak</p>
+<div class="flex items-baseline gap-2">
+<span class="text-4xl font-bold font-headline text-primary">24</span>
+<span class="text-on-surface-variant font-medium">Days</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
+<!-- Streak Highlight Card -->
+<div class="md:col-span-2 lg:col-span-2 bg-surface-container-low rounded-xl p-6 relative overflow-hidden flex flex-col justify-between h-64 border border-outline-variant/10">
+<div class="relative z-10">
+<span class="material-symbols-outlined text-primary mb-4" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<h3 class="text-xl font-bold font-headline mb-1">Consistency King</h3>
+<p class="text-on-surface-variant text-sm">30-day activity streak maintained.</p>
+</div>
+<div class="relative z-10">
+<div class="w-full bg-surface-dim h-1.5 rounded-full overflow-hidden mb-2">
+<div class="liquid-metal h-full w-[80%] rounded-full"></div>
+</div>
+<p class="text-[0.6875rem] font-label text-on-surface-variant tracking-wider uppercase">80% to Mastery</p>
+</div>
+<!-- Background Pattern -->
+<div class="absolute -right-4 -bottom-4 opacity-10">
+<span class="material-symbols-outlined text-9xl">speed</span>
+</div>
+</div>
+<!-- Milestone Grid -->
+<div class="md:col-span-2 lg:col-span-4 bg-surface-container rounded-xl p-6 border border-outline-variant/10">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-sm font-bold font-headline tracking-widest uppercase text-on-surface-variant">Milestone Badges</h3>
+<span class="text-primary text-[0.6875rem] font-label uppercase cursor-pointer hover:underline">View All</span>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+<!-- Badge 1 -->
+<div class="flex flex-col items-center text-center">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-3 group transition-all">
+<span class="material-symbols-outlined text-3xl text-primary group-hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 1;">hexagon</span>
+</div>
+<span class="text-xs font-semibold">First 100km</span>
+<span class="text-[10px] text-on-surface-variant mt-1 uppercase tracking-tighter">Completed</span>
+</div>
+<!-- Badge 2 -->
+<div class="flex flex-col items-center text-center">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-3 group transition-all">
+<span class="material-symbols-outlined text-3xl text-tertiary group-hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+</div>
+<span class="text-xs font-semibold">Elite Swimmer</span>
+<span class="text-[10px] text-on-surface-variant mt-1 uppercase tracking-tighter">Aug 2023</span>
+</div>
+<!-- Badge 3 -->
+<div class="flex flex-col items-center text-center">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-3 group transition-all opacity-40 grayscale">
+<span class="material-symbols-outlined text-3xl text-on-surface-variant" style="font-variation-settings: 'FILL' 0;">mountain_flag</span>
+</div>
+<span class="text-xs font-semibold">Summit Seeker</span>
+<span class="text-[10px] text-on-surface-variant mt-1 uppercase tracking-tighter">Locked</span>
+</div>
+<!-- Badge 4 -->
+<div class="flex flex-col items-center text-center">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-3 group transition-all">
+<span class="material-symbols-outlined text-3xl text-secondary group-hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<span class="text-xs font-semibold">Speed Demon</span>
+<span class="text-[10px] text-on-surface-variant mt-1 uppercase tracking-tighter">Sep 2023</span>
+</div>
+</div>
+</div>
+<!-- Training Stats Monolith -->
+<div class="md:col-span-2 lg:col-span-2 bg-surface-container-low rounded-xl p-8 border border-outline-variant/10 flex flex-col justify-between">
+<div>
+<h3 class="text-on-surface-variant text-[0.6875rem] font-label uppercase tracking-[0.2em] mb-8">Training Volume</h3>
+<div class="space-y-6">
+<div>
+<span class="block text-4xl font-bold font-headline leading-none">1,248</span>
+<span class="text-[0.6875rem] text-on-surface-variant font-label uppercase tracking-widest">Total Kilometers</span>
+</div>
+<div class="h-[2px] w-12 bg-primary/30"></div>
+<div>
+<span class="block text-4xl font-bold font-headline leading-none text-tertiary">42</span>
+<span class="text-[0.6875rem] text-on-surface-variant font-label uppercase tracking-widest">Sessions Monthly</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Active Challenges -->
+<div class="md:col-span-2 lg:col-span-4 bg-surface-container-high rounded-xl p-6 relative overflow-hidden group border border-primary/20">
+<div class="absolute inset-0 holographic-glow pointer-events-none"></div>
+<div class="relative z-10 flex flex-col md:flex-row gap-8 items-center">
+<div class="w-full md:w-1/3">
+<img alt="Challenge visual" class="rounded-lg h-40 w-full object-cover grayscale hover:grayscale-0 transition-all duration-700" data-alt="High-contrast black and white photography of a runner's silhouette against a foggy dawn landscape with a subtle teal color grade" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBN3wz6ZtCBbYlhQxXXtLuOzcoS8ObHGdhlqyyu9ON6kmvLfEh5ibSWOdDlvRMU6lXvuoOYKXlKKfcnOUBr27VBRwv04ZscC0x25d6MkgcSAZJ2kS99Pku16S58aFhfYXqGH7DITSaZJJukv2T9RJO0a3Wlueu_dQkKEP9w1PlkI3dgRSVbHuyfyWe2JhCjh9c6ebEHbCS91kfIB0dJddNUZRxvWITcmyMTELgaV3md0oKp28zzx1PP46o4mN86Er20OF57qNEYRho"/>
+</div>
+<div class="flex-1 text-center md:text-left">
+<div class="inline-flex items-center gap-2 bg-primary/10 text-primary px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest mb-3">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                            Live Challenge
+                        </div>
+<h3 class="text-2xl font-bold font-headline mb-2">The Iron Core Project</h3>
+<p class="text-on-surface-variant text-sm mb-6 max-w-md">Complete 20 high-intensity core sessions within 30 days to unlock the exclusive Graphite badge.</p>
+<button class="liquid-metal px-6 py-2 rounded text-on-primary-container font-label font-semibold text-sm active:scale-95 transition-transform">
+                            Join Challenge
+                        </button>
+</div>
+</div>
+</div>
+<!-- Secondary Metrics -->
+<div class="md:col-span-2 lg:col-span-3 bg-surface-container-low rounded-xl p-6 border border-outline-variant/10">
+<h3 class="text-xs font-bold font-label text-on-surface-variant uppercase tracking-[0.2em] mb-4">Challenge History</h3>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-3 bg-surface-dim rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-xl">check_circle</span>
+<span class="text-sm font-medium">Summer Sprint Series</span>
+</div>
+<span class="text-[10px] text-on-surface-variant font-label uppercase">July 2023</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-dim rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-xl">check_circle</span>
+<span class="text-sm font-medium">Vertical Climb 5K</span>
+</div>
+<span class="text-[10px] text-on-surface-variant font-label uppercase">June 2023</span>
+</div>
+</div>
+</div>
+<div class="md:col-span-2 lg:col-span-3 bg-surface-container-low rounded-xl p-6 border border-outline-variant/10">
+<h3 class="text-xs font-bold font-label text-on-surface-variant uppercase tracking-[0.2em] mb-4">Rankings</h3>
+<div class="flex items-center gap-6">
+<div class="flex-1">
+<p class="text-[0.6875rem] text-on-surface-variant uppercase mb-1">Global Percentile</p>
+<p class="text-3xl font-bold font-headline">Top 4%</p>
+</div>
+<div class="w-px h-12 bg-outline-variant/20"></div>
+<div class="flex-1">
+<p class="text-[0.6875rem] text-on-surface-variant uppercase mb-1">Local Rank</p>
+<p class="text-3xl font-bold font-headline text-tertiary">#12</p>
+</div>
+</div>
+<div class="mt-6 flex gap-1">
+<div class="h-1 flex-1 bg-primary rounded-full"></div>
+<div class="h-1 flex-1 bg-primary rounded-full"></div>
+<div class="h-1 flex-1 bg-primary rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container-highest rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container-highest rounded-full"></div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-zinc-950/60 backdrop-blur-xl rounded-t-xl border-none shadow-[0px_12px_32px_rgba(0,0,0,0.4)] md:hidden">
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 group transition-all" href="#">
+<span class="material-symbols-outlined group-hover:text-[#46f4cb]">speed</span>
+<span class="text-[10px] font-label mt-1 tracking-wider">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 group transition-all" href="#">
+<span class="material-symbols-outlined group-hover:text-[#46f4cb]">monitoring</span>
+<span class="text-[10px] font-label mt-1 tracking-wider">Activity</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 group transition-all" href="#">
+<span class="material-symbols-outlined group-hover:text-[#46f4cb]">workspace_premium</span>
+<span class="text-[10px] font-label mt-1 tracking-wider">Premium</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#46f4cb] bg-zinc-900/80 rounded-xl px-4 py-1.5 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="text-[10px] font-label mt-1 tracking-wider font-semibold">Profile</span>
+</a>
+</nav>
+</body></html>

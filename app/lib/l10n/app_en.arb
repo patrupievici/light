@@ -1,0 +1,44 @@
+{
+  "@@locale": "en",
+
+  "languageScreenTitle": "Language",
+  "@languageScreenTitle": {
+    "description": "Title of the UI-language picker screen (settings/language_screen.dart)."
+  },
+
+  "languageScreenEyebrow": "GENERAL",
+  "@languageScreenEyebrow": {
+    "description": "Small uppercase eyebrow label above the Language screen title."
+  },
+
+  "languageScreenNote": "Your display-language choice is stored on this device. Screens that have translations use it automatically.",
+  "@languageScreenNote": {
+    "description": "Explanatory note at the bottom of the Language picker."
+  },
+
+  "languagePreferenceSaved": "Language preference saved.",
+  "@languagePreferenceSaved": {
+    "description": "Snackbar confirmation shown after the user picks a UI language."
+  },
+
+  "save": "Save",
+  "@save": {
+    "description": "Generic Save button label."
+  },
+
+  "done": "Done",
+  "@done": {
+    "description": "Generic Done button label."
+  },
+
+  "workoutsCount": "{count, plural, =0{No workouts yet} =1{1 workout} other{{count} workouts}}",
+  "@workoutsCount": {
+    "description": "ICU plural example: how many workouts a user has logged.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  }
+}

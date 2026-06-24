@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PULSE - Activity Moment</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#006b57",
+                    "surface-container-high": "#292a2d",
+                    "outline-variant": "#3b4a44",
+                    "secondary": "#adc6ff",
+                    "on-primary": "#00382c",
+                    "tertiary": "#8ee7ff",
+                    "error": "#ffb4ab",
+                    "surface-container-low": "#1b1b1f",
+                    "surface-bright": "#38393c",
+                    "primary-fixed-dim": "#21dfb8",
+                    "surface": "#121316",
+                    "on-primary-container": "#005847",
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "primary-fixed": "#52fcd3",
+                    "inverse-surface": "#e3e2e6",
+                    "surface-container-highest": "#343538",
+                    "on-primary-fixed": "#002019",
+                    "surface-dim": "#121316",
+                    "on-error": "#690005",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "surface-container-lowest": "#0d0e11",
+                    "on-surface-variant": "#bacac3",
+                    "on-secondary-fixed-variant": "#004494",
+                    "inverse-on-surface": "#2f3034",
+                    "tertiary-container": "#35cfef",
+                    "on-tertiary-fixed": "#001f26",
+                    "surface-variant": "#343538",
+                    "on-surface": "#e3e2e6",
+                    "secondary-fixed": "#d8e2ff",
+                    "on-tertiary-container": "#005564",
+                    "on-error-container": "#ffdad6",
+                    "surface-tint": "#21dfb8",
+                    "outline": "#84948e",
+                    "on-secondary-container": "#e0e8ff",
+                    "on-primary-fixed-variant": "#005141",
+                    "on-secondary": "#002e69",
+                    "on-background": "#e3e2e6",
+                    "error-container": "#93000a",
+                    "background": "#121316",
+                    "primary": "#46f4cb",
+                    "surface-container": "#1f1f23",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "secondary-container": "#0264d4",
+                    "primary-container": "#00d7b0",
+                    "on-tertiary": "#003640",
+                    "tertiary-fixed": "#acedff",
+                    "on-secondary-fixed": "#001a41"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal-gradient {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .glass-panel {
+            background: rgba(52, 53, 56, 0.6);
+            backdrop-filter: blur(20px);
+        }
+        .data-glow-line {
+            filter: drop-shadow(0 0 4px rgba(70, 244, 203, 0.4));
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim text-on-surface font-body selection:bg-primary selection:text-on-primary">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex items-center justify-between px-6 h-16 bg-slate-950/60 backdrop-blur-xl no-border bg-slate-900/40">
+<div class="flex items-center gap-4">
+<button class="transition-transform scale-95 active:opacity-80">
+<span class="material-symbols-outlined text-slate-400">arrow_back</span>
+</button>
+<h1 class="font-['Manrope'] font-black tracking-[0.2em] text-[#F5F7FA] uppercase">PULSE</h1>
+</div>
+<div class="flex items-center gap-6">
+<span class="material-symbols-outlined text-slate-400 hover:text-[#46f4cb] transition-colors cursor-pointer">share</span>
+<span class="material-symbols-outlined text-slate-400 hover:text-[#46f4cb] transition-colors cursor-pointer">settings</span>
+</div>
+</header>
+<main class="pt-16 pb-24 max-w-5xl mx-auto px-4 md:px-8 lg:px-12">
+<!-- Hero Section: Activity Moment Card -->
+<section class="mt-8 mb-12">
+<div class="relative group overflow-hidden rounded-xl bg-surface-container-lowest">
+<div class="aspect-[16/9] w-full relative">
+<img alt="Athletic runner on urban coastal path" class="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" data-alt="Athletic runner in high-performance gear sprinting on an urban coastal path during twilight, with soft blue and teal ambient lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDskQ1_gUf2GsAgemhAcpZ9kmMa5aVJh5SjehkukmcNQP5UyEEbHKaWkJ-PZypK8GzycWJzQk8ynjk0xWrCWtpms61K4QeN2OCI8YSD9hJfmCxDPJgaFZmJcnCUqwhyaPiQErmXFUAmC8JWI_Tr9MCIvlSOxbgrBgc4hmdzR_UGh6qQi5kvHo-IPJ0MVunTOF59D_c4dRuE2erPl9bu86vHeqpoUNC0l4Ye-Ed6p6XUtkJFQoFUQ1TyzqzL5tBH1k8If9WPUGEOIKQ"/>
+<!-- Metric Overlay -->
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim via-transparent to-transparent"></div>
+<div class="absolute top-6 left-6 flex flex-col gap-1">
+<span class="font-label text-[10px] uppercase tracking-widest text-primary-fixed drop-shadow-md">Morning Run</span>
+<h2 class="font-headline font-extrabold text-3xl text-white tracking-tight">Vapor Trail Loop</h2>
+</div>
+<div class="absolute bottom-6 left-6 right-6 flex items-end justify-between">
+<div class="flex gap-8">
+<div class="flex flex-col">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Distance</span>
+<span class="font-headline font-bold text-2xl text-white">12.4<span class="text-sm font-medium ml-1">km</span></span>
+</div>
+<div class="flex flex-col">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Pace</span>
+<span class="font-headline font-bold text-2xl text-white">4'12"<span class="text-sm font-medium ml-1">/km</span></span>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<div class="w-12 h-12 rounded-full border-2 border-primary p-0.5">
+<img alt="Profile" class="w-full h-full object-cover rounded-full" data-alt="Close-up portrait of a determined female athlete with dark hair and striking eyes in soft moody gym lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7YEklnz_tY1h_PpM53TaZE6ToHvd6PrBnBl0TvPENGH891CH8xnjO3HbXBgTYh4VDFqFWPLPHtaj9zl_-QX68WO3ncQaF08T8PBAC1pUpPepW1M_pvjVA8HfzWDKsTA5VQpHOjGOgu7YC8Y1CH8K8my5rdXrbydHUz5MiYUPOGYpCSDPZMbVCaxb2jdJ-atHwSKKoQx_m5xO9sfl9eRFhTUBDiRY9CWOdHJW_7z3fNt6rlZuf5PDx2GryjyHDCJP0xlwSghIAAZ8"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Structured Data Bento -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
+<!-- Performance Chart -->
+<div class="md:col-span-8 bg-surface-container-low rounded-xl p-6 flex flex-col gap-6">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-headline font-bold text-on-surface">Pace Distribution</h3>
+<p class="font-label text-xs text-on-surface-variant">Efficiency analysis across all splits</p>
+</div>
+<span class="font-label text-xs font-semibold text-primary px-2 py-1 bg-primary/10 rounded">Live Feedback</span>
+</div>
+<div class="h-48 w-full flex items-end justify-between gap-1">
+<!-- Mock Chart Bars -->
+<div class="bg-primary/20 hover:bg-primary/40 transition-colors w-full h-[60%] rounded-t-sm"></div>
+<div class="bg-primary/20 hover:bg-primary/40 transition-colors w-full h-[45%] rounded-t-sm"></div>
+<div class="bg-primary/30 hover:bg-primary/60 transition-colors w-full h-[75%] rounded-t-sm"></div>
+<div class="bg-primary/40 hover:bg-primary/80 transition-colors w-full h-[90%] rounded-t-sm"></div>
+<div class="bg-primary-container hover:bg-primary transition-colors w-full h-[100%] rounded-t-sm data-glow-line"></div>
+<div class="bg-primary/60 hover:bg-primary/80 transition-colors w-full h-[85%] rounded-t-sm"></div>
+<div class="bg-primary/40 hover:bg-primary/60 transition-colors w-full h-[70%] rounded-t-sm"></div>
+<div class="bg-primary/30 hover:bg-primary/50 transition-colors w-full h-[55%] rounded-t-sm"></div>
+<div class="bg-primary/20 hover:bg-primary/40 transition-colors w-full h-[40%] rounded-t-sm"></div>
+<div class="bg-primary/10 hover:bg-primary/30 transition-colors w-full h-[25%] rounded-t-sm"></div>
+</div>
+</div>
+<!-- Stats Highlight -->
+<div class="md:col-span-4 grid grid-rows-2 gap-6">
+<div class="bg-surface-container-highest rounded-xl p-6 flex flex-col justify-center border-l-4 border-tertiary">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">Heart Rate Avg</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline font-extrabold text-4xl text-on-surface">164</span>
+<span class="font-label text-sm text-tertiary font-medium">BPM</span>
+</div>
+</div>
+<div class="bg-surface-container rounded-xl p-6 flex flex-col justify-center border-l-4 border-primary">
+<span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">Effort Score</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline font-extrabold text-4xl text-on-surface">8.4</span>
+<span class="font-label text-sm text-primary font-medium">Elite</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Split Summary Table -->
+<section class="mb-12">
+<h3 class="font-headline font-bold text-lg text-on-surface mb-6 ml-1">Split Analysis</h3>
+<div class="bg-surface-container-low rounded-xl overflow-hidden">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface-container-high/50">
+<th class="px-6 py-4 font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Lap</th>
+<th class="px-6 py-4 font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Time</th>
+<th class="px-6 py-4 font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Pace</th>
+<th class="px-6 py-4 font-label text-[10px] uppercase tracking-widest text-on-surface-variant text-right">Elevation</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<tr class="hover:bg-surface-container/50 transition-colors">
+<td class="px-6 py-4 font-headline font-bold text-on-surface">1</td>
+<td class="px-6 py-4 font-label text-sm text-on-surface-variant">04:18</td>
+<td class="px-6 py-4 font-label text-sm text-on-surface-variant">4'18"/km</td>
+<td class="px-6 py-4 font-label text-sm text-primary text-right">+12m</td>
+</tr>
+<tr class="hover:bg-surface-container/50 transition-colors">
+<td class="px-6 py-4 font-headline font-bold text-on-surface">2</td>
+<td class="px-6 py-4 font-label text-sm text-on-surface-variant">04:12</td>
+<td class="px-6 py-4 font-label text-sm text-on-surface-variant">4'12"/km</td>
+<td class="px-6 py-4 font-label text-sm text-primary text-right">+4m</td>
+</tr>
+<tr class="hover:bg-surface-container/50 transition-colors bg-primary/5">
+<td class="px-6 py-4 font-headline font-bold text-primary">3</td>
+<td class="px-6 py-4 font-label text-sm text-on-surface-variant">04:05</td>
+<td class="px-6 py-4 font-label text-sm text-on-surface-variant">4'05"/km</td>
+<td class="px-6 py-4 font-label text-sm text-primary text-right">-2m</td>
+</tr>
+<tr class="hover:bg-surface-container/50 transition-colors">
+<td class="px-6 py-4 font-headline font-bold text-on-surface">4</td>
+<td class="px-6 py-4 font-label text-sm text-on-surface-variant">04:15</td>
+<td class="px-6 py-4 font-label text-sm text-on-surface-variant">4'15"/km</td>
+<td class="px-6 py-4 font-label text-sm text-primary text-right">+8m</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Social Activity -->
+<section class="mb-12">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline font-bold text-lg text-on-surface ml-1">Debrief &amp; Reaction</h3>
+<div class="flex gap-2">
+<button class="bg-surface-container-high px-3 py-1.5 rounded-full flex items-center gap-2 hover:bg-primary/20 transition-all border border-outline-variant/20">
+<span class="material-symbols-outlined text-sm text-primary" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface">Elite Pace</span>
+</button>
+<button class="bg-surface-container-high px-3 py-1.5 rounded-full flex items-center gap-2 hover:bg-tertiary/20 transition-all border border-outline-variant/20">
+<span class="material-symbols-outlined text-sm text-tertiary" style="font-variation-settings: 'FILL' 1;">speed</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface">Top Split</span>
+</button>
+</div>
+</div>
+<div class="space-y-4">
+<!-- Comment 1 -->
+<div class="flex gap-4 p-4 rounded-xl bg-surface-container-lowest border border-transparent hover:border-outline-variant/20 transition-all">
+<div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-surface-container-highest">
+<img alt="Avatar" class="w-full h-full object-cover" data-alt="Headshot of a male athlete with short hair and athletic build in high-contrast professional studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCND-moPk2bQ23kFsb-IJBHklB3_5mj8vgVYfzMBB2C5jyTgQxYaBC9eMah9yYEXm2fFpIQXPLEP0t6LhrXxj6owUcHV7zC75NVkBP7aifCKwsDwa2_xSZvq-o4jMOE_L9JdkX-3Py-3L6iMmlog5kew1FbFhHa2xYZMcTlzQwJYMaI1YjQQIxkQVoVgMlkx6q75No7rc2pMd6fondPM2K_I97zeoQdpP08N2bjjh77ChRGFRJ8eudqPMvfBPqtdw9EOsIJBVwInxc"/>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-baseline gap-2">
+<span class="font-headline font-bold text-sm text-on-surface">Marcus Chen</span>
+<span class="font-label text-[10px] text-on-surface-variant">2h ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed">Solid split on that 3rd lap. Elevation gain there is no joke. Great form.</p>
+<div class="flex items-center gap-4 mt-2">
+<button class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter text-primary">
+<span class="material-symbols-outlined text-xs">keyboard_arrow_up</span> 12
+                            </button>
+<button class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant">
+                                Reply
+                            </button>
+</div>
+</div>
+</div>
+<!-- Comment 2 -->
+<div class="flex gap-4 p-4 rounded-xl bg-surface-container-lowest border border-transparent hover:border-outline-variant/20 transition-all">
+<div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-surface-container-highest">
+<img alt="Avatar" class="w-full h-full object-cover" data-alt="Close-up portrait of a determined female athlete with dark hair and striking eyes in soft moody gym lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAkpNg0S231D_0WP-JFcQgXZzLJRM3fvGhJaQ09aBwfHj0YqRLyXcMGhjMPtyssVOr_8F67MblSqiHDig1KDNZPjnDi4CSmQWyTkSU3msFtbfpxpSKaGCyaLwosbHPFOzmo2GFg8WRuSB2bc_ci3Ook3ZzB6dgMiSp7JjebRMpPO8Mwzh43CHzpJ4G6rlus1iCQ0O6Zce9ErjWlVVO807tA81U14lpq2E7HoMhlhW0Ki_u26AH_ThPyf3_Vm9ERVp_LhZZWkdr_ZOo"/>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-baseline gap-2">
+<span class="font-headline font-bold text-sm text-on-surface">Elena Rodriguez</span>
+<span class="font-label text-[10px] text-on-surface-variant">5h ago</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed">That heart rate recovery post-run is insane. What's your secret for zone 2 work?</p>
+<div class="flex items-center gap-4 mt-2">
+<button class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant">
+<span class="material-symbols-outlined text-xs">keyboard_arrow_up</span> 4
+                            </button>
+<button class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant">
+                                Reply
+                            </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Input Area -->
+<div class="mt-8 flex gap-4 items-center">
+<div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-surface-container-highest">
+<img alt="Current User" class="w-full h-full object-cover grayscale" data-alt="Athletic user profile image" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAj2Xyn1joWiMROQIqtGkBV0xC3aGonHFOVgtv3ARe_ajV2aZ8PmKifAXysLJuVEb_znleFgOf9SCoJjSFYLizKcND_Ma85zf1ugNFjDk4wjM6DBDFert4Vb6sq_JL372XQXaMxP8W4dDeIWxSanhhs7PoR3oE5Cr9I8Tiqxn0AiBWyaadPYV-uIWNIInjENEsyV2-6Sx4topf3Zku0bdCpdWx9sFaatHVYpIb4Dom7vv_6dhzbr_e-obh5RFHztlDfbneRkoh6U2I"/>
+</div>
+<div class="flex-1 relative">
+<input class="w-full bg-surface-container-lowest border-none border-b-2 border-outline-variant focus:border-primary focus:ring-0 text-sm py-3 px-0 transition-all placeholder:text-on-surface-variant/40" placeholder="Add technical insight..." type="text"/>
+<button class="absolute right-0 top-1/2 -translate-y-1/2 text-primary font-label text-[10px] font-bold uppercase tracking-widest">Post</button>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe bg-slate-950/60 backdrop-blur-xl no-border bg-slate-900/40">
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all cursor-pointer">
+<span class="material-symbols-outlined">home</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all cursor-pointer">
+<span class="material-symbols-outlined">fitness_center</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Workout</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all cursor-pointer">
+<span class="material-symbols-outlined">insights</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Progress</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#46f4cb] font-bold transition-all cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Social</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-slate-200 transition-all cursor-pointer">
+<span class="material-symbols-outlined">person</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-wider uppercase">Profile</span>
+</div>
+</nav>
+</body></html>

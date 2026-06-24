@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&amp;family=Inter:wght@300;400;600&amp;family=Space+Grotesk:wght@400;700&amp;family=Space+Mono:wght@400;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-fixed-dim": "#adc6ff",
+                    "on-tertiary": "#003640",
+                    "on-primary-container": "#005847",
+                    "inverse-surface": "#e3e2e6",
+                    "background": "#121316",
+                    "tertiary-container": "#35cfef",
+                    "surface-container-low": "#1b1b1f",
+                    "secondary-fixed": "#d8e2ff",
+                    "on-secondary-fixed": "#001a41",
+                    "on-surface": "#e3e2e6",
+                    "surface-container": "#1f1f23",
+                    "on-error": "#690005",
+                    "tertiary": "#8ee7ff",
+                    "surface-container-highest": "#343538",
+                    "on-primary-fixed": "#002019",
+                    "on-secondary-container": "#e0e8ff",
+                    "on-primary-fixed-variant": "#005141",
+                    "primary": "#46f4cb",
+                    "secondary-container": "#0264d4",
+                    "error-container": "#93000a",
+                    "tertiary-fixed": "#acedff",
+                    "outline-variant": "#3b4a44",
+                    "surface-variant": "#343538",
+                    "surface-container-lowest": "#0d0e11",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-surface-variant": "#bacac3",
+                    "surface-dim": "#121316",
+                    "surface-bright": "#38393c",
+                    "on-tertiary-fixed": "#001f26",
+                    "primary-container": "#00d7b0",
+                    "on-error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "on-background": "#e3e2e6",
+                    "secondary": "#adc6ff",
+                    "on-secondary": "#002e69",
+                    "outline": "#84948e",
+                    "inverse-primary": "#006b57",
+                    "inverse-on-surface": "#2f3034",
+                    "error": "#ffb4ab",
+                    "primary-fixed": "#52fcd3",
+                    "surface": "#121316",
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-primary": "#00382c",
+                    "surface-tint": "#21dfb8",
+                    "on-tertiary-container": "#005564",
+                    "surface-container-high": "#292a2d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Space Grotesk"],
+                    "mono": ["Space Mono"]
+            }
+          },
+        },
+      }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuDgRavl5kXjUftgSh32-NmOmthW9b3p4fZh0Zsb0A2bkpkLXSHZwE1g6weJZypZ_3yajpDp3xP5xMGjCgsXOAznWDakJSHXM3AZVBq0cG1tbv2xDZ9VgQidbzanHbYGHR7jFEr49ltc54nZjX36nJKYEk2RHnmBn3ELJSBlLdh6_xhALhkZhk8-LkU8cpsPUMWBZ1cgsxIGDi-91vzmyX1_i_XM2X3uSbXMGChWRk59AZik_HFihJn0I-VUoDo-dSLOt3Bc_QnYrII);
+    opacity: 0.05
+    }
+.dual-glow {
+    background: radial-gradient(circle at 10% 20%, rgba(74, 141, 255, 0.1) 0%, transparent 40%), radial-gradient(circle at 90% 80%, rgba(0, 215, 176, 0.1) 0%, transparent 40%)
+    }
+.beast-gradient-border {
+    padding: 1px;
+    background: linear-gradient(135deg, #00D7B0, transparent)
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-on-primary min-h-screen">
+<div class="fixed inset-0 grain-overlay pointer-events-none"></div>
+<div class="fixed inset-0 dual-glow pointer-events-none"></div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#121316]/80 backdrop-blur-lg border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<button class="text-[#00D7B0] hover:opacity-80 transition-opacity active:scale-95 transition-transform">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="text-2xl font-[800] tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0] font-headline uppercase">ZVELT</h1>
+<button class="text-[#00D7B0] hover:opacity-80 transition-opacity active:scale-95 transition-transform">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-2xl mx-auto space-y-8 relative">
+<!-- Editorial Header -->
+<div class="space-y-2">
+<div class="flex items-center gap-2">
+<span class="bg-surface-container-highest px-3 py-1 rounded-full text-[10px] font-mono font-bold text-tertiary tracking-wider">👥 MODULE 06</span>
+</div>
+<h2 class="text-[40px] font-headline font-extrabold leading-tight tracking-tight">Pack Feed</h2>
+</div>
+<!-- Beast Card (User Status) -->
+<div class="beast-gradient-border rounded-xl">
+<div class="bg-surface-container-low rounded-[calc(0.75rem-1px)] p-6 flex items-center gap-6">
+<div class="relative">
+<div class="w-20 h-20 rounded-full border-2 border-primary overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="close-up artistic portrait of a majestic grey wolf with intense golden eyes and sharp detail in dark dramatic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuARgPXv7-viWn6-JHpnc5eUKo-2uE5vYFDl3OHYl-QgTyOZ9F7ZrYmVJLgwiMQu8SR3x_0ZV1Wtp3KFKo0TulncJOZOyBrU8zRfTeQppKGLfJMeP9XipM58lLibyT-JECCat9_WsB--zJcYZbeE-9Jj2x8_tBmNV3ciqIrdMpawp-3n95xZfRq_86wtWY7I7kSNj4h2x1FxH3mKsQsB7FAwOZ2d-rRqaYZtCgH-UyH7nMCQmUyYghzdxxBuGVpkhgcnHwCOdhdeqIQ"/>
+</div>
+<div class="absolute -bottom-1 -right-1 bg-primary text-on-primary text-[10px] font-mono font-bold px-2 py-1 rounded-md">LV.14</div>
+</div>
+<div class="flex-1 space-y-3">
+<div class="flex justify-between items-end">
+<h3 class="text-xl font-headline font-extrabold text-on-surface">Similea</h3>
+<span class="font-mono text-xs text-on-surface-variant">68% XP</span>
+</div>
+<div class="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-secondary-container to-primary-container" style="width: 68%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Pack Activity Feed -->
+<div class="space-y-4">
+<div class="flex justify-between items-center px-2">
+<h4 class="font-mono font-bold text-xs uppercase text-on-surface-variant tracking-widest">Recent Pack Activity</h4>
+<span class="material-symbols-outlined text-outline-variant">more_horiz</span>
+</div>
+<!-- Feed Item 01 -->
+<div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-5 space-y-4 relative overflow-hidden group">
+<div class="flex items-start gap-4">
+<div class="w-12 h-12 rounded-lg bg-surface-container-high flex-shrink-0 overflow-hidden border border-white/5">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="portrait of a determined male athlete with short hair and athletic build in a dark moody gym environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjTO4AoiFZ4BilFrr7uLySGMqCrelhazzZecxtBN2ufUC-vWkpzRm0vtNfGmb-oS0mC8esVPF_TgsI7vBHn37VmKX-0JqJ5fsfFIlixa341iYdU2_abMJDr30113-CpqUh1BKMD3FaJNG5AY2GzkicfP_eGpgZb9n2S8VkJYKGv3_CI5JTadT8mir5b2p9uXSRrG7lfteZSJvsdZhWqu52GunIeRFfqk1CYHFEOUikk8WcsJmTsCgS4QsnUowyktbP6WcqNGK_6Dc"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-on-surface font-semibold text-sm">Ciprian <span class="text-on-surface-variant font-normal">destroyed a</span></p>
+<p class="text-tertiary font-headline font-extrabold text-lg">5KM NIGHT SPRINT</p>
+</div>
+<span class="bg-primary/10 text-primary px-2 py-1 rounded font-mono text-[10px] font-bold">+450 XP</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-2 font-mono">14:22 MIN • PACE 2:52</p>
+</div>
+</div>
+<div class="flex items-center gap-3 pt-2">
+<button class="flex items-center gap-2 bg-gradient-to-r from-secondary-container/20 to-primary-container/20 border border-primary/20 px-4 py-2 rounded-full active:scale-95 transition-transform group/btn">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-headline font-bold text-xs text-primary uppercase">Hype</span>
+</button>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border border-background bg-surface-container-highest"></div>
+<div class="w-6 h-6 rounded-full border border-background bg-surface-container-high"></div>
+<div class="w-6 h-6 rounded-full border border-background flex items-center justify-center bg-surface-container-low text-[8px] font-bold">+8</div>
+</div>
+</div>
+</div>
+<!-- Feed Item 02 -->
+<div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-5 space-y-4 relative overflow-hidden group">
+<div class="flex items-start gap-4">
+<div class="w-12 h-12 rounded-lg bg-surface-container-high flex-shrink-0 overflow-hidden border border-white/5">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="focused athletic man during high intensity workout with dramatic rim lighting and sweat details" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUbruZXD_E6acyhoUQomfemwAzesqxmfivQDmy_EzHC7RPi1Ra7GuuKgCMZKNtkoBMgxkgJFQzS5PARhVaIEcq7soiwsyzbLpToNZ-w8Lj0MSNULyFG-HGLXqkj18cisPMf_hscVEGxsVnn8BnfGts8swyvIBXHIsA_cBI-zAVGMnyzPKhZdWgHJhWhbOONXWzDk6Vg0jtcwUhsxlHl-f8z5bLD--Pk9kCYtkSMKYWdMsHLHnuLim5KsktrOW5OIef-ZkLMlBDDgA"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-on-surface font-semibold text-sm">Andrei <span class="text-on-surface-variant font-normal">reached level</span></p>
+<p class="text-secondary font-headline font-extrabold text-lg uppercase">Apex Predator</p>
+</div>
+<span class="bg-secondary/10 text-secondary px-2 py-1 rounded font-mono text-[10px] font-bold">+1.2K XP</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-2 font-mono">STREAK: 14 DAYS</p>
+</div>
+</div>
+<div class="flex items-center gap-3 pt-2">
+<button class="flex items-center gap-2 bg-surface-container-highest border border-white/5 px-4 py-2 rounded-full active:scale-95 transition-transform group/btn">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">bolt</span>
+<span class="font-headline font-bold text-xs text-on-surface-variant uppercase">Hype</span>
+</button>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border border-background bg-surface-container-highest"></div>
+<div class="w-6 h-6 rounded-full border border-background flex items-center justify-center bg-surface-container-low text-[8px] font-bold">+3</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Sticky CTA -->
+<div class="pt-4">
+<button class="w-full bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0] text-on-primary py-4 rounded-full font-headline font-extrabold uppercase tracking-widest text-sm shadow-[0_8px_30px_rgba(74,141,255,0.3)] hover:opacity-90 active:scale-95 transition-all">
+                Continue
+            </button>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 bg-[#121316]/90 backdrop-blur-xl border-t border-white/5 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+<a class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">bolt</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#00D7B0] bg-gradient-to-b from-[#00D7B0]/10 to-transparent p-3 relative after:content-[''] after:absolute after:top-0 after:w-1/2 after:h-[2px] after:bg-[#00D7B0] active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">emoji_events</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-600 p-3 hover:text-[#4A8DFF] transition-colors active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">person</span>
+</a>
+</nav>
+</body></html>

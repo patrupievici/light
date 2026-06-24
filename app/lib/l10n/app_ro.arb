@@ -1,0 +1,11 @@
+{
+  "@@locale": "ro",
+
+  "languageScreenTitle": "Limbă",
+  "languageScreenEyebrow": "GENERAL",
+  "languageScreenNote": "Alegerea limbii de afișare este salvată pe acest dispozitiv. Ecranele traduse o folosesc automat.",
+  "languagePreferenceSaved": "Preferința de limbă a fost salvată.",
+  "save": "Salvează",
+  "done": "Gata",
+  "workoutsCount": "{count, plural, =0{Niciun antrenament încă} =1{1 antrenament} other{{count} antrenamente}}"
+}

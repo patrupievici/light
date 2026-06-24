@@ -1,0 +1,16 @@
+# Flutter gen-l10n configuration (i18n scaffold).
+#
+# Reads the ARB files under lib/l10n and generates AppLocalizations. This is the
+# foundation + pattern only — ONE pilot screen (settings/language_screen.dart) is
+# migrated to prove the pipeline end to end. Full migration is incremental.
+#
+# Output is written into the project tree (not the deprecated synthetic package)
+# so it imports cleanly as `package:zvelt_app/l10n/gen/app_localizations.dart`.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+output-dir: lib/l10n/gen
+# Keep English copy for any key missing in another locale (e.g. the ro skeleton)
+# so the UI stays fully rendered while translations land incrementally.
+nullable-getter: false

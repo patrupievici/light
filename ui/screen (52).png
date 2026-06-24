@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT — Attribution</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&amp;family=Inter:wght@300;400;600&amp;family=Space+Grotesk:wght@400;700&amp;family=Space+Mono:wght@400;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-fixed-dim": "#adc6ff",
+                    "on-tertiary": "#003640",
+                    "on-primary-container": "#005847",
+                    "inverse-surface": "#e3e2e6",
+                    "background": "#121316",
+                    "tertiary-container": "#35cfef",
+                    "surface-container-low": "#1b1b1f",
+                    "secondary-fixed": "#d8e2ff",
+                    "on-secondary-fixed": "#001a41",
+                    "on-surface": "#e3e2e6",
+                    "surface-container": "#1f1f23",
+                    "on-error": "#690005",
+                    "tertiary": "#8ee7ff",
+                    "surface-container-highest": "#343538",
+                    "on-primary-fixed": "#002019",
+                    "on-secondary-container": "#e0e8ff",
+                    "on-primary-fixed-variant": "#005141",
+                    "primary": "#46f4cb",
+                    "secondary-container": "#0264d4",
+                    "error-container": "#93000a",
+                    "tertiary-fixed": "#acedff",
+                    "outline-variant": "#3b4a44",
+                    "surface-variant": "#343538",
+                    "surface-container-lowest": "#0d0e11",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-surface-variant": "#bacac3",
+                    "surface-dim": "#121316",
+                    "surface-bright": "#38393c",
+                    "on-tertiary-fixed": "#001f26",
+                    "primary-container": "#00d7b0",
+                    "on-error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "on-background": "#e3e2e6",
+                    "secondary": "#adc6ff",
+                    "on-secondary": "#002e69",
+                    "outline": "#84948e",
+                    "inverse-primary": "#006b57",
+                    "inverse-on-surface": "#2f3034",
+                    "error": "#ffb4ab",
+                    "primary-fixed": "#52fcd3",
+                    "surface": "#121316",
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-primary": "#00382c",
+                    "surface-tint": "#21dfb8",
+                    "on-tertiary-container": "#005564",
+                    "surface-container-high": "#292a2d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Space Grotesk"],
+                    "mono": ["Space Mono"]
+            }
+          },
+        },
+      }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuAdRWTLQ6iKSJA5XiiuRzGBAbWpPOOuTIOofyMiHjCtFYvYeHkEmumONYdMgdVgSpv_TOaQgMOsJADLPqQuJIRf29HpkM94cWrrEpg5quiUhznsWbuarRwY7OgBr-yvuiQ8WJ-jQwHMNkvlng2qq-Bz8pqvq5UZpXbA2kQ9TWbyVRulcDYRC_NmnrxRQjB0Yrr2xwdHdiPXEuXHTEZWaHHWi_es7p9bRrYqYVLZJlo8OW9-hy6DDLGMrwY3Q07EgVgkNVrxy_bQxWE);
+    filter: contrast(150%) brightness(1000%);
+    opacity: 0.03;
+    pointer-events: none
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary/30">
+<div class="fixed inset-0 grain-overlay z-[100]"></div>
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#121316]/80 backdrop-blur-lg border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<div class="flex items-center gap-4">
+<button class="active:scale-95 transition-transform hover:opacity-80 transition-opacity text-[#00D7B0]">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<span class="text-2xl font-[800] tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0]">ZVELT</span>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-6 font-['Manrope'] font-extrabold uppercase tracking-widest text-sm">
+<a class="text-slate-500 hover:opacity-80 transition-opacity" href="#">Pulse</a>
+<a class="text-slate-500 hover:opacity-80 transition-opacity" href="#">Metrics</a>
+<a class="text-slate-500 hover:opacity-80 transition-opacity" href="#">Elite</a>
+</nav>
+<button class="active:scale-95 transition-transform hover:opacity-80 transition-opacity text-slate-500">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</header>
+<main class="min-h-screen pt-28 pb-32 px-6 max-w-2xl mx-auto flex flex-col relative">
+<!-- Atmospheric Depth Gradient -->
+<div class="fixed top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-gradient-to-b from-secondary-container/10 to-transparent pointer-events-none -z-10"></div>
+<!-- Section Title -->
+<div class="mb-10 text-center md:text-left">
+<p class="font-mono text-[10px] tracking-widest text-primary uppercase mb-2">Discovery Protocol</p>
+<h1 class="font-headline font-[800] text-4xl md:text-5xl leading-tight tracking-tight">
+                How did you find <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0]">ZVELT</span>?
+            </h1>
+</div>
+<!-- Attribution Options Grid -->
+<div class="space-y-4">
+<!-- Option Row: Instagram (Checked) -->
+<label class="group relative flex items-center justify-between p-6 bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-xl cursor-pointer hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="photo_camera">photo_camera</span>
+</div>
+<span class="font-headline font-semibold text-lg tracking-tight">Instagram</span>
+</div>
+<div class="relative flex items-center justify-center">
+<input checked="" class="peer hidden" type="checkbox"/>
+<div class="w-6 h-6 border-2 border-outline-variant rounded-md transition-all peer-checked:bg-primary-container peer-checked:border-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-sm font-bold scale-0 peer-checked:scale-100 transition-transform" data-icon="check" data-weight="fill">check</span>
+</div>
+</div>
+</label>
+<!-- Option Row: TikTok (Checked) -->
+<label class="group relative flex items-center justify-between p-6 bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-xl cursor-pointer hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="movie_filter">movie_filter</span>
+</div>
+<span class="font-headline font-semibold text-lg tracking-tight">TikTok</span>
+</div>
+<div class="relative flex items-center justify-center">
+<input checked="" class="peer hidden" type="checkbox"/>
+<div class="w-6 h-6 border-2 border-outline-variant rounded-md transition-all peer-checked:bg-primary-container peer-checked:border-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-sm font-bold scale-0 peer-checked:scale-100 transition-transform" data-icon="check" data-weight="fill">check</span>
+</div>
+</div>
+</label>
+<!-- Option Row: Google -->
+<label class="group relative flex items-center justify-between p-6 bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-xl cursor-pointer hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="search">search</span>
+</div>
+<span class="font-headline font-semibold text-lg tracking-tight">Google</span>
+</div>
+<div class="relative flex items-center justify-center">
+<input class="peer hidden" type="checkbox"/>
+<div class="w-6 h-6 border-2 border-outline-variant rounded-md transition-all peer-checked:bg-primary-container peer-checked:border-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-sm font-bold scale-0 peer-checked:scale-100 transition-transform" data-icon="check" data-weight="fill">check</span>
+</div>
+</div>
+</label>
+<!-- Option Row: YouTube -->
+<label class="group relative flex items-center justify-between p-6 bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-xl cursor-pointer hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="play_circle">play_circle</span>
+</div>
+<span class="font-headline font-semibold text-lg tracking-tight">YouTube</span>
+</div>
+<div class="relative flex items-center justify-center">
+<input class="peer hidden" type="checkbox"/>
+<div class="w-6 h-6 border-2 border-outline-variant rounded-md transition-all peer-checked:bg-primary-container peer-checked:border-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-sm font-bold scale-0 peer-checked:scale-100 transition-transform" data-icon="check" data-weight="fill">check</span>
+</div>
+</div>
+</label>
+<!-- Option Row: X -->
+<label class="group relative flex items-center justify-between p-6 bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-xl cursor-pointer hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="post_add">post_add</span>
+</div>
+<span class="font-headline font-semibold text-lg tracking-tight">X</span>
+</div>
+<div class="relative flex items-center justify-center">
+<input class="peer hidden" type="checkbox"/>
+<div class="w-6 h-6 border-2 border-outline-variant rounded-md transition-all peer-checked:bg-primary-container peer-checked:border-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-sm font-bold scale-0 peer-checked:scale-100 transition-transform" data-icon="check" data-weight="fill">check</span>
+</div>
+</div>
+</label>
+<!-- Option Row: App Store -->
+<label class="group relative flex items-center justify-between p-6 bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-xl cursor-pointer hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="app_store">store</span>
+</div>
+<span class="font-headline font-semibold text-lg tracking-tight">App Store</span>
+</div>
+<div class="relative flex items-center justify-center">
+<input class="peer hidden" type="checkbox"/>
+<div class="w-6 h-6 border-2 border-outline-variant rounded-md transition-all peer-checked:bg-primary-container peer-checked:border-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-sm font-bold scale-0 peer-checked:scale-100 transition-transform" data-icon="check" data-weight="fill">check</span>
+</div>
+</div>
+</label>
+<!-- Option Row: Word of mouth -->
+<label class="group relative flex items-center justify-between p-6 bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-xl cursor-pointer hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="forum">forum</span>
+</div>
+<span class="font-headline font-semibold text-lg tracking-tight">Word of mouth</span>
+</div>
+<div class="relative flex items-center justify-center">
+<input class="peer hidden" type="checkbox"/>
+<div class="w-6 h-6 border-2 border-outline-variant rounded-md transition-all peer-checked:bg-primary-container peer-checked:border-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-sm font-bold scale-0 peer-checked:scale-100 transition-transform" data-icon="check" data-weight="fill">check</span>
+</div>
+</div>
+</label>
+<!-- Option Row: Other -->
+<label class="group relative flex items-center justify-between p-6 bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-xl cursor-pointer hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="more_horiz">more_horiz</span>
+</div>
+<span class="font-headline font-semibold text-lg tracking-tight">Other</span>
+</div>
+<div class="relative flex items-center justify-center">
+<input class="peer hidden" type="checkbox"/>
+<div class="w-6 h-6 border-2 border-outline-variant rounded-md transition-all peer-checked:bg-primary-container peer-checked:border-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-sm font-bold scale-0 peer-checked:scale-100 transition-transform" data-icon="check" data-weight="fill">check</span>
+</div>
+</div>
+</label>
+</div>
+<!-- Footer Action -->
+<div class="mt-12 mb-8 sticky bottom-8">
+<button class="w-full h-16 bg-gradient-to-r from-[#4A8DFF] to-[#00D7B0] rounded-full flex items-center justify-center font-headline font-bold text-lg text-on-primary shadow-[0_8px_32px_rgba(74,141,255,0.3)] hover:scale-[1.02] active:scale-95 transition-all duration-300">
+                Continue
+                <span class="material-symbols-outlined ml-2" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<p class="text-center mt-4 font-mono text-[10px] text-slate-500 uppercase tracking-widest">Step 3 of 5 • Profile Setup</p>
+</div>
+</main>
+<!-- Side Data Strip (HUD Element) -->
+<div class="hidden lg:flex fixed left-8 top-1/2 -translate-y-1/2 flex-col gap-8 pointer-events-none opacity-40">
+<div class="flex items-center gap-2 font-mono text-xs text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="radar">radar</span>
+            SCANNING SOURCE
+        </div>
+<div class="h-40 w-[1px] bg-gradient-to-b from-transparent via-outline-variant to-transparent mx-auto"></div>
+<div class="[writing-mode:vertical-lr] font-mono text-[10px] text-slate-600 tracking-[0.4em] uppercase">
+            attribution_module_v1.0.8
+        </div>
+</div>
+</body></html>

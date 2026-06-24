@@ -1,0 +1,1018 @@
+Da. Direct: Zvelt trebuie reinventat ca “hardcore gym tracker + food tracker + social challenges”, nu ca platforma de biology. Ai gresit cand ai incercat sa sari direct spre Whoop / Oura / AI health platform. Acolo intri in date, wearables, algoritmi, recovery, HRV, validare, costuri si bugs. Pentru lansare, e prea mult.
+
+Pozitionarea noua ar trebui sa fie:
+
+Zvelt — train hard, track clean, compete with friends.
+
+Nu suna complicat. Nu promite magie. Promite ceva ce poti construi.
+
+⸻
+
+1. Directia produsului
+
+Ce pastrezi pentru MVP
+
+Zvelt v1 trebuie sa aiba doar 4 piloni:
+
+Pilon	Ce face	Prioritate
+Gym tracker hardcore	log workout rapid, seturi, PR, volum, progresie	10/10
+Nutrition tracker	calorii, proteine, mese, target zilnic	8/10
+Social feed	postezi workout-uri, progres, provocari	7/10
+AI simplu	plan antrenament + plan alimentar	6/10
+
+Ce scoti temporar
+
+Scoate complet din prima lansare:
+
+* biology
+* recovery score
+* HRV
+* sleep score
+* stress score
+* integrare complexa cu ceasuri
+* AI coach care “te intelege” continuu
+* dashboard-uri medicale
+
+Astea sunt update-uri de versiune 2 sau 3.
+
+⸻
+
+2. Competitorii de care trebuie sa tii cont
+
+Zvelt nu trebuie sa concureze direct cu toate aplicatiile fitness. Trebuie sa iei cate ceva din fiecare.
+
+Aplicatie	Ce merita copiat	De ce
+Hevy	logging simplu, social, progres	Hevy se pozitioneaza pe workout logging, progress tracking si socializing, adica fix triunghiul unde poate intra Zvelt.  
+Liftosaur	progresii automate, programe strength	Liftosaur pune accent pe progressive overload automat si ajustare greutati/repetari dupa logica definita de user.  
+Strava	feed, kudos, competitie usoara	Nu copia sport tracking-ul, copia sentimentul de comunitate.
+Apple Fitness	UI curat, cards, contrast bun	Apple recomanda culori adaptabile la light/dark mode si contrast ridicat pentru text.  
+
+Concluzie: Zvelt trebuie sa fie mai social decat Liftosaur, mai serios decat Hevy, mai simplu decat un AI health coach.
+
+⸻
+
+3. Structura principala a aplicatiei
+
+As face 5 tab-uri jos:
+
+Home | Train | Food | Feed | Profile
+
+Nu as pune “AI” ca tab principal. AI-ul trebuie sa fie un buton contextual, nu o sectiune separata care pare neterminata.
+
+De ce?
+
+Pentru ca userul intra in aplicatie pentru actiuni clare:
+
+* log workout
+* log food
+* vezi progres
+* vezi ce fac prietenii
+* porneste o provocare
+
+AI-ul il ajuta, dar nu trebuie sa para ca produsul depinde de el.
+
+⸻
+
+4. Design style: Zvelt Clean Hardcore
+
+Nu premium exagerat. Nu luxury. Nu black-gold. Nu efecte 3D multe.
+
+Directia buna:
+
+clean
+sportiv
+putin agresiv
+usor de implementat
+bun in light si dark mode
+
+Stil vizual
+
+* carduri rotunjite moderat: 16px radius
+* spacing mare: 16px / 20px / 24px
+* iconite simple line icons
+* grafice minimaliste
+* o singura culoare accent
+* butoane mari, clare
+* font fara figuri: Inter, SF Pro, Geist sau Manrope
+
+Paleta recomandata
+
+Light mode
+
+Element	Culoare
+Background	#F7F5F1
+Card	#FFFFFF
+Card secundar	#EEEAE7
+Text principal	#171512
+Text secundar	#6E6860
+Border	#DDD8D2
+Accent	#FF6A2A
+
+Dark mode
+
+Element	Culoare
+Background	#11100E
+Card	#1B1916
+Card secundar	#24211D
+Text principal	#F4F1EA
+Text secundar	#A9A198
+Border	#34302A
+Accent	#FF7A3D
+
+Pastreaza logo-ul Zvelt alb pe fundal inchis, dar foloseste portocaliul doar pentru actiuni: Start Workout, Add Set, Save Meal, Join Challenge.
+
+⸻
+
+5. UX flow principal
+
+Zvelt trebuie construit in jurul unui loop simplu:
+
+Open app
+↓
+Start workout / log food
+↓
+See progress
+↓
+Post or challenge
+↓
+Get feedback
+↓
+Come back tomorrow
+
+Asta e produsul. Nu AI-ul. Nu biology-ul.
+
+⸻
+
+6. Ecranele aplicatiei
+
+6.1 Splash screen
+
+Foarte simplu:
+
+ZVELT logo
+dark background
+small text: Train. Track. Compete.
+
+Nu animatie lunga. Maxim 1 secunda.
+
+⸻
+
+6.2 Onboarding
+
+3 ecrane, nu 10.
+
+Screen 1 — Goal
+
+What are you training for?
+Build Muscle
+Lose Fat
+Get Stronger
+Stay Consistent
+
+Screen 2 — Experience
+
+Training level
+Beginner
+Intermediate
+Advanced
+
+Screen 3 — Setup
+
+How many days per week?
+2 / 3 / 4 / 5 / 6
+
+Dupa asta:
+
+Create my plan
+
+Aici bagi AI simplu.
+
+⸻
+
+7. Home screen
+
+Home-ul trebuie sa fie dashboard de azi, nu muzeu de grafice.
+
+Layout
+
+Top:
+Good evening, Razvan
+Today, 23 June
+Main card:
+Start Workout
+Small cards:
+Calories
+Protein
+Workout
+Steps optional
+Progress strip:
+Weekly consistency 3/5 workouts
+Social preview:
+Alex just completed Push Day
+
+Exemplu vizual
+
+Good evening, Razvan
+[ Start Workout ]
+Today
+Calories        2,140 / 3,000
+Protein         142g / 180g
+Workout         Push Day pending
+This week
+3 / 5 workouts completed
+Friend activity
+Marius hit a new bench PR: 100kg
+
+Regula importanta
+
+Butonul Start Workout trebuie sa fie cel mai vizibil element din aplicatie.
+
+⸻
+
+8. Train screen — partea cea mai importanta
+
+Aici trebuie sa bagi cea mai multa atentie.
+
+Train are 4 sub-zone:
+
+Routines | Start Empty | Exercises | History
+
+8.1 Routines
+
+Carduri simple:
+
+Push Day
+Chest • Shoulders • Triceps
+6 exercises · 58 min
+Pull Day
+Back • Biceps
+7 exercises · 64 min
+Leg Day
+Quads • Hamstrings • Calves
+6 exercises · 70 min
+
+Fiecare card are:
+
+* Start
+* Edit
+* Duplicate
+* Share
+
+8.2 Active workout screen
+
+Asta trebuie sa fie rapid, nu frumos degeaba.
+
+Push Day
+00:42:18
+Bench Press
+Previous: 80kg x 8
+Set    Kg    Reps    RPE
+1      80    8       8
+2      80    8       8
+3      82.5  6       9
+[+ Add set]
+[Rest timer 01:30]
+Incline DB Press
+...
+
+Functii obligatorii pentru hardcore gym tracker
+
+Functie	MVP?	De ce
+Add set rapid	Da	baza
+Previous workout visible	Da	progres
+Rest timer	Da	foarte important
+Warmup set	Da	standard gym
+Drop set	Da	util
+Superset	Da, simplu	diferentiator
+RPE / RIR	Da, optional	pentru useri seriosi
+Notes per exercise	Da	util
+Custom exercise	Da	obligatoriu
+Plate calculator	Da	usor, valoros
+PR detection	Da	retention
+Auto progression	Da, simplu	diferentiator major
+Full program scripting	Nu	prea greu acum
+
+8.3 Auto progression simplu
+
+Nu copia complexitatea Liftosaur complet. Ia ideea de baza: userul nu trebuie sa ghiceasca mereu greutatea urmatoare. Liftosaur deja foloseste progressive overload si ajustare automata a greutatilor/repetarilor pe baza logicii setate.  
+
+Pentru Zvelt v1:
+
+If user completes all sets at target reps:
++2.5kg next time
+If user misses target by more than 2 reps:
+same weight next time
+If user fails 2 sessions in a row:
+-5% deload
+
+Asta e suficient.
+
+⸻
+
+9. Exercise detail screen
+
+Cand apesi pe Bench Press:
+
+Bench Press
+Best set
+100kg x 3
+Estimated 1RM
+110kg
+Last 6 sessions
+line chart
+History
+23 Jun — 80kg x 8, 80kg x 8, 82.5kg x 6
+18 Jun — 80kg x 8, 80kg x 7, 80kg x 6
+
+Grafice aici
+
+Pentru fiecare exercitiu:
+
+* best weight
+* estimated 1RM
+* total volume
+* total reps
+
+Nu mai mult.
+
+⸻
+
+10. Food screen
+
+Nu transforma Zvelt in MyFitnessPal. Nu poti bate MyFitnessPal pe baza de date.
+
+Fa-l simplu:
+
+Today
+Calories
+2,140 / 3,000
+Protein
+142g / 180g
+Carbs
+250g
+Fat
+70g
+Meals
+Breakfast
+Lunch
+Dinner
+Snacks
+[+ Add Food]
+[+ Quick Add Calories]
+[AI Meal Plan]
+
+Functii MVP
+
+* quick add calories
+* quick add protein
+* save meal
+* repeat yesterday
+* barcode later, nu acum daca nu e facut
+* AI meal plan simplu
+* target calorii / proteine
+
+Observatie critica
+
+Daca ai nutrition tracker functional, nu-l complica. Pentru gym users, proteina + calorii conteaza mai mult decat 40 de micronutrienti in prima versiune.
+
+⸻
+
+11. AI screen / AI modal
+
+Nu tab separat. Il faci ca bottom sheet.
+
+AI in Train
+
+Buton:
+
+Generate Plan
+
+Input simplu:
+
+Goal: Build muscle / Lose fat / Strength
+Days per week: 3 / 4 / 5 / 6
+Experience: Beginner / Intermediate / Advanced
+Equipment: Gym / Home / Dumbbells
+Injuries: optional
+
+Output:
+
+4 Day Muscle Plan
+Day 1 Push
+Day 2 Pull
+Day 3 Legs
+Day 4 Upper
+[Save as routine]
+[Edit plan]
+
+AI in Food
+
+Buton:
+
+Create Meal Plan
+
+Input:
+
+Goal
+Calories
+Protein target
+Meals per day
+Foods you dislike
+Budget: low / medium / high
+
+Output:
+
+7 day meal plan
+
+Foarte important
+
+Nu il numi “AI Coach” in prima versiune. Numele mai bun:
+
+AI Plan Builder
+
+De ce? Pentru ca “coach” promite interactiune continua si responsabilitate. “Plan Builder” promite un output clar, controlabil.
+
+⸻
+
+12. Feed screen
+
+Feed-ul nu trebuie sa fie Instagram. Trebuie sa fie activitate fitness.
+
+Post types
+
+Workout completed
+New PR
+Progress photo
+Challenge update
+Meal target hit
+
+Card feed
+
+Razvan completed Push Day
+Volume: 12,430kg
+Duration: 58 min
+PR: Bench Press 100kg x 3
+[Respect] [Comment] [Challenge]
+
+Reactiile trebuie sa fie fitness-specific:
+
+Respect
+Strong
+Beast
+Clean work
+
+Nu doar like.
+
+Ce nu trebuie sa faci
+
+Nu baga:
+
+* reels
+* stories complexe
+* filtre video
+* chat complicat
+* explore page mare
+
+Astea mananca timp si nu ajuta MVP-ul.
+
+⸻
+
+13. Challenges
+
+Ai zis ceva foarte bun aici: flotari in 30 zile, volum ridicat, grupuri. Asta poate fi diferentiatorul Zvelt.
+
+Dar trebuie simplificat.
+
+Tipuri de challenge pentru v1
+
+Challenge	Cum se masoara	Bun pentru
+Most workouts in 30 days	numar workout-uri	consistenta
+Most volume lifted	kg total	gym hardcore
+Push-up challenge	reps total	grupuri
+Bench press volume	kg total pe bench	strength
+Protein streak	zile target atins	nutrition
+Weight loss challenge	kg pierdute	risky, as pune mai tarziu
+
+Challenge screen
+
+Challenges
+Active
+June Volume War
+You are #2
+124,500kg lifted
+Friends
+Push-up 30 Day
+435 / 1000 reps
+Create Challenge
+
+Create challenge
+
+Challenge type
+- Volume
+- Reps
+- Workouts completed
+- Exercise specific
+- Nutrition streak
+Duration
+7 / 14 / 30 days
+Privacy
+Friends / Group / Public
+
+⸻
+
+14. Gamification fara prostii
+
+Aici trebuie sa fii atent. Gamification-ul prost face aplicatia sa para ieftina.
+
+Studiile pe gamification si mHealth folosesc des Self-Determination Theory: motivatia e sustinuta de autonomy, competence, relatedness — adica userul simte ca are control, ca devine mai bun si ca e conectat cu altii.  
+
+Deci Zvelt nu trebuie sa dea “diamante”. Trebuie sa dea:
+
+1. Competence
+
+Userul simte ca progreseaza.
+
+New PR
++2.5kg since last month
+Best volume this week
+
+2. Autonomy
+
+Userul simte ca alege singur.
+
+Choose your split
+Edit AI plan
+Skip exercise
+Replace movement
+
+3. Relatedness
+
+Userul simte ca nu e singur.
+
+Friends trained today
+Challenge leaderboard
+Respect reaction
+Group goal
+
+Asta e gamification-ul corect pentru Zvelt.
+
+⸻
+
+15. Achievement-uri recomandate
+
+Nu exagera. Maxim 20 achievements in prima versiune.
+
+Exemple bune
+
+Achievement	Trigger
+First Workout	primul workout logat
+7 Day Streak	7 zile activitate
+10 Workouts	10 antrenamente
+100 Sets Logged	100 seturi
+First PR	primul personal record
+Volume Beast	100,000kg total volume
+Protein Locked	7 zile target proteina
+Consistent Month	12 workouts intr-o luna
+Challenge Winner	castiga challenge
+Comeback	revine dupa 7 zile pauza
+
+Ce sa nu faci
+
+* level 1-100
+* coins
+* shop
+* avatar skins
+* loot boxes
+* badge-uri peste tot
+* sunete multe
+
+Alea duc aplicatia spre joc mobil, nu spre fitness serios.
+
+⸻
+
+16. Grafice recomandate
+
+Pastreaza doar grafice care ajuta decizia userului.
+
+Dashboard Progress
+
+Body weight
+Calories
+Protein
+Workout consistency
+
+Train analytics
+
+Volume lifted
+Estimated 1RM
+Sets per muscle group
+Workout frequency
+
+Food analytics
+
+Calories weekly average
+Protein hit rate
+Weight vs calories
+
+Social / challenge analytics
+
+Leaderboard
+Rank movement
+Team progress
+
+Cel mai bun grafic pentru retention
+
+Calendar heatmap.
+
+Gen:
+
+Mon Tue Wed Thu Fri Sat Sun
+■   ■   □   ■   □   ■   □
+■   ■   ■   □   ■   □   ■
+
+Userul vede lantul. Nu vrea sa-l rupa. E simplu si puternic.
+
+⸻
+
+17. Profile screen
+
+Profile-ul trebuie sa arate ca un “fitness identity card”.
+
+Razvan
+Build Muscle · Intermediate
+Stats
+82kg
+18 workouts this month
+124,500kg volume
+5 PRs
+Personal Records
+Bench Press 100kg
+Squat 140kg
+Deadlift 180kg
+Progress Photos
+Before / After
+Achievements
+
+Public profile
+
+Cand altcineva iti vede profilul:
+
+Follow
+Challenge
+Copy routine
+
+Asta e cheia sociala. Userii trebuie sa poata copia rutina altuia.
+
+Hevy deja foloseste componenta sociala: follow friends, copy routines, profile public/private.   Zvelt trebuie sa faca asta, dar cu provocari mai vizibile.
+
+⸻
+
+18. Settings
+
+Nu complica.
+
+Account
+Units: kg / lbs
+Theme: system / light / dark
+Privacy
+Notifications
+Health integrations - later
+Subscription
+Export data
+Delete account
+
+Include neaparat:
+
+* private profile
+* public profile
+* who can challenge me
+* who can see my workouts
+
+Social fitness fara privacy bun devine problema.
+
+⸻
+
+19. Notificari care aduc userul inapoi
+
+Nu spam.
+
+Notificari bune
+
+You are 1 workout away from completing your week.
+Alex just passed you in June Volume War.
+Your next Push Day is ready.
+You hit protein 5 days in a row. Keep it clean today.
+
+Notificari proaste
+
+Come back to Zvelt!
+You are losing your streak!
+Don't be lazy!
+
+Nu folosi guilt. Merge pe termen scurt, strica produsul pe termen lung.
+
+⸻
+
+20. Layout concret pentru fiecare tab
+
+Home
+
+Header
+- greeting
+- date
+- profile icon
+Hero CTA
+- Start Workout
+Today cards
+- calories
+- protein
+- workout
+- streak
+Weekly card
+- calendar heatmap
+Friend card
+- latest friend activity
+
+Train
+
+Header
+- Train
+- + Create routine
+Tabs
+- Routines
+- History
+- Exercises
+Routine cards
+- name
+- muscle groups
+- duration
+- start button
+
+Active Workout
+
+Sticky top
+- workout name
+- timer
+- finish
+Exercise block
+- name
+- previous best
+- set rows
+- add set
+- rest timer
+Bottom
+- add exercise
+- notes
+- finish workout
+
+Food
+
+Header
+- Food
+- date selector
+Macro cards
+- calories
+- protein
+- carbs/fat smaller
+Meals
+- breakfast
+- lunch
+- dinner
+- snacks
+Actions
+- quick add
+- add food
+- AI meal plan
+
+Feed
+
+Header
+- Feed
+- create post
+Filters
+- Friends
+- Challenges
+- PRs
+Feed cards
+- workout summary
+- reaction buttons
+- challenge button
+
+Profile
+
+Header
+- avatar
+- name
+- goal
+Stats
+- workouts
+- volume
+- PRs
+- streak
+Sections
+- PRs
+- progress photos
+- achievements
+- routines
+
+⸻
+
+21. Cel mai important ecran: Active Workout
+
+Daca Active Workout e slab, Zvelt moare.
+
+Trebuie sa fie:
+
+* rapid
+* clar
+* folosibil cu o mana
+* vizibil in sala
+* text mare
+* butoane mari
+* fara animatii inutile
+* fara feed in timpul workout-ului
+
+Regula mea
+
+In timpul workout-ului, userul trebuie sa poata loga un set in maximum 2-3 atingeri.
+
+Exemplu:
+
+Tap reps
+Tap check
+Rest timer starts
+
+Daca il faci sa navigheze prin 4 ecrane, ai pierdut.
+
+⸻
+
+22. Ce as pune in prima versiune platita
+
+Pentru monetizare:
+
+Free
+
+* log workouts
+* basic food tracking
+* 3 routines
+* social feed
+* join challenges
+
+Pro — £4.99/month
+
+* unlimited routines
+* AI plan builder
+* AI meal plan
+* advanced graphs
+* custom progression rules
+* private groups
+* progress photo comparison
+* export data
+
+Atentie: nu pune logging-ul de baza dupa paywall. Asta omoara cresterea.
+
+⸻
+
+23. Ce faci cu biology mai tarziu
+
+Il transformi in:
+
+Zvelt Recovery
+
+Dar dupa ce ai utilizatori.
+
+V2:
+
+* sleep input manual
+* soreness check-in
+* energy rating
+* stress rating
+
+V3:
+
+* Apple Health / Google Fit
+* HRV
+* resting heart rate
+* readiness score
+
+V4:
+
+* AI adaptive plan
+
+Nu incepe cu V4.
+
+⸻
+
+24. Critica directa pe ipotezele tale
+
+1. “Claude termina socialul in 2h”
+
+Asta e o ipoteza slaba. Poate termina UI-ul, nu produsul.
+
+Social inseamna:
+
+* post privacy
+* delete post
+* report
+* block user
+* comments
+* notifications
+* feed sorting
+* abuse handling
+* challenge validation
+
+Deci nu presupune ca e gata doar pentru ca arata bine.
+
+2. “Nutrition tracker e functional”
+
+Functional nu inseamna bun.
+
+Trebuie testat:
+
+* cat de rapid adaugi o masa
+* daca targeturile sunt clare
+* daca userul intelege caloriile ramase
+* daca poti repeta mese
+* daca datele nu se pierd
+
+3. “AI simplu e usor”
+
+Tehnic e usor. Product-wise nu e chiar asa.
+
+Trebuie sa eviti promisiuni medicale. Spune “plan suggestion”, nu “diagnosis”, “treatment” sau “medical advice”.
+
+4. “Hardcore gym tracker” poate deveni prea complicat
+
+Hardcore nu inseamna 100 de setari. Inseamna:
+
+rapid
+precis
+progresie buna
+istoric clar
+
+⸻
+
+25. Roadmap pragmatic
+
+Versiunea de lansare
+
+Workout tracker bun
+Nutrition tracker simplu
+Social feed functional
+Challenges basic
+AI plan builder
+AI meal plan
+Light/dark mode
+Profile
+Basic subscription
+
+Update 1
+
+Progress photos
+More charts
+Better challenge types
+Copy friend's routine
+Exercise video/gifs
+
+Update 2
+
+Auto progression avansat
+Groups
+Private clubs
+Program marketplace
+
+Update 3
+
+Apple Health / Google Fit
+Sleep
+Recovery
+Readiness
+
+⸻
+
+26. Verdictul meu
+
+Zvelt nu trebuie sa fie:
+
+AI biology fitness platform
+
+Trebuie sa fie:
+
+un gym tracker rapid, social si motivational
+
+Fraza produsului:
+
+Zvelt helps you log serious workouts, track food, and compete with friends without turning fitness into a complicated health dashboard.
+
+Asta e mult mai usor de lansat si mai credibil.
+
+Prioritatea absoluta:
+
+1. Active Workout screen
+2. Routine builder
+3. Progress charts
+4. Food quick add
+5. Social challenge flow
+6. AI plan builder
+
+Daca astea 6 sunt bune, Zvelt poate fi publicat intr-o forma realista. Biology-ul nu este abandonat. Doar nu mai are voie sa blocheze lansarea

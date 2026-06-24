@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT Widgets Home Screen</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#0264d4",
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "primary-container": "#00d7b0",
+                    "on-surface-variant": "#bacac3",
+                    "surface-bright": "#38393c",
+                    "outline": "#84948e",
+                    "on-tertiary": "#003640",
+                    "on-primary-fixed": "#002019",
+                    "surface-container-high": "#292a2d",
+                    "inverse-surface": "#e3e2e6",
+                    "on-primary-fixed-variant": "#005141",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-tertiary-container": "#005564",
+                    "on-secondary-fixed": "#001a41",
+                    "on-surface": "#e3e2e6",
+                    "surface-variant": "#343538",
+                    "secondary": "#adc6ff",
+                    "on-secondary-fixed-variant": "#004494",
+                    "secondary-fixed": "#d8e2ff",
+                    "inverse-primary": "#006b57",
+                    "on-secondary": "#002e69",
+                    "on-primary": "#00382c",
+                    "surface-container-low": "#1b1b1f",
+                    "on-error": "#690005",
+                    "surface-dim": "#121316",
+                    "outline-variant": "#3b4a44",
+                    "background": "#121316",
+                    "tertiary-fixed": "#acedff",
+                    "on-error-container": "#ffdad6",
+                    "tertiary": "#8ee7ff",
+                    "primary": "#46f4cb",
+                    "on-secondary-container": "#e0e8ff",
+                    "primary-fixed": "#52fcd3",
+                    "surface-container": "#1f1f23",
+                    "on-tertiary-fixed": "#001f26",
+                    "on-background": "#e3e2e6",
+                    "surface-container-lowest": "#0d0e11",
+                    "surface-tint": "#21dfb8",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "error-container": "#93000a",
+                    "on-primary-container": "#005847",
+                    "error": "#ffb4ab",
+                    "tertiary-container": "#35cfef",
+                    "surface-container-highest": "#343538",
+                    "inverse-on-surface": "#2f3034",
+                    "surface": "#121316"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem",
+                    "widget": "1.25rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .widget-glow {
+            box-shadow: 0px 4px 24px rgba(0, 0, 0, 0.6);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim font-body text-on-surface selection:bg-primary/30">
+<!-- Mobile Device Frame Simulator -->
+<div class="min-h-screen flex items-center justify-center p-4">
+<div class="relative w-full max-w-[390px] h-[844px] bg-[#0d0e11] rounded-[3rem] overflow-hidden border-[8px] border-[#1b1b1f] widget-glow">
+<!-- Wallpaper Background -->
+<div class="absolute inset-0 z-0">
+<div class="w-full h-full bg-gradient-to-br from-[#121316] via-[#1b1b1f] to-[#0d0e11]" data-alt="Dark abstract background with subtle deep teal atmospheric glow and grainy texture for a premium tech feel"></div>
+</div>
+<!-- Top App Bar (Shared Component Logic Applied) -->
+<header class="relative z-10 flex justify-between items-center px-8 pt-12 pb-6">
+<span class="text-2xl font-headline font-extrabold tracking-tighter text-[#F5F7FA]">ZVELT</span>
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container border border-outline-variant flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait silhouette of a determined athlete in high contrast moody lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLZoEApmUi-9Z76u02ghSIg__J7ZGTQcpYUSUAaKwoTqtnNyXcmSQlH5MBDeMmybHNuJxrbw72gt9uZkXPKdGrU8ErlyUQPEg9_9D-SGCeOMQw6BL22sMF3jmkmZkFsnmEoGV_BE6xR9AmRdF6Oc4aNQLCT19lNP2nS2fKklD2-y70_vbXW9jHIvxS2FetsB-vulP7ulAM4FI5IOpiivvaiqo_uW-lbJJCDtec5vSXxQXEGh7hUME_H9RW5B7zG5Stpvccy9eUZTE"/>
+</div>
+</div>
+</header>
+<!-- Home Screen Content (Widget Grid) -->
+<main class="relative z-10 px-6 space-y-4">
+<!-- Weekly Progress Widget (Medium) -->
+<section class="bg-surface-container-low rounded-widget p-5 widget-glow border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div>
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">Weekly Training</p>
+<h2 class="font-headline text-2xl font-bold text-primary">12.4<span class="text-sm font-medium text-on-surface-variant ml-1">hrs</span></h2>
+</div>
+<span class="material-symbols-outlined text-primary-fixed-dim" data-icon="insights">insights</span>
+</div>
+<div class="flex items-end justify-between h-24 gap-2 px-1">
+<div class="flex-1 bg-surface-variant rounded-t-sm h-[40%]"></div>
+<div class="flex-1 bg-surface-variant rounded-t-sm h-[65%]"></div>
+<div class="flex-1 bg-surface-variant rounded-t-sm h-[30%]"></div>
+<div class="flex-1 bg-primary rounded-t-sm h-[90%] shadow-[0_0_12px_rgba(70,244,203,0.3)]"></div>
+<div class="flex-1 bg-surface-variant rounded-t-sm h-[50%]"></div>
+<div class="flex-1 bg-surface-variant rounded-t-sm h-[75%]"></div>
+<div class="flex-1 bg-surface-variant rounded-t-sm h-[20%]"></div>
+</div>
+<div class="flex justify-between mt-2 px-1">
+<span class="text-[9px] font-medium text-on-surface-variant">M</span>
+<span class="text-[9px] font-medium text-on-surface-variant">T</span>
+<span class="text-[9px] font-medium text-on-surface-variant">W</span>
+<span class="text-[9px] font-medium text-primary">T</span>
+<span class="text-[9px] font-medium text-on-surface-variant">F</span>
+<span class="text-[9px] font-medium text-on-surface-variant">S</span>
+<span class="text-[9px] font-medium text-on-surface-variant">S</span>
+</div>
+</section>
+<div class="grid grid-cols-2 gap-4">
+<!-- Streak Widget (Small) -->
+<section class="bg-surface-container-low rounded-widget p-5 widget-glow border border-outline-variant/10 flex flex-col justify-between aspect-square">
+<div class="flex justify-between items-start">
+<div class="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="bolt" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+</div>
+<div>
+<h3 class="font-headline text-lg font-bold leading-tight">12 Day Streak</h3>
+<div class="grid grid-cols-7 gap-1 mt-3">
+<div class="h-1 rounded-full bg-primary"></div>
+<div class="h-1 rounded-full bg-primary"></div>
+<div class="h-1 rounded-full bg-primary"></div>
+<div class="h-1 rounded-full bg-primary"></div>
+<div class="h-1 rounded-full bg-primary"></div>
+<div class="h-1 rounded-full bg-primary"></div>
+<div class="h-1 rounded-full bg-surface-variant"></div>
+</div>
+</div>
+</section>
+<!-- Profile/Quick Start Placeholder -->
+<section class="bg-surface-container-low rounded-widget p-5 widget-glow border border-outline-variant/10 flex flex-col items-center justify-center aspect-square text-center">
+<div class="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-on-primary-container text-2xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+<p class="font-label text-xs font-bold uppercase tracking-widest text-on-surface">Start Workout</p>
+</section>
+</div>
+<!-- Social Activity Widget (Medium) -->
+<section class="bg-surface-container-low rounded-widget p-5 widget-glow border border-outline-variant/10">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Friends Active Now</h3>
+<div class="flex -space-x-2">
+<div class="w-5 h-5 rounded-full border border-surface-container-low overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close up face of a male runner with sweat on brow in moody lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNnMr7qJ0MGLsDXKpL8SJuqye0k2Ydr-Oy4lLM5_1or5u9cSMS_p3IygamSHs-3Nzv9kteXbHGb6FNiQ5tb0BZuGE0sW9RWoGEnwrIPEn5mum-qIjzoQytCIH0D_SXkKUVptbl8ShYjK6bGGqOXTiKlpBONQ_C9ZYzkPn06TQfKcwep0T7V7tnpwj21hy4RwndL6LlxN-zts6aOKFgrRbqFjatOpAG8QkVS4o_cEFLxKaYYCJW0VNkd__31FkiRsfDH8JX5k7xoLs"/>
+</div>
+<div class="w-5 h-5 rounded-full border border-surface-container-low overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait of a female athlete focused and ready for training" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZAdTMfxl6hZ-jZwHBXsNTJLiLTG77L_YbaxHUFBEJu8KD5eBcGPnQ5aNONazpB-RiVgA55G46xnowqgV2o8Q3aptTff9yq_CM6LPOtkBA1gg1-nDW1LPv8ZWB6VBX3l_isXYrqlisZ0CFBiKznsVRVZo6UAfXkBqfaN202YBQ0dMS1JdlaqXq0e-wRqxngrVqSlKRopgsG2HtMX6wr4R8_TTUEMkhMZHQvbcIuaiJdxeVhUXmN-049kOIYKIPIlvX2jK6I6XPAjg"/>
+</div>
+</div>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="Headshot of a male athlete with intense gaze" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAN6kvao7tORlhXozC2IIqaYQY_yDDNqi3RJvr3jzIy7a9pFvg-UXAW7c77sIcJMXjnYT2f5NIytTn3TJ4eMdDl3dBd_RiqGdsWHGS50s3szcMEWaMSZnkF8GGvdqdm45AQRFG1jnlGtQF5RWfR7Go9OW0yhf2Q2H_IG2rYis_odmAuRmqwhNkCMPefhXxeEBiuhAlgTyzDzMHfiICwlaGOc1VScqEFGaGSn72l52qMA1KNz4rgJfp9dgxjHc-usobttHYNf5wUD9s"/>
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-surface-container-low shadow-[0_0_8px_rgba(70,244,203,0.5)]"></div>
+</div>
+<div class="flex-1 border-b border-outline-variant/10 pb-2">
+<p class="text-sm font-semibold text-on-surface">Adrian</p>
+<p class="text-xs text-on-surface-variant">10k Performance Run</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="Smiling female athlete after a workout" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAr2-YBuMm0f8MNXW0n61L8HBQrA92IM_lB6Nv1vkfgXGiDxIumjT3OyD-Q1l-qmdpUwTjchW_Xk5Qt1ahgINAmBn66qvIFDyPxQWEW8gPOeLkhoIALTtGFnldRbO_Wp6sMYiCQVzlzwLFHKZx6rzSMytQVSO5CCVxy13TRI3zERxaWjaOeqKhHhRH3ZLz6G6cHMqtJuN1PQbwtySndLvF3BeadQ6LLSg3owIbXIGSGI92CPbuJIp-Elcxbx-U6GG5gHGb7cN_K15Q"/>
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-surface-container-low shadow-[0_0_8px_rgba(70,244,203,0.5)]"></div>
+</div>
+<div class="flex-1">
+<p class="text-sm font-semibold text-on-surface">Elena</p>
+<p class="text-xs text-on-surface-variant">High-Intensity HIIT</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Shell (Shared Component Logic) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-3 pb-8 bg-[#121316]/90 backdrop-blur-2xl border-t border-[#1f1f23] z-50">
+<div class="flex flex-col items-center justify-center text-[#46f4cb] bg-[#1f1f23] rounded-lg px-3 py-1 scale-90 transition-all duration-200">
+<span class="material-symbols-outlined text-xl" data-icon="grid_view" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span class="font-inter text-[10px] font-medium tracking-wide">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:bg-[#292a2d] transition-all">
+<span class="material-symbols-outlined text-xl" data-icon="insights">insights</span>
+<span class="font-inter text-[10px] font-medium tracking-wide">Activity</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:bg-[#292a2d] transition-all">
+<span class="material-symbols-outlined text-xl" data-icon="groups">groups</span>
+<span class="font-inter text-[10px] font-medium tracking-wide">Social</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#A7B0BC] opacity-60 hover:bg-[#292a2d] transition-all">
+<span class="material-symbols-outlined text-xl" data-icon="person">person</span>
+<span class="font-inter text-[10px] font-medium tracking-wide">Profile</span>
+</div>
+</nav>
+<!-- Device Bottom Indicator -->
+<div class="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-surface-variant rounded-full z-50"></div>
+</div>
+</div>
+</body></html>

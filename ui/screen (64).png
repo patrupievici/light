@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "outline": "#84948e",
+                        "on-secondary-container": "#e0e8ff",
+                        "surface-container-lowest": "#0d0e11",
+                        "secondary-container": "#0264d4",
+                        "on-surface-variant": "#bacac3",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#121316",
+                        "primary-fixed-dim": "#21dfb8",
+                        "on-primary-fixed-variant": "#005141",
+                        "on-background": "#e3e2e6",
+                        "surface-tint": "#21dfb8",
+                        "primary-container": "#00d7b0",
+                        "on-surface": "#e3e2e6",
+                        "on-primary-container": "#005847",
+                        "surface-container-highest": "#343538",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "on-tertiary-fixed": "#001f26",
+                        "surface-container-low": "#1b1b1f",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#2f3034",
+                        "primary-fixed": "#52fcd3",
+                        "primary": "#46f4cb",
+                        "tertiary-container": "#35cfef",
+                        "error-container": "#93000a",
+                        "on-tertiary": "#003640",
+                        "surface-container-high": "#292a2d",
+                        "on-secondary-fixed-variant": "#004494",
+                        "on-secondary": "#002e69",
+                        "on-primary-fixed": "#002019",
+                        "secondary-fixed": "#d8e2ff",
+                        "background": "#121316",
+                        "secondary": "#adc6ff",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "outline-variant": "#3b4a44",
+                        "on-secondary-fixed": "#001a41",
+                        "inverse-primary": "#006b57",
+                        "on-error": "#690005",
+                        "tertiary": "#8ee7ff",
+                        "surface-container": "#1f1f23",
+                        "surface-bright": "#38393c",
+                        "on-tertiary-container": "#005564",
+                        "surface-variant": "#343538",
+                        "surface": "#121316",
+                        "tertiary-fixed": "#acedff",
+                        "on-primary": "#00382c",
+                        "inverse-surface": "#e3e2e6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal-bg {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .glass-panel {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim text-on-surface font-body selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<button class="text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<span class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</span>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 text-sm tracking-wide" href="#">Dashboard</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 text-sm tracking-wide" href="#">Activity</a>
+<a class="text-[#46f4cb] font-semibold text-sm tracking-wide" href="#">Premium</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 text-sm tracking-wide" href="#">Profile</a>
+</nav>
+<div class="h-8 w-8 rounded-full bg-surface-container-high overflow-hidden">
+<img alt="User avatar" class="w-full h-full object-cover" data-alt="close-up portrait of a fit professional athlete with a clean minimalist background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCM77EPNeZCRepkYFUDGeI88RcaHGQRxWYp-caF_1YtCqRaozZtfMsvVTHjg-LUCiBCHymnj5zQiCaVLUZak9Cg_QTIM65UIYktzt9hZlmqH1j5Cn0mf7JqA217roaPi9VIxA_QRaiv5gvHeo3QSyuoWltq7SeKJGIPdn5SQsMW8QmXRaH16yeTOto22j91n09871FIGpP1dNmDyxTwuFH0Tqt_ScoVd-vpuJ85evW_LF7ladUjvPWhd6mqlQhmw71zgHEOQ3A1TwU"/>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-7xl mx-auto">
+<!-- Hero Section -->
+<section class="mb-16">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+<div class="max-w-2xl">
+<span class="text-primary font-label text-xs font-bold tracking-[0.2em] uppercase mb-3 block">Elevated Performance</span>
+<h1 class="text-4xl md:text-6xl font-headline font-extrabold text-on-surface tracking-tighter leading-tight mb-4">
+                        ZVELT <span class="text-transparent bg-clip-text liquid-metal-bg">ELITE</span>
+</h1>
+<p class="text-on-surface-variant text-lg leading-relaxed max-w-lg">
+                        Precision analytics for the uncompromising athlete. Turn biometric noise into a roadmap for peak human performance.
+                    </p>
+</div>
+<div class="flex items-center gap-3 bg-surface-container-low p-1.5 rounded-xl">
+<button class="px-6 py-2.5 rounded-lg text-sm font-semibold bg-surface-container-high text-on-surface shadow-sm">Monthly</button>
+<button class="px-6 py-2.5 rounded-lg text-sm font-semibold text-on-surface-variant hover:text-on-surface transition-all">Yearly</button>
+</div>
+</div>
+<!-- Bento Grid Features -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+<!-- Large Main Feature -->
+<div class="md:col-span-8 group relative overflow-hidden rounded-xl bg-surface-container-low h-[400px]">
+<div class="absolute inset-0 opacity-40 group-hover:scale-105 transition-transform duration-700 bg-cover bg-center" data-alt="High tech sports data visualization on a dark digital dashboard with glowing cyan and blue interface elements" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA4BI41DKpr69_flj_1H5UOd2mQwDIuJBkpllqMMUo6F0IcGaUsdHZ7N5hScrVjEm0TbxbNo43rgR8WkPWQIy7gs3pmJUdtOY6U4wOLBRDldnf20oMXpg-fuJnl6Q_NJvMydB_vbU93WVWTcZpey_qftTgWWh6c564tV6L3NFNyiUrR19H4VE2mzmgpQe-kP9Yrve2LU8aN1kvKDFAZLAjlTBxB4n5h3c_1hgIB9AI5vL2b9sof0U2VhHqR0MGLgOWoJbstiywCfVw')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent"></div>
+<div class="absolute bottom-0 left-0 p-8">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">monitoring</span>
+<span class="text-xs font-bold tracking-widest text-primary font-label uppercase">Advanced Analytics</span>
+</div>
+<h3 class="text-2xl md:text-3xl font-headline font-bold mb-3">Biometric Synthesis Engine</h3>
+<p class="text-on-surface-variant max-w-md text-sm leading-relaxed">
+                            ZVELT Elite correlates heart rate variability, metabolic load, and sleep architecture to predict your optimal training windows with 99.2% precision.
+                        </p>
+</div>
+</div>
+<!-- Side Feature 1 -->
+<div class="md:col-span-4 rounded-xl bg-surface-container p-8 flex flex-col justify-between border-b-4 border-primary">
+<div>
+<span class="material-symbols-outlined text-tertiary text-3xl mb-4">rebase_edit</span>
+<h4 class="text-xl font-headline font-bold mb-2">Deeper Recovery Insights</h4>
+<p class="text-on-surface-variant text-sm leading-relaxed">
+                            Monitor neurological fatigue and parasympathetic activation. Know exactly when to push and when to regenerate.
+                        </p>
+</div>
+<div class="mt-8 flex items-center gap-2 text-primary group cursor-pointer">
+<span class="text-xs font-bold font-label uppercase tracking-wider">Explore metrics</span>
+<span class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</div>
+</div>
+<!-- Bottom Row Features -->
+<div class="md:col-span-4 rounded-xl bg-surface-container-low p-6 flex items-start gap-4">
+<div class="p-3 rounded-lg bg-surface-container text-primary">
+<span class="material-symbols-outlined">psychology</span>
+</div>
+<div>
+<h5 class="font-bold text-on-surface mb-1">Cognitive Load</h5>
+<p class="text-xs text-on-surface-variant leading-relaxed">Correlation between mental stress and physical output capacity.</p>
+</div>
+</div>
+<div class="md:col-span-4 rounded-xl bg-surface-container-low p-6 flex items-start gap-4">
+<div class="p-3 rounded-lg bg-surface-container text-tertiary">
+<span class="material-symbols-outlined">nutrition</span>
+</div>
+<div>
+<h5 class="font-bold text-on-surface mb-1">Metabolic Precision</h5>
+<p class="text-xs text-on-surface-variant leading-relaxed">Personalized fueling strategies based on real-time activity intensity.</p>
+</div>
+</div>
+<div class="md:col-span-4 rounded-xl bg-surface-container-low p-6 flex items-start gap-4">
+<div class="p-3 rounded-lg bg-surface-container text-on-surface-variant">
+<span class="material-symbols-outlined">hub</span>
+</div>
+<div>
+<h5 class="font-bold text-on-surface mb-1">Ecosystem Sync</h5>
+<p class="text-xs text-on-surface-variant leading-relaxed">Deep integration with high-end cycling computers and smart scales.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Pricing Selection -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+<!-- Monthly Plan -->
+<div class="bg-surface-container rounded-xl p-10 flex flex-col border border-outline-variant/10 hover:border-primary/20 transition-all group">
+<div class="flex justify-between items-start mb-10">
+<div>
+<h3 class="text-2xl font-headline font-bold mb-1">Elite Monthly</h3>
+<p class="text-on-surface-variant text-sm">Flexible commitment</p>
+</div>
+<div class="text-right">
+<span class="text-3xl font-headline font-extrabold text-on-surface">$29</span>
+<span class="text-on-surface-variant text-sm">/mo</span>
+</div>
+</div>
+<ul class="space-y-4 mb-10 flex-grow">
+<li class="flex items-center gap-3 text-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                        Full Biometric Dashboard
+                    </li>
+<li class="flex items-center gap-3 text-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                        Advanced HRV Trend Analysis
+                    </li>
+<li class="flex items-center gap-3 text-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                        Weekly Performance Synthesis
+                    </li>
+</ul>
+<button class="w-full py-4 rounded-lg text-on-surface border border-outline-variant hover:bg-surface-container-high transition-all font-semibold tracking-wide">
+                    Select Plan
+                </button>
+</div>
+<!-- Yearly Plan (Featured) -->
+<div class="bg-surface-container-high rounded-xl p-10 flex flex-col relative overflow-hidden shadow-2xl group border border-primary/20">
+<div class="absolute top-0 right-0 px-4 py-1 liquid-metal-bg text-on-primary-container text-[10px] font-bold tracking-[0.2em] uppercase rounded-bl-lg">
+                    Best Value
+                </div>
+<div class="flex justify-between items-start mb-10">
+<div>
+<h3 class="text-2xl font-headline font-bold mb-1">Elite Yearly</h3>
+<p class="text-on-surface-variant text-sm">Peak Performance commitment</p>
+</div>
+<div class="text-right">
+<span class="text-3xl font-headline font-extrabold text-primary">$240</span>
+<span class="text-on-surface-variant text-sm">/yr</span>
+<p class="text-[10px] text-primary/80 font-bold mt-1">SAVE $108</p>
+</div>
+</div>
+<ul class="space-y-4 mb-10 flex-grow">
+<li class="flex items-center gap-3 text-sm text-on-surface">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        Everything in Monthly
+                    </li>
+<li class="flex items-center gap-3 text-sm text-on-surface">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        Direct API Access for TrainingPeaks
+                    </li>
+<li class="flex items-center gap-3 text-sm text-on-surface">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        Exclusive 'Pro' Performance Coaching
+                    </li>
+<li class="flex items-center gap-3 text-sm text-on-surface">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        Early Access to Beta Wearables
+                    </li>
+</ul>
+<button class="w-full py-4 rounded-lg liquid-metal-bg text-on-primary-container font-bold tracking-wide shadow-lg hover:opacity-90 transition-all scale-[1.02]">
+                    Get Elite Access
+                </button>
+</div>
+</section>
+<!-- Guarantee -->
+<div class="text-center max-w-lg mx-auto">
+<p class="text-xs text-on-surface-variant font-label leading-relaxed opacity-60">
+                30-day performance satisfaction guarantee. Elite data requires compatible biometric sensor hardware. 
+                Subscriptions auto-renew unless cancelled.
+            </p>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-zinc-950/60 backdrop-blur-xl rounded-t-xl shadow-[0px_-12px_32px_rgba(0,0,0,0.4)]">
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined">speed</span>
+<span class="text-[10px] font-label font-medium mt-1 tracking-wider uppercase">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="text-[10px] font-label font-medium mt-1 tracking-wider uppercase">Activity</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#46f4cb] bg-zinc-900/80 rounded-xl px-4 py-1.5 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+<span class="text-[10px] font-label font-bold mt-1 tracking-wider uppercase">Premium</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70 hover:bg-zinc-800/50 transition-all duration-300 px-4 py-1.5 rounded-xl" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-label font-medium mt-1 tracking-wider uppercase">Profile</span>
+</a>
+</nav>
+</body></html>

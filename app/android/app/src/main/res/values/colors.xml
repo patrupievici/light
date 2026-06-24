@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Zvelt V2: light bg + brand orange for monochrome adaptive icon background -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="zvelt_splash_bg">#F6F7F5</color>
+    <color name="zvelt_brand">#FF7A2F</color>
+</resources>

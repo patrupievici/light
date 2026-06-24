@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT Premium | Recovery Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#42d7f8",
+                        "outline": "#84948e",
+                        "on-secondary-container": "#e0e8ff",
+                        "surface-container-lowest": "#0d0e11",
+                        "secondary-container": "#0264d4",
+                        "on-surface-variant": "#bacac3",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#121316",
+                        "primary-fixed-dim": "#21dfb8",
+                        "on-primary-fixed-variant": "#005141",
+                        "on-background": "#e3e2e6",
+                        "surface-tint": "#21dfb8",
+                        "primary-container": "#00d7b0",
+                        "on-surface": "#e3e2e6",
+                        "on-primary-container": "#005847",
+                        "surface-container-highest": "#343538",
+                        "on-tertiary-fixed-variant": "#004e5c",
+                        "on-tertiary-fixed": "#001f26",
+                        "surface-container-low": "#1b1b1f",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#2f3034",
+                        "primary-fixed": "#52fcd3",
+                        "primary": "#46f4cb",
+                        "tertiary-container": "#35cfef",
+                        "error-container": "#93000a",
+                        "on-tertiary": "#003640",
+                        "surface-container-high": "#292a2d",
+                        "on-secondary-fixed-variant": "#004494",
+                        "on-secondary": "#002e69",
+                        "on-primary-fixed": "#002019",
+                        "secondary-fixed": "#d8e2ff",
+                        "background": "#121316",
+                        "secondary": "#adc6ff",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "outline-variant": "#3b4a44",
+                        "on-secondary-fixed": "#001a41",
+                        "inverse-primary": "#006b57",
+                        "on-error": "#690005",
+                        "tertiary": "#8ee7ff",
+                        "surface-container": "#1f1f23",
+                        "surface-bright": "#38393c",
+                        "on-tertiary-container": "#005564",
+                        "surface-variant": "#343538",
+                        "surface": "#121316",
+                        "tertiary-fixed": "#acedff",
+                        "on-primary": "#00382c",
+                        "inverse-surface": "#e3e2e6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .liquid-metal-bg {
+            background: linear-gradient(135deg, #46f4cb 0%, #00d7b0 100%);
+        }
+        .no-line-boundary {
+            box-shadow: inset 0 -2px 0 0 rgba(59, 74, 68, 0.05);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim text-on-surface font-body selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">menu</span>
+<h1 class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</h1>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-8 text-sm">
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200" href="#">Dashboard</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200" href="#">Activity</a>
+<a class="text-[#46f4cb] font-semibold" href="#">Premium</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200" href="#">Profile</a>
+</nav>
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-container">
+<img alt="User avatar" data-alt="Close-up portrait of a professional woman with a minimalist tech aesthetic, soft cinematic lighting, neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBIq_8ffcmAGWtuASiX_HgJ7aLhIxsF0Q0aICJD6VKOFl--o-zufNh6gYMNawHfKZ47t1SsfnRfQsjUKo0jGyZf1Yo-gqqMMCQvYiSL0KBnpEGpnH34oeiiyIGBQh_yiOi-pxa01JKt5MD-JVbxbb9LUzwcYD5V23mZ2lQcZOzC0c-E6zBtrPNc1YjK80UW7uMnq8vXCrK16N4tG8W56O4T7T0UdbESf-KkmYprQhB3X0fRKfuHNCTa9nTbVSl61cbleCLeXmpwXnY"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-6xl mx-auto">
+<!-- Editorial Header Section -->
+<section class="mb-12">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div class="max-w-2xl">
+<span class="text-primary font-label text-[0.6875rem] uppercase tracking-[0.15em] mb-3 block">Exclusive Access</span>
+<h2 class="text-4xl md:text-5xl font-extrabold font-headline tracking-tighter text-on-surface mb-4">Metabolic Recovery Engine</h2>
+<p class="text-on-surface-variant text-lg leading-relaxed max-w-xl">
+                        Unlock medical-grade physiological insights. Our proprietary algorithm synthesizes HRV, metabolic load, and sleep architecture to predict your peak performance window.
+                    </p>
+</div>
+<div class="flex flex-col items-start md:items-end gap-1">
+<span class="text-on-surface-variant font-label text-[0.6875rem] uppercase tracking-widest">Status</span>
+<div class="flex items-center gap-2 bg-surface-container-high px-4 py-2 rounded-xl">
+<span class="material-symbols-outlined text-secondary text-sm">lock</span>
+<span class="text-secondary font-semibold text-sm">Premium Locked</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Bento Grid Feature Display -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
+<!-- Main Locked Feature Card -->
+<div class="md:col-span-8 relative overflow-hidden rounded-xl bg-surface-container-low group">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim via-transparent to-transparent z-10"></div>
+<img alt="Complex data visualization" class="w-full h-[450px] object-cover opacity-30 grayscale group-hover:scale-105 transition-transform duration-700" data-alt="High-tech interface showing complex physiological data curves and metabolic graphs in glowing cyan and teal tones on a dark screen" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPmTZzz3JieWJcwfeVTw7f3cTJ3G1eATY18-9qqL-NPKG2CADoncYGTPUAdXIJfEnuCYbFWeSPJFwpSdjciEKT-7M0FwO6Lv6DwWF8Ueh9sdCA4owsz-d9PMxlujRf8Zb4q9f1xnr8jYJdm4C5w1n8cBInQSekmFUqIP5r6WlQVPMOaEfeW83g3QBulIum3vv4AokbGSY9EYAbZGjt8YMDZ6EP5XcU3iTfJwhOI4W7Z-M57bSf10Etyzsl58v96YwryzNjEXoQYUM"/>
+<div class="absolute inset-0 flex flex-col items-center justify-center z-20 p-8 text-center">
+<div class="w-16 h-16 rounded-full bg-zinc-900/80 backdrop-blur-md flex items-center justify-center mb-6 border border-outline-variant/30">
+<span class="material-symbols-outlined text-primary text-3xl">analytics</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-2">Biometric Resonance Mapping</h3>
+<p class="text-on-surface-variant max-w-md mb-8">
+                        Visualizing the synchronization between your central nervous system and metabolic output. Requires ZVELT Premium.
+                    </p>
+<div class="flex flex-wrap justify-center gap-3">
+<span class="bg-surface-container-high px-3 py-1 rounded-sm text-[0.6875rem] font-medium tracking-wider text-on-surface-variant border border-outline-variant/10">HRV TRENDS</span>
+<span class="bg-surface-container-high px-3 py-1 rounded-sm text-[0.6875rem] font-medium tracking-wider text-on-surface-variant border border-outline-variant/10">METABOLIC EFFICIENCY</span>
+<span class="bg-surface-container-high px-3 py-1 rounded-sm text-[0.6875rem] font-medium tracking-wider text-on-surface-variant border border-outline-variant/10">CNS READINESS</span>
+</div>
+</div>
+<!-- Lock Overlay Gradient -->
+<div class="absolute inset-0 bg-surface-dim/40 backdrop-blur-[2px] z-15"></div>
+</div>
+<!-- Side Metric Teasers -->
+<div class="md:col-span-4 flex flex-col gap-6">
+<!-- Metric 1 -->
+<div class="bg-surface-container rounded-xl p-6 relative group overflow-hidden">
+<div class="flex justify-between items-start mb-8">
+<div>
+<span class="text-on-surface-variant font-label text-[0.6875rem] uppercase tracking-widest block mb-1">Weekly Delta</span>
+<h4 class="font-headline text-xl font-bold">Deep Recovery Score</h4>
+</div>
+<span class="material-symbols-outlined text-primary/40">lock</span>
+</div>
+<div class="h-16 w-full flex items-end gap-1 opacity-20">
+<div class="flex-1 bg-primary h-[40%]"></div>
+<div class="flex-1 bg-primary h-[60%]"></div>
+<div class="flex-1 bg-primary h-[35%]"></div>
+<div class="flex-1 bg-primary h-[80%]"></div>
+<div class="flex-1 bg-primary h-[50%]"></div>
+<div class="flex-1 bg-primary h-[90%]"></div>
+</div>
+<div class="absolute inset-0 bg-gradient-to-r from-transparent via-surface-container/80 to-transparent flex items-center justify-center translate-y-4 group-hover:translate-y-0 transition-all duration-300">
+<span class="text-xs font-semibold text-primary-fixed tracking-widest uppercase">Upgrade to View</span>
+</div>
+</div>
+<!-- Metric 2 -->
+<div class="bg-surface-container rounded-xl p-6 relative group overflow-hidden">
+<div class="flex justify-between items-start mb-8">
+<div>
+<span class="text-on-surface-variant font-label text-[0.6875rem] uppercase tracking-widest block mb-1">Circadian Alignment</span>
+<h4 class="font-headline text-xl font-bold">Sleep Architecture</h4>
+</div>
+<span class="material-symbols-outlined text-primary/40">lock</span>
+</div>
+<div class="flex items-center gap-4 opacity-20">
+<div class="w-12 h-12 rounded-full border-4 border-tertiary border-t-transparent"></div>
+<div class="flex flex-col gap-1">
+<div class="h-2 w-24 bg-surface-container-highest rounded-full"></div>
+<div class="h-2 w-16 bg-surface-container-highest rounded-full"></div>
+</div>
+</div>
+<div class="absolute inset-0 bg-gradient-to-r from-transparent via-surface-container/80 to-transparent flex items-center justify-center translate-y-4 group-hover:translate-y-0 transition-all duration-300">
+<span class="text-xs font-semibold text-primary-fixed tracking-widest uppercase">Upgrade to View</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Conversion Section -->
+<div class="bg-surface-container-low rounded-xl p-8 md:p-12 border-l-4 border-primary/40">
+<div class="grid md:grid-cols-2 gap-12 items-center">
+<div>
+<h3 class="text-3xl font-headline font-extrabold mb-4">Precision shouldn't be a luxury.</h3>
+<p class="text-on-surface-variant mb-6 text-lg">
+                        The premium tier offers more than just data—it offers clarity. Join 45,000+ athletes who use ZVELT to eliminate guesswork from their training cycles.
+                    </p>
+<ul class="space-y-4 mb-8">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-sm mt-1">check_circle</span>
+<span class="text-on-surface">Unlimited Historical Data Storage</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-sm mt-1">check_circle</span>
+<span class="text-on-surface">AI-Powered Training Readiness Forecasting</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-sm mt-1">check_circle</span>
+<span class="text-on-surface">Advanced Metabolic Signal Export (PDF/CSV)</span>
+</li>
+</ul>
+</div>
+<div class="bg-surface-container-high p-8 rounded-xl border border-outline-variant/20 shadow-2xl shadow-black/20">
+<div class="text-center mb-8">
+<span class="text-on-surface-variant font-label text-[0.6875rem] uppercase tracking-widest block mb-2">Premium Membership</span>
+<div class="flex items-baseline justify-center gap-1">
+<span class="text-4xl font-headline font-extrabold">$14.99</span>
+<span class="text-on-surface-variant">/mo</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-2">Billed annually at $179.88</p>
+</div>
+<button class="w-full liquid-metal-bg py-4 rounded-xl text-on-primary-container font-bold text-sm uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all mb-4">
+                        Upgrade to Premium
+                    </button>
+<button class="w-full py-4 border border-outline-variant rounded-xl text-on-surface font-semibold text-sm hover:bg-surface-container-highest transition-colors">
+                        Restore Subscription
+                    </button>
+<p class="text-[0.625rem] text-center text-on-surface-variant mt-6 px-4">
+                        Cancel anytime. Your performance data is encrypted and never sold to third parties.
+                    </p>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-zinc-950/60 backdrop-blur-xl rounded-t-xl shadow-[0px_12px_32px_rgba(0,0,0,0.4)] md:hidden">
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70" href="#">
+<span class="material-symbols-outlined">speed</span>
+<span class="text-[0.6875rem] font-label mt-1 tracking-wider">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70" href="#">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="text-[0.6875rem] font-label mt-1 tracking-wider">Activity</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#46f4cb] bg-zinc-900/80 rounded-xl px-4 py-1.5 transition-all" href="#">
+<span class="material-symbols-outlined">workspace_premium</span>
+<span class="text-[0.6875rem] font-label mt-1 tracking-wider font-semibold">Premium</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 opacity-70" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[0.6875rem] font-label mt-1 tracking-wider">Profile</span>
+</a>
+</nav>
+</body></html>

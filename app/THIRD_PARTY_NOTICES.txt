@@ -1,0 +1,29 @@
+Zvelt — third-party references (outdoor map track)
+
+1) mo7amedaliEbaid/run-tracker
+   https://github.com/mo7amedaliEbaid/run-tracker
+   License: Apache-2.0
+   This app uses the same Flutter packages (flutter_map, latlong2, geolocator)
+   and similar patterns for GPS + polyline; it is not a bundled copy of that repo.
+
+2) fleaflet/flutter_map
+   https://github.com/fleaflet/flutter_map
+   Map tiles: OpenStreetMap contributors (https://www.openstreetmap.org/copyright).
+
+3) fl_chart (weekly effort screen)
+   https://github.com/imaNNeo/fl_chart
+
+4) chat_bubbles (DM thread UI — message bubbles)
+   https://pub.dev/packages/chat_bubbles
+   License: MIT
+
+5) flutter_local_notifications + timezone + flutter_timezone (daily retention reminder)
+   https://pub.dev/packages/flutter_local_notifications
+
+Backend env (optional features):
+- OPENWEATHER_API_KEY — current weather proxy /v1/weather/current
+- DEEPSEEK_API_KEY — AI chat /v1/ai/chat (optional DEEPSEEK_API_URL, DEEPSEEK_MODEL)
+- FIREBASE_PROJECT_ID — FCM HTTP v1 (push social)
+- FIREBASE_SERVICE_ACCOUNT_JSON — JSON complet service account (un singur rând / string), scope firebase.messaging
+
+Flutter push: rulează `flutterfire configure` sau completează `lib/config/firebase_options.dart` + `android/app/google-services.json` (înlocuiește placeholder-ul).

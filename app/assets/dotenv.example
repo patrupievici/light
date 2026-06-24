@@ -1,0 +1,7 @@
+# Copy this file to `assets/dotenv` (same folder) for local builds.
+# File `assets/dotenv` is gitignored — never commit real keys.
+#
+# USDA FoodData Central (food search in app):
+# https://fdc.nal.usda.gov/api-key-signup.html
+
+USDA_API_KEY=

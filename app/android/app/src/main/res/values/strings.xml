@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_title">Today</string>
+    <string name="widget_today_description">Streak and quick Train shortcut.</string>
+    <string name="widget_brand">Zvelt</string>
+    <string name="widget_streak_fmt">%1$d-day streak</string>
+    <string name="widget_workouts_fmt">%1$d workouts</string>
+    <string name="widget_gap_today">Last workout: today</string>
+    <string name="widget_gap_unknown">Open app to sync</string>
+    <string name="widget_at_risk">Streak at risk</string>
+    <string name="widget_train">Train</string>
+    <string name="widget_streak_title">Streak</string>
+    <string name="widget_streak_description">Your current workout streak at a glance.</string>
+    <string name="widget_streak_days">days</string>
+    <string name="widget_streak_flame_desc">Flame</string>
+    <string name="widget_xp_title">XP Progress</string>
+    <string name="widget_xp_description">Daily XP progress, calories and streak at a glance.</string>
+    <string name="widget_xp_footer">Today: %d%% complete</string>
+    <string name="widget_xp_ring_desc">XP progress ring</string>
+    <string name="widget_xp_medium_title">Daily Progress</string>
+    <string name="widget_xp_medium_description">XP progress, stats and 7-day bar chart.</string>
+    <string name="widget_xp_week_title">7-Day Progress</string>
+    <string name="widget_xp_chart_desc">7-day XP bar chart</string>
+    <string name="widget_xp_cta">Finish today\'s goal ›</string>
+    <plurals name="widget_gap_days_ago">
+        <item quantity="one">Last workout: %d day ago</item>
+        <item quantity="other">Last workout: %d days ago</item>
+    </plurals>
+    <string name="widget_day_streak_label">Day Streak</string>
+    <string name="widget_day_streak_title">Day Streak</string>
+    <string name="widget_day_streak_description">Your current workout streak at a glance.</string>
+    <string name="widget_chain_title">Don\'t Break the Chain</string>
+    <string name="widget_chain_description">7-day workout chain and last session info.</string>
+    <string name="widget_chain_circles_desc">Weekly chain circles</string>
+    <string name="widget_chain_no_workout">No workouts yet</string>
+    <string name="widget_chain_last_workout_desc">Last workout</string>
+    <string name="widget_chain_cta">Train now ›</string>
+    <string name="widget_recovery_title">Recovery</string>
+    <string name="widget_recovery_small_description">Recovery score ring at a glance.</string>
+    <string name="widget_recovery_medium_description">Recovery score, sleep, stress, HRV and AI recommendation.</string>
+    <string name="widget_recovery_ring_desc">Recovery score ring</string>
+    <string name="widget_recovery_ready">Ready to train</string>
+    <string name="widget_recovery_message_default">Sync app for data.</string>
+    <string name="widget_recovery_ai_label">AI Recommendation</string>
+    <string name="widget_recovery_ai_default">Open app to sync</string>
+    <string name="widget_challenge_title">Pack Challenge</string>
+    <string name="widget_challenge_small_description">Your rank in the active pack challenge.</string>
+    <string name="widget_challenge_large_description">Pack challenge leaderboard and gap to next rank.</string>
+    <string name="widget_challenge_leaderboard_desc">Challenge leaderboard</string>
+    <string name="widget_challenge_cta_default">Open app to see challenge</string>
+
+    <!-- Play Store dangerous-permission rationales (P1.14). Used by Play review and as documentation
+         of WHY each runtime permission is requested. Actual user-facing dialogs are presented by
+         the image_picker / mobile_scanner plugins at the point of use. -->
+    <string name="permission_camera_rationale">Zvelt uses your camera to scan food barcodes for nutrition logging and to take workout/progress photos you choose to attach to posts.</string>
+    <string name="permission_media_rationale">Zvelt accesses your photos so you can attach an image to a workout post or set a profile picture. Selection is one-time and only the picked image is read.</string>
+</resources>

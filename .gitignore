@@ -1,0 +1,128 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ENVIRONMENT & SECRETS — NEVER COMMIT THESE
+# ─────────────────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+# Copie locală fără punct (nu comite niciodată)
+backend/env
+
+# Cursor / Claude local
+.claude/
+
+*.pem
+*.key
+*.cert
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NODE.JS / BACKEND
+# ─────────────────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+
+# Prisma
+prisma/migrations/dev.db
+prisma/*.db
+prisma/*.db-journal
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FLUTTER / DART
+# ─────────────────────────────────────────────────────────────────────────────
+# Dependencies
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# Build outputs
+build/
+*.g.dart
+*.freezed.dart
+
+# Android
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
+**/android/.gradle
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+**/*.keystore
+**/*.jks
+
+# iOS
+**/ios/.generated/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Pods/
+
+# macOS
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+**/macos/Flutter/ephemeral/
+
+# Windows
+**/windows/flutter/generated_plugin_registrant.cc
+**/windows/flutter/generated_plugin_registrant.h
+**/windows/flutter/generated_plugins.cmake
+
+# Coverage
+coverage/
+*.lcov
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EDITORS & OS
+# ─────────────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MISC
+# ─────────────────────────────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.swp
+*.orig
+
+# Local backup of secrets (never push)
+/key.zip
+
+raz/
+x/
+
+# Firebase Android config (local / CI secrets — nu în repo public)
+google-services.json
+
+# Design exports locale (opțional)
+screenshots.zip
+screenshots_extracted/
+
+# Copie locală altă variantă proiect (nu în același repo)
+/beastpack-zvetutzu/

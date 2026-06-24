@@ -1,0 +1,374 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── USERS ───────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  status    String   @default("active") // active|disabled|deleted
+
+  profile        UserProfile?
+  authIdentities AuthIdentity[]
+  workouts       Workout[]
+  posts          Post[]
+  postLikes      PostLike[]
+  postComments   PostComment[]
+  friendsFrom    Friendship[]        @relation("FriendshipUser")
+  friendsTo      Friendship[]        @relation("FriendshipFriend")
+  exerciseRanks  UserExerciseRank[]
+  seasonStats    UserSeasonStat[]
+  wallet         Wallet?
+  analyticsEvents AnalyticsEvent[]
+  userAchievements UserAchievement[]
+  trainingProfile UserTrainingProfile?
+
+  @@map("users")
+}
+
+model AuthIdentity {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  provider        String   // email|apple|google
+  providerSubject String   @map("provider_subject")
+  email           String?
+  passwordHash    String?  @map("password_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerSubject])
+  @@map("auth_identities")
+}
+
+model UserProfile {
+  userId         String   @id @map("user_id")
+  username       String?  @unique
+  displayName    String?  @map("display_name")
+  bio            String?
+  unitSystem     String   @default("metric") @map("unit_system") // metric|imperial
+  bodyweightKg   Decimal? @db.Decimal(6, 2) @map("bodyweight_kg")
+  birthYear      Int?     @map("birth_year")
+  sex            String?  // male|female|other|null
+  privacyDefault   String   @default("friends") @map("privacy_default") // private|friends|public
+  heightCm         Decimal? @db.Decimal(6, 2) @map("height_cm")
+  dailyCalories    Int?     @map("daily_calories")
+  dailyProtein     Decimal? @db.Decimal(8, 2) @map("daily_protein")
+  dailyCarbs       Decimal? @db.Decimal(8, 2) @map("daily_carbs")
+  dailyFat         Decimal? @db.Decimal(8, 2) @map("daily_fat")
+  dailyWaterMl     Int?     @map("daily_water_ml")
+  gameXpTotal      Int      @default(0) @map("game_xp_total")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_profiles")
+}
+
+model UserTrainingProfile {
+  userId              String   @id @map("user_id")
+  primaryGoal         String?  @map("primary_goal")
+  secondaryGoals      Json     @default("[]") @map("secondary_goals")
+  trainingLevel       String?  @map("training_level")
+  gymExperience       String?  @map("gym_experience") @db.VarChar(500)
+  daysPerWeek         Int?     @map("days_per_week")
+  sessionMinutes      Int?     @map("session_minutes")
+  equipment           Json     @default("[]")
+  injuriesLimitations String?  @map("injuries_limitations") @db.Text
+  splitPreference     String?  @map("split_preference")
+  onboardingCompleted Boolean  @default(false) @map("onboarding_completed")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_training_profiles")
+}
+
+// ─── EXERCISES ───────────────────────────────────────────────────────────────
+
+model Exercise {
+  id            String  @id @default(uuid())
+  name          String
+  primaryMuscle String? @map("primary_muscle")
+  equipment     String?
+  rankModel     String  @default("WEIGHTED") @map("rank_model") // WEIGHTED|BW_REPS|TIME
+  category      String  @default("strength") // strength|explosive|bodyweight|cardio
+  movementPattern   String   @default("skill_stability") @map("movement_pattern")
+  secondaryPatterns Json     @default("[]") @map("secondary_patterns")
+  fatigueScore      Int      @default(3) @map("fatigue_score")
+  goalTags          Json     @default("[]") @map("goal_tags")
+  contraindications Json     @default("[]")
+  beginnerSuitable  Boolean  @default(true) @map("beginner_suitable")
+  isRanked      Boolean @default(true) @map("is_ranked")
+  isCustom      Boolean @default(false) @map("is_custom")
+  createdByUserId String? @map("created_by_user_id")
+
+  workoutExercises WorkoutExercise[]
+  exerciseRanks    UserExerciseRank[]
+
+  @@map("exercises")
+}
+
+// ─── WORKOUTS ────────────────────────────────────────────────────────────────
+
+model Workout {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  status    String    @default("draft") // draft|completed|posted
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  timezone  String?
+  notes     String?
+
+  user      User              @relation(fields: [userId], references: [id])
+  exercises WorkoutExercise[]
+  post      Post?
+
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id                 String  @id @default(uuid())
+  workoutId          String  @map("workout_id")
+  exerciseId         String  @map("exercise_id")
+  position           Int
+  restSecondsDefault Int?    @map("rest_seconds_default")
+  repRangeHint       String? @map("rep_range_hint") @db.VarChar(80)
+
+  workout  Workout      @relation(fields: [workoutId], references: [id])
+  exercise Exercise     @relation(fields: [exerciseId], references: [id])
+  sets     WorkoutSet[]
+
+  @@unique([workoutId, position])
+  @@map("workout_exercises")
+}
+
+model WorkoutSet {
+  id                String  @id @default(uuid())
+  workoutExerciseId String  @map("workout_exercise_id")
+  setIndex          Int     @map("set_index")
+  weightKg          Decimal @default(0) @db.Decimal(7, 2) @map("weight_kg")
+  reps              Int
+  rpe               Decimal? @db.Decimal(3, 1)
+  tag               String  @default("WORK") // WORK|WARMUP|DROP
+  isCompleted       Boolean @default(false) @map("is_completed")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id])
+
+  @@unique([workoutExerciseId, setIndex])
+  @@map("workout_sets")
+}
+
+// ─── POSTS & SOCIAL ──────────────────────────────────────────────────────────
+
+model Post {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  workoutId  String   @unique @map("workout_id")
+  visibility String   @default("friends") // private|friends|public
+  caption    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user           User               @relation(fields: [userId], references: [id])
+  workout        Workout            @relation(fields: [workoutId], references: [id])
+  privacySettings PostPrivacySetting?
+  likes          PostLike[]
+  comments       PostComment[]
+
+  @@map("posts")
+}
+
+model PostPrivacySetting {
+  postId         String  @id @map("post_id")
+  hideWeights    Boolean @default(false) @map("hide_weights")
+  hideReps       Boolean @default(false) @map("hide_reps")
+  hideBodyweight Boolean @default(false) @map("hide_bodyweight")
+
+  post Post @relation(fields: [postId], references: [id])
+
+  @@map("post_privacy_settings")
+}
+
+model Friendship {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  friendUserId String   @map("friend_user_id")
+  status       String   // requested|accepted|blocked
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user   User @relation("FriendshipUser", fields: [userId], references: [id])
+  friend User @relation("FriendshipFriend", fields: [friendUserId], references: [id])
+
+  @@unique([userId, friendUserId])
+  @@map("friendships")
+}
+
+model PostLike {
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@id([postId, userId])
+  @@map("post_likes")
+}
+
+model PostComment {
+  id        String   @id @default(uuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("post_comments")
+}
+
+// ─── RANKS ───────────────────────────────────────────────────────────────────
+
+model UserExerciseRank {
+  userId         String   @map("user_id")
+  exerciseId     String   @map("exercise_id")
+  bestE1rmKg     Decimal  @db.Decimal(7, 2) @map("best_e1rm_kg")
+  strengthRatio  Decimal  @db.Decimal(8, 4) @map("strength_ratio")
+  lpTotal        Int      @map("lp_total")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id])
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@id([userId, exerciseId])
+  @@map("user_exercise_ranks")
+}
+
+model Season {
+  id       String @id @default(uuid())
+  startsAt DateTime @map("starts_at")
+  endsAt   DateTime @map("ends_at")
+  label    String
+
+  seasonStats UserSeasonStat[]
+
+  @@map("seasons")
+}
+
+model UserSeasonStat {
+  seasonId  String   @map("season_id")
+  userId    String   @map("user_id")
+  lpSeason  Int      @default(0) @map("lp_season")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  season Season @relation(fields: [seasonId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@id([seasonId, userId])
+  @@map("user_season_stats")
+}
+
+// ─── ECONOMY ─────────────────────────────────────────────────────────────────
+
+model Wallet {
+  userId  String @id @map("user_id")
+  balance Int    @default(0)
+
+  user         User              @relation(fields: [userId], references: [id])
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model ShopItem {
+  id            String @id @default(uuid())
+  sku           String @unique
+  title         String
+  itemType      String @map("item_type") // cosmetic|consumable
+  priceCurrency Int    @map("price_currency")
+  metadata      Json   @default("{}")
+
+  transactions WalletTransaction[]
+
+  @@map("shop_items")
+}
+
+model WalletTransaction {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  itemId    String?  @map("item_id")
+  delta     Int
+  reason    String   // earn_workout|purchase_item|admin_adjustment
+  createdAt DateTime @default(now()) @map("created_at")
+
+  wallet   Wallet    @relation(fields: [userId], references: [userId])
+  shopItem ShopItem? @relation(fields: [itemId], references: [id])
+
+  @@map("wallet_transactions")
+}
+
+// ─── ANALYTICS ───────────────────────────────────────────────────────────────
+
+model AnalyticsEvent {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  eventName String   @map("event_name")
+  eventTime DateTime @default(now()) @map("event_time")
+  props     Json     @default("{}")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("analytics_events")
+}
+
+// ─── REFRESH TOKENS ──────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("refresh_tokens")
+}
+
+// ─── ACHIEVEMENTS ────────────────────────────────────────────────────────────
+
+model Achievement {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  title       String
+  description String
+  tier        String  // bronze|silver|gold|platinum
+  xpReward    Int     @default(0) @map("xp_reward")
+  iconName    String? @map("icon_name")
+
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  achievementId String   @map("achievement_id")
+  achievedAt    DateTime @default(now()) @map("achieved_at")
+
+  user        User        @relation(fields: [userId], references: [id])
+  achievement Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}

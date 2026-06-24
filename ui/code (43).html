@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&amp;family=Inter:wght@300;400;600&amp;family=Space+Mono:wght@400;700&amp;family=Space+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-fixed-dim": "#adc6ff",
+                    "on-tertiary": "#003640",
+                    "on-primary-container": "#005847",
+                    "inverse-surface": "#e3e2e6",
+                    "background": "#121316",
+                    "tertiary-container": "#35cfef",
+                    "surface-container-low": "#1b1b1f",
+                    "secondary-fixed": "#d8e2ff",
+                    "on-secondary-fixed": "#001a41",
+                    "on-surface": "#e3e2e6",
+                    "surface-container": "#1f1f23",
+                    "on-error": "#690005",
+                    "tertiary": "#8ee7ff",
+                    "surface-container-highest": "#343538",
+                    "on-primary-fixed": "#002019",
+                    "on-secondary-container": "#e0e8ff",
+                    "on-primary-fixed-variant": "#005141",
+                    "primary": "#46f4cb",
+                    "secondary-container": "#0264d4",
+                    "error-container": "#93000a",
+                    "tertiary-fixed": "#acedff",
+                    "outline-variant": "#3b4a44",
+                    "surface-variant": "#343538",
+                    "surface-container-lowest": "#0d0e11",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-surface-variant": "#bacac3",
+                    "surface-dim": "#121316",
+                    "surface-bright": "#38393c",
+                    "on-tertiary-fixed": "#001f26",
+                    "primary-container": "#00d7b0",
+                    "on-error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "on-background": "#e3e2e6",
+                    "secondary": "#adc6ff",
+                    "on-secondary": "#002e69",
+                    "outline": "#84948e",
+                    "inverse-primary": "#006b57",
+                    "inverse-on-surface": "#2f3034",
+                    "error": "#ffb4ab",
+                    "primary-fixed": "#52fcd3",
+                    "surface": "#121316",
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-primary": "#00382c",
+                    "surface-tint": "#21dfb8",
+                    "on-tertiary-container": "#005564",
+                    "surface-container-high": "#292a2d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {},
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Space Grotesk"],
+                    "mono": ["Space Mono"]
+            }
+          },
+        },
+      }
+    </script>
+<style>.grain-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuAgcwrrMmqxr-JzlhvZvoas56QmHO8NaK7xAjBSB20-HxbxYKTQCIiEQf2a9vXKmsHx8FqT5JTJGx_eACba7uWJkOaJV6aFzbsKEhm1o-G-jDwr5KHznjjaHfqCswIEJZnr03waOZ4G-lvsImwAixTUdx9YoXUTS86tk-NHjUWWs7J4RAZkIr2Us4i4zwfCa5Xx9ziOhvNSs0Yc9wPxiKpHjm-a5-hbmV2GpaoBH9ExMyvUBb7XnnvBaVFAUXrOPXZ_ZjoC6FKI610);
+    opacity: 0.03;
+    pointer-events: none
+    }
+.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body min-h-screen relative overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<div class="fixed inset-0 grain-overlay z-0"></div>
+<!-- Top Navigation Shell - Per JSON Authority -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#121316]/80 backdrop-blur-lg border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<div class="flex items-center gap-4">
+<button class="active:scale-95 transition-transform hover:opacity-80">
+<span class="material-symbols-outlined text-[#00D7B0]" data-icon="arrow_back">arrow_back</span>
+</button>
+<span class="font-['Manrope'] font-extrabold uppercase tracking-widest text-sm text-[#00D7B0]">ZVELT</span>
+</div>
+<button class="active:scale-95 transition-transform hover:opacity-80">
+<span class="material-symbols-outlined text-slate-500" data-icon="settings">settings</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="relative z-10 pt-16 pb-24 px-6 min-h-screen flex flex-col items-center justify-center">
+<!-- Kinetic Centerpiece: The Vault -->
+<div class="relative mb-12">
+<!-- Atmospheric Glow -->
+<div class="absolute inset-0 bg-gradient-to-br from-[#4A8DFF] to-[#00D7B0] blur-[60px] opacity-20 scale-150"></div>
+<!-- Glass Vault Square -->
+<div class="w-[148px] h-[148px] bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl flex items-center justify-center relative z-20 shadow-2xl overflow-hidden">
+<!-- Inner Decorative Grid -->
+<div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(circle, #fff 1px, transparent 1px); background-size: 16px 16px;"></div>
+<span class="material-symbols-outlined text-5xl bg-clip-text text-transparent bg-gradient-to-br from-[#4A8DFF] to-[#00D7B0]" data-icon="lock" data-weight="fill" style="font-variation-settings: 'FILL' 1;">lock</span>
+<!-- Internal Corner Accents -->
+<div class="absolute top-4 left-4 w-2 h-2 border-t border-l border-primary/40"></div>
+<div class="absolute bottom-4 right-4 w-2 h-2 border-b border-r border-primary/40"></div>
+</div>
+</div>
+<!-- Headline Authority -->
+<div class="text-center mb-12 space-y-3 max-w-sm">
+<h1 class="font-headline font-[800] text-4xl md:text-5xl tracking-tighter text-on-surface leading-none">
+                Privacy by Design
+            </h1>
+<p class="font-body font-light text-on-surface-variant leading-relaxed">
+                Your performance data is encrypted, decentralized, and strictly yours. We build tools, not profiles.
+            </p>
+</div>
+<!-- Transactional Actions -->
+<div class="w-full max-w-xs space-y-6 flex flex-col items-center">
+<!-- Apple Auth: Secondary Style requested (White bg, Dark text) -->
+<button class="w-full bg-[#FFFFFF] text-[#000000] font-headline font-bold py-4 rounded-full flex items-center justify-center gap-3 active:scale-95 transition-all shadow-lg shadow-white/5">
+<svg class="w-5 h-5" fill="currentColor" viewbox="0 0 384 512">
+<path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"></path>
+</svg>
+                Continue with Apple
+            </button>
+<button class="text-on-surface-variant font-mono text-sm hover:text-primary transition-colors border-b border-transparent hover:border-primary active:scale-95 pb-1">
+                Use email instead
+            </button>
+</div>
+<!-- Technical Legal Layer -->
+<div class="mt-auto pt-16 max-w-md w-full">
+<div class="bg-surface-container-low rounded-xl p-6 border border-white/5 space-y-4">
+<div class="flex items-center justify-between border-b border-white/5 pb-4">
+<span class="font-mono text-[10px] text-tertiary-fixed tracking-widest uppercase">Encryption Status</span>
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+<span class="font-mono text-[10px] text-on-surface">AES-256 ACTIVE</span>
+</div>
+</div>
+<p class="font-mono text-[11px] leading-relaxed text-on-surface-variant text-center opacity-60">
+                    By proceeding, you acknowledge that ZVELT encrypts biometric streams locally before cloud synchronization. Review our <a class="text-primary underline underline-offset-4" href="#">Vault Protocol</a> and <a class="text-primary underline underline-offset-4" href="#">Terms of Sovereignty</a>.
+                </p>
+</div>
+</div>
+</main>
+<!-- Contextual HUD Strips (Asymmetry/Modernity) -->
+<aside class="fixed left-6 top-1/2 -translate-y-1/2 hidden xl:flex flex-col gap-12 pointer-events-none opacity-20">
+<div class="rotate-90 origin-left flex items-center gap-4">
+<span class="font-mono text-xs tracking-tighter text-tertiary-fixed whitespace-nowrap">SIGNAL STRENGTH | 0.982 MS</span>
+<div class="h-[1px] w-48 bg-gradient-to-r from-tertiary-fixed to-transparent"></div>
+</div>
+</aside>
+<aside class="fixed right-6 bottom-32 hidden xl:flex flex-col gap-4 items-end pointer-events-none opacity-20">
+<div class="flex items-center gap-3">
+<div class="h-32 w-[1px] bg-gradient-to-t from-primary to-transparent"></div>
+<span class="font-mono text-xs tracking-[0.2em] [writing-mode:vertical-lr] text-primary">ENCRYPTED_NODE_08</span>
+</div>
+</aside>
+<!-- Bottom Shell - Suppressed for focus journey as per mandates, but included for structure if needed -->
+<!-- Navigation hidden on this focused screen to prioritize the content canvas -->
+</body></html>

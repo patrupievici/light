@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ZVELT Settings Hub</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#42d7f8",
+                    "outline": "#84948e",
+                    "on-secondary-container": "#e0e8ff",
+                    "surface-container-lowest": "#0d0e11",
+                    "secondary-container": "#0264d4",
+                    "on-surface-variant": "#bacac3",
+                    "error": "#ffb4ab",
+                    "surface-dim": "#121316",
+                    "primary-fixed-dim": "#21dfb8",
+                    "on-primary-fixed-variant": "#005141",
+                    "on-background": "#e3e2e6",
+                    "surface-tint": "#21dfb8",
+                    "primary-container": "#00d7b0",
+                    "on-surface": "#e3e2e6",
+                    "on-primary-container": "#005847",
+                    "surface-container-highest": "#343538",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "on-tertiary-fixed": "#001f26",
+                    "surface-container-low": "#1b1b1f",
+                    "on-error-container": "#ffdad6",
+                    "inverse-on-surface": "#2f3034",
+                    "primary-fixed": "#52fcd3",
+                    "primary": "#46f4cb",
+                    "tertiary-container": "#35cfef",
+                    "error-container": "#93000a",
+                    "on-tertiary": "#003640",
+                    "surface-container-high": "#292a2d",
+                    "on-secondary-fixed-variant": "#004494",
+                    "on-secondary": "#002e69",
+                    "on-primary-fixed": "#002019",
+                    "secondary-fixed": "#d8e2ff",
+                    "background": "#121316",
+                    "secondary": "#adc6ff",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "outline-variant": "#3b4a44",
+                    "on-secondary-fixed": "#001a41",
+                    "inverse-primary": "#006b57",
+                    "on-error": "#690005",
+                    "tertiary": "#8ee7ff",
+                    "surface-container": "#1f1f23",
+                    "surface-bright": "#38393c",
+                    "on-tertiary-container": "#005564",
+                    "surface-variant": "#343538",
+                    "surface": "#121316",
+                    "tertiary-fixed": "#acedff",
+                    "on-primary": "#00382c",
+                    "inverse-surface": "#e3e2e6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            background-color: #121316;
+            color: #e3e2e6;
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-zinc-950/60 backdrop-blur-xl">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#00D7B0]">menu</span>
+<h1 class="text-xl font-bold tracking-tighter text-[#00D7B0] font-headline">ZVELT</h1>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-8 items-center">
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 font-label text-sm tracking-wider uppercase" href="#">Dashboard</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 font-label text-sm tracking-wider uppercase" href="#">Activity</a>
+<a class="text-zinc-500 font-medium hover:text-[#46f4cb] transition-colors duration-200 font-label text-sm tracking-wider uppercase" href="#">Premium</a>
+<a class="text-[#46f4cb] font-semibold transition-colors duration-200 font-label text-sm tracking-wider uppercase" href="#">Settings</a>
+</nav>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant/30">
+<img alt="User avatar" class="w-full h-full object-cover" data-alt="close-up portrait of a professional athlete with intense focus, studio lighting with teal rim light, high contrast" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQW8j2bFonNUWwnbfGH4fiEvW7FikNkhylr0kpsYJu6plbRw2UHw8aKKwBVG1SQJ269QHAvpgiUfO7AnINEmsolzBBkp5DOZnjddntNxhaOme6Hv4Ug-yMCCV-oekIwGA9d8USjJSH0OAm_a4u1aGYzHwIHz1C1ds-LaJYTnrYzHk2NVBrqyAyCFxTzKS75LcEcSzDHWFHY8AtO3CGi25aj8sQXmSSCM1h-zQDXxylODOF9EU8qPwXCKsdYQI2qdwPR78ar96d3kk"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-3xl mx-auto min-h-screen">
+<!-- Header Section -->
+<section class="mb-10">
+<h2 class="text-4xl font-extrabold font-headline tracking-tight text-on-surface mb-2">Settings</h2>
+<p class="text-on-surface-variant font-body text-sm max-w-md">Configure your precision performance parameters and account environment.</p>
+</section>
+<!-- Premium Callout Card -->
+<div class="mb-8 p-6 rounded-xl bg-gradient-to-br from-primary-container/20 to-secondary-container/10 border-l-4 border-primary relative overflow-hidden">
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+<span class="text-xs font-bold tracking-widest uppercase text-primary font-label">Premium Member</span>
+</div>
+<h3 class="text-lg font-bold font-headline mb-1">Advanced Biometrics Active</h3>
+<p class="text-sm text-on-surface-variant font-body">Your subscription is active until Oct 2025.</p>
+</div>
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-9xl">speed</span>
+</div>
+</div>
+<!-- Settings List Hub -->
+<div class="space-y-1">
+<!-- Category: Account -->
+<div class="group py-4 px-2 hover:bg-surface-container-low transition-all duration-200 rounded-lg cursor-pointer flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-md bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+<div>
+<span class="block text-sm font-semibold font-headline tracking-wide">Account</span>
+<span class="block text-xs text-on-surface-variant font-label tracking-tight">Profile, email, and security</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+<div class="h-px w-full bg-surface-container-highest/30"></div>
+<!-- Category: Notifications -->
+<div class="group py-4 px-2 hover:bg-surface-container-low transition-all duration-200 rounded-lg cursor-pointer flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-md bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">notifications</span>
+</div>
+<div>
+<span class="block text-sm font-semibold font-headline tracking-wide">Notifications</span>
+<span class="block text-xs text-on-surface-variant font-label tracking-tight">Push alerts and weekly reports</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+<div class="h-px w-full bg-surface-container-highest/30"></div>
+<!-- Category: Connected Devices -->
+<div class="group py-4 px-2 hover:bg-surface-container-low transition-all duration-200 rounded-lg cursor-pointer flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-md bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">watch</span>
+</div>
+<div>
+<span class="block text-sm font-semibold font-headline tracking-wide">Connected Devices</span>
+<span class="block text-xs text-on-surface-variant font-label tracking-tight">Manage sensors and smartwatches</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20">2 ACTIVE</span>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+</div>
+<div class="h-px w-full bg-surface-container-highest/30"></div>
+<!-- Category: Privacy -->
+<div class="group py-4 px-2 hover:bg-surface-container-low transition-all duration-200 rounded-lg cursor-pointer flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-md bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">shield</span>
+</div>
+<div>
+<span class="block text-sm font-semibold font-headline tracking-wide">Privacy</span>
+<span class="block text-xs text-on-surface-variant font-label tracking-tight">Data sharing and visibility</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+<div class="h-px w-full bg-surface-container-highest/30"></div>
+<!-- Category: Appearance -->
+<div class="group py-4 px-2 hover:bg-surface-container-low transition-all duration-200 rounded-lg cursor-pointer flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-md bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">palette</span>
+</div>
+<div>
+<span class="block text-sm font-semibold font-headline tracking-wide">Appearance</span>
+<span class="block text-xs text-on-surface-variant font-label tracking-tight">Theme, accent colors, and layout</span>
+</div>
+</div>
+<span class="text-xs text-on-surface-variant font-label mr-1">Dark Mode</span>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+<div class="h-px w-full bg-surface-container-highest/30"></div>
+<!-- Category: Workout Preferences -->
+<div class="group py-4 px-2 hover:bg-surface-container-low transition-all duration-200 rounded-lg cursor-pointer flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-md bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">fitness_center</span>
+</div>
+<div>
+<span class="block text-sm font-semibold font-headline tracking-wide">Workout Preferences</span>
+<span class="block text-xs text-on-surface-variant font-label tracking-tight">Auto-pause, heart rate zones</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+<div class="h-px w-full bg-surface-container-highest/30"></div>
+<!-- Category: Units -->
+<div class="group py-4 px-2 hover:bg-surface-container-low transition-all duration-200 rounded-lg cursor-pointer flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-md bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">straighten</span>
+</div>
+<div>
+<span class="block text-sm font-semibold font-headline tracking-wide">Units</span>
+<span class="block text-xs text-on-surface-variant font-label tracking-tight">Metric / Imperial precision</span>
+</div>
+</div>
+<span class="text-xs text-on-surface-variant font-label mr-1">Metric</span>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+<div class="h-px w-full bg-surface-container-highest/30"></div>
+<!-- Category: Help & Support -->
+<div class="group py-4 px-2 hover:bg-surface-container-low transition-all duration-200 rounded-lg cursor-pointer flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-md bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">help</span>
+</div>
+<div>
+<span class="block text-sm font-semibold font-headline tracking-wide">Help &amp; Support</span>
+<span class="block text-xs text-on-surface-variant font-label tracking-tight">FAQs, contact us, legal</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+</div>
+<!-- Logout Section -->
+<div class="mt-12 flex justify-center">
+<button class="flex items-center gap-2 text-error text-xs font-bold tracking-widest uppercase py-3 px-8 rounded-md hover:bg-error/10 transition-colors border border-error/20">
+<span class="material-symbols-outlined text-sm">logout</span>
+                Sign Out
+            </button>
+</div>
+<div class="mt-8 text-center">
+<p class="text-[10px] font-label text-on-surface-variant/40 tracking-[0.2em] uppercase">ZVELT Performance OS • v2.4.12-pro</p>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-zinc-950/60 backdrop-blur-xl rounded-t-xl md:hidden">
+<div class="flex flex-col items-center justify-center text-zinc-500 opacity-70 font-label">
+<span class="material-symbols-outlined">speed</span>
+<span class="text-[10px] mt-1 tracking-wider">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-500 opacity-70 font-label">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="text-[10px] mt-1 tracking-wider">Activity</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-500 opacity-70 font-label">
+<span class="material-symbols-outlined">workspace_premium</span>
+<span class="text-[10px] mt-1 tracking-wider">Premium</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#46f4cb] bg-zinc-900/80 rounded-xl px-4 py-1.5 transition-all font-label">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="text-[10px] mt-1 tracking-wider">Profile</span>
+</div>
+</nav>
+</body></html>

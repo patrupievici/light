@@ -1,0 +1,1049 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── USERS ───────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  status    String   @default("active") // active|disabled|deleted
+  /// Soft-delete grace window (opt-in via ZVELT_SOFT_DELETE). When set, the user
+  /// is blocked from login and hard-erased by a cron after scheduledHardEraseAt.
+  softDeletedAt        DateTime? @map("soft_deleted_at")
+  scheduledHardEraseAt DateTime? @map("scheduled_hard_erase_at")
+
+  profile        UserProfile?
+  authIdentities AuthIdentity[]
+  workouts       Workout[]
+  posts          Post[]
+  postLikes      PostLike[]
+  postComments   PostComment[]
+  friendsFrom    Friendship[]        @relation("FriendshipUser")
+  friendsTo      Friendship[]        @relation("FriendshipFriend")
+  exerciseRanks  UserExerciseRank[]
+  seasonStats    UserSeasonStat[]
+  wallet         Wallet?
+  analyticsEvents AnalyticsEvent[]
+  userAchievements UserAchievement[]
+  trainingProfile UserTrainingProfile?
+  notifications   Notification[]
+  dmConversationsLow  DirectConversation[] @relation("DmUserLow")
+  dmConversationsHigh DirectConversation[] @relation("DmUserHigh")
+  directMessagesSent  DirectMessage[]
+  pushTokens          UserPushToken[]
+  nutritionLogDays    NutritionLogDay[]
+  nutritionPlanDays   NutritionPlanDay[]
+  plannedWorkouts     PlannedWorkout[]
+  routines            Routine[]
+  challengesCreated        Challenge[]
+  challengeParticipations  ChallengeParticipant[]
+  challengeProgressLogs    ChallengeProgressLog[]
+  challengeMessages        ChallengeMessage[]
+  stories                  Story[]
+  storyLikes               StoryLike[]
+  postBookmarks            PostBookmark[]
+  postHides                PostHide[]
+  postReports              PostReport[]
+  gpsActivities            GpsActivity[]
+  createdSegments          Segment[]       @relation("SegmentCreator")
+  segmentEfforts           SegmentEffort[]
+  wearableConnections      WearableConnection[]
+  healthImports            UserHealthImport[]
+  healthDailyMetrics       UserHealthDailyMetric[]
+  healthConsents           HealthConsent[]
+
+  @@map("users")
+}
+
+/// Planned weekly workouts synced cross-device (pending/completed in calendar).
+model PlannedWorkout {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  day       String   @db.VarChar(10) @map("day")
+  weekStart String   @db.VarChar(10) @map("week_start")
+  title     String   @db.VarChar(140)
+  kind      String   @db.VarChar(32) // gym|run|swim|cycle|walk|other
+  status    String   @default("pending") @db.VarChar(16) // pending|completed
+  /// AI-generated exercise list for the day: [{ name, sets, reps, restSeconds, notes?, whyThisExercise?, exerciseId? }]
+  exercisesJson Json?  @map("exercises_json")
+  /// Free-form AI commentary for the day (focus area, warmup hints, etc.).
+  notes     String?    @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, day])
+  @@index([userId, weekStart])
+  @@map("planned_workouts")
+}
+
+/// Reusable workout templates the user saves and starts repeatedly (mockup 4
+/// "Routines": Push Day, Pull Day, ...). `exercisesJson` mirrors
+/// PlannedWorkout.exercisesJson so a routine can be built from an AI plan and
+/// started via the same converter path.
+model Routine {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  name          String   @db.VarChar(80)
+  /// Optional muscle-group summary line, e.g. "Chest • Shoulders • Triceps".
+  focus         String?  @db.VarChar(140)
+  /// [{ name, sets, reps, restSeconds, notes?, exerciseId? }]
+  exercisesJson Json     @map("exercises_json")
+  position      Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("routines")
+}
+
+/// Log nutriție pe zi (calendar local client — YYYY-MM-DD), payload JSON: entries, waterMl, weightKg.
+model NutritionLogDay {
+  userId    String   @map("user_id")
+  day       String   @db.VarChar(10)
+  payload   Json     @default("{}")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("nutrition_log_days")
+}
+
+/// Generated daily nutrition targets for a week, synced cross-device.
+model NutritionPlanDay {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  day         String   @db.VarChar(10)
+  weekStart   String   @db.VarChar(10) @map("week_start")
+  goal        String   @db.VarChar(32)
+  calories    Int
+  proteinG    Int      @map("protein_g")
+  carbsG      Int      @map("carbs_g")
+  fatG        Int      @map("fat_g")
+  waterMl     Int      @map("water_ml")
+  mealPlan    Json?    @map("meal_plan")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+  @@index([userId, weekStart])
+  @@map("nutrition_plan_days")
+}
+
+/// Token FCM per dispozitiv — pentru push social (prieteni, like, DM).
+model UserPushToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique @db.VarChar(512)
+  platform  String   @db.VarChar(16) // android|ios|web
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_push_tokens")
+}
+
+model AuthIdentity {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  provider        String   // email|apple|google
+  providerSubject String   @map("provider_subject")
+  email           String?
+  passwordHash    String?  @map("password_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerSubject])
+  @@map("auth_identities")
+}
+
+model UserProfile {
+  userId         String   @id @map("user_id")
+  username       String?  @unique
+  displayName    String?  @map("display_name")
+  bio            String?
+  unitSystem     String   @default("metric") @map("unit_system") // metric|imperial
+  bodyweightKg   Decimal? @db.Decimal(6, 2) @map("bodyweight_kg")
+  birthYear      Int?     @map("birth_year")
+  sex            String?  // male|female|other|null
+  privacyDefault   String   @default("friends") @map("privacy_default") // private|friends|public
+  feedFriendsOnly  Boolean  @default(true) @map("feed_friends_only")
+  discoveryOptIn   Boolean  @default(false) @map("discovery_opt_in")
+  dmFriendsOnly    Boolean  @default(true) @map("dm_friends_only")
+  showBodyStats    Boolean  @default(true) @map("show_body_stats")
+  showActivityFeed Boolean  @default(true) @map("show_activity_feed")
+  heightCm         Decimal? @db.Decimal(6, 2) @map("height_cm")
+  dailyCalories    Int?     @map("daily_calories")
+  dailyProtein     Decimal? @db.Decimal(8, 2) @map("daily_protein")
+  dailyCarbs       Decimal? @db.Decimal(8, 2) @map("daily_carbs")
+  dailyFat         Decimal? @db.Decimal(8, 2) @map("daily_fat")
+  dailyWaterMl     Int?     @map("daily_water_ml")
+  /// Profile photo URL — Google OAuth `picture` at signup; users can upload
+  /// via settings (saved to same field). Nullable → UI falls back to initials.
+  photoUrl       String?  @map("photo_url")
+  /// Gym-RPG style XP (gym_rpg_app.html); awarded on workout complete.
+  gameXpTotal      Int      @default(0) @map("game_xp_total")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_profiles")
+}
+
+/// Input vector for program generation (goals, schedule, equipment, limits).
+/// Demographics live on UserProfile; this extends training-specific prefs.
+model UserTrainingProfile {
+  userId              String   @id @map("user_id")
+  primaryGoal         String?  @map("primary_goal")
+  secondaryGoals      Json     @default("[]") @map("secondary_goals")
+  trainingLevel       String?  @map("training_level")
+  gymExperience       String?  @map("gym_experience") @db.VarChar(500)
+  daysPerWeek         Int?     @map("days_per_week")
+  sessionMinutes      Int?     @map("session_minutes")
+  equipment           Json     @default("[]")
+  injuriesLimitations String?  @map("injuries_limitations") @db.Text
+  splitPreference     String?  @map("split_preference")
+  onboardingCompleted Boolean  @default(false) @map("onboarding_completed")
+  /// Textul liber din onboarding („Tell AI your goal”) — aceeași sursă ca la generarea planului.
+  onboardingGoalText  String?  @map("onboarding_goal_text") @db.VarChar(2000)
+  /// Sfaturi personalizate (al doilea apel AI pe același goal text).
+  goalAdviceText      String?  @map("goal_advice_text") @db.Text
+  /// Cached `GET /v1/me/workout-suggestion` for the UTC day (avoids duplicate DeepSeek calls).
+  workoutSuggestionCache    Json?     @map("workout_suggestion_cache")
+  workoutSuggestionCachedAt DateTime? @map("workout_suggestion_cached_at")
+  /// Progressive-overload scheme: auto (RPE autoreg) | linear | double | reps_sum.
+  progressionScheme   String   @default("auto") @map("progression_scheme")
+  /// Per-user plate inventory (kg per side, JSON array) + bar weight for the plate calculator.
+  plateInventoryKg    Json?    @map("plate_inventory_kg")
+  barbellKg           Float?   @map("barbell_kg")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_training_profiles")
+}
+
+/// Cloud wearable / aggregator account connection. Tokens should stay with the
+/// aggregator when possible; if provider tokens are ever stored here, encrypt
+/// them before persistence.
+model WearableConnection {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  provider       String    @db.VarChar(40) // terra|spike|rook|garmin|fitbit|huawei|...
+  sourcePath     String    @map("source_path") @db.VarChar(40) // aggregator|huawei_health_kit|manual_bridge
+  externalUserId String?   @map("external_user_id") @db.VarChar(160)
+  status         String    @default("link_required") @db.VarChar(32)
+  scopes         Json      @default("[]")
+  metadata       Json      @default("{}")
+  connectedAt    DateTime? @map("connected_at")
+  lastSyncAt     DateTime? @map("last_sync_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, sourcePath])
+  @@index([userId, provider])
+  @@index([provider, status])
+  @@map("wearable_connections")
+}
+
+/// Raw/semi-normalized health event imported from Health Connect or a cloud
+/// wearable aggregator. Daily summaries should be derived from this table.
+model UserHealthImport {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  metricType   String   @map("metric_type") @db.VarChar(48)
+  sourcePath   String   @map("source_path") @db.VarChar(40)
+  provider     String   @db.VarChar(64)
+  sourceApp    String?  @map("source_app") @db.VarChar(120)
+  sourceDevice String?  @map("source_device") @db.VarChar(120)
+  externalId   String   @map("external_id") @db.VarChar(240)
+  startAt      DateTime @map("start_at")
+  endAt        DateTime @map("end_at")
+  value        Decimal? @db.Decimal(14, 4)
+  unit         String?  @db.VarChar(32)
+  payload      Json     @default("{}")
+  importedAt   DateTime @default(now()) @map("imported_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourcePath, provider, metricType, externalId])
+  @@index([userId, metricType, startAt])
+  @@index([userId, sourcePath, provider])
+  @@map("user_health_imports")
+}
+
+/// Source-aware daily rollup. A later reconciliation job can derive a single
+/// user-facing daily summary without double-counting overlapping providers.
+model UserHealthDailyMetric {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  day        String   @db.VarChar(10)
+  sourcePath String   @map("source_path") @db.VarChar(40)
+  provider   String   @db.VarChar(64)
+  steps      Int?
+  distanceM  Decimal? @map("distance_m") @db.Decimal(14, 2)
+  activeKcal Decimal? @map("active_kcal") @db.Decimal(14, 2)
+  restingHr  Decimal? @map("resting_hr") @db.Decimal(6, 2)
+  avgHr      Decimal? @map("avg_hr") @db.Decimal(6, 2)
+  hrvMs      Decimal? @map("hrv_ms") @db.Decimal(8, 2)
+  sleepMin   Int?     @map("sleep_min")
+  spo2Pct    Decimal? @map("spo2_pct") @db.Decimal(6, 2)
+  payload    Json     @default("{}")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day, sourcePath, provider])
+  @@index([userId, day])
+  @@map("user_health_daily_metrics")
+}
+
+// ─── EXERCISES ───────────────────────────────────────────────────────────────
+
+model Exercise {
+  id            String  @id @default(uuid())
+  name          String
+  primaryMuscle String? @map("primary_muscle")
+  equipment     String?
+  rankModel     String  @default("WEIGHTED") @map("rank_model") // WEIGHTED|BW_REPS|TIME
+  /// BW_REPS: fracțiune din greutatea corporală tratată ca „încărcare” (ex. push-up ~0.64, pull-up 1.0). Opțional; altfel se deduce din nume.
+  bwStrengthFraction Decimal? @map("bw_strength_fraction") @db.Decimal(4, 3)
+  category      String  @default("strength") // strength|explosive|bodyweight|cardio
+  /// Primary pattern for exercise selection / program structure
+  movementPattern   String   @default("skill_stability") @map("movement_pattern")
+  secondaryPatterns Json     @default("[]") @map("secondary_patterns")
+  /// Structured secondary muscles (controlled vocabulary, see constants/muscles)
+  /// — feeds the muscle map, recovery model, and substitution muscle-overlap.
+  secondaryMuscles  Json     @default("[]") @map("secondary_muscles")
+  /// Variation grouping: canonical parent exercise (a front-squat variation ->
+  /// back squat). Null = top-level/canonical.
+  parentExerciseId  String?  @map("parent_exercise_id")
+  /// Catalogue curation metadata.
+  provenance        String?  @db.VarChar(64)
+  sourceLicense     String?  @map("source_license") @db.VarChar(64)
+  reviewStatus      String?  @map("review_status") @db.VarChar(24)
+  /// 1 = low local fatigue … 5 = very demanding
+  fatigueScore      Int      @default(3) @map("fatigue_score")
+  goalTags          Json     @default("[]") @map("goal_tags")
+  contraindications Json     @default("[]")
+  beginnerSuitable  Boolean  @default(true) @map("beginner_suitable")
+
+  isRanked      Boolean @default(true) @map("is_ranked")
+  isCustom      Boolean @default(false) @map("is_custom")
+  createdByUserId String? @map("created_by_user_id")
+
+  workoutExercises WorkoutExercise[]
+  exerciseRanks    UserExerciseRank[]
+
+  @@map("exercises")
+}
+
+// ─── WORKOUTS ────────────────────────────────────────────────────────────────
+
+model Workout {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  status    String    @default("draft") // draft|completed|posted
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  timezone  String?
+  notes     String?
+
+  user      User              @relation(fields: [userId], references: [id])
+  exercises WorkoutExercise[]
+  post      Post?
+
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id                 String  @id @default(uuid())
+  workoutId          String  @map("workout_id")
+  exerciseId         String  @map("exercise_id")
+  position           Int
+  restSecondsDefault Int?    @map("rest_seconds_default")
+  /// Prescription from generator, e.g. "8–12" — shown in app; optional.
+  repRangeHint       String? @map("rep_range_hint") @db.VarChar(80)
+
+  workout  Workout      @relation(fields: [workoutId], references: [id])
+  exercise Exercise     @relation(fields: [exerciseId], references: [id])
+  sets     WorkoutSet[]
+
+  @@unique([workoutId, position])
+  @@map("workout_exercises")
+}
+
+model WorkoutSet {
+  id                String  @id @default(uuid())
+  workoutExerciseId String  @map("workout_exercise_id")
+  setIndex          Int     @map("set_index")
+  weightKg          Decimal @default(0) @db.Decimal(7, 2) @map("weight_kg")
+  reps              Int
+  rpe               Decimal? @db.Decimal(3, 1)
+  tag               String  @default("WORK") // WORK|WARMUP|DROP
+  isCompleted       Boolean @default(false) @map("is_completed")
+  /// Client-side idempotency token: retries from the offline queue reuse the
+  /// same row instead of creating duplicates.
+  clientSetId       String?  @unique @map("client_set_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id])
+  setEditAudits   SetEditAudit[]
+
+  @@unique([workoutExerciseId, setIndex])
+  @@map("workout_sets")
+}
+
+// ─── POSTS & SOCIAL ──────────────────────────────────────────────────────────
+
+model Post {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  /// Null = postare doar social (fără antrenament atașat)
+  workoutId  String?  @unique @map("workout_id")
+  visibility String   @default("friends") // private|friends|public
+  caption    String?
+  /// Cale relativă servită de /uploads/... (ex. /uploads/posts/{id}.jpg)
+  imageUrl   String?  @map("image_url") @db.VarChar(512)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user           User               @relation(fields: [userId], references: [id])
+  workout        Workout?           @relation(fields: [workoutId], references: [id])
+  privacySettings PostPrivacySetting?
+  likes          PostLike[]
+  comments       PostComment[]
+  bookmarks      PostBookmark[]
+  hides          PostHide[]
+  reports        PostReport[]
+  editCount      Int      @default(0) @map("edit_count")
+  lastEditAt     DateTime? @map("last_edit_at")
+  /// True when the attached workout set a personal record (rank LP gained on
+  /// post). Drives the Feed "PRs" filter (kind=pr). Set at post creation.
+  isPr           Boolean  @default(false) @map("is_pr")
+
+  @@map("posts")
+}
+
+/// Provocări sociale (vizibilitate friends | public).
+model Challenge {
+  id           String   @id @default(uuid())
+  creatorId    String   @map("creator_id")
+  kind         String // pullUps|deadlift|squat|benchPress|custom
+  customTitle  String?  @map("custom_title") @db.VarChar(200)
+  visibility   String // friends|public
+  targetHint   String?  @map("target_hint") @db.VarChar(120)
+  durationDays Int      @map("duration_days")
+  endsAt       DateTime @map("ends_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  creator      User                   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  participants ChallengeParticipant[]
+  progressLogs ChallengeProgressLog[]
+  messages     ChallengeMessage[]
+
+  @@index([creatorId, endsAt])
+  @@index([visibility, endsAt])
+  @@map("challenges")
+}
+
+/// One "Log progress" entry in a race — totals/standings are SUM(amount)
+/// per user. Append-only audit trail (anti-cheat principle: no silent edits).
+model ChallengeProgressLog {
+  id          String   @id @default(uuid())
+  challengeId String   @map("challenge_id")
+  userId      String   @map("user_id")
+  amount      Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([challengeId, userId])
+  @@index([challengeId, createdAt])
+  @@map("challenge_progress_logs")
+}
+
+/// Shared race chat — visible to everyone who can see the challenge.
+model ChallengeMessage {
+  id          String   @id @default(uuid())
+  challengeId String   @map("challenge_id")
+  userId      String   @map("user_id")
+  body        String   @db.VarChar(500)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([challengeId, createdAt])
+  @@map("challenge_messages")
+}
+
+model PostPrivacySetting {
+  postId         String  @id @map("post_id")
+  hideWeights    Boolean @default(false) @map("hide_weights")
+  hideReps       Boolean @default(false) @map("hide_reps")
+  hideBodyweight Boolean @default(false) @map("hide_bodyweight")
+
+  post Post @relation(fields: [postId], references: [id])
+
+  @@map("post_privacy_settings")
+}
+
+model Friendship {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  friendUserId String   @map("friend_user_id")
+  status       String   // requested|accepted|blocked
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user   User @relation("FriendshipUser", fields: [userId], references: [id])
+  friend User @relation("FriendshipFriend", fields: [friendUserId], references: [id])
+
+  @@unique([userId, friendUserId])
+  @@map("friendships")
+}
+
+/// In-app notifications (friend requests, likes, comments). Push tokens = viitor.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  type      String // friend_request|friend_accepted|post_like|post_comment
+  actorId   String?   @map("actor_id")
+  payload   Json      @default("{}")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model PostLike {
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@id([postId, userId])
+  @@map("post_likes")
+}
+
+model PostComment {
+  id        String   @id @default(uuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("post_comments")
+}
+
+/// Conversație DM 1:1 — cheie canonică userLowId < userHighId (lexicografic).
+model DirectConversation {
+  id         String   @id @default(uuid())
+  userLowId  String   @map("user_low_id")
+  userHighId String   @map("user_high_id")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  userLow  User @relation("DmUserLow", fields: [userLowId], references: [id], onDelete: Cascade)
+  userHigh User @relation("DmUserHigh", fields: [userHighId], references: [id], onDelete: Cascade)
+  messages DirectMessage[]
+
+  @@unique([userLowId, userHighId])
+  @@index([userLowId])
+  @@index([userHighId])
+  @@map("direct_conversations")
+}
+
+model DirectMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  senderId       String   @map("sender_id")
+  body           String   @db.VarChar(2000)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User               @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@map("direct_messages")
+}
+
+// ─── RANKS ───────────────────────────────────────────────────────────────────
+
+model UserExerciseRank {
+  userId         String   @map("user_id")
+  exerciseId     String   @map("exercise_id")
+  bestE1rmKg     Decimal  @db.Decimal(7, 2) @map("best_e1rm_kg")
+  strengthRatio  Decimal  @db.Decimal(8, 4) @map("strength_ratio")
+  lpTotal        Int      @map("lp_total")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id])
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@id([userId, exerciseId])
+  @@map("user_exercise_ranks")
+}
+
+/// Durable per-lift autoregulation state, written on workout complete.
+/// Records what was actually logged last (weight/reps/max RPE) and the engine's
+/// decision for next time (source/weight/reason via autoregulateLoad). Read by
+/// the next-session reconcile + the "next session" UI. No FK relations on
+/// purpose — keep migration risk minimal; absent row = fall back to last-set query.
+model UserExerciseProgress {
+  userId        String   @map("user_id")
+  exerciseId    String   @map("exercise_id")
+  lastWeightKg  Decimal? @db.Decimal(7, 2) @map("last_weight_kg")
+  lastReps      Int?     @map("last_reps")
+  lastRpe       Decimal? @db.Decimal(3, 1) @map("last_rpe")
+  lastWorkoutAt DateTime @map("last_workout_at")
+  /// progression | hold | deload | no_history — the autoregulation decision.
+  nextSource    String?  @db.VarChar(16) @map("next_source")
+  nextWeightKg  Decimal? @db.Decimal(7, 2) @map("next_weight_kg")
+  nextReason    String?  @map("next_reason")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([userId, exerciseId])
+  @@index([userId])
+  @@map("user_exercise_progress")
+}
+
+/// Backend-persisted body measurements (was device-only). Generic type+value so
+/// weight / body-fat / circumferences share one table. FK-less like
+/// UserExerciseProgress — erasure cleans it explicitly.
+model UserBodyMeasurement {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  type       String   @db.VarChar(32) // weight|body_fat|chest|waist|hips|arm|thigh|...
+  valueNum   Decimal  @db.Decimal(10, 3) @map("value_num")
+  unit       String   @db.VarChar(12) // kg|lb|cm|in|pct
+  measuredAt DateTime @map("measured_at")
+  source     String?  @db.VarChar(24)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([userId, type, measuredAt(sort: Desc)])
+  @@map("user_body_measurements")
+}
+
+/// Durable raw-envelope inbox for provider webhooks (Terra/wearables). Lets a
+/// webhook be acked instantly and processed/retried by a worker instead of
+/// best-effort in-handler. Not user-scoped (provider events).
+model WebhookInbox {
+  id          String    @id @default(uuid())
+  provider    String    @db.VarChar(40)
+  sourcePath  String?   @db.VarChar(40) @map("source_path")
+  eventType   String?   @db.VarChar(64) @map("event_type")
+  externalId  String?   @db.VarChar(240) @map("external_id")
+  payload     Json
+  status      String    @default("received") @db.VarChar(16) // received|processed|failed
+  attempts    Int       @default(0)
+  error       String?   @db.Text
+  receivedAt  DateTime  @default(now()) @map("received_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@index([status, receivedAt])
+  @@map("webhook_inbox")
+}
+
+/// Reusable saved-meal templates for one-tap re-logging. FK-less; erasure cleans it.
+model NutritionMealTemplate {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String   @db.VarChar(80)
+  itemsJson Json     @map("items_json")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("nutrition_meal_templates")
+}
+
+/// Append-only consent ledger (GDPR Art. 7 verifiable history). Each grant/revoke
+/// is a new immutable row. FK-less; erasure cleans it.
+model HealthConsentEvent {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  consentType    String   @db.VarChar(64) @map("consent_type")
+  granted        Boolean
+  consentVersion String   @default("1") @db.VarChar(16) @map("consent_version")
+  source         String?  @db.VarChar(32)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("health_consent_events")
+}
+
+/// Per-locale exercise name/description (translatable layer over the canonical
+/// Exercise). FK-less; resolver prefers the active locale, falls back to base name.
+model ExerciseTranslation {
+  id          String   @id @default(uuid())
+  exerciseId  String   @map("exercise_id")
+  locale      String   @db.VarChar(8)
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([exerciseId, locale])
+  @@index([locale])
+  @@map("exercise_translations")
+}
+
+model Season {
+  id       String @id @default(uuid())
+  startsAt DateTime @map("starts_at")
+  endsAt   DateTime @map("ends_at")
+  label    String
+
+  seasonStats UserSeasonStat[]
+
+  @@map("seasons")
+}
+
+model UserSeasonStat {
+  seasonId  String   @map("season_id")
+  userId    String   @map("user_id")
+  lpSeason  Int      @default(0) @map("lp_season")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  season Season @relation(fields: [seasonId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@id([seasonId, userId])
+  @@map("user_season_stats")
+}
+
+// ─── ECONOMY ─────────────────────────────────────────────────────────────────
+
+model Wallet {
+  userId  String @id @map("user_id")
+  balance Int    @default(0)
+
+  user         User              @relation(fields: [userId], references: [id])
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model ShopItem {
+  id            String @id @default(uuid())
+  sku           String @unique
+  title         String
+  itemType      String @map("item_type") // cosmetic|consumable
+  priceCurrency Int    @map("price_currency")
+  metadata      Json   @default("{}")
+
+  transactions WalletTransaction[]
+
+  @@map("shop_items")
+}
+
+model WalletTransaction {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  itemId    String?  @map("item_id")
+  delta     Int
+  reason    String   // earn_workout|purchase_item|admin_adjustment
+  createdAt DateTime @default(now()) @map("created_at")
+
+  wallet   Wallet    @relation(fields: [userId], references: [userId])
+  shopItem ShopItem? @relation(fields: [itemId], references: [id])
+
+  @@map("wallet_transactions")
+}
+
+// ─── GLOBAL DAILY QUOTE (UK calendar day; filled by cron @ Europe/London midnight) ──
+
+model GlobalDailyQuote {
+  calendarDay String   @id @map("calendar_day") @db.VarChar(10)
+  quote       String   @db.Text
+  author      String   @default("Zvelt Coach") @db.VarChar(120)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("global_daily_quotes")
+}
+
+// ─── ANALYTICS ───────────────────────────────────────────────────────────────
+
+model AnalyticsEvent {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  eventName String   @map("event_name")
+  eventTime DateTime @default(now()) @map("event_time")
+  props     Json     @default("{}")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("analytics_events")
+}
+
+// ─── REFRESH TOKENS ──────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("refresh_tokens")
+}
+
+// ─── ACHIEVEMENTS ────────────────────────────────────────────────────────────
+
+model Achievement {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  title       String
+  description String
+  tier        String  // bronze|silver|gold|platinum
+  xpReward    Int     @default(0) @map("xp_reward")
+  iconName    String? @map("icon_name")
+
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  achievementId String   @map("achievement_id")
+  achievedAt    DateTime @default(now()) @map("achieved_at")
+
+  user        User        @relation(fields: [userId], references: [id])
+  achievement Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+// ─── FEED FEATURES ───────────────────────────────────────────────────────────
+
+model ChallengeParticipant {
+  challengeId String   @map("challenge_id")
+  userId      String   @map("user_id")
+  joinedAt    DateTime @default(now()) @map("joined_at")
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([challengeId, userId])
+  @@index([challengeId])
+  @@index([userId])
+  @@map("challenge_participants")
+}
+
+model Story {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  caption   String?  @db.VarChar(500)
+  imageUrl  String?  @map("image_url") @db.VarChar(512)
+  location  String?  @db.VarChar(200)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes StoryLike[]
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@map("stories")
+}
+
+/// Story hearts — one per user per story (toggle).
+model StoryLike {
+  storyId   String   @map("story_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([storyId, userId])
+  @@index([storyId])
+  @@map("story_likes")
+}
+
+model PostBookmark {
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("post_bookmarks")
+}
+
+model PostHide {
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId])
+  @@map("post_hides")
+}
+
+model PostReport {
+  id        String   @id @default(uuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  reason    String?  @db.VarChar(200)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@map("post_reports")
+}
+
+// ─── GPS ACTIVITIES & SEGMENTS ───────────────────────────────────────────────
+
+/// GPS outdoor session recorded by BackgroundTrackingService.
+model GpsActivity {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  routePoints Json      @default("[]") @map("route_points")
+  distanceM   Float?    @map("distance_m")
+  durationS   Int?      @map("duration_s")
+  /// Server-computed metrics (recomputed from route_points, anti-cheat).
+  elevGainM   Float?    @map("elev_gain_m")
+  avgSpeedMs  Float?    @map("avg_speed_ms")
+  /// Per-activity GPS privacy. private = only me; friends; public.
+  visibility  String    @default("private")
+  calories    Int?
+  startedAt   DateTime  @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  segmentEfforts SegmentEffort[]
+
+  @@index([userId, startedAt(sort: Desc)])
+  @@map("activities")
+}
+
+/// Named stretch of road/trail that users can race against each other on.
+model Segment {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  routePoints Json     @default("[]") @map("route_points")
+  startLat    Float?   @map("start_lat")
+  startLng    Float?   @map("start_lng")
+  endLat      Float?   @map("end_lat")
+  endLng      Float?   @map("end_lng")
+  distanceM   Float?   @map("distance_m")
+  elevGainM   Float?   @map("elev_gain_m")
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  creator User?           @relation("SegmentCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  efforts SegmentEffort[]
+
+  @@index([startLat, startLng])
+  @@index([createdBy])
+  @@map("segments")
+}
+
+/// One attempt by a user on a segment.  Multiple per user are kept;
+/// the leaderboard surfaces personal-best via DISTINCT ON.
+model SegmentEffort {
+  id           String   @id @default(uuid())
+  segmentId    String   @map("segment_id")
+  userId       String   @map("user_id")
+  activityId   String?  @map("activity_id")
+  elapsedTimeS Int      @map("elapsed_time_s")
+  avgSpeedKmh  Float?   @map("avg_speed_kmh")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  segment  Segment      @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity GpsActivity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@index([segmentId, elapsedTimeS])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("segment_efforts")
+}
+
+// ─── ANTI-CHEAT & HEALTH CONSENT ─────────────────────────────────────────────
+
+model SetEditAudit {
+  id        String   @id @default(uuid())
+  setId     String   @map("set_id")
+  userId    String   @map("user_id")
+  workoutId String   @map("workout_id")
+  /// JSON snapshot of mutable set fields before the edit.
+  before    Json
+  /// JSON snapshot of mutable set fields after the edit.
+  after     Json
+  /// Optional user-supplied note (required when a weight jump is flagged).
+  note      String?  @db.VarChar(500)
+  /// True when this edit triggered the >2x personal-max anti-cheat path.
+  flagged   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  set WorkoutSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([setId])
+  @@map("set_edit_audits")
+}
+
+model HealthConsent {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  /// e.g. heart_rate, sleep, weight, steps, hrv, blood_oxygen, ... or "all".
+  consentType    String    @map("consent_type") @db.VarChar(64)
+  granted        Boolean   @default(true)
+  consentVersion String    @default("1") @map("consent_version") @db.VarChar(16)
+  source         String?   @db.VarChar(32) // healthkit|health_connect|manual
+  grantedAt      DateTime  @default(now()) @map("granted_at")
+  revokedAt      DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, consentType])
+  @@index([userId])
+  @@map("health_consents")
+}
