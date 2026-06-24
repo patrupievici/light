@@ -1,9 +1,10 @@
 // Backend base URL.
 //
-// Productie: https://zveltutzu.onrender.com (default pentru build release).
+// Productie (LIGHT): https://light-l6en.onrender.com (default pentru build release).
+// (App-ul full ramane pe https://zveltutzu.onrender.com.)
 // Dev local emulator: flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
 // Dev local telefon fizic: flutter run --dart-define=API_BASE_URL=http://192.168.1.10:3000
-const String _kProductionUrl = 'https://zveltutzu.onrender.com';
+const String _kProductionUrl = 'https://light-l6en.onrender.com';
 
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
