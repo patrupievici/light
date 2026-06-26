@@ -29,6 +29,7 @@ import { weatherRoutes } from './routes/weather'
 import { aiRoutes } from './routes/ai'
 import { pushRoutes } from './routes/push'
 import { nutritionRoutes } from './routes/nutrition'
+import { nutritionFoodsRoutes } from './routes/nutrition-foods'
 import { plannedWorkoutsRoutes } from './routes/planned-workouts'
 import { bodyMeasurementRoutes } from './routes/body-measurements'
 import { gdprRoutes } from './routes/gdpr'
@@ -142,6 +143,7 @@ async function main() {
   app.register(weatherRoutes, { prefix: '/v1/weather' })
   app.register(aiRoutes, { prefix: '/v1/ai' })
   app.register(nutritionRoutes, { prefix: '/v1/nutrition' })
+  app.register(nutritionFoodsRoutes, { prefix: '/v1/nutrition' })
   app.register(integrationsRoutes, { prefix: '/v1/integrations' })
   app.register(adminRoutes, { prefix: '/v1/admin' })
   // storyRoutes is Razvan's expanded version (post-merge canonical name)

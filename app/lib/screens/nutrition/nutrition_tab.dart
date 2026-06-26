@@ -16,6 +16,7 @@ import '../../widgets/zvelt_primary_button.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
 import '../../widgets/zvelt_error_state.dart';
 import '../social/notifications_screen.dart';
+import 'recipe_builder_screen.dart';
 import 'nutrition_barcode_scan_screen.dart';
 
 /// Precomputed diary roll-up for one day. The four macro totals + the
@@ -418,6 +419,126 @@ class _NutritionTabState extends State<NutritionTab> {
     );
   }
 
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ZveltTokens.rSm)),
+    ));
+  }
+
+  Future<String?> _promptName(String hint) async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ZveltTokens.surface,
+        title: Text(hint, style: ZType.h4.copyWith(color: ZveltTokens.text)),
+        content: TextField(controller: ctrl, autofocus: true),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Anulează')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: ZveltTokens.brand, foregroundColor: ZveltTokens.onBrand),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Salvează'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    return name;
+  }
+
+  Future<void> _showDayMenu() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: ZveltTokens.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: ZveltTokens.s2),
+            _sheetHandle(),
+            ListTile(
+              leading: const Icon(AppIcons.restaurant, color: ZveltTokens.brand),
+              title: Text('Salvează ziua ca masă', style: ZType.bodyM.copyWith(color: ZveltTokens.text)),
+              onTap: () => Navigator.pop(context, 'save'),
+            ),
+            ListTile(
+              leading: const Icon(AppIcons.calendar, color: ZveltTokens.brand),
+              title: Text('Copiază dintr-o altă zi', style: ZType.bodyM.copyWith(color: ZveltTokens.text)),
+              onTap: () => Navigator.pop(context, 'copy'),
+            ),
+            const SizedBox(height: ZveltTokens.s4),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'save') await _saveAsTemplate();
+    if (action == 'copy') await _copyFromDay();
+  }
+
+  Future<void> _saveAsTemplate() async {
+    if (_day.entries.isEmpty) {
+      _toast('Ziua e goală — nimic de salvat');
+      return;
+    }
+    final name = await _promptName('Nume masă');
+    if (!mounted || name == null || name.isEmpty) return;
+    final items = _day.entries
+        .map((e) => MealTemplateItem(
+              name: e.food.name,
+              grams: e.grams,
+              calories: e.calories,
+              proteinG: e.protein,
+              carbsG: e.carbs,
+              fatG: e.fat,
+              meal: e.meal,
+            ))
+        .toList();
+    try {
+      await _service.createMealTemplate(name, items);
+      _toast('Masă salvată');
+    } catch (e) {
+      _toast(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _copyFromDay() async {
+    final src = await showDatePicker(
+      context: context,
+      initialDate: _today.subtract(const Duration(days: 1)),
+      firstDate: DateTime(2021, 1, 1),
+      lastDate: _today,
+    );
+    if (!mounted || src == null) return;
+    try {
+      final day = await _service.getDay(src);
+      if (!mounted) return;
+      if (day.entries.isEmpty) {
+        _toast('Ziua aleasă e goală');
+        return;
+      }
+      for (final e in day.entries) {
+        await _service.addEntry(MealEntry(
+          id: 'cp${DateTime.now().microsecondsSinceEpoch}_${e.id}',
+          food: e.food,
+          grams: e.grams,
+          meal: e.meal,
+          loggedAt: DateTime.now(),
+        ));
+      }
+      if (!mounted) return;
+      await _load(showSpinner: false);
+      _toast('Copiat ${day.entries.length} alimente');
+    } catch (e) {
+      if (mounted) _toast(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
   void _showWaterDialog() async {
     // ── Design parity: bottom sheet (not AlertDialog) with the 3-column
     // quick-add grid (+250ml / +500ml / +1L) plus custom input.
@@ -656,6 +777,12 @@ class _NutritionTabState extends State<NutritionTab> {
                 icon: AppIcons.settings_sliders,
                 semanticLabel: 'Edit goals',
                 onTap: () => _showGoalsSheet(),
+              ),
+              const SizedBox(width: ZveltTokens.s2),
+              _NutritionHeaderBtn(
+                icon: AppIcons.menu_dots,
+                semanticLabel: 'Acțiuni zi',
+                onTap: _showDayMenu,
               ),
             ],
           ),
@@ -1716,6 +1843,330 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
     );
   }
 
+  // ── Tabs: Caută · Recente · Favorite · Custom · Mese ───────────────────────
+  static const List<String> _tabLabels = ['Caută', 'Recente', 'Favorite', 'Custom', 'Mese', 'Rețete'];
+  int _tab = 0;
+  bool _tabLoading = false;
+  List<FoodItem> _recent = [];
+  List<FoodItem> _favorites = [];
+  List<FoodItem> _custom = [];
+  List<MealTemplate> _templates = [];
+  List<Recipe> _recipes = [];
+  final Set<String> _favIds = {};
+  final Set<int> _loadedTabs = {0};
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshFavIds();
+  }
+
+  Future<void> _refreshFavIds() async {
+    final favs = await _service.getFavoriteFoods();
+    if (!mounted) return;
+    setState(() {
+      _favorites = favs;
+      _favIds
+        ..clear()
+        ..addAll(favs.map((f) => f.id));
+      _loadedTabs.add(2);
+    });
+  }
+
+  Future<void> _selectTab(int tab) async {
+    setState(() => _tab = tab);
+    if (_loadedTabs.contains(tab)) return;
+    setState(() => _tabLoading = true);
+    try {
+      if (tab == 1) {
+        _recent = await _service.getRecentFoods();
+      } else if (tab == 3) {
+        _custom = await _service.getCustomFoods();
+      } else if (tab == 4) {
+        _templates = await _service.getMealTemplates();
+      } else if (tab == 5) {
+        _recipes = await _service.getRecipes();
+      }
+      _loadedTabs.add(tab);
+    } finally {
+      if (mounted) setState(() => _tabLoading = false);
+    }
+  }
+
+  Future<void> _toggleFavorite(FoodItem food) async {
+    final wasFav = _favIds.contains(food.id);
+    setState(() {
+      if (wasFav) {
+        _favIds.remove(food.id);
+        _favorites.removeWhere((f) => f.id == food.id);
+      } else {
+        _favIds.add(food.id);
+        _favorites = [food, ..._favorites.where((f) => f.id != food.id)];
+      }
+    });
+    try {
+      if (wasFav) {
+        await _service.removeFavorite(food.id);
+      } else {
+        await _service.addFavorite(food);
+      }
+    } catch (_) {
+      if (mounted) await _refreshFavIds();
+    }
+  }
+
+  Widget _foodTile(FoodItem food) {
+    final brandPart = food.brand.isNotEmpty ? '${food.brand} · ' : '';
+    final isFav = _favIds.contains(food.id);
+    return ListTile(
+      title: Text(food.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontSize: 13, fontWeight: FontWeight.w600)),
+      subtitle: Text('$brandPart${food.caloriesPer100g.round()} kcal/100g',
+          style: ZType.bodyS.copyWith(color: ZveltTokens.text2, fontSize: 12)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: Icon(isFav ? AppIcons.heart : AppIcons.heart,
+                color: isFav ? ZveltTokens.brand : ZveltTokens.text3, size: 18),
+            tooltip: isFav ? 'Scoate de la favorite' : 'Adaugă la favorite',
+            onPressed: () => _toggleFavorite(food),
+          ),
+          const Icon(AppIcons.plus, color: ZveltTokens.brand, size: 20),
+        ],
+      ),
+      onTap: () => _selectFood(food),
+    );
+  }
+
+  Widget _emptyHint(IconData icon, String text) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: const BoxDecoration(shape: BoxShape.circle).copyWith(color: ZveltTokens.surface2),
+              child: Icon(icon, color: ZveltTokens.text3, size: 28),
+            ),
+            const SizedBox(height: ZveltTokens.s4),
+            Text(text, textAlign: TextAlign.center, style: ZType.bodyM.copyWith(color: ZveltTokens.text2, fontSize: 13)),
+          ],
+        ),
+      );
+
+  Widget _altTabBody(ScrollController controller) {
+    if (_tabLoading) {
+      return const Center(child: CircularProgressIndicator(color: ZveltTokens.brand));
+    }
+    if (_tab == 1) {
+      if (_recent.isEmpty) return _emptyHint(AppIcons.clock, 'Niciun aliment recent încă');
+      return ListView.builder(
+        controller: controller,
+        itemCount: _recent.length,
+        itemBuilder: (_, i) => _foodTile(_recent[i]),
+      );
+    }
+    if (_tab == 2) {
+      if (_favorites.isEmpty) return _emptyHint(AppIcons.heart, 'Niciun favorit. Atinge inima pe un aliment.');
+      return ListView.builder(
+        controller: controller,
+        itemCount: _favorites.length,
+        itemBuilder: (_, i) => _foodTile(_favorites[i]),
+      );
+    }
+    if (_tab == 3) {
+      return ListView(
+        controller: controller,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(ZveltTokens.s4, ZveltTokens.s2, ZveltTokens.s4, ZveltTokens.s2),
+            child: OutlinedButton.icon(
+              onPressed: _openCustomForm,
+              icon: const Icon(AppIcons.plus, size: 18),
+              label: const Text('Creează aliment custom'),
+            ),
+          ),
+          if (_custom.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(ZveltTokens.s6),
+              child: _emptyHint(AppIcons.restaurant, 'Niciun aliment custom încă'),
+            )
+          else
+            for (final f in _custom) _customTile(f),
+        ],
+      );
+    }
+    if (_tab == 4) {
+      // Mese (saved meal templates)
+      if (_templates.isEmpty) return _emptyHint(AppIcons.restaurant, 'Nicio masă salvată încă');
+      return ListView.builder(
+        controller: controller,
+        itemCount: _templates.length,
+        itemBuilder: (_, i) {
+          final t = _templates[i];
+          return ListTile(
+            title: Text(t.name,
+                style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: Text('${t.itemCount} alimente · ${t.totalCalories.round()} kcal',
+                style: ZType.bodyS.copyWith(color: ZveltTokens.text2, fontSize: 12)),
+            trailing: const Icon(AppIcons.plus, color: ZveltTokens.brand, size: 20),
+            onTap: () => _applyTemplate(t),
+          );
+        },
+      );
+    }
+    // _tab == 5 — Rețete
+    return ListView(
+      controller: controller,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(ZveltTokens.s4, ZveltTokens.s2, ZveltTokens.s4, ZveltTokens.s2),
+          child: OutlinedButton.icon(
+            onPressed: () => _openRecipeBuilder(),
+            icon: const Icon(AppIcons.plus, size: 18),
+            label: const Text('Creează rețetă'),
+          ),
+        ),
+        if (_recipes.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(ZveltTokens.s6),
+            child: _emptyHint(AppIcons.restaurant, 'Nicio rețetă încă'),
+          )
+        else
+          for (final r in _recipes) _recipeTile(r),
+      ],
+    );
+  }
+
+  Widget _recipeTile(Recipe r) {
+    final perServ = r.servings > 0 ? r.totalCalories / r.servings : r.totalCalories;
+    return ListTile(
+      title: Text(r.name,
+          maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontSize: 13, fontWeight: FontWeight.w600)),
+      subtitle: Text('${r.ingredients.length} ingr · ${perServ.round()} kcal/porție · ${r.servings} porții',
+          style: ZType.bodyS.copyWith(color: ZveltTokens.text2, fontSize: 12)),
+      trailing: PopupMenuButton<String>(
+        icon: Icon(AppIcons.menu_dots_vertical, color: ZveltTokens.text3, size: 16),
+        onSelected: (v) {
+          if (v == 'apply') _applyRecipe(r);
+          if (v == 'edit') _openRecipeBuilder(editing: r);
+          if (v == 'delete') _deleteRecipe(r);
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem<String>(value: 'apply', child: Text('Adaugă în jurnal')),
+          PopupMenuItem<String>(value: 'edit', child: Text('Editează')),
+          PopupMenuItem<String>(value: 'delete', child: Text('Șterge')),
+        ],
+      ),
+      onTap: () => _applyRecipe(r),
+    );
+  }
+
+  Future<void> _openRecipeBuilder({Recipe? editing}) async {
+    final saved = await Navigator.of(context).push<Recipe>(
+      MaterialPageRoute<Recipe>(builder: (_) => RecipeBuilderScreen(editing: editing)),
+    );
+    if (!mounted || saved == null) return;
+    setState(() {
+      _recipes = [saved, ..._recipes.where((r) => r.id != saved.id)];
+    });
+  }
+
+  Future<void> _applyRecipe(Recipe r) async {
+    final servings = await showDialog<double>(
+      context: context,
+      builder: (_) => _ServingsDialog(recipe: r),
+    );
+    if (!mounted || servings == null) return;
+    Navigator.pop(context); // close add-food sheet
+    await widget.onAdd(r.toMealEntry(meal: widget.meal, servingsToLog: servings));
+  }
+
+  Future<void> _deleteRecipe(Recipe r) async {
+    setState(() => _recipes = _recipes.where((x) => x.id != r.id).toList());
+    try {
+      await _service.deleteRecipe(r.id);
+    } catch (_) {/* best-effort */}
+  }
+
+  Future<void> _applyTemplate(MealTemplate t) async {
+    Navigator.pop(context); // close add-food sheet
+    for (final item in t.items) {
+      await widget.onAdd(item.toMealEntry(widget.meal));
+    }
+  }
+
+  Future<void> _openQuickAdd() async {
+    final entry = await showModalBottomSheet<MealEntry>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _QuickAddSheet(meal: widget.meal),
+    );
+    if (!mounted || entry == null) return;
+    Navigator.pop(context); // close add-food sheet
+    await widget.onAdd(entry);
+  }
+
+  Future<void> _openCustomForm() async {
+    final created = await showModalBottomSheet<FoodItem>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _CustomFoodSheet(),
+    );
+    if (!mounted || created == null) return;
+    setState(() => _custom = [created, ..._custom]);
+    _selectFood(created);
+  }
+
+  Widget _customTile(FoodItem food) {
+    final brandPart = food.brand.isNotEmpty ? '${food.brand} · ' : '';
+    return ListTile(
+      title: Text(food.name,
+          maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontSize: 13, fontWeight: FontWeight.w600)),
+      subtitle: Text('$brandPart${food.caloriesPer100g.round()} kcal/100g',
+          style: ZType.bodyS.copyWith(color: ZveltTokens.text2, fontSize: 12)),
+      trailing: PopupMenuButton<String>(
+        icon: Icon(AppIcons.menu_dots_vertical, color: ZveltTokens.text3, size: 16),
+        onSelected: (v) {
+          if (v == 'add') _selectFood(food);
+          if (v == 'edit') _editCustom(food);
+          if (v == 'delete') _deleteCustom(food);
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem<String>(value: 'add', child: Text('Adaugă în jurnal')),
+          PopupMenuItem<String>(value: 'edit', child: Text('Editează')),
+          PopupMenuItem<String>(value: 'delete', child: Text('Șterge')),
+        ],
+      ),
+      onTap: () => _selectFood(food),
+    );
+  }
+
+  Future<void> _editCustom(FoodItem food) async {
+    final updated = await showModalBottomSheet<FoodItem>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CustomFoodSheet(editing: food),
+    );
+    if (!mounted || updated == null) return;
+    setState(() => _custom = _custom.map((f) => f.id == updated.id ? updated : f).toList());
+  }
+
+  Future<void> _deleteCustom(FoodItem food) async {
+    setState(() => _custom = _custom.where((f) => f.id != food.id).toList());
+    try {
+      await _service.deleteCustomFood(food.id);
+    } catch (_) {/* best-effort */}
+  }
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -1797,6 +2248,19 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                       borderRadius: BorderRadius.circular(ZveltTokens.rPill),
                     ),
                     child: IconButton(
+                      icon: const Icon(AppIcons.bolt),
+                      color: ZveltTokens.brand,
+                      tooltip: 'Adaugă rapid calorii',
+                      onPressed: _openQuickAdd,
+                    ),
+                  ),
+                  const SizedBox(width: ZveltTokens.s2),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: ZveltTokens.brandTint,
+                      borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                    ),
+                    child: IconButton(
                       icon: const Icon(AppIcons.barcode_scan),
                       color: ZveltTokens.brand,
                       tooltip: 'Scan barcode',
@@ -1806,18 +2270,49 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(ZveltTokens.s5, 0, ZveltTokens.s5, ZveltTokens.s2),
-              child: Text(
-                'USDA FoodData Central · type 3+ letters and pause, or submit.',
-                style: ZType.bodyS.copyWith(
-                  color: ZveltTokens.text2,
-                  fontSize: 11,
-                  height: 1.3,
-                ),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s4),
+                itemCount: _tabLabels.length,
+                separatorBuilder: (_, __) => const SizedBox(width: ZveltTokens.s2),
+                itemBuilder: (_, i) {
+                  final sel = _tab == i;
+                  return GestureDetector(
+                    onTap: () => _selectTab(i),
+                    child: Container(
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s4),
+                      decoration: BoxDecoration(
+                        color: sel ? ZveltTokens.brand : ZveltTokens.surface2,
+                        borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                      ),
+                      child: Text(_tabLabels[i],
+                          style: ZType.bodyS.copyWith(
+                            color: sel ? ZveltTokens.onBrand : ZveltTokens.text2,
+                            fontSize: 12,
+                            fontWeight: sel ? FontWeight.w600 : FontWeight.w400,
+                          )),
+                    ),
+                  );
+                },
               ),
             ),
-            if (_searchError != null)
+            const SizedBox(height: ZveltTokens.s2),
+            if (_tab == 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(ZveltTokens.s5, 0, ZveltTokens.s5, ZveltTokens.s2),
+                child: Text(
+                  'USDA + Open Food Facts · scrie 3+ litere și așteaptă, sau scanează.',
+                  style: ZType.bodyS.copyWith(
+                    color: ZveltTokens.text2,
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            if (_tab == 0 && _searchError != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(ZveltTokens.s4, 0, ZveltTokens.s4, ZveltTokens.s2),
                 child: Container(
@@ -1845,7 +2340,9 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                 ),
               ),
             Expanded(
-              child: _loading
+              child: _tab != 0
+                  ? _altTabBody(controller)
+                  : _loading
                   ? const Center(child: CircularProgressIndicator(color: ZveltTokens.brand))
                   : _results.isEmpty &&
                           _searchError == null &&
@@ -1901,7 +2398,22 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                                     style: ZType.bodyS.copyWith(
                                         color: ZveltTokens.text2, fontSize: 12),
                                   ),
-                                  trailing: const Icon(AppIcons.plus, color: ZveltTokens.brand),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        icon: Icon(AppIcons.heart,
+                                            color: _favIds.contains(food.id)
+                                                ? ZveltTokens.brand
+                                                : ZveltTokens.text3,
+                                            size: 18),
+                                        tooltip: 'Favorite',
+                                        onPressed: () => _toggleFavorite(food),
+                                      ),
+                                      const Icon(AppIcons.plus, color: ZveltTokens.brand, size: 20),
+                                    ],
+                                  ),
                                   onTap: () => _selectFood(food),
                                 );
                               },
@@ -3163,6 +3675,385 @@ class _GoalsSheetState extends State<_GoalsSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Shared sheet scaffold + number field for the new food sheets ─────────────
+Widget _sheetShell({required Widget child}) => Container(
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
+      ),
+      padding: const EdgeInsets.fromLTRB(ZveltTokens.s5, ZveltTokens.s4, ZveltTokens.s5, ZveltTokens.s6),
+      child: child,
+    );
+
+Widget _sheetHandle() => Center(
+      child: Container(
+        width: 40,
+        height: 4,
+        margin: const EdgeInsets.only(bottom: ZveltTokens.s4),
+        decoration: BoxDecoration(color: ZveltTokens.border, borderRadius: BorderRadius.circular(ZveltTokens.rPill)),
+      ),
+    );
+
+Widget _numRow(String label, TextEditingController c, String hint) => Padding(
+      padding: const EdgeInsets.only(bottom: ZveltTokens.s2),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: ZType.bodyM.copyWith(color: ZveltTokens.text))),
+          SizedBox(
+            width: 110,
+            child: TextField(
+              controller: c,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+              textAlign: TextAlign.center,
+              style: ZType.num_.copyWith(color: ZveltTokens.text),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: hint,
+                hintStyle: ZType.bodyS.copyWith(color: ZveltTokens.text4),
+                filled: true,
+                fillColor: ZveltTokens.surface2,
+                contentPadding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s3, vertical: ZveltTokens.s3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(ZveltTokens.rSm),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+double? _parseNum(TextEditingController c) => double.tryParse(c.text.trim().replaceAll(',', '.'));
+
+String _fmtNum(double v) {
+  final s = v.toStringAsFixed(1);
+  return s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
+}
+
+/// Quick-add: log a calories/macros entry without a food search.
+class _QuickAddSheet extends StatefulWidget {
+  const _QuickAddSheet({required this.meal});
+  final String meal;
+  @override
+  State<_QuickAddSheet> createState() => _QuickAddSheetState();
+}
+
+class _QuickAddSheetState extends State<_QuickAddSheet> {
+  final _name = TextEditingController();
+  final _cal = TextEditingController();
+  final _p = TextEditingController();
+  final _c = TextEditingController();
+  final _f = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    for (final x in [_name, _cal, _p, _c, _f]) {
+      x.dispose();
+    }
+    super.dispose();
+  }
+
+  void _add() {
+    final cal = _parseNum(_cal);
+    if (cal == null || cal <= 0) {
+      setState(() => _error = 'Introdu caloriile');
+      return;
+    }
+    final food = FoodItem(
+      id: 'quick:${DateTime.now().microsecondsSinceEpoch}',
+      name: _name.text.trim().isEmpty ? 'Adaos rapid' : _name.text.trim(),
+      brand: 'Manual',
+      caloriesPer100g: cal,
+      proteinPer100g: _parseNum(_p) ?? 0,
+      fatPer100g: _parseNum(_f) ?? 0,
+      carbsPer100g: _parseNum(_c) ?? 0,
+    );
+    Navigator.pop(
+      context,
+      MealEntry(
+        id: 'q${DateTime.now().microsecondsSinceEpoch}',
+        food: food,
+        grams: 100,
+        meal: widget.meal,
+        loggedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: _sheetShell(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sheetHandle(),
+            Text('Adaugă rapid calorii', style: ZType.h3.copyWith(color: ZveltTokens.text)),
+            const SizedBox(height: ZveltTokens.s4),
+            _numRow('Calorii', _cal, 'kcal'),
+            _numRow('Proteine (g)', _p, 'opț'),
+            _numRow('Carbo (g)', _c, 'opț'),
+            _numRow('Grăsimi (g)', _f, 'opț'),
+            const SizedBox(height: ZveltTokens.s1),
+            TextField(
+              controller: _name,
+              style: ZType.bodyM.copyWith(color: ZveltTokens.text),
+              decoration: InputDecoration(
+                hintText: 'Nume (opțional)',
+                hintStyle: ZType.bodyS.copyWith(color: ZveltTokens.text3),
+                filled: true,
+                fillColor: ZveltTokens.surface2,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s3, vertical: ZveltTokens.s3),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(ZveltTokens.rSm), borderSide: BorderSide.none),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: ZveltTokens.s2),
+              Text(_error!, style: ZType.bodyS.copyWith(color: ZveltTokens.error)),
+            ],
+            const SizedBox(height: ZveltTokens.s4),
+            SizedBox(
+              height: 50,
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: ZveltTokens.brand,
+                    foregroundColor: ZveltTokens.onBrand,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ZveltTokens.rMd))),
+                onPressed: _add,
+                child: Text('Adaugă', style: ZType.bodyM.copyWith(color: ZveltTokens.onBrand, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Create or edit a custom food (saved to the user's catalog, synced).
+class _CustomFoodSheet extends StatefulWidget {
+  const _CustomFoodSheet({this.editing});
+  final FoodItem? editing;
+  @override
+  State<_CustomFoodSheet> createState() => _CustomFoodSheetState();
+}
+
+class _CustomFoodSheetState extends State<_CustomFoodSheet> {
+  final _name = TextEditingController();
+  final _brand = TextEditingController();
+  final _cal = TextEditingController();
+  final _p = TextEditingController();
+  final _c = TextEditingController();
+  final _f = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.editing;
+    if (e != null) {
+      _name.text = e.name;
+      _brand.text = e.brand;
+      _cal.text = _fmtNum(e.caloriesPer100g);
+      _p.text = _fmtNum(e.proteinPer100g);
+      _c.text = _fmtNum(e.carbsPer100g);
+      _f.text = _fmtNum(e.fatPer100g);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final x in [_name, _brand, _cal, _p, _c, _f]) {
+      x.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    final cal = _parseNum(_cal);
+    if (name.isEmpty) {
+      setState(() => _error = 'Introdu un nume');
+      return;
+    }
+    if (cal == null || cal < 0) {
+      setState(() => _error = 'Introdu caloriile / 100g');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final svc = NutritionService.instance;
+      final editing = widget.editing;
+      final food = editing == null
+          ? await svc.createCustomFood(
+              name: name,
+              brand: _brand.text.trim(),
+              caloriesPer100g: cal,
+              proteinPer100g: _parseNum(_p) ?? 0,
+              carbsPer100g: _parseNum(_c) ?? 0,
+              fatPer100g: _parseNum(_f) ?? 0,
+            )
+          : await svc.updateCustomFood(
+              editing.id,
+              name: name,
+              brand: _brand.text.trim(),
+              caloriesPer100g: cal,
+              proteinPer100g: _parseNum(_p) ?? 0,
+              carbsPer100g: _parseNum(_c) ?? 0,
+              fatPer100g: _parseNum(_f) ?? 0,
+            );
+      if (!mounted) return;
+      Navigator.pop(context, food);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: _sheetShell(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sheetHandle(),
+            Text(widget.editing == null ? 'Aliment custom' : 'Editează aliment',
+                style: ZType.h3.copyWith(color: ZveltTokens.text)),
+            const SizedBox(height: ZveltTokens.s1),
+            Text('Valori per 100g.', style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
+            const SizedBox(height: ZveltTokens.s4),
+            TextField(
+              controller: _name,
+              style: ZType.bodyM.copyWith(color: ZveltTokens.text),
+              decoration: InputDecoration(
+                hintText: 'Nume',
+                hintStyle: ZType.bodyS.copyWith(color: ZveltTokens.text3),
+                filled: true,
+                fillColor: ZveltTokens.surface2,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s3, vertical: ZveltTokens.s3),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(ZveltTokens.rSm), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: ZveltTokens.s2),
+            TextField(
+              controller: _brand,
+              style: ZType.bodyM.copyWith(color: ZveltTokens.text),
+              decoration: InputDecoration(
+                hintText: 'Brand (opțional)',
+                hintStyle: ZType.bodyS.copyWith(color: ZveltTokens.text3),
+                filled: true,
+                fillColor: ZveltTokens.surface2,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s3, vertical: ZveltTokens.s3),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(ZveltTokens.rSm), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: ZveltTokens.s3),
+            _numRow('Calorii / 100g', _cal, 'kcal'),
+            _numRow('Proteine / 100g', _p, 'g'),
+            _numRow('Carbo / 100g', _c, 'g'),
+            _numRow('Grăsimi / 100g', _f, 'g'),
+            if (_error != null) ...[
+              const SizedBox(height: ZveltTokens.s2),
+              Text(_error!, style: ZType.bodyS.copyWith(color: ZveltTokens.error)),
+            ],
+            const SizedBox(height: ZveltTokens.s4),
+            SizedBox(
+              height: 50,
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: ZveltTokens.brand,
+                    foregroundColor: ZveltTokens.onBrand,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ZveltTokens.rMd))),
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 22, height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: ZveltTokens.onBrand))
+                    : Text('Salvează', style: ZType.bodyM.copyWith(color: ZveltTokens.onBrand, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pick how many recipe servings to log → returns the servings count.
+class _ServingsDialog extends StatefulWidget {
+  const _ServingsDialog({required this.recipe});
+  final Recipe recipe;
+  @override
+  State<_ServingsDialog> createState() => _ServingsDialogState();
+}
+
+class _ServingsDialogState extends State<_ServingsDialog> {
+  double _servings = 1;
+  @override
+  Widget build(BuildContext context) {
+    final perServ = widget.recipe.perServingCalories;
+    return AlertDialog(
+      backgroundColor: ZveltTokens.surface,
+      title: Text(widget.recipe.name, style: ZType.h4.copyWith(color: ZveltTokens.text)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('${(perServ * _servings).round()} kcal',
+              style: ZType.num_.copyWith(color: ZveltTokens.text, fontSize: 28)),
+          Text('${_fmtNum(_servings)} porții', style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
+          const SizedBox(height: ZveltTokens.s2),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(AppIcons.minus, color: ZveltTokens.brand),
+                onPressed: () => setState(() => _servings = (_servings - 0.5).clamp(0.5, 20)),
+              ),
+              SizedBox(
+                width: 56,
+                child: Text(_fmtNum(_servings),
+                    textAlign: TextAlign.center, style: ZType.num_.copyWith(color: ZveltTokens.text, fontSize: 20)),
+              ),
+              IconButton(
+                icon: const Icon(AppIcons.plus, color: ZveltTokens.brand),
+                onPressed: () => setState(() => _servings = (_servings + 0.5).clamp(0.5, 20)),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Anulează')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: ZveltTokens.brand, foregroundColor: ZveltTokens.onBrand),
+          onPressed: () => Navigator.pop(context, _servings),
+          child: const Text('Adaugă'),
+        ),
+      ],
     );
   }
 }

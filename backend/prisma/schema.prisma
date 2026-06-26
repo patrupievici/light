@@ -43,6 +43,9 @@ model User {
   plannedWorkouts     PlannedWorkout[]
   routines            Routine[]
   userPrograms        UserProgram[]
+  customFoods         UserCustomFood[]
+  favoriteFoods       UserFavoriteFood[]
+  recipes             UserRecipe[]
   challengesCreated        Challenge[]
   challengeParticipations  ChallengeParticipant[]
   challengeProgressLogs    ChallengeProgressLog[]
@@ -726,6 +729,73 @@ model NutritionMealTemplate {
 
   @@index([userId])
   @@map("nutrition_meal_templates")
+}
+
+/// User-created custom foods (MyFitnessPal-style). Macros stored canonical per-100g
+/// to match the diary FoodItem shape. Referenced from a diary entry via
+/// foodId = `custom:<id>`.
+model UserCustomFood {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  name            String   @db.VarChar(120)
+  brand           String?  @db.VarChar(120)
+  caloriesPer100g Float    @map("calories_per_100g")
+  proteinPer100g  Float    @map("protein_per_100g")
+  carbsPer100g    Float    @map("carbs_per_100g")
+  fatPer100g      Float    @map("fat_per_100g")
+  servingGrams    Float?   @map("serving_grams")
+  servingLabel    String?  @db.VarChar(60) @map("serving_label")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_custom_foods")
+}
+
+/// Starred foods for one-tap re-logging. foodId is the source key
+/// (`off:<barcode>` | `usda_fdc_<id>` | `custom:<id>`); macros cached per-100g.
+model UserFavoriteFood {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  foodId          String   @db.VarChar(120) @map("food_id")
+  name            String   @db.VarChar(120)
+  brand           String?  @db.VarChar(120)
+  caloriesPer100g Float    @map("calories_per_100g")
+  proteinPer100g  Float    @map("protein_per_100g")
+  carbsPer100g    Float    @map("carbs_per_100g")
+  fatPer100g      Float    @map("fat_per_100g")
+  servingGrams    Float?   @map("serving_grams")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, foodId])
+  @@index([userId])
+  @@map("user_favorite_foods")
+}
+
+/// Multi-ingredient recipe; per-serving macros derived from the ingredient totals
+/// on apply. ingredientsJson: [{ name, grams, caloriesPer100g, proteinPer100g,
+/// carbsPer100g, fatPer100g, foodId? }].
+model UserRecipe {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  name            String   @db.VarChar(120)
+  ingredientsJson Json     @map("ingredients_json")
+  servings        Int      @default(1)
+  totalCalories   Float    @map("total_calories")
+  totalProtein    Float    @map("total_protein")
+  totalCarbs      Float    @map("total_carbs")
+  totalFat        Float    @map("total_fat")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_recipes")
 }
 
 /// Append-only consent ledger (GDPR Art. 7 verifiable history). Each grant/revoke

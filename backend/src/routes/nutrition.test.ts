@@ -433,10 +433,14 @@ describe('POST /v1/nutrition/claim-xp — idempotency', () => {
 
 // ── OFF fallback wiring ──────────────────────────────────────────────────────
 describe('USDA search — Open Food Facts fallback', () => {
-  it('does NOT call OFF when USDA already returns a usable hit (behavior preserved)', async () => {
+  it('does NOT call OFF when USDA returns a rich page of hits', async () => {
     process.env.USDA_API_KEY = 'k'
+    // 8+ usable USDA hits (>= MIN_USDA_HITS_BEFORE_OFF) → OFF merge is skipped.
     const usdaBody = JSON.stringify({
-      foods: [{ description: 'Chicken', foodNutrients: [{ nutrientName: 'Energy', value: 165 }] }],
+      foods: Array.from({ length: 8 }, (_, i) => ({
+        description: `Chicken ${i}`,
+        foodNutrients: [{ nutrientName: 'Energy', value: 165 }],
+      })),
     })
     const spy = vi
       .spyOn(globalThis, 'fetch')
@@ -449,7 +453,38 @@ describe('USDA search — Open Food Facts fallback', () => {
     })
     expect(res.statusCode).toBe(200)
     expect(searchOffByName).not.toHaveBeenCalled()
-    expect(res.json().foods).toHaveLength(1)
+    expect(res.json().foods).toHaveLength(8)
+    spy.mockRestore()
+    await app.close()
+  })
+
+  it('merges OFF after USDA when USDA returns only a few hits (EU coverage)', async () => {
+    process.env.USDA_API_KEY = 'k'
+    // One thin generic USDA hit (< MIN_USDA_HITS_BEFORE_OFF) → OFF is queried and
+    // its branded EU rows are appended so the actual product is findable.
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          foods: [{ description: 'Generic hazelnut spread', foodNutrients: [{ nutrientName: 'Energy', value: 500 }] }],
+        }),
+        { status: 200 },
+      ),
+    )
+    searchOffByName.mockResolvedValue([
+      { fdcId: 'off:nutella', description: 'Nutella', foodNutrients: [{ nutrientName: 'Energy', value: 539 }] },
+    ])
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/nutrition/usda/foods/search',
+      payload: { query: 'nutella' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(searchOffByName).toHaveBeenCalledWith('nutella', { pageSize: 25 })
+    const foods = res.json().foods
+    expect(foods).toHaveLength(2) // USDA generic first, OFF appended
+    expect(foods[0].description).toBe('Generic hazelnut spread')
+    expect(foods[1].fdcId).toBe('off:nutella')
     spy.mockRestore()
     await app.close()
   })

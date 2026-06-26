@@ -365,6 +365,9 @@ describe('erasure completeness vs User relations (schema guard)', () => {
     'StoryLike',
     'Segment', // SetNull: authored segments outlive the author by design
     'UserProgram', // Cascade: a user's training programs vanish with the account
+    'UserCustomFood', // Cascade: custom foods vanish with the account
+    'UserFavoriteFood', // Cascade: favorite foods vanish with the account
+    'UserRecipe', // Cascade: recipes vanish with the account
   ])
 
   function modelToAccessor(model: string): string {
