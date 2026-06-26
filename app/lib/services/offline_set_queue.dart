@@ -58,6 +58,7 @@ class PendingSetEntry {
     this.reps = 1,
     this.rpe,
     this.tag = 'WORK',
+    this.note,
     this.queuedAt,
     this.retryCount = 0,
     this.nextRetryAt,
@@ -73,6 +74,7 @@ class PendingSetEntry {
     required String clientSetId,
     double? rpe,
     String tag = 'WORK',
+    String? note,
     DateTime? queuedAt,
   }) =>
       PendingSetEntry(
@@ -84,6 +86,7 @@ class PendingSetEntry {
         reps: reps,
         rpe: rpe,
         tag: tag,
+        note: note,
         queuedAt: queuedAt,
       );
 
@@ -98,6 +101,7 @@ class PendingSetEntry {
     required double weightKg,
     required int reps,
     double? rpe,
+    String? note,
     DateTime? queuedAt,
   }) =>
       PendingSetEntry(
@@ -109,6 +113,7 @@ class PendingSetEntry {
         weightKg: weightKg,
         reps: reps,
         rpe: rpe,
+        note: note,
         queuedAt: queuedAt,
       );
 
@@ -139,6 +144,9 @@ class PendingSetEntry {
   final int reps;
   final double? rpe;
   final String tag;
+  /// Anti-cheat justification note carried with a >2× weight-jump set so an
+  /// offline replay re-sends the same justification the user already gave.
+  final String? note;
   final DateTime? queuedAt;
   /// Idempotency token: re-sending the same one returns the existing set.
   /// Shared between an `add` and any `update`/`delete` of the SAME set so the
@@ -165,6 +173,7 @@ class PendingSetEntry {
       clientSetId: clientSetId,
       rpe: rpe,
       tag: tag,
+      note: note,
       queuedAt: queuedAt,
       retryCount: next,
       nextRetryAt: now.add(Duration(seconds: delaySec)),
@@ -181,6 +190,7 @@ class PendingSetEntry {
         'reps': reps,
         if (rpe != null) 'rpe': rpe,
         'tag': tag,
+        if (note != null) 'note': note,
         'clientSetId': clientSetId,
         'queuedAt': (queuedAt ?? DateTime.now()).toIso8601String(),
         if (retryCount > 0) 'retryCount': retryCount,
@@ -202,6 +212,7 @@ class PendingSetEntry {
     final reps = (m['reps'] as num?)?.toInt() ?? 1;
     final rpe = (m['rpe'] as num?)?.toDouble();
     final tag = m['tag'] as String? ?? 'WORK';
+    final note = m['note'] as String?;
     final queuedAt =
         m['queuedAt'] != null ? DateTime.tryParse(m['queuedAt'] as String) : null;
     // Legacy entries (queued before clientSetId existed) get a DETERMINISTIC id
@@ -220,6 +231,7 @@ class PendingSetEntry {
       reps: reps,
       rpe: rpe,
       tag: tag,
+      note: note,
       clientSetId: clientSetId,
       queuedAt: queuedAt,
       retryCount: (m['retryCount'] as num?)?.toInt() ?? 0,
@@ -449,6 +461,7 @@ class OfflineSetQueue {
           rpe: e.rpe,
           tag: e.tag,
           clientSetId: e.clientSetId,
+          note: e.note,
         );
       case PendingSetOp.update:
         // setId is guaranteed non-null for update (enforced in fromJson and the
@@ -461,6 +474,7 @@ class OfflineSetQueue {
           reps: e.reps,
           rpe: e.rpe,
           isCompleted: true,
+          note: e.note,
         );
       case PendingSetOp.delete:
         // Offline DELETE replay needs WorkoutService.deleteSet
@@ -563,6 +577,20 @@ class OfflineSetQueue {
           } else {
             remaining.add(e._afterTransientFailure(now));
           }
+        } on WeightJumpNoteRequiredException catch (_) {
+          // A >2× weight jump the server won't accept without a justification
+          // note. A background flush can't prompt the user, so retrying loops
+          // forever — drop it like a 4xx (and orphan its children), recording it
+          // so the discarded set is observable. (When the note WAS captured
+          // online it rides along in e.note and this branch never fires.)
+          dropped++;
+          if (e.op == PendingSetOp.add) {
+            orphanedClientSetIds.add(e.clientSetId);
+          }
+          reportErrorNoStack(
+            'offline ${_opToJson(e.op)} dropped (weight-jump needs note): we=${e.weId} wkg=${e.weightKg}',
+            reason: 'offline-queue:drop-weight-jump',
+          );
         } catch (_) {
           // Network error or timeout — keep with backoff for the next attempt.
           remaining.add(e._afterTransientFailure(now));

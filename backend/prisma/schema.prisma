@@ -448,6 +448,9 @@ model WorkoutSet {
   /// Client-side idempotency token: retries from the offline queue reuse the
   /// same row instead of creating duplicates.
   clientSetId       String?  @unique @map("client_set_id")
+  /// Optional justification note. Required (anti-cheat) when the weight is a >2x
+  /// jump vs the user's recent personal max for this exercise.
+  note              String?  @map("note")
   createdAt         DateTime @default(now()) @map("created_at")
 
   workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id])

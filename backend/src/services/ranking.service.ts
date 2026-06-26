@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma'
 import { getCanonicalBodyweightKg } from '../lib/bodyweight'
+import { isSrAnomaly } from './anti-cheat.service'
 
 // ─── Constante ───────────────────────────────────────────────────────────────
 
@@ -325,7 +326,8 @@ export async function computeRanks(
     const lpDelta = newLp - prevLp
 
     const prevSr = prevRank ? Number(prevRank.strengthRatio) : 0
-    const isAnomaly = prevSr > 0 && sr > prevSr * 1.2
+    // Single source of truth for the >20% SR-jump heuristic (anti-cheat.service).
+    const isAnomaly = isSrAnomaly(sr, prevSr)
 
     await prisma.userExerciseRank.upsert({
       where: { userId_exerciseId: { userId, exerciseId: we.exerciseId } },

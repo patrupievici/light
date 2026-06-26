@@ -9,6 +9,7 @@ import { createNotificationSafe, NotificationType } from '../services/notificati
 import { decodePostPhotoBase64, savePostPhoto } from '../lib/post-photo'
 import { areFriends, getFriendIdsAndHidden } from '../lib/friendships'
 import { stripControlChars } from '../lib/sanitize'
+import { evaluateEditLimit } from '../services/anti-cheat.service'
 
 const CreatePostSchema = z
   .object({
@@ -488,14 +489,20 @@ export async function postRoutes(app: FastifyInstance) {
     if (!post) return reply.code(404).send({ error: 'NOT_FOUND', message: 'Post negăsit', requestId: request.id })
     if (post.userId !== me) return reply.code(403).send({ error: 'FORBIDDEN', message: 'Nu poți edita această postare', requestId: request.id })
 
-    // Anti-cheat: max 3 edits per 24h
-    const windowStart = new Date(Date.now() - 86_400_000)
-    if (post.lastEditAt && post.lastEditAt > windowStart && post.editCount >= 3) {
+    // Anti-cheat: max 3 edits / 24h. The pure validator (anti-cheat.service) is
+    // the single source of truth — crucially it RESETS the counter once the 24h
+    // window has rolled over. The old inline check never reset, so editCount grew
+    // unbounded and eventually locked a post out forever.
+    const editVerdict = evaluateEditLimit(
+      { editCount: post.editCount, lastEditAt: post.lastEditAt },
+      new Date(),
+    )
+    if (!editVerdict.allowed) {
       return reply.code(429).send({ error: 'EDIT_LIMIT', message: 'Maxim 3 editări per 24h', requestId: request.id })
     }
 
     const body = request.body as { caption?: string; visibility?: string }
-    const updates: Record<string, unknown> = { editCount: post.editCount + 1, lastEditAt: new Date() }
+    const updates: Record<string, unknown> = { editCount: editVerdict.nextEditCount, lastEditAt: new Date() }
     if (body.caption !== undefined) updates.caption = body.caption?.trim() || null
     if (body.visibility && ['private', 'friends', 'public'].includes(body.visibility)) {
       updates.visibility = body.visibility

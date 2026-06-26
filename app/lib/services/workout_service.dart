@@ -88,6 +88,20 @@ class HeatmapRequestException implements Exception {
   String toString() => 'HeatmapRequestException($statusCode): $message';
 }
 
+/// Raised by [WorkoutService.addSet] / [WorkoutService.updateSet] when the server
+/// rejects a >2× weight jump (vs the recent personal max) with a 422
+/// `WEIGHT_JUMP_REQUIRES_NOTE`. The UI catches this to prompt the user for a
+/// justification note and retry the same call with `note:` supplied.
+class WeightJumpNoteRequiredException implements Exception {
+  const WeightJumpNoteRequiredException([
+    this.message =
+        'O greutate mult peste recordul tău recent necesită o notă explicativă.',
+  ]);
+  final String message;
+  @override
+  String toString() => 'WeightJumpNoteRequiredException($message)';
+}
+
 /// Bounds per CLAUDE.md spec — keep in sync with backend validators.
 const double kSetWeightMinKg = 0.0;
 const double kSetWeightMaxKg = 500.0;
@@ -179,6 +193,7 @@ class WorkoutService {
     String tag = 'WORK',
     bool isCompleted = true,
     String? clientSetId,
+    String? note,
   }) async {
     _validateSetInputs(weightKg: weightKg, reps: reps, rpe: rpe);
     final body = <String, dynamic>{
@@ -188,12 +203,21 @@ class WorkoutService {
       'isCompleted': isCompleted,
       if (rpe != null) 'rpe': rpe,
       if (clientSetId != null) 'clientSetId': clientSetId,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
     };
     final res = await http.post(
       Uri.parse('$v1Base/workouts/$workoutId/exercises/$weId/sets'),
       headers: await _headers(),
       body: jsonEncode(body),
     ).withTimeout();
+    // Anti-cheat: a >2× jump vs the recent personal max is rejected until the
+    // user attaches a justification note.
+    if (res.statusCode == 422 && _isWeightJump(res)) {
+      final msg = _messageOf(res);
+      throw msg == null
+          ? const WeightJumpNoteRequiredException()
+          : WeightJumpNoteRequiredException(msg);
+    }
     // 201 = created, 200 = idempotent replay (same clientSetId).
     if (res.statusCode != 201 && res.statusCode != 200) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -209,6 +233,7 @@ class WorkoutService {
     int? reps,
     double? rpe,
     bool? isCompleted,
+    String? note,
   }) async {
     _validateSetInputs(weightKg: weightKg, reps: reps, rpe: rpe);
     final body = <String, dynamic>{
@@ -216,6 +241,7 @@ class WorkoutService {
       if (reps != null) 'reps': reps,
       if (rpe != null) 'rpe': rpe,
       if (isCompleted != null) 'isCompleted': isCompleted,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
     };
     if (body.isEmpty) {
       throw Exception('Nothing to update');
@@ -225,6 +251,13 @@ class WorkoutService {
       headers: await _headers(),
       body: jsonEncode(body),
     ).withTimeout();
+    // Anti-cheat: a >2× jump vs the prior weight needs a justification note.
+    if (res.statusCode == 422 && _isWeightJump(res)) {
+      final msg = _messageOf(res);
+      throw msg == null
+          ? const WeightJumpNoteRequiredException()
+          : WeightJumpNoteRequiredException(msg);
+    }
     if (res.statusCode != 200) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     return WorkoutSetDto.fromJson(data['set'] as Map<String, dynamic>);
@@ -815,6 +848,27 @@ class WorkoutService {
       statusCode: res.statusCode,
       message: message ?? 'Server error (${res.statusCode})',
     );
+  }
+
+  /// True when the response is the anti-cheat `WEIGHT_JUMP_REQUIRES_NOTE` error.
+  bool _isWeightJump(http.Response res) {
+    try {
+      final body = jsonDecode(res.body) as Map<String, dynamic>?;
+      return body?['error'] == 'WEIGHT_JUMP_REQUIRES_NOTE';
+    } on FormatException {
+      return false;
+    }
+  }
+
+  /// Best-effort `message` field from a JSON error body (null if absent/unparsable).
+  String? _messageOf(http.Response res) {
+    try {
+      final body = jsonDecode(res.body) as Map<String, dynamic>?;
+      final m = body?['message'];
+      return m?.toString();
+    } on FormatException {
+      return null;
+    }
   }
 }
 

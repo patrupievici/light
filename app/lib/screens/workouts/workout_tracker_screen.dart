@@ -18,6 +18,7 @@ import '../../widgets/exercise_gif_dialog.dart';
 import '../../widgets/plate_calculator.dart';
 import '../../widgets/set_log_dialog.dart';
 import '../../widgets/sync_status_chip.dart';
+import '../../widgets/weight_jump_note_sheet.dart';
 import 'exercise_library_screen.dart';
 import 'xp_complete_screen.dart';
 
@@ -344,50 +345,67 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     // Same client-side UUID for the POST and any later offline-queue replay, so
     // the server dedupes on `clientSetId` rather than creating duplicate sets.
     final clientSetId = const Uuid().v4();
-    try {
-      final added = await _service.addSet(
-        widget.workoutId,
-        we.id,
-        weightKg: vals.$1,
-        reps: vals.$2,
-        rpe: vals.$3,
-        tag: tag,
-        clientSetId: clientSetId,
-      );
-      _patchWorkoutSets(we.id, (sets) {
-        // Idempotent replay can return an existing row — replace by id if
-        // present, otherwise append the freshly created set.
-        final idx = sets.indexWhere((s) => s.id == added.id);
-        if (idx >= 0) {
-          sets[idx] = added;
-        } else {
-          sets.add(added);
-        }
-        return sets;
-      });
-      _maybeFlagPr(
-        exerciseId: we.exerciseId,
-        weightKg: vals.$1,
-        reps: vals.$2,
-        tag: tag,
-        setId: added.id,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      // Offline-first: enqueue an ADD op instead of dropping the set. The
-      // coordinator's connectivity listener flushes on reconnect; the server
-      // dedupes on clientSetId.
-      await _enqueueOfflineSet(
-        PendingSetEntry.add(
-          workoutId: widget.workoutId,
-          weId: we.id,
+    // Anti-cheat retry loop: a >2× weight jump vs the recent personal max is
+    // rejected until a justification note is attached. Each pass re-sends with
+    // whatever note the user supplied; the note also rides any offline enqueue.
+    String? note;
+    while (true) {
+      try {
+        final added = await _service.addSet(
+          widget.workoutId,
+          we.id,
           weightKg: vals.$1,
           reps: vals.$2,
           rpe: vals.$3,
           tag: tag,
           clientSetId: clientSetId,
-        ),
-      );
+          note: note,
+        );
+        if (!mounted) return;
+        _patchWorkoutSets(we.id, (sets) {
+          // Idempotent replay can return an existing row — replace by id if
+          // present, otherwise append the freshly created set.
+          final idx = sets.indexWhere((s) => s.id == added.id);
+          if (idx >= 0) {
+            sets[idx] = added;
+          } else {
+            sets.add(added);
+          }
+          return sets;
+        });
+        _maybeFlagPr(
+          exerciseId: we.exerciseId,
+          weightKg: vals.$1,
+          reps: vals.$2,
+          tag: tag,
+          setId: added.id,
+        );
+        return;
+      } on WeightJumpNoteRequiredException catch (ex) {
+        if (!mounted) return;
+        final entered = await showWeightJumpNoteSheet(context, message: ex.message);
+        if (entered == null) return; // user cancelled → set is NOT logged
+        note = entered;
+        // loop again, now with the note attached
+      } catch (e) {
+        if (!mounted) return;
+        // Offline-first: enqueue an ADD op instead of dropping the set. The
+        // coordinator's connectivity listener flushes on reconnect; the server
+        // dedupes on clientSetId. Any note the user gave rides along.
+        await _enqueueOfflineSet(
+          PendingSetEntry.add(
+            workoutId: widget.workoutId,
+            weId: we.id,
+            weightKg: vals.$1,
+            reps: vals.$2,
+            rpe: vals.$3,
+            tag: tag,
+            clientSetId: clientSetId,
+            note: note,
+          ),
+        );
+        return;
+      }
     }
   }
 
@@ -430,44 +448,58 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
       title: AppStrings.logSet,
     );
     if (vals == null || !mounted) return;
-    try {
-      final updated = await _service.updateSet(
-        widget.workoutId,
-        we.id,
-        set.id,
-        weightKg: vals.$1,
-        reps: vals.$2,
-        rpe: vals.$3,
-        isCompleted: true,
-      );
-      await _recordSetCompletion(we: we, setId: set.id);
-      _patchWorkoutSets(we.id, (sets) {
-        final idx = sets.indexWhere((s) => s.id == updated.id);
-        if (idx >= 0) sets[idx] = updated;
-        return sets;
-      });
-      _maybeFlagPr(
-        exerciseId: we.exerciseId,
-        weightKg: vals.$1,
-        reps: vals.$2,
-        tag: set.tag,
-        setId: updated.id,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      // Offline-first: enqueue an UPDATE op (not a fresh ADD) so the existing
-      // set row is patched on reconnect instead of being duplicated.
-      await _enqueueOfflineSet(
-        PendingSetEntry.update(
-          workoutId: widget.workoutId,
-          weId: we.id,
-          setId: set.id,
-          clientSetId: const Uuid().v4(),
+    // Anti-cheat retry loop: a >2× jump vs the prior weight needs a note.
+    String? note;
+    while (true) {
+      try {
+        final updated = await _service.updateSet(
+          widget.workoutId,
+          we.id,
+          set.id,
           weightKg: vals.$1,
           reps: vals.$2,
           rpe: vals.$3,
-        ),
-      );
+          isCompleted: true,
+          note: note,
+        );
+        await _recordSetCompletion(we: we, setId: set.id);
+        if (!mounted) return;
+        _patchWorkoutSets(we.id, (sets) {
+          final idx = sets.indexWhere((s) => s.id == updated.id);
+          if (idx >= 0) sets[idx] = updated;
+          return sets;
+        });
+        _maybeFlagPr(
+          exerciseId: we.exerciseId,
+          weightKg: vals.$1,
+          reps: vals.$2,
+          tag: set.tag,
+          setId: updated.id,
+        );
+        return;
+      } on WeightJumpNoteRequiredException catch (ex) {
+        if (!mounted) return;
+        final entered = await showWeightJumpNoteSheet(context, message: ex.message);
+        if (entered == null) return; // user cancelled → set is NOT changed
+        note = entered;
+      } catch (e) {
+        if (!mounted) return;
+        // Offline-first: enqueue an UPDATE op (not a fresh ADD) so the existing
+        // set row is patched on reconnect instead of being duplicated.
+        await _enqueueOfflineSet(
+          PendingSetEntry.update(
+            workoutId: widget.workoutId,
+            weId: we.id,
+            setId: set.id,
+            clientSetId: const Uuid().v4(),
+            weightKg: vals.$1,
+            reps: vals.$2,
+            rpe: vals.$3,
+            note: note,
+          ),
+        );
+        return;
+      }
     }
   }
 
@@ -477,44 +509,58 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     required double weightKg,
     required int reps,
   }) async {
-    try {
-      final updated = await _service.updateSet(
-        widget.workoutId,
-        we.id,
-        set.id,
-        weightKg: weightKg,
-        reps: reps,
-        rpe: set.rpe,
-        isCompleted: true,
-      );
-      await _recordSetCompletion(we: we, setId: set.id);
-      _patchWorkoutSets(we.id, (sets) {
-        final idx = sets.indexWhere((s) => s.id == updated.id);
-        if (idx >= 0) sets[idx] = updated;
-        return sets;
-      });
-      _maybeFlagPr(
-        exerciseId: we.exerciseId,
-        weightKg: weightKg,
-        reps: reps,
-        tag: set.tag,
-        setId: updated.id,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      // Offline-first: enqueue an UPDATE op targeting this set so reconnect
-      // patches the existing row instead of creating a duplicate ADD.
-      await _enqueueOfflineSet(
-        PendingSetEntry.update(
-          workoutId: widget.workoutId,
-          weId: we.id,
-          setId: set.id,
-          clientSetId: const Uuid().v4(),
+    // Anti-cheat retry loop: a >2× jump vs the prior weight needs a note.
+    String? note;
+    while (true) {
+      try {
+        final updated = await _service.updateSet(
+          widget.workoutId,
+          we.id,
+          set.id,
           weightKg: weightKg,
           reps: reps,
           rpe: set.rpe,
-        ),
-      );
+          isCompleted: true,
+          note: note,
+        );
+        await _recordSetCompletion(we: we, setId: set.id);
+        if (!mounted) return;
+        _patchWorkoutSets(we.id, (sets) {
+          final idx = sets.indexWhere((s) => s.id == updated.id);
+          if (idx >= 0) sets[idx] = updated;
+          return sets;
+        });
+        _maybeFlagPr(
+          exerciseId: we.exerciseId,
+          weightKg: weightKg,
+          reps: reps,
+          tag: set.tag,
+          setId: updated.id,
+        );
+        return;
+      } on WeightJumpNoteRequiredException catch (ex) {
+        if (!mounted) return;
+        final entered = await showWeightJumpNoteSheet(context, message: ex.message);
+        if (entered == null) return; // user cancelled → set is NOT changed
+        note = entered;
+      } catch (e) {
+        if (!mounted) return;
+        // Offline-first: enqueue an UPDATE op targeting this set so reconnect
+        // patches the existing row instead of creating a duplicate ADD.
+        await _enqueueOfflineSet(
+          PendingSetEntry.update(
+            workoutId: widget.workoutId,
+            weId: we.id,
+            setId: set.id,
+            clientSetId: const Uuid().v4(),
+            weightKg: weightKg,
+            reps: reps,
+            rpe: set.rpe,
+            note: note,
+          ),
+        );
+        return;
+      }
     }
   }
 
