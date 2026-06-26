@@ -10,6 +10,7 @@ import { decodePostPhotoBase64, savePostPhoto } from '../lib/post-photo'
 import { areFriends, getFriendIdsAndHidden } from '../lib/friendships'
 import { stripControlChars } from '../lib/sanitize'
 import { evaluateEditLimit } from '../services/anti-cheat.service'
+import { canViewerSeePostPure } from '../lib/post-visibility'
 
 const CreatePostSchema = z
   .object({
@@ -66,14 +67,23 @@ async function canViewerSeePost(
   post: { userId: string; visibility: string },
 ): Promise<boolean> {
   if (post.userId === viewerId) return true
+  // Extra privacy overlay on top of the core visibility rule: an owner who hid
+  // their activity feed is invisible to others even for 'public' posts.
   const sharing = await prisma.userProfile.findUnique({
     where: { userId: post.userId },
     select: { showActivityFeed: true },
   })
   if (sharing?.showActivityFeed === false) return false
-  if (post.visibility === 'private') return false
-  if (post.visibility === 'public') return true
-  return areFriends(viewerId, post.userId)
+  // Resolve friendship only when the decision actually depends on it, then defer
+  // to the pure, unit-tested rule (single source of truth).
+  const needsFriendCheck = post.visibility !== 'public' && post.visibility !== 'private'
+  const friends = needsFriendCheck ? await areFriends(viewerId, post.userId) : false
+  return canViewerSeePostPure({
+    viewerId,
+    ownerId: post.userId,
+    visibility: post.visibility,
+    areFriends: friends,
+  })
 }
 
 export async function postRoutes(app: FastifyInstance) {
@@ -339,6 +349,16 @@ export async function postRoutes(app: FastifyInstance) {
     const { userId } = request.user
     const { id: postId } = request.params as { id: string }
 
+    // Privacy gate: you can only like a post you're allowed to see. 404 (not 403)
+    // so a private/non-friend post stays indistinguishable from a missing one.
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true, visibility: true },
+    })
+    if (!post || !(await canViewerSeePost(userId, post))) {
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Post negasit', requestId: request.id })
+    }
+
     const existing = await prisma.postLike.findUnique({
       where: { postId_userId: { postId, userId } },
     })
@@ -351,13 +371,9 @@ export async function postRoutes(app: FastifyInstance) {
       await prisma.analyticsEvent.create({
         data: { userId, eventName: 'post_liked' },
       })
-      const owner = await prisma.post.findUnique({
-        where: { id: postId },
-        select: { userId: true },
-      })
-      if (owner && owner.userId !== userId) {
+      if (post.userId !== userId) {
         await createNotificationSafe({
-          recipientId: owner.userId,
+          recipientId: post.userId,
           actorId: userId,
           type: NotificationType.POST_LIKE,
           payload: { postId },
@@ -382,6 +398,15 @@ export async function postRoutes(app: FastifyInstance) {
       })
     }
 
+    // Privacy gate: only comment on a post you can see (404 = no enumeration).
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true, visibility: true },
+    })
+    if (!post || !(await canViewerSeePost(userId, post))) {
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Post negasit', requestId: request.id })
+    }
+
     // Strip control chars + trim, but keep the text RAW (no HTML-entity
     // encoding): the Flutter `Text` client renders plain text, so encoding here
     // would corrupt display (`a < b` -> `a &lt; b`). The naive `<[^>]*>` strip
@@ -398,13 +423,9 @@ export async function postRoutes(app: FastifyInstance) {
       data: { userId, eventName: 'post_commented' },
     })
 
-    const owner = await prisma.post.findUnique({
-      where: { id: postId },
-      select: { userId: true },
-    })
-    if (owner && owner.userId !== userId) {
+    if (post.userId !== userId) {
       await createNotificationSafe({
-        recipientId: owner.userId,
+        recipientId: post.userId,
         actorId: userId,
         type: NotificationType.POST_COMMENT,
         payload: { postId, bodyPreview: body.slice(0, 120) },
@@ -416,8 +437,19 @@ export async function postRoutes(app: FastifyInstance) {
 
   // GET /v1/posts/:id/comments
   app.get('/:id/comments', { preHandler: authenticate }, async (request, reply) => {
+    const { userId: viewerId } = request.user
     const { id: postId } = request.params as { id: string }
     const query = request.query as { page?: string; limit?: string }
+
+    // Privacy gate: don't expose a post's comments to someone who can't see the
+    // post itself. 404 mirrors the post-not-found body (no enumeration).
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true, visibility: true },
+    })
+    if (!post || !(await canViewerSeePost(viewerId, post))) {
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Post negasit', requestId: request.id })
+    }
 
     const page = Math.max(1, parseInt(query.page ?? '1'))
     const limit = Math.min(50, parseInt(query.limit ?? '20'))
@@ -530,6 +562,16 @@ export async function postRoutes(app: FastifyInstance) {
     const { userId: me } = request.user
     const { id: postId } = request.params as { id: string }
 
+    // Privacy gate: don't let a viewer bookmark (and thus track / leak the
+    // existence of) a post they aren't allowed to see.
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true, visibility: true },
+    })
+    if (!post || !(await canViewerSeePost(me, post))) {
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Post negăsit', requestId: request.id })
+    }
+
     const existing = await prisma.postBookmark.findUnique({
       where: { postId_userId: { postId, userId: me } },
     })
@@ -546,6 +588,16 @@ export async function postRoutes(app: FastifyInstance) {
     const { userId: me } = request.user
     const { id: postId } = request.params as { id: string }
 
+    // Privacy gate: a post you can't see isn't in your feed, so there's nothing
+    // legitimate to hide — and a 201 here would leak its existence.
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true, visibility: true },
+    })
+    if (!post || !(await canViewerSeePost(me, post))) {
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Post negăsit', requestId: request.id })
+    }
+
     await prisma.postHide.upsert({
       where: { postId_userId: { postId, userId: me } },
       update: {},
@@ -560,6 +612,16 @@ export async function postRoutes(app: FastifyInstance) {
     const { id: postId } = request.params as { id: string }
     const body = request.body as { reason?: string }
     const reason = body?.reason?.trim().slice(0, 200) || null
+
+    // Privacy gate: you can only report a post you can actually see — otherwise a
+    // 201 leaks existence and lets someone spuriously report invisible posts.
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true, visibility: true },
+    })
+    if (!post || !(await canViewerSeePost(me, post))) {
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Post negăsit', requestId: request.id })
+    }
 
     const report = await prisma.postReport.upsert({
       where: { postId_userId: { postId, userId: me } },

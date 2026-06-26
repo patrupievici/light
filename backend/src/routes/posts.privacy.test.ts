@@ -12,6 +12,18 @@ const userProfileFindMany = vi.fn()
 const friendshipFindFirst = vi.fn()
 const friendshipFindMany = vi.fn()
 const postHideFindMany = vi.fn()
+const postLikeFindUnique = vi.fn()
+const postLikeCreate = vi.fn()
+const postLikeDelete = vi.fn()
+const postCommentCreate = vi.fn()
+const postCommentFindMany = vi.fn()
+const postCommentCount = vi.fn()
+const analyticsEventCreate = vi.fn()
+const postBookmarkFindUnique = vi.fn()
+const postBookmarkCreate = vi.fn()
+const postBookmarkDelete = vi.fn()
+const postHideUpsert = vi.fn()
+const postReportUpsert = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
@@ -27,7 +39,27 @@ vi.mock('../lib/prisma', () => ({
       findFirst: (...a: unknown[]) => friendshipFindFirst(...a),
       findMany: (...a: unknown[]) => friendshipFindMany(...a),
     },
-    postHide: { findMany: (...a: unknown[]) => postHideFindMany(...a) },
+    postHide: {
+      findMany: (...a: unknown[]) => postHideFindMany(...a),
+      upsert: (...a: unknown[]) => postHideUpsert(...a),
+    },
+    postLike: {
+      findUnique: (...a: unknown[]) => postLikeFindUnique(...a),
+      create: (...a: unknown[]) => postLikeCreate(...a),
+      delete: (...a: unknown[]) => postLikeDelete(...a),
+    },
+    postComment: {
+      create: (...a: unknown[]) => postCommentCreate(...a),
+      findMany: (...a: unknown[]) => postCommentFindMany(...a),
+      count: (...a: unknown[]) => postCommentCount(...a),
+    },
+    postBookmark: {
+      findUnique: (...a: unknown[]) => postBookmarkFindUnique(...a),
+      create: (...a: unknown[]) => postBookmarkCreate(...a),
+      delete: (...a: unknown[]) => postBookmarkDelete(...a),
+    },
+    postReport: { upsert: (...a: unknown[]) => postReportUpsert(...a) },
+    analyticsEvent: { create: (...a: unknown[]) => analyticsEventCreate(...a) },
   },
 }))
 
@@ -77,6 +109,18 @@ beforeEach(() => {
   friendshipFindFirst.mockReset()
   friendshipFindMany.mockReset()
   postHideFindMany.mockReset()
+  postLikeFindUnique.mockReset()
+  postLikeCreate.mockReset()
+  postLikeDelete.mockReset()
+  postCommentCreate.mockReset()
+  postCommentFindMany.mockReset()
+  postCommentCount.mockReset()
+  analyticsEventCreate.mockReset()
+  postBookmarkFindUnique.mockReset()
+  postBookmarkCreate.mockReset()
+  postBookmarkDelete.mockReset()
+  postHideUpsert.mockReset()
+  postReportUpsert.mockReset()
   // Owner has activity feed shared (the gate's first lookup).
   userProfileFindUnique.mockResolvedValue({ showActivityFeed: true })
 })
@@ -171,6 +215,108 @@ describe('GET /v1/posts/:id — privacy gate on a FRIENDS-ONLY post', () => {
 
     expect(res.statusCode).toBe(401)
     expect(postFindUnique).not.toHaveBeenCalled()
+    await app.close()
+  })
+})
+
+describe('interaction routes are gated by the same visibility rule', () => {
+  it('POST /:id/likes — a non-friend cannot like a friends-only post (404, no like written)', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue(null) // not friends
+    authedAs('stranger')
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: '/v1/posts/p1/likes' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toMatchObject({ error: 'NOT_FOUND' })
+    expect(postLikeCreate).not.toHaveBeenCalled()
+    expect(postLikeFindUnique).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('POST /:id/comments — a non-friend cannot comment on a friends-only post (404, no comment written)', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue(null)
+    authedAs('stranger')
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST', url: '/v1/posts/p1/comments', payload: { body: 'sneaky' },
+    })
+
+    expect(res.statusCode).toBe(404)
+    expect(postCommentCreate).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('GET /:id/comments — a non-friend cannot read a friends-only post\'s comments (404, none read)', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue(null)
+    authedAs('stranger')
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/p1/comments' })
+
+    expect(res.statusCode).toBe(404)
+    expect(postCommentFindMany).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('GET /:id/comments — an accepted friend CAN read the comments (200, not over-blocked)', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue({ id: 'f1', status: 'accepted' })
+    postCommentFindMany.mockResolvedValue([])
+    postCommentCount.mockResolvedValue(0)
+    authedAs('buddy')
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/p1/comments' })
+
+    expect(res.statusCode).toBe(200)
+    expect(postCommentFindMany).toHaveBeenCalledOnce()
+    await app.close()
+  })
+
+  it('POST /:id/bookmark — a non-friend cannot bookmark a friends-only post (404, no write)', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue(null)
+    authedAs('stranger')
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: '/v1/posts/p1/bookmark' })
+
+    expect(res.statusCode).toBe(404)
+    expect(postBookmarkCreate).not.toHaveBeenCalled()
+    expect(postBookmarkFindUnique).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('POST /:id/hide — a non-friend cannot hide a friends-only post (404, no write)', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue(null)
+    authedAs('stranger')
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: '/v1/posts/p1/hide' })
+
+    expect(res.statusCode).toBe(404)
+    expect(postHideUpsert).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('POST /:id/report — a non-friend cannot report a friends-only post (404, no write)', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    friendshipFindFirst.mockResolvedValue(null)
+    authedAs('stranger')
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST', url: '/v1/posts/p1/report', payload: { reason: 'spam' },
+    })
+
+    expect(res.statusCode).toBe(404)
+    expect(postReportUpsert).not.toHaveBeenCalled()
     await app.close()
   })
 })
