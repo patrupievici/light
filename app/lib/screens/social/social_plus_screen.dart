@@ -20,6 +20,7 @@ import 'circle_screen.dart';
 import 'create_challenge_sheet.dart';
 import 'gallery_screen.dart';
 import 'challenges_screen.dart';
+import 'discover_rooms_screen.dart';
 import 'story_composer_screen.dart';
 import 'story_viewer_screen.dart';
 import '../workouts/post_workout_screen.dart';
@@ -243,6 +244,59 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       MaterialPageRoute(builder: (_) => StoryComposerScreen(service: _storiesService)),
     );
     if (created == true && mounted) _loadStories(_loadGen);
+  }
+
+  void _openDiscoverRooms() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const DiscoverRoomsScreen()),
+    );
+  }
+
+  /// Always-visible entry into "Camere publice" (public rooms / official rooms).
+  Widget _buildRoomsEntry() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+      child: Material(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+          onTap: _openDiscoverRooms,
+          child: Padding(
+            padding: const EdgeInsets.all(ZveltTokens.s3),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(ZveltTokens.s3),
+                  decoration: BoxDecoration(
+                    color: ZveltTokens.brandTint.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                  ),
+                  child: const Icon(AppIcons.globe, color: ZveltTokens.brand, size: 20),
+                ),
+                const SizedBox(width: ZveltTokens.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Camere publice',
+                          style: ZType.bodyM.copyWith(
+                              color: ZveltTokens.text, fontWeight: FontWeight.w700)),
+                      Text('Intră în provocări publice și camere oficiale',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ZType.bodyS.copyWith(color: ZveltTokens.text3, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _openStoryGroup(int groupIndex) {
@@ -476,6 +530,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                           ),
                         ),
                         SliverToBoxAdapter(child: _buildRaceHeroCard()),
+                        SliverToBoxAdapter(child: _buildRoomsEntry()),
                         SliverToBoxAdapter(child: _buildFeedControls()),
                         if (_challenges.isNotEmpty) ...[
                           SliverToBoxAdapter(child: _buildChallengeHeader()),

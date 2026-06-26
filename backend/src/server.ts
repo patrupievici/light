@@ -43,6 +43,7 @@ import { startGlobalDailyQuoteCron } from './services/global-daily-quote'
 import { startWeeklyPlanRegenCron } from './services/weekly-plan-cron.service'
 import { startGoalAwarePushCron } from './services/goal-aware-push.service'
 import { startStoriesCleanupCron } from './services/stories-cleanup.service'
+import { startOfficialRoomsSeed } from './services/official-rooms.service'
 import { startWebhookReconcileCron } from './services/webhook-reconcile-cron.service'
 import { startSoftDeleteCron } from './services/soft-delete-cron.service'
 import { adminRoutes } from './routes/admin'
@@ -158,6 +159,7 @@ async function main() {
   startWeeklyPlanRegenCron(app.log)
   startGoalAwarePushCron(app.log)
   startStoriesCleanupCron(app.log)
+  startOfficialRoomsSeed(app.log)
   startWebhookReconcileCron(app.log)
   startSoftDeleteCron(app.log)
 

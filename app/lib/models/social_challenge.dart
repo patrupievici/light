@@ -47,6 +47,7 @@ class SocialChallenge {
     this.isMine = true,
     this.participantsCount = 0,
     this.joined = false,
+    this.isOfficial = false,
   });
 
   final String id;
@@ -68,6 +69,9 @@ class SocialChallenge {
   /// True when the viewer is in the participant set — drives Join/Leave label.
   final bool joined;
 
+  /// Seeded "official" public room run by the Zvelt account (Camere publice).
+  final bool isOfficial;
+
   SocialChallenge copyWith({int? participantsCount, bool? joined}) => SocialChallenge(
         id: id,
         kind: kind,
@@ -82,6 +86,7 @@ class SocialChallenge {
         isMine: isMine,
         participantsCount: participantsCount ?? this.participantsCount,
         joined: joined ?? this.joined,
+        isOfficial: isOfficial,
       );
 
   String get title {
@@ -107,6 +112,7 @@ class SocialChallenge {
         'isMine': isMine,
         'participantsCount': participantsCount,
         'joined': joined,
+        'isOfficial': isOfficial,
       };
 
   static SocialChallenge? fromJson(dynamic o) {
@@ -143,6 +149,7 @@ class SocialChallenge {
       isMine: isMine,
       participantsCount: (m['participantsCount'] as num?)?.toInt() ?? 0,
       joined: m['joined'] as bool? ?? false,
+      isOfficial: m['isOfficial'] as bool? ?? false,
     );
   }
 }

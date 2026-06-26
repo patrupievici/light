@@ -63,6 +63,24 @@ class SocialChallengeService {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
+  /// GET /v1/challenges/discover — public "rooms" (Camere publice): official
+  /// rooms first, then user-created public challenges, with real participant
+  /// counts + the viewer's joined flag. Network-only (no local fallback) — the
+  /// Discover screen surfaces an error/empty state. Throws on auth/network/non-200.
+  Future<List<SocialChallenge>> discover({int page = 1, int limit = 20}) async {
+    final headers = await _headersAuth();
+    if (headers.isEmpty) throw Exception('Not signed in');
+    final res = await http
+        .get(Uri.parse('$v1Base/challenges/discover?page=$page&limit=$limit'), headers: headers)
+        .timeout(const Duration(seconds: 22));
+    if (res.statusCode != 200) {
+      throw Exception('Discover failed (${res.statusCode})');
+    }
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final list = data['data'] as List<dynamic>? ?? [];
+    return list.map(SocialChallenge.fromJson).whereType<SocialChallenge>().toList();
+  }
+
   Future<List<SocialChallenge>> _loadAllLocal() async {
     final p = await SharedPreferences.getInstance();
     final raw = p.getString(await _prefsKey());

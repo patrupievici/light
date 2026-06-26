@@ -41,6 +41,7 @@ function serializeChallenge(
     kind: string
     customTitle: string | null
     visibility: string
+    isOfficial?: boolean
     targetHint: string | null
     durationDays: number
     endsAt: Date
@@ -50,6 +51,7 @@ function serializeChallenge(
     }
   },
   viewerId: string,
+  extra?: { participantsCount?: number; joined?: boolean },
 ) {
   const title =
     row.kind === 'custom' && row.customTitle?.trim()
@@ -61,6 +63,7 @@ function serializeChallenge(
     creatorId: row.creatorId,
     creatorDisplayName: creatorLabel(row.creator.profile),
     isMine: row.creatorId === viewerId,
+    isOfficial: row.isOfficial ?? false,
     kind: row.kind,
     customTitle: row.customTitle ?? '',
     title,
@@ -69,6 +72,8 @@ function serializeChallenge(
     durationDays: row.durationDays,
     createdAt: row.createdAt.toISOString(),
     endsAt: row.endsAt.toISOString(),
+    ...(extra?.participantsCount !== undefined ? { participantsCount: extra.participantsCount } : {}),
+    ...(extra?.joined !== undefined ? { joined: extra.joined } : {}),
   }
 }
 
@@ -155,7 +160,13 @@ export async function challengeRoutes(app: FastifyInstance) {
     const rows = await prisma.challenge.findMany({
       where: {
         endsAt: { gt: now },
-        OR: [{ creatorId: me }, { visibility: 'public' }, { visibility: 'friends', creatorId: { in: friendIds } }],
+        // Official "rooms" are permanent and Discover-only — they'd clutter this
+        // time-boxed feed with "9999 days left" entries, so exclude them here.
+        OR: [
+          { creatorId: me },
+          { visibility: 'public', isOfficial: false },
+          { visibility: 'friends', creatorId: { in: friendIds } },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -170,6 +181,54 @@ export async function challengeRoutes(app: FastifyInstance) {
 
     const data = rows.map((r) => serializeChallenge(r, me))
     return reply.send({ data, requestId: request.id })
+  })
+
+  // GET /v1/challenges/discover — public rooms (Camere publice): every PUBLIC,
+  // still-active challenge regardless of friendship, official rooms first, with
+  // real participant counts + the viewer's joined flag so the browse UI can show
+  // "1.2K in this room" + a Join/Open button. Page/limit paginated.
+  app.get('/discover', { preHandler: authenticate }, async (request, reply) => {
+    const { userId: me } = request.user
+    const q = request.query as { page?: string; limit?: string }
+    const limit = Math.min(50, Math.max(1, parseInt(q.limit ?? '20', 10) || 20))
+    const page = Math.max(1, parseInt(q.page ?? '1', 10) || 1)
+    const now = new Date()
+
+    const rows = await prisma.challenge.findMany({
+      where: { visibility: 'public', endsAt: { gt: now } },
+      // Official rooms first, then newest. (createdAt is the stable tiebreaker.)
+      orderBy: [{ isOfficial: 'desc' }, { createdAt: 'desc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        creator: { select: { profile: { select: { username: true, displayName: true } } } },
+      },
+    })
+
+    if (rows.length === 0) return reply.send({ data: [], meta: { page, limit }, requestId: request.id })
+
+    const ids = rows.map((r) => r.id)
+    const [counts, mine] = await Promise.all([
+      prisma.challengeParticipant.groupBy({
+        by: ['challengeId'],
+        where: { challengeId: { in: ids } },
+        _count: { challengeId: true },
+      }),
+      prisma.challengeParticipant.findMany({
+        where: { challengeId: { in: ids }, userId: me },
+        select: { challengeId: true },
+      }),
+    ])
+    const countBy = new Map(counts.map((c) => [c.challengeId, c._count.challengeId]))
+    const joined = new Set(mine.map((m) => m.challengeId))
+
+    const data = rows.map((r) =>
+      serializeChallenge(r, me, {
+        participantsCount: countBy.get(r.id) ?? 0,
+        joined: joined.has(r.id),
+      }),
+    )
+    return reply.send({ data, meta: { page, limit }, requestId: request.id })
   })
 
   // POST /v1/challenges/:id/join

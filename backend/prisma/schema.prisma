@@ -498,6 +498,9 @@ model Challenge {
   kind         String // pullUps|deadlift|squat|benchPress|custom
   customTitle  String?  @map("custom_title") @db.VarChar(200)
   visibility   String // friends|public
+  /// Seeded "official" public rooms (Camere publice) run by the Zvelt system
+  /// account. Surfaced first in Discover; user-created challenges are false.
+  isOfficial   Boolean  @default(false) @map("is_official")
   targetHint   String?  @map("target_hint") @db.VarChar(120)
   durationDays Int      @map("duration_days")
   endsAt       DateTime @map("ends_at")
@@ -510,6 +513,7 @@ model Challenge {
 
   @@index([creatorId, endsAt])
   @@index([visibility, endsAt])
+  @@index([visibility, isOfficial, endsAt])
   @@map("challenges")
 }
 
