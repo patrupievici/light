@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../config/api_config.dart' show mediaAbsoluteUrl;
 import '../../services/_crash_reporter.dart';
@@ -71,11 +72,15 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       ..addStatusListener((s) {
         if (s == AnimationStatus.completed) _advance();
       });
+    // Immersive full-screen: hide the status/nav bars so the media is true
+    // full-bleed and system UI can't sit over the top progress bars.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WidgetsBinding.instance.addPostFrameCallback((_) => _restart());
   }
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _progress.dispose();
     super.dispose();
   }
@@ -179,17 +184,17 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ZveltTokens.surface,
-        title: Text('Șterge story-ul?', style: ZType.h4.copyWith(color: ZveltTokens.text)),
-        content: Text('Acțiunea nu poate fi anulată.',
+        title: Text('Delete story?', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+        content: Text('This can\'t be undone.',
             style: ZType.bodyM.copyWith(color: ZveltTokens.text3)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Anulează', style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
+            child: Text('Cancel', style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Șterge', style: ZType.bodyM.copyWith(color: ZveltTokens.error)),
+            child: Text('Delete', style: ZType.bodyM.copyWith(color: ZveltTokens.error)),
           ),
         ],
       ),
@@ -208,7 +213,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       reportError(e, st, reason: 'stories:delete');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nu am putut șterge story-ul.')),
+        const SnackBar(content: Text('Couldn\'t delete the story.')),
       );
       _setPaused(false);
     }
@@ -256,6 +261,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                       fit: BoxFit.contain,
                       width: double.infinity,
                       cacheWidth: ZveltImageCacheWidth.feedFull,
+                      placeholder: (_) => const Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        ),
+                      ),
                     )
                   : _TextStory(caption: story.caption),
             ),
@@ -315,7 +327,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              group.isMe ? 'Story-ul tău' : group.authorName,
+                              group.isMe ? 'Your story' : group.authorName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: ZType.bodyM.copyWith(
@@ -333,12 +345,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                         IconButton(
                           onPressed: _confirmDelete,
                           icon: const Icon(AppIcons.trash, color: Colors.white, size: 20),
-                          tooltip: 'Șterge',
+                          tooltip: 'Delete',
                         ),
                       IconButton(
                         onPressed: _close,
                         icon: const Icon(AppIcons.cross_small, color: Colors.white, size: 24),
-                        tooltip: 'Închide',
+                        tooltip: 'Close',
                       ),
                     ],
                   ),
@@ -469,28 +481,36 @@ class _BottomBar extends StatelessWidget {
             Row(
               children: [
                 if (onLike != null)
-                  GestureDetector(
-                    onTap: onLike,
-                    behavior: HitTestBehavior.opaque,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(AppIcons.heart,
-                            color: liked ? ZveltTokens.error : Colors.white, size: 26),
-                        if (likeCount > 0) ...[
-                          const SizedBox(width: 6),
-                          Text('$likeCount',
-                              style: ZType.bodyM.copyWith(
-                                  color: Colors.white, fontWeight: FontWeight.w600)),
-                        ],
-                      ],
+                  Semantics(
+                    button: true,
+                    label: liked ? 'Unlike' : 'Like',
+                    child: GestureDetector(
+                      onTap: onLike,
+                      behavior: HitTestBehavior.opaque,
+                      // Padding lifts the hit area to a 44dp minimum touch target.
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(AppIcons.heart,
+                                color: liked ? ZveltTokens.error : Colors.white, size: 26),
+                            if (likeCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Text('$likeCount',
+                                  style: ZType.bodyM.copyWith(
+                                      color: Colors.white, fontWeight: FontWeight.w600)),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                   )
                 else ...[
                   // Own story — read-only heart tally of viewers' likes.
                   const Icon(AppIcons.heart, color: Colors.white70, size: 22),
                   const SizedBox(width: 6),
-                  Text('$likeCount aprecieri',
+                  Text('$likeCount likes',
                       style: ZType.bodyM.copyWith(color: Colors.white70)),
                 ],
               ],

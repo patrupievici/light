@@ -347,7 +347,7 @@ export async function workoutRoutes(app: FastifyInstance) {
         return reply.code(422).send({
           error: 'WEIGHT_JUMP_REQUIRES_NOTE',
           message:
-            'O greutate de peste 2× recordul tău personal recent necesită o notă explicativă.',
+            'A weight more than 2× your recent personal record needs an explanatory note.',
           requestId: request.id,
         })
       }
@@ -445,7 +445,7 @@ export async function workoutRoutes(app: FastifyInstance) {
       return reply.code(422).send({
         error: 'WEIGHT_JUMP_REQUIRES_NOTE',
         message:
-          'O creștere de greutate de peste 2× față de setul anterior necesită o notă explicativă.',
+          'A weight increase of more than 2× over the previous set needs an explanatory note.',
         requestId: request.id,
       })
     }

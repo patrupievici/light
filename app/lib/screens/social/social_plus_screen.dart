@@ -280,10 +280,10 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Camere publice',
+                      Text('Public rooms',
                           style: ZType.bodyM.copyWith(
                               color: ZveltTokens.text, fontWeight: FontWeight.w700)),
-                      Text('Intră în provocări publice și camere oficiale',
+                      Text('Join public challenges and official rooms',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: ZType.bodyS.copyWith(color: ZveltTokens.text3, fontSize: 12)),

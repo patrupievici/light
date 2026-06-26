@@ -95,7 +95,7 @@ class HeatmapRequestException implements Exception {
 class WeightJumpNoteRequiredException implements Exception {
   const WeightJumpNoteRequiredException([
     this.message =
-        'O greutate mult peste recordul tău recent necesită o notă explicativă.',
+        'A weight far above your recent record needs a short note explaining it.',
   ]);
   final String message;
   @override

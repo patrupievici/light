@@ -7,6 +7,7 @@ import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/zvelt_empty_state.dart';
 import '../../widgets/zvelt_error_state.dart';
+import '../../widgets/zvelt_main_nav_bar.dart';
 import 'race_hub_screen.dart';
 
 /// "Camere publice" — browse public rooms: seeded official rooms first, then
@@ -74,7 +75,7 @@ class _DiscoverRoomsScreenState extends State<DiscoverRoomsScreen> {
       reportError(e, st, reason: 'rooms:join');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nu am putut intra în cameră.')),
+        const SnackBar(content: Text('Couldn\'t join the room.')),
       );
     } finally {
       if (mounted) setState(() => _joining.remove(room.id));
@@ -95,12 +96,22 @@ class _DiscoverRoomsScreenState extends State<DiscoverRoomsScreen> {
       appBar: AppBar(
         backgroundColor: ZveltTokens.surface,
         surfaceTintColor: Colors.transparent,
-        title: Text('Camere publice', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+        title: Text('Public rooms', style: ZType.h4.copyWith(color: ZveltTokens.text)),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: ZveltTokens.brand))
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: ZveltTokens.brand),
+                  const SizedBox(height: ZveltTokens.s4),
+                  Text('Finding public rooms…',
+                      style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
+                ],
+              ),
+            )
           : _failed
-              ? ZveltErrorState(title: 'Nu am putut încărca camerele', onRetry: _load)
+              ? ZveltErrorState(title: 'Couldn\'t load rooms', onRetry: _load)
               : RefreshIndicator(
                   color: ZveltTokens.brand,
                   onRefresh: _load,
@@ -110,8 +121,8 @@ class _DiscoverRoomsScreenState extends State<DiscoverRoomsScreen> {
                             SizedBox(height: 80),
                             ZveltEmptyState(
                               icon: AppIcons.globe,
-                              title: 'Nicio cameră publică',
-                              subtitle: 'Creează o provocare publică din feed ca să apară aici.',
+                              title: 'No public rooms',
+                              subtitle: 'Create a public challenge from the feed to see it here.',
                             ),
                           ],
                         )
@@ -124,10 +135,12 @@ class _DiscoverRoomsScreenState extends State<DiscoverRoomsScreen> {
     final official = _rooms.where((r) => r.isOfficial).toList();
     final community = _rooms.where((r) => !r.isOfficial).toList();
     return ListView(
-      padding: const EdgeInsets.only(bottom: ZveltTokens.s8),
+      // Reserve clearance so the last card isn't hidden behind the bottom nav pill.
+      padding: EdgeInsets.only(
+          bottom: ZveltMainNavBar.reservedBottomHeight(context) + ZveltTokens.s4),
       children: [
         if (official.isNotEmpty) ...[
-          _sectionHeader('Camere oficiale', AppIcons.badge_check),
+          _sectionHeader('Official rooms', AppIcons.badge_check),
           for (final r in official) _RoomCard(
             room: r,
             joining: _joining.contains(r.id),
@@ -136,7 +149,7 @@ class _DiscoverRoomsScreenState extends State<DiscoverRoomsScreen> {
           ),
         ],
         if (community.isNotEmpty) ...[
-          _sectionHeader('De la comunitate', AppIcons.users),
+          _sectionHeader('From the community', AppIcons.users),
           for (final r in community) _RoomCard(
             room: r,
             joining: _joining.contains(r.id),
@@ -230,7 +243,7 @@ class _RoomCard extends StatelessWidget {
                       children: [
                         Icon(AppIcons.users, color: ZveltTokens.text3, size: 13),
                         const SizedBox(width: 4),
-                        Text('${room.participantsCount} membri',
+                        Text('${room.participantsCount} members',
                             style: ZType.bodyS.copyWith(color: ZveltTokens.text3, fontSize: 12)),
                         if (room.creatorDisplayName != null && !room.isOfficial) ...[
                           Text('  ·  ', style: ZType.bodyS.copyWith(color: ZveltTokens.text4)),
@@ -259,7 +272,7 @@ class _RoomCard extends StatelessWidget {
     if (room.joined) {
       return TextButton(
         onPressed: onOpen,
-        child: Text('Deschide', style: ZType.bodyM.copyWith(color: ZveltTokens.brand, fontWeight: FontWeight.w600)),
+        child: Text('Open', style: ZType.bodyM.copyWith(color: ZveltTokens.brand, fontWeight: FontWeight.w600)),
       );
     }
     return FilledButton(
@@ -272,7 +285,7 @@ class _RoomCard extends StatelessWidget {
       ),
       child: joining
           ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-          : const Text('Intră'),
+          : const Text('Join'),
     );
   }
 }

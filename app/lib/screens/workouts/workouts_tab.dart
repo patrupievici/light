@@ -11,6 +11,7 @@ import '../../services/workout_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/z/z_card.dart';
 import '../../widgets/z/z_eyebrow.dart';
+import '../../widgets/zvelt_main_nav_bar.dart';
 import '../calendar/activity_calendar_screen.dart';
 import 'quick_launch_sheet.dart';
 import 'exercise_library_screen.dart';
@@ -216,7 +217,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                     padding: const EdgeInsets.fromLTRB(ZveltTokens.screenPaddingH, 0,
                         ZveltTokens.screenPaddingH, ZveltTokens.s3),
                     child: _SegmentedControl(
-                      labels: const ['Azi', 'Programe', 'Exerciții', 'Istoric'],
+                      labels: const ['Today', 'Programs', 'Exercises', 'History'],
                       selected: _trainTab,
                       onChanged: _selectTrainTab,
                     ),
@@ -242,7 +243,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
       child: Row(
         children: [
           Expanded(
-            child: Text('Antrenament', style: ZType.h1.copyWith(color: ZveltTokens.text)),
+            child: Text('Fitness', style: ZType.h1.copyWith(color: ZveltTokens.text)),
           ),
           _CircleIconButton(
             icon: AppIcons.plus,
@@ -296,8 +297,10 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
       color: ZveltTokens.brand,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(ZveltTokens.screenPaddingH, ZveltTokens.s2,
-            ZveltTokens.screenPaddingH, ZveltTokens.s8),
+        // Bottom reserves the nav-pill height so the last item clears it.
+        padding: EdgeInsets.fromLTRB(ZveltTokens.screenPaddingH, ZveltTokens.s2,
+            ZveltTokens.screenPaddingH,
+            ZveltMainNavBar.reservedBottomHeight(context) + ZveltTokens.s4),
         children: children,
       ),
     );
@@ -429,7 +432,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   Widget _exercitiiTab() {
     return _subTabScroll([
       Text(
-        'Caută orice exercițiu cu demonstrație GIF, filtrează pe grupă musculară și echipament, sau adaugă-ți propriile exerciții.',
+        'Search any exercise with a GIF demo, filter by muscle group and equipment, or add your own exercises.',
         style: ZType.bodyM.copyWith(color: ZveltTokens.text2),
       ),
       const SizedBox(height: ZveltTokens.s4),
@@ -444,7 +447,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
         child: OutlinedButton.icon(
           onPressed: _starting ? null : _startWorkout,
           icon: const Icon(AppIcons.play),
-          label: const Text('Începe un antrenament gol'),
+          label: const Text('Start an empty workout'),
         ),
       ),
     ]);
@@ -916,10 +919,10 @@ class _ProgramsEntryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Programe', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+                Text('Programs', style: ZType.h4.copyWith(color: ZveltTokens.text)),
                 const SizedBox(height: 2),
                 Text(
-                  'Planuri pe 3–8 săptămâni: 5×5, PPL, 5/3/1, nSuns…',
+                  '3–8 week plans: 5×5, PPL, 5/3/1, nSuns…',
                   style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
                 ),
               ],
@@ -959,10 +962,10 @@ class _ExerciseLibraryEntryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Bibliotecă de exerciții', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+                Text('Exercise library', style: ZType.h4.copyWith(color: ZveltTokens.text)),
                 const SizedBox(height: 2),
                 Text(
-                  'Caută exerciții cu demonstrații GIF, pe grupe musculare și echipament.',
+                  'Search exercises with GIF demos, by muscle group and equipment.',
                   style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
                 ),
               ],

@@ -54,7 +54,7 @@ class _WeightJumpNoteSheetState extends State<_WeightJumpNoteSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final message = widget.message ??
-        'O greutate mult peste recordul tău recent necesită o notă explicativă.';
+        'A weight far above your recent record needs a short note explaining it.';
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
@@ -85,7 +85,7 @@ class _WeightJumpNoteSheetState extends State<_WeightJumpNoteSheet> {
                 const Icon(AppIcons.shield_check, color: ZveltTokens.warn, size: 22),
                 const SizedBox(width: ZveltTokens.s3),
                 Expanded(
-                  child: Text('Confirmă saltul de greutate',
+                  child: Text('Confirm weight jump',
                       style: ZType.h4.copyWith(color: ZveltTokens.text)),
                 ),
               ],
@@ -103,7 +103,8 @@ class _WeightJumpNoteSheetState extends State<_WeightJumpNoteSheet> {
               textInputAction: TextInputAction.done,
               style: ZType.bodyM.copyWith(color: ZveltTokens.text),
               decoration: InputDecoration(
-                hintText: 'Ex: record personal nou, schimbat la bară de 20kg…',
+                labelText: 'Note',
+                hintText: 'E.g. new personal record, switched to a 20kg bar…',
                 hintStyle: ZType.bodyM.copyWith(color: ZveltTokens.text4),
                 filled: true,
                 fillColor: ZveltTokens.surface2,
@@ -135,7 +136,7 @@ class _WeightJumpNoteSheetState extends State<_WeightJumpNoteSheet> {
                         borderRadius: BorderRadius.circular(ZveltTokens.rMd),
                       ),
                     ),
-                    child: Text('Anulează',
+                    child: Text('Cancel',
                         style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
                   ),
                 ),
@@ -154,7 +155,7 @@ class _WeightJumpNoteSheetState extends State<_WeightJumpNoteSheet> {
                         borderRadius: BorderRadius.circular(ZveltTokens.rMd),
                       ),
                     ),
-                    child: const Text('Salvează setul'),
+                    child: const Text('Save set'),
                   ),
                 ),
               ],

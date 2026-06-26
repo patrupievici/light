@@ -62,7 +62,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
       reportError(e, st, reason: 'stories:pick');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nu am putut accesa imaginea.')),
+        const SnackBar(content: Text('Couldn\'t access the image.')),
       );
     }
   }
@@ -83,7 +83,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
       if (!mounted) return;
       setState(() => _posting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nu am putut posta story-ul. Încearcă din nou.')),
+        const SnackBar(content: Text('Couldn\'t post the story. Try again.')),
       );
     }
   }
@@ -95,7 +95,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
       appBar: AppBar(
         backgroundColor: ZveltTokens.surface,
         surfaceTintColor: Colors.transparent,
-        title: Text('Story nou', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+        title: Text('New story', style: ZType.h4.copyWith(color: ZveltTokens.text)),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: ZveltTokens.s3),
@@ -103,11 +103,11 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
               onPressed: _canPost ? _post : null,
               child: _posting
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: ZveltTokens.brand),
                     )
-                  : Text('Postează',
+                  : Text('Post',
                       style: ZType.bodyM.copyWith(
                         color: _canPost ? ZveltTokens.brand : ZveltTokens.text4,
                         fontWeight: FontWeight.w700,
@@ -127,14 +127,14 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
             minLines: 2,
             maxLines: 5,
             style: ZType.bodyM.copyWith(color: ZveltTokens.text),
-            decoration: _decoration('Scrie un caption…', counter: true),
+            decoration: _decoration('Write a caption…', counter: true),
           ),
           const SizedBox(height: ZveltTokens.s3),
           TextField(
             controller: _locationCtrl,
             maxLength: 200,
             style: ZType.bodyM.copyWith(color: ZveltTokens.text),
-            decoration: _decoration('Locație (opțional)', icon: AppIcons.location_alt),
+            decoration: _decoration('Location (optional)', icon: AppIcons.location_alt),
           ),
         ],
       ),
@@ -160,7 +160,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
                 child: IconButton(
                   onPressed: () => setState(() => _bytes = null),
                   icon: const Icon(AppIcons.cross_small, color: Colors.white, size: 20),
-                  tooltip: 'Elimină',
+                  tooltip: 'Remove',
                 ),
               ),
             ),
@@ -180,14 +180,14 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
         children: [
           Icon(AppIcons.picture, color: ZveltTokens.text3, size: 40),
           const SizedBox(height: ZveltTokens.s3),
-          Text('Adaugă o poză la story', style: ZType.bodyM.copyWith(color: ZveltTokens.text3)),
+          Text('Add a photo to your story', style: ZType.bodyM.copyWith(color: ZveltTokens.text3)),
           const SizedBox(height: ZveltTokens.s4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _pickButton(AppIcons.camera, 'Cameră', () => _pick(ImageSource.camera)),
+              _pickButton(AppIcons.camera, 'Camera', () => _pick(ImageSource.camera)),
               const SizedBox(width: ZveltTokens.s3),
-              _pickButton(AppIcons.picture, 'Galerie', () => _pick(ImageSource.gallery)),
+              _pickButton(AppIcons.picture, 'Gallery', () => _pick(ImageSource.gallery)),
             ],
           ),
         ],
@@ -201,6 +201,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
       style: OutlinedButton.styleFrom(
         foregroundColor: ZveltTokens.brand,
         side: const BorderSide(color: ZveltTokens.brand),
+        minimumSize: const Size(0, 48), // ≥48dp Android touch target
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ZveltTokens.rPill)),
       ),
       icon: Icon(icon, size: 18),

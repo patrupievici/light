@@ -57,7 +57,7 @@ class _AddBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _BubbleColumn(
-      label: 'Adaugă',
+      label: 'Add',
       onTap: onTap,
       ring: Container(
         width: 64,
@@ -82,7 +82,7 @@ class _StoryBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final thumb = group.thumbUrl;
     return _BubbleColumn(
-      label: group.isMe ? 'Story-ul tău' : group.authorName,
+      label: group.isMe ? 'Your story' : group.authorName,
       onTap: onTap,
       ring: Container(
         width: 64,
@@ -126,7 +126,10 @@ class _BubbleColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
@@ -145,6 +148,7 @@ class _BubbleColumn extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
