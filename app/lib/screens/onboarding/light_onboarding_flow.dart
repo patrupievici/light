@@ -7,7 +7,7 @@ import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../login_screen.dart';
 import '../splash_screen.dart';
-import 'onboarding2.dart' show kOnboarding2CompletedKey;
+import 'onboarding_keys.dart';
 
 /// Light onboarding (brief §6, mockup 1-2): Splash → Auth (reused [LoginScreen])
 /// → 3 questions (Goal · Experience · Days/week) → "Create my plan". Replaces the

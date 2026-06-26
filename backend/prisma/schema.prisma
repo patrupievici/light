@@ -42,6 +42,7 @@ model User {
   nutritionPlanDays   NutritionPlanDay[]
   plannedWorkouts     PlannedWorkout[]
   routines            Routine[]
+  userPrograms        UserProgram[]
   challengesCreated        Challenge[]
   challengeParticipations  ChallengeParticipant[]
   challengeProgressLogs    ChallengeProgressLog[]
@@ -105,6 +106,45 @@ model Routine {
 
   @@index([userId])
   @@map("routines")
+}
+
+/// A multi-week periodized training program a user has STARTED (e.g. an instance
+/// of the "5/3/1 BBB" or "PPL 6-day" code template). The template structure lives
+/// in code (src/programming/program-templates.ts); this row holds the user's
+/// instance + mutable progression state (training maxes / working weights) and is
+/// materialized one DAY at a time into the existing PlannedWorkout → tracker flow.
+model UserProgram {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  /// Code template id, e.g. 'stronglifts_5x5' | 'ppl_6day' | '531_bbb' | 'nsuns_4day'.
+  templateId        String    @db.VarChar(64) @map("template_id")
+  title             String    @db.VarChar(120)
+  totalWeeks        Int       @map("total_weeks")
+  daysPerWeek       Int       @map("days_per_week")
+  /// Progression strategy: auto (RPE) | linear | double | reps_sum | percentage (% of training max).
+  progressionScheme String    @default("auto") @db.VarChar(16) @map("progression_scheme")
+  /// Planned deload cadence in weeks (0 = no scheduled deload).
+  deloadCadence     Int       @default(4) @map("deload_cadence")
+  status            String    @default("active") @db.VarChar(16) // active|completed|archived
+  /// 1-based current training week within the program.
+  currentWeek       Int       @default(1) @map("current_week")
+  /// Per-slot mutable progression state, keyed by slotKey:
+  /// { [slotKey]: { trainingMaxKg?, currentWeightKg?, currentReps?, failCount? } }
+  stateJson         Json?     @map("state_json")
+  /// User customizations layered over the code template (swaps, set/rep edits).
+  /// null = use the code template verbatim.
+  structureJson     Json?     @map("structure_json")
+  /// Equipment the user selected at start (filters exercise resolution).
+  equipmentTags     Json      @default("[]") @map("equipment_tags")
+  startedAt         DateTime  @default(now()) @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("user_programs")
 }
 
 /// Log nutriție pe zi (calendar local client — YYYY-MM-DD), payload JSON: entries, waterMl, weightKg.

@@ -12,6 +12,7 @@ import { profileRoutes } from './routes/profile'
 import { exerciseRoutes } from './routes/exercises'
 import { workoutRoutes } from './routes/workouts'
 import { routineRoutes } from './routes/routines'
+import { programRoutes } from './routes/programs'
 import { postRoutes } from './routes/posts'
 import { challengeRoutes } from './routes/challenges'
 import { rankRoutes } from './routes/ranks'
@@ -122,6 +123,7 @@ async function main() {
   app.register(exerciseRoutes, { prefix: '/v1/exercises' })
   app.register(workoutRoutes, { prefix: '/v1/workouts' })
   app.register(routineRoutes, { prefix: '/v1/routines' })
+  app.register(programRoutes, { prefix: '/v1/programs' })
   app.register(postRoutes, { prefix: '/v1/posts' })
   app.register(challengeRoutes, { prefix: '/v1/challenges' })
   app.register(friendRoutes, { prefix: '/v1/friends' })

@@ -15,6 +15,7 @@ import '../calendar/activity_calendar_screen.dart';
 import 'quick_launch_sheet.dart';
 import 'exercise_library_screen.dart';
 import 'program_builder_screen.dart';
+import 'programs_library_screen.dart';
 import 'workout_tracker_screen.dart';
 import '../../services/routine_service.dart';
 // workout_tracker_screen import removed — QuickLaunchSheet handles the tracker.
@@ -261,6 +262,14 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                               onTap: () => Navigator.of(context).push<void>(
                                 MaterialPageRoute<void>(
                                   builder: (_) => const ProgramBuilderScreen(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: ZveltTokens.s5),
+                            _ProgramsEntryCard(
+                              onTap: () => Navigator.of(context).push<void>(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const ProgramsLibraryScreen(),
                                 ),
                               ),
                             ),
@@ -806,6 +815,49 @@ class _AiPlanBuilderCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Entry to the multi-week program library ("Programe"): 5x5, PPL, 5/3/1,
+/// nSuns, etc. Opens [ProgramsLibraryScreen].
+class _ProgramsEntryCard extends StatelessWidget {
+  const _ProgramsEntryCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ZCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: ZveltTokens.brandTint,
+              borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+            ),
+            child: const Icon(AppIcons.gym, color: ZveltTokens.brandDeep, size: 22),
+          ),
+          const SizedBox(width: ZveltTokens.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Programe', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+                const SizedBox(height: 2),
+                Text(
+                  'Planuri pe 3–8 săptămâni: 5×5, PPL, 5/3/1, nSuns…',
+                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                ),
+              ],
+            ),
+          ),
+          Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 22),
+        ],
       ),
     );
   }
