@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "prisma migrate deploy && node dist/server.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
@@ -30,6 +30,7 @@
     "google-auth-library": "^9.14.0",
     "node-cron": "^4.2.1",
     "pg": "^8.20.0",
+    "prisma": "^5.14.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -38,7 +39,6 @@
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.20.0",
     "@vitest/coverage-v8": "^4.1.7",
-    "prisma": "^5.14.0",
     "tsx": "^4.15.0",
     "typescript": "^5.4.5",
     "vitest": "^4.1.7"
