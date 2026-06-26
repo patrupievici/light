@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import '../config/api_config.dart';
 import '_crash_reporter.dart';
@@ -404,6 +405,39 @@ class AuthService {
       {'idToken': idToken},
       failLabel: 'Google login failed',
     );
+  }
+
+  /// SharedPreferences flag marking the current session as an anonymous "guest"
+  /// (no real email/Google identity), so the UI can later offer to save it.
+  static const String _keyIsGuest = 'zvelt_is_guest';
+
+  /// Creates a throwaway "guest" account so the user can enter the app WITHOUT a
+  /// login screen. Generates random credentials and signs up; the regular
+  /// [signup] path persists the returned tokens, so afterwards [getAccessToken]
+  /// works normally. Returns true on success, false on failure (e.g. offline) —
+  /// the caller may still let the user continue offline.
+  Future<bool> continueAsGuest({String displayName = 'Athlete'}) async {
+    final id = const Uuid().v4().replaceAll('-', '');
+    final email = 'guest_$id@guest.zvelt.app';
+    // Backend only enforces length 8–128; this is ~34 chars with letters+digits.
+    final password = 'Gx${id}9';
+    final res = await signup(email: email, password: password, displayName: displayName);
+    if (res == null) return false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyIsGuest, true);
+    } catch (_) {/* flag is best-effort */}
+    return true;
+  }
+
+  /// Whether the active session is an anonymous guest account.
+  Future<bool> isGuest() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyIsGuest) ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> logout() async {

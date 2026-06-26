@@ -5,15 +5,13 @@ import '../../services/auth_service.dart';
 import '../../services/training_profile_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
-import '../login_screen.dart';
 import '../splash_screen.dart';
 import 'onboarding_keys.dart';
 
-/// Light onboarding (brief §6, mockup 1-2): Splash → Auth (reused [LoginScreen])
-/// → 3 questions (Goal · Experience · Days/week) → "Create my plan". Replaces the
-/// 28-screen NewOnboardingFlow for the light build.
-///
-/// Drop-in: same constructor shape the [AuthGate] used for NewOnboardingFlow.
+/// Light onboarding: Splash → (silent guest sign-in, no login screen) → 3 short
+/// questions (Goal · Experience · Days/week, skippable) → into the app. The user
+/// can later save their account from Settings; until then they run as an
+/// anonymous guest so backend calls still have a session.
 class LightOnboardingFlow extends StatefulWidget {
   const LightOnboardingFlow({
     super.key,
@@ -32,7 +30,7 @@ class LightOnboardingFlow extends StatefulWidget {
   State<LightOnboardingFlow> createState() => _LightOnboardingFlowState();
 }
 
-enum _Phase { splash, auth, goal, experience, days, finishing }
+enum _Phase { splash, settingUp, goal, experience, days, finishing }
 
 class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
   _Phase _phase = _Phase.splash;
@@ -42,25 +40,21 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
   int? _days;
 
   void _afterSplash() {
-    setState(() => _phase = widget.startAuthenticated ? _Phase.goal : _Phase.auth);
+    if (widget.startAuthenticated) {
+      setState(() => _phase = _Phase.goal);
+    } else {
+      _createGuestThenContinue();
+    }
   }
 
-  /// After login/signup: a returning user who ALREADY onboarded must skip the
-  /// questions (they were just logged out, not new). Mirror AuthGate's per-user
-  /// completion checks; otherwise advance to the first question.
-  Future<void> _afterAuth() async {
+  /// No login screen: silently spin up an anonymous guest account so the user
+  /// has a backend session, then drop into the questions. If it fails (offline)
+  /// we still continue — the questions + app degrade gracefully without a token.
+  Future<void> _createGuestThenContinue() async {
+    setState(() => _phase = _Phase.settingUp);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final uid = await AuthService().getStoredUserId() ?? '';
-      final suffix = uid.isEmpty ? 'guest' : uid;
-      final done = (prefs.getBool('${kOnboarding2CompletedKey}_$suffix') ?? false) ||
-          (prefs.getBool('onboarding_v3_completed_$suffix') ?? false) ||
-          (prefs.getBool('zvelt_onboarding_v2_completed_$suffix') ?? false);
-      if (done) {
-        widget.onComplete();
-        return;
-      }
-    } catch (_) {/* fall through to questions */}
+      await AuthService().continueAsGuest();
+    } catch (_) {/* offline — let them in anyway */}
     if (mounted) setState(() => _phase = _Phase.goal);
   }
 
@@ -96,8 +90,11 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
     switch (_phase) {
       case _Phase.splash:
         return SplashScreen(onDone: _afterSplash);
-      case _Phase.auth:
-        return LoginScreen(onLoggedIn: _afterAuth);
+      case _Phase.settingUp:
+        return Scaffold(
+          backgroundColor: ZveltTokens.bg,
+          body: const Center(child: CircularProgressIndicator(color: ZveltTokens.brand)),
+        );
       case _Phase.goal:
         return _QuestionScreen(
           step: 0,
@@ -113,7 +110,8 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
           onSelect: (v) => setState(() => _goal = v),
           ctaLabel: 'Next',
           onCta: _goal == null ? null : () => setState(() => _phase = _Phase.experience),
-          onBack: widget.startAuthenticated ? null : () => setState(() => _phase = _Phase.auth),
+          onBack: null,
+          onSkip: _finish,
         );
       case _Phase.experience:
         return _QuestionScreen(
@@ -130,6 +128,7 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
           ctaLabel: 'Next',
           onCta: _level == null ? null : () => setState(() => _phase = _Phase.days),
           onBack: () => setState(() => _phase = _Phase.goal),
+          onSkip: _finish,
         );
       case _Phase.days:
         return _QuestionScreen(
@@ -148,6 +147,7 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
           ctaLabel: 'Create my plan',
           onCta: _days == null ? null : _finish,
           onBack: () => setState(() => _phase = _Phase.experience),
+          onSkip: _finish,
         );
       case _Phase.finishing:
         return Scaffold(
@@ -176,6 +176,7 @@ class _QuestionScreen extends StatelessWidget {
     required this.ctaLabel,
     required this.onCta,
     this.onBack,
+    this.onSkip,
   });
 
   final int step; // 0..2
@@ -187,6 +188,7 @@ class _QuestionScreen extends StatelessWidget {
   final String ctaLabel;
   final VoidCallback? onCta;
   final VoidCallback? onBack;
+  final VoidCallback? onSkip;
 
   @override
   Widget build(BuildContext context) {
@@ -231,7 +233,23 @@ class _QuestionScreen extends StatelessWidget {
                     if (i < 2) const SizedBox(width: 6),
                   ],
                   const Spacer(),
-                  const SizedBox(width: 44),
+                  SizedBox(
+                    width: 56,
+                    height: 44,
+                    child: onSkip == null
+                        ? null
+                        : Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: onSkip,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s2),
+                              ),
+                              child: Text('Skip',
+                                  style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
+                            ),
+                          ),
+                  ),
                 ],
               ),
               const SizedBox(height: ZveltTokens.s8),
