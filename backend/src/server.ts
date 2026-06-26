@@ -18,6 +18,7 @@ import { challengeRoutes } from './routes/challenges'
 import { rankRoutes } from './routes/ranks'
 import { achievementsRoutes } from './routes/achievements'
 import { statsRoutes } from './routes/stats'
+import { muscleLevelsRoutes } from './routes/muscle-levels'
 import { trainingProfileRoutes } from './routes/training-profile'
 import { workoutSuggestionRoutes } from './routes/workout-suggestion'
 import { weeklyCoachReadRoutes } from './routes/weekly-coach-read'
@@ -133,6 +134,7 @@ async function main() {
   app.register(rankRoutes, { prefix: '/v1/ranks' })
   app.register(achievementsRoutes, { prefix: '/v1/achievements' })
   app.register(statsRoutes, { prefix: '/v1/me' })
+  app.register(muscleLevelsRoutes, { prefix: '/v1/me' })
   app.register(trainingProfileRoutes, { prefix: '/v1/me' })
   app.register(workoutSuggestionRoutes, { prefix: '/v1/me' })
   app.register(weeklyCoachReadRoutes, { prefix: '/v1/me' })
