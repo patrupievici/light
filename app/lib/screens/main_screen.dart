@@ -12,14 +12,15 @@ import 'settings/settings_screen.dart';
 import 'skeleton/skeleton_profile_tab.dart';
 import 'social/notifications_screen.dart';
 import 'social/social_plus_screen.dart';
+import 'workouts/quick_launch_sheet.dart';
 import 'workouts/workouts_tab.dart';
 
-/// Main shell — **5-tab light layout** (redesign brief §3, §20):
-/// Home · Train · Food · Feed · Profile.
+/// Main shell — **4 destinations + a center Quick-Start action**:
+/// Home · Train · ⚡ · Feed · Nutrition.
 ///
-/// Start Workout is no longer a floating action; it lives as the dominant hero
-/// on Home and as the primary action on the Train tab. AI is a contextual
-/// button inside Train/Food, never a tab.
+/// The ⚡ center button is not a tab — it opens the Quick-Start workout sheet.
+/// Profile is no longer a bottom-nav destination: it opens from the Home avatar
+/// (top-left); Settings opens from the Home gear (top-right).
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key, required this.onLogout});
 
@@ -30,7 +31,9 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  static const int _tabCount = 5;
+  // 0 Home · 1 Train · 2 Feed · 3 Nutrition. (The ⚡ center action is not a tab.)
+  static const int _tabCount = 4;
+  static const int _feedIndex = 2;
 
   int _currentIndex = 0;
 
@@ -38,7 +41,7 @@ class _MainScreenState extends State<MainScreen> {
   /// State then lives for the whole session — scroll position and loaded
   /// data survive tab switches. Tabs refresh themselves via pull-to-refresh
   /// and FeedRefreshNotifier bumps.
-  final List<bool> _built = [true, false, false, false, false];
+  final List<bool> _built = [true, false, false, false];
   final List<Widget?> _pageCache = List<Widget?>.filled(_tabCount, null);
 
   Widget _page(int i) {
@@ -50,20 +53,18 @@ class _MainScreenState extends State<MainScreen> {
     switch (i) {
       case 0:
         return HomeTab(
-          onOpenProfile: () => _switchTo(4),
+          onOpenProfile: _openProfile,
           onOpenNotifications: _openNotifications,
           onOpenSettings: _openSettings,
-          onOpenFood: () => _switchTo(2),
-          onOpenFeed: () => _switchTo(3),
+          onOpenFood: () => _switchTo(3),
+          onOpenFeed: () => _switchTo(_feedIndex),
         );
       case 1:
         return const WorkoutsTab();
       case 2:
-        return const NutritionTab();
-      case 3:
         return const SocialPlusScreen();
-      case 4:
-        return SkeletonProfileTab(onLogout: widget.onLogout);
+      case 3:
+        return const NutritionTab();
       default:
         return const SizedBox.shrink();
     }
@@ -74,7 +75,28 @@ class _MainScreenState extends State<MainScreen> {
       _built[i] = true;
       _currentIndex = i;
     });
-    if (i == 3) SocialNotificationHub.refresh();
+    if (i == _feedIndex) SocialNotificationHub.refresh();
+  }
+
+  /// Profile is no longer a tab — it opens as a pushed route from the Home
+  /// avatar. SkeletonProfileTab shows a back arrow when it can pop.
+  void _openProfile() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => SkeletonProfileTab(onLogout: widget.onLogout),
+      ),
+    );
+  }
+
+  /// Center ⚡ action — the Quick-Start workout sheet, then refresh the Train tab
+  /// so a freshly-started/finished workout shows on return.
+  Future<void> _startQuickWorkout() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => const QuickLaunchSheet(),
+      ),
+    );
   }
 
   void _openNotifications() {
@@ -100,8 +122,8 @@ class _MainScreenState extends State<MainScreen> {
       if (!mounted) return;
       final index = switch (value) {
         'train' => 1,
-        'food' => 2,
-        'feed' => 3,
+        'feed' => 2,
+        'food' => 3,
         _ => 0, // 'home' (and legacy 'progress') land on Home
       };
       setState(() {
@@ -126,12 +148,12 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: ZveltMainNavBar(
         currentIndex: _currentIndex,
         onTap: _switchTo,
+        onCenterTap: _startQuickWorkout,
         items: const [
           ZveltNavItem(label: 'Home', icon: AppIcons.home),
           ZveltNavItem(label: 'Train', icon: AppIcons.gym),
-          ZveltNavItem(label: 'Food', icon: AppIcons.restaurant),
           ZveltNavItem(label: 'Feed', icon: AppIcons.globe),
-          ZveltNavItem(label: 'Profile', icon: AppIcons.user),
+          ZveltNavItem(label: 'Nutrition', icon: AppIcons.restaurant),
         ],
       ),
     );

@@ -288,8 +288,8 @@ class _CustomizationScreenState extends State<CustomizationScreen> {
                 options: const [
                   (value: 'home', label: 'Home'),
                   (value: 'train', label: 'Train'),
-                  (value: 'food', label: 'Food'),
                   (value: 'feed', label: 'Feed'),
+                  (value: 'food', label: 'Nutrition'),
                 ],
                 onChanged: (value) =>
                     _setString(SettingsKeys.startScreen, value),
