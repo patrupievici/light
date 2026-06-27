@@ -20,11 +20,17 @@ class ZveltEmptyState extends StatelessWidget {
     this.iconColor,
     this.action,
     this.compact = false,
+    this.mascot,
   });
 
   final String title;
   final String? subtitle;
   final IconData icon;
+
+  /// Optional 3D coach-mascot asset (e.g. 'assets/mascot/m8.png'). When set
+  /// (and not [compact]) it replaces the soft icon chip — the periwinkle
+  /// design leads empty states with the rabbit coach.
+  final String? mascot;
 
   /// Defaults to [ZveltTokens.text3] so the icon reads as a "soft" cue
   /// rather than an interactive element.
@@ -56,14 +62,29 @@ class ZveltEmptyState extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: EdgeInsets.all(compact ? ZveltTokens.s3 : ZveltTokens.s5),
-                decoration: BoxDecoration(
-                  color: ZveltTokens.surface2,
-                  shape: BoxShape.circle,
+              if (mascot != null && !compact)
+                Image.asset(
+                  mascot!,
+                  height: 120,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Container(
+                    padding: const EdgeInsets.all(ZveltTokens.s5),
+                    decoration: BoxDecoration(
+                      color: ZveltTokens.surface2,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: iconSize * 0.7, color: resolvedIconColor),
+                  ),
+                )
+              else
+                Container(
+                  padding: EdgeInsets.all(compact ? ZveltTokens.s3 : ZveltTokens.s5),
+                  decoration: BoxDecoration(
+                    color: ZveltTokens.surface2,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: iconSize * 0.7, color: resolvedIconColor),
                 ),
-                child: Icon(icon, size: iconSize * 0.7, color: resolvedIconColor),
-              ),
               SizedBox(height: compact ? ZveltTokens.s3 : ZveltTokens.s4),
               Text(
                 title,
