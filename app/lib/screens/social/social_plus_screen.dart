@@ -566,10 +566,10 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                                       ),
                                     )
                                   : const ZveltEmptyState(
-                                      compact: true,
+                                      mascot: 'assets/mascot/m8.png',
                                       icon: AppIcons.camera,
-                                      title: 'No posts yet',
-                                      subtitle: 'Create a photo post to fill your feed.',
+                                      title: 'Your feed is quiet',
+                                      subtitle: 'Post your first workout or challenge a friend.',
                                     ),
                             ),
                           )
@@ -743,23 +743,22 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
         child: Container(
           padding: const EdgeInsets.all(ZveltTokens.s5),
           decoration: BoxDecoration(
-            color: ZveltTokens.surface,
-            borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-            boxShadow: ZveltTokens.shadowCard,
+            gradient: ZveltTokens.gradBrand,
+            borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+            boxShadow: ZveltTokens.shadowHero,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(AppIcons.trophy,
-                      size: 12, color: ZveltTokens.brand),
+                  const Icon(AppIcons.trophy, size: 12, color: Colors.white),
                   const SizedBox(width: 4),
                   Text(
                     'RACE OF THE WEEK',
                     style: ZType.eyebrow.copyWith(
                       fontSize: 11,
-                      color: ZveltTokens.text3,
+                      color: Colors.white.withValues(alpha: 0.85),
                     ),
                   ),
                 ],
@@ -769,7 +768,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                 top.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: ZType.h4,
+                style: ZType.h4.copyWith(color: Colors.white),
               ),
               const SizedBox(height: ZveltTokens.s1),
               Text(
@@ -777,7 +776,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                 style: TextStyle(
                   fontFamily: ZveltTokens.fontPrimary,
                   fontSize: 12,
-                  color: ZveltTokens.text2,
+                  color: Colors.white.withValues(alpha: 0.85),
                 ),
               ),
               const SizedBox(height: ZveltTokens.s3),
@@ -793,21 +792,21 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: ZveltTokens.s4, vertical: ZveltTokens.s2),
                       decoration: BoxDecoration(
-                        color: ZveltTokens.text,
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(ZveltTokens.rPill),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(AppIcons.bolt, size: 14, color: Colors.white),
+                          Icon(AppIcons.bolt, size: 14, color: ZveltTokens.brand),
                           SizedBox(width: 6),
                           Text(
                             'Join the race',
                             style: TextStyle(
                               fontFamily: ZveltTokens.fontPrimary,
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              color: ZveltTokens.brand,
                             ),
                           ),
                         ],
@@ -832,9 +831,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  gradient: ZveltTokens.gradBrand,
-                                  border: Border.all(
-                                      color: ZveltTokens.surface, width: 2),
+                                  color: ZveltTokens.brandDeep,
+                                  border: Border.all(color: Colors.white, width: 2),
                                 ),
                                 child: Text(
                                   initials[i],
@@ -856,8 +854,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                         style: TextStyle(
                           fontFamily: ZveltTokens.fontPrimary,
                           fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: ZveltTokens.text2,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
                     ],

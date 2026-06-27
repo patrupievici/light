@@ -17,6 +17,9 @@ import 'quick_launch_sheet.dart';
 import 'exercise_library_screen.dart';
 import 'program_builder_screen.dart';
 import 'programs_library_screen.dart';
+import 'program_detail_screen.dart';
+import 'active_program_screen.dart';
+import '../../services/program_service.dart';
 import 'workout_tracker_screen.dart';
 import '../../services/routine_service.dart';
 // workout_tracker_screen import removed — QuickLaunchSheet handles the tracker.
@@ -308,25 +311,23 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
 
   // ── Azi — train now ───────────────────────────────────────────────────────
   Widget _aziTab() {
+    final last = _lastCompletedWorkout();
     return _subTabScroll([
       if (_error != null) ...[
         _InlineWarning(message: _error!),
         const SizedBox(height: ZveltTokens.s4),
       ],
-      SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: _starting ? null : _startWorkout,
-          icon: _starting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: ZveltTokens.onBrand),
-                )
-              : const Icon(AppIcons.play),
-          label: Text(_starting ? 'Starting…' : 'Start workout'),
-        ),
-      ),
+      _todayCoachBubble(),
+      const SizedBox(height: ZveltTokens.s4),
+      _todaysWorkoutHero(),
+      const SizedBox(height: ZveltTokens.s4),
+      if (last != null) ...[
+        _lastWorkoutCard(last),
+        const SizedBox(height: ZveltTokens.s4),
+      ],
+      _quickActionsSection(),
+      const SizedBox(height: ZveltTokens.s4),
+      _thisWeekCard(),
       const SizedBox(height: ZveltTokens.s5),
       _calendarCard(),
       const SizedBox(height: ZveltTokens.s5),
@@ -338,6 +339,333 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     ]);
   }
 
+  // ── Today data helpers (real data, honest fallbacks) ───────────────────────
+  String _ymdKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  PlannedWorkoutEntry? _plannedToday() {
+    final list = _planned[_ymdKey(DateUtils.dateOnly(DateTime.now()))];
+    if (list == null) return null;
+    for (final e in list) {
+      if (!e.completed) return e;
+    }
+    return null;
+  }
+
+  WorkoutDto? _lastCompletedWorkout() {
+    WorkoutDto? best;
+    for (final w in _workouts) {
+      if (w.status != 'completed' && w.endedAt == null) continue;
+      final t = w.endedAt ?? w.startedAt;
+      final bt = best == null ? null : (best.endedAt ?? best.startedAt);
+      if (bt == null || t.isAfter(bt)) best = w;
+    }
+    return best;
+  }
+
+  double _workoutVolume(WorkoutDto w) {
+    var v = 0.0;
+    for (final ex in w.exercises) {
+      for (final s in ex.sets) {
+        if (s.tag == 'WARMUP') continue;
+        v += s.weightKg * s.reps;
+      }
+    }
+    return v;
+  }
+
+  String _fmtInt(num n) {
+    final s = n.round().toString();
+    final b = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+      b.write(s[i]);
+    }
+    return b.toString();
+  }
+
+  String _durLabel(Duration d) {
+    final h = d.inHours, m = d.inMinutes % 60;
+    return h > 0 ? '${h}h ${m}m' : '${m}m';
+  }
+
+  int _currentStreak() {
+    var streak = 0;
+    var day = DateUtils.dateOnly(DateTime.now());
+    // Today doesn't break the streak if not yet trained; start counting from
+    // the most recent trained day.
+    if (_activities[_ymdKey(day)]?.isEmpty ?? true) {
+      day = day.subtract(const Duration(days: 1));
+    }
+    while (_activities[_ymdKey(day)]?.isNotEmpty ?? false) {
+      streak++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
+  // ── Zvelt Coach bubble (spec A) — m8 mascot + a line of dry coach copy ─────
+  Widget _todayCoachBubble() {
+    return Container(
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        boxShadow: ZveltTokens.shadowCard,
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 12, 16, 12),
+      child: Row(
+        children: [
+          Image.asset(
+            'assets/mascot/m8.png',
+            height: 74,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const SizedBox(width: 74),
+          ),
+          const SizedBox(width: ZveltTokens.s3),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ZVELT COACH',
+                  style: ZType.bodyS.copyWith(
+                    color: ZveltTokens.brand,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    letterSpacing: 0.06 * 11,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Show up and start light. Keep it clean, not heroic.',
+                  style: ZType.bodyS.copyWith(
+                    color: ZveltTokens.text,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── TODAY'S WORKOUT — planned session name (real) or honest fallback ───────
+  Widget _todaysWorkoutHero() {
+    final planned = _plannedToday();
+    final title = planned?.title ?? 'Ready to train';
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _starting ? null : _startWorkout,
+        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            gradient: ZveltTokens.gradBrand,
+            borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+            boxShadow: ZveltTokens.glowBrand,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "TODAY'S WORKOUT",
+                style: ZType.bodyS.copyWith(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 0.1 * 12,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: ZType.h2.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                ),
+                child: Text(
+                  _starting ? 'Starting…' : 'Start Workout →',
+                  style: ZType.bodyM.copyWith(
+                    color: ZveltTokens.brand,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── LAST WORKOUT — real volume / exercises / duration ──────────────────────
+  Widget _lastWorkoutCard(WorkoutDto w) {
+    final vol = _workoutVolume(w);
+    final dur = w.endedAt != null ? _durLabel(w.endedAt!.difference(w.startedAt)) : '—';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(ZveltTokens.s5),
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        boxShadow: ZveltTokens.shadowCard,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('LAST WORKOUT',
+              style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _miniStat(_fmtInt(vol), 'kg volume')),
+              Expanded(child: _miniStat('${w.exercises.length}', 'exercises')),
+              Expanded(child: _miniStat(dur, 'duration')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniStat(String value, String label) {
+    return Column(
+      children: [
+        Text(value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ZType.h4.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 2),
+        Text(label, style: ZType.bodyS.copyWith(color: ZveltTokens.text2, fontSize: 11)),
+      ],
+    );
+  }
+
+  // ── QUICK ACTIONS ──────────────────────────────────────────────────────────
+  Widget _quickActionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('QUICK ACTIONS', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+        const SizedBox(height: ZveltTokens.s3),
+        _quickActionRow(AppIcons.plus, 'Start empty workout',
+            _starting ? null : _startWorkout),
+        const SizedBox(height: ZveltTokens.cardGap),
+        _quickActionRow(AppIcons.gym, 'Choose a program', () => _selectTrainTab(1)),
+        const SizedBox(height: ZveltTokens.cardGap),
+        _quickActionRow(AppIcons.search, 'Browse exercises', () => _selectTrainTab(2)),
+      ],
+    );
+  }
+
+  Widget _quickActionRow(IconData icon, String label, VoidCallback? onTap) {
+    return ZCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: ZveltTokens.brandTint,
+              borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+            ),
+            child: Icon(icon, color: ZveltTokens.brand, size: 20),
+          ),
+          const SizedBox(width: ZveltTokens.s3),
+          Expanded(child: Text(label, style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w600))),
+          Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 20),
+        ],
+      ),
+    );
+  }
+
+  // ── THIS WEEK — real trained days + streak ─────────────────────────────────
+  Widget _thisWeekCard() {
+    final now = DateTime.now();
+    final monday = DateUtils.dateOnly(now).subtract(Duration(days: now.weekday - 1));
+    final today = DateUtils.dateOnly(now);
+    const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final streak = _currentStreak();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(ZveltTokens.s5),
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        boxShadow: ZveltTokens.shadowCard,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('This week', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(AppIcons.flame, color: ZveltTokens.brand, size: 16),
+                  const SizedBox(width: 5),
+                  Text('$streak day streak',
+                      style: ZType.bodyS.copyWith(color: ZveltTokens.brand, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (var i = 0; i < 7; i++)
+                _weekDay(labels[i], monday.add(Duration(days: i)), today),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _weekDay(String label, DateTime day, DateTime today) {
+    final trained = _activities[_ymdKey(day)]?.isNotEmpty ?? false;
+    final isToday = day == today;
+    return Column(
+      children: [
+        Text(label, style: ZType.bodyS.copyWith(color: ZveltTokens.text3, fontSize: 11)),
+        const SizedBox(height: 8),
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: trained ? ZveltTokens.brand : ZveltTokens.surface3,
+            border: (isToday && !trained)
+                ? Border.all(color: ZveltTokens.brand, width: 2)
+                : null,
+          ),
+          child: trained
+              ? const Icon(AppIcons.check, size: 15, color: ZveltTokens.onBrand)
+              : null,
+        ),
+      ],
+    );
+  }
+
+  // Coach card — 3D rabbit mascot + a line of honest, dry coach copy.
   /// Calendar + selected-day summary. Lives in Azi so "what's on for today" is
   /// in the Today tab, not buried in historical analytics.
   Widget _calendarCard() {
@@ -412,14 +740,129 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   }
 
   // ── Programe — multi-week programs ────────────────────────────────────────
+  // Program templates for the Programs sub-tab — fetched once, memoized so the
+  // lazy/kept-alive pane doesn't refetch on every rebuild.
+  Future<List<ProgramSummary>>? _programsFuture;
+  Future<ActiveProgramView>? _activeFuture;
+
+  Future<void> _openTemplate(ProgramSummary t) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => ProgramDetailScreen(templateId: t.id)),
+    );
+    if (mounted) _load();
+  }
+
+  // Continue-program banner (spec A) — only when there's a real active program.
+  Widget _continueProgramBanner() {
+    return FutureBuilder<ActiveProgramView>(
+      future: _activeFuture,
+      builder: (context, snap) {
+        final prog = snap.data?.program;
+        if (prog == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: ZveltTokens.s5),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(builder: (_) => const ActiveProgramScreen()),
+              ),
+              borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+              child: Container(
+                padding: const EdgeInsets.all(ZveltTokens.s4),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brandTint,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 54,
+                      height: 54,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: ZveltTokens.brand,
+                        boxShadow: ZveltTokens.glowBrand,
+                      ),
+                      child: const Icon(AppIcons.gym, color: ZveltTokens.onBrand, size: 24),
+                    ),
+                    const SizedBox(width: ZveltTokens.s3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Continue program',
+                              style: ZType.bodyS.copyWith(
+                                  color: ZveltTokens.brand,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12)),
+                          const SizedBox(height: 2),
+                          Text(prog.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ZType.h4.copyWith(
+                                  color: ZveltTokens.text,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 2),
+                          Text('Week ${prog.currentWeek} of ${prog.totalWeeks}',
+                              style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
+                        ],
+                      ),
+                    ),
+                    const Icon(AppIcons.angle_small_right, color: ZveltTokens.brand, size: 22),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _programeTab() {
+    _programsFuture ??= ProgramService().getTemplates();
+    _activeFuture ??= ProgramService().getActive();
     return _subTabScroll([
+      _continueProgramBanner(),
       _AiPlanBuilderCard(
         onTap: () => Navigator.of(context).push<void>(
           MaterialPageRoute<void>(builder: (_) => const ProgramBuilderScreen()),
         ),
       ),
       const SizedBox(height: ZveltTokens.s5),
+      Text('CHOOSE A PROGRAM', style: ZType.eyebrow),
+      const SizedBox(height: ZveltTokens.s3),
+      FutureBuilder<List<ProgramSummary>>(
+        future: _programsFuture,
+        builder: (context, snap) {
+          if (!snap.hasData && snap.connectionState != ConnectionState.done) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: ZveltTokens.s8),
+              child: Center(child: CircularProgressIndicator(color: ZveltTokens.brand)),
+            );
+          }
+          if (snap.hasError) {
+            return Text('Could not load programs. Pull to retry.',
+                style: ZType.bodyS.copyWith(color: ZveltTokens.text2));
+          }
+          final programs = snap.data ?? const <ProgramSummary>[];
+          if (programs.isEmpty) {
+            return Text('No programs available yet.',
+                style: ZType.bodyS.copyWith(color: ZveltTokens.text2));
+          }
+          return Column(
+            children: [
+              for (final p in programs) ...[
+                _ProgramSummaryCard(summary: p, onTap: () => _openTemplate(p)),
+                const SizedBox(height: ZveltTokens.cardGap),
+              ],
+            ],
+          );
+        },
+      ),
+      const SizedBox(height: ZveltTokens.s2),
       _ProgramsEntryCard(
         onTap: () => Navigator.of(context).push<void>(
           MaterialPageRoute<void>(builder: (_) => const ProgramsLibraryScreen()),
@@ -919,10 +1362,10 @@ class _ProgramsEntryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Programs', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+                Text('Program library', style: ZType.h4.copyWith(color: ZveltTokens.text)),
                 const SizedBox(height: 2),
                 Text(
-                  '3–8 week plans: 5×5, PPL, 5/3/1, nSuns…',
+                  'Search, filter & sort all plans',
                   style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
                 ),
               ],
@@ -930,6 +1373,96 @@ class _ProgramsEntryCard extends StatelessWidget {
           ),
           Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 22),
         ],
+      ),
+    );
+  }
+}
+
+/// A single program template card in the Programs sub-tab list. Opens the
+/// program detail/preview. Periwinkle: soft card + meta chips.
+class _ProgramSummaryCard extends StatelessWidget {
+  const _ProgramSummaryCard({required this.summary, required this.onTap});
+
+  final ProgramSummary summary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <(IconData, String)>[
+      (AppIcons.calendar_check, '${summary.daysPerWeek}×/week · ${summary.defaultWeeks} wks'),
+      (AppIcons.chart_line_up, programSchemeLabel(summary.scheme)),
+      (AppIcons.trophy, programLevelLabel(summary.level)),
+    ];
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        child: Container(
+          decoration: BoxDecoration(
+            color: ZveltTokens.surface,
+            borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+            boxShadow: ZveltTokens.shadowCard,
+          ),
+          padding: const EdgeInsets.all(ZveltTokens.s5),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      summary.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ZType.h3.copyWith(color: ZveltTokens.text),
+                    ),
+                  ),
+                  Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 22),
+                ],
+              ),
+              if (summary.description.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  summary.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2, height: 1.45),
+                ),
+              ],
+              const SizedBox(height: ZveltTokens.s3),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final c in chips)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: ZveltTokens.bg2,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(c.$1, size: 14, color: ZveltTokens.text2),
+                          const SizedBox(width: 7),
+                          Text(
+                            c.$2,
+                            style: ZType.bodyS.copyWith(
+                              color: ZveltTokens.text2,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

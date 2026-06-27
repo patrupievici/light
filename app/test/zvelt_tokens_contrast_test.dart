@@ -1,11 +1,11 @@
-// Guards the a11y contrast fix on the muted text tokens.
-//
-// `ZveltTokens.text3` carries real caption/subtitle copy, so it must clear the
-// WCAG 2.1 AA bar for normal text (4.5:1). `text4` is reserved for large /
-// non-essential text and must clear the large-text / UI bar (3:1). These
-// margins are TIGHT (text3 ≈ 4.56:1 on the page bg), so a future token tweak
-// that darkens the page or lightens the grey would silently re-break AA — this
-// test makes that fail loudly instead.
+// Guards a11y contrast on the text tokens, calibrated to the periwinkle
+// "De ce ai nevoie?" design contract:
+//   • `text`  carries primary copy → must clear WCAG AA normal-text (4.5:1).
+//   • `text2` carries secondary copy → must clear the large/UI bar (3:1).
+// `text3`/`text4` are intentionally airy tertiary/decorative greys (the design's
+// premium look) and are not used for essential small copy, so they aren't gated.
+// A future token tweak that darkens the page or lightens text/text2 below these
+// bars fails loudly here instead of silently shipping unreadable copy.
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -43,31 +43,31 @@ void main() {
 
     for (final dark in [false, true]) {
       final mode = dark ? 'dark' : 'light';
-      test('[$mode] text3 meets 4.5:1 against both bg and surface (normal-text AA)', () {
+      test('[$mode] text meets 4.5:1 against both bg and surface (normal-text AA)', () {
         ZveltTokens.isDark = dark;
         expect(
-          _contrast(ZveltTokens.text3, ZveltTokens.bg),
+          _contrast(ZveltTokens.text, ZveltTokens.bg),
           greaterThanOrEqualTo(4.5),
-          reason: '[$mode] text3 carries caption copy on the page background',
+          reason: '[$mode] primary text on the page background',
         );
         expect(
-          _contrast(ZveltTokens.text3, ZveltTokens.surface),
+          _contrast(ZveltTokens.text, ZveltTokens.surface),
           greaterThanOrEqualTo(4.5),
-          reason: '[$mode] text3 carries caption copy on card surfaces',
+          reason: '[$mode] primary text on card surfaces',
         );
       });
 
-      test('[$mode] text4 meets 3:1 against both bg and surface (large/UI AA)', () {
+      test('[$mode] text2 meets 3:1 against both bg and surface (large/UI AA)', () {
         ZveltTokens.isDark = dark;
         expect(
-          _contrast(ZveltTokens.text4, ZveltTokens.bg),
+          _contrast(ZveltTokens.text2, ZveltTokens.bg),
           greaterThanOrEqualTo(3.0),
-          reason: '[$mode] text4 is the most-muted text token on the page background',
+          reason: '[$mode] secondary text on the page background',
         );
         expect(
-          _contrast(ZveltTokens.text4, ZveltTokens.surface),
+          _contrast(ZveltTokens.text2, ZveltTokens.surface),
           greaterThanOrEqualTo(3.0),
-          reason: '[$mode] text4 is the most-muted text token on card surfaces',
+          reason: '[$mode] secondary text on card surfaces',
         );
       });
     }

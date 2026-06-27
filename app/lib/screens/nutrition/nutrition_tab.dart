@@ -717,6 +717,8 @@ class _NutritionTabState extends State<NutritionTab> {
                           ),
                           const SizedBox(height: ZveltTokens.s4),
                           _buildAddFoodCta(),
+                          const SizedBox(height: ZveltTokens.s4),
+                          _nutritionCoachCard(),
                           const SizedBox(height: ZveltTokens.s1),
                         ],
                       ),
@@ -724,6 +726,68 @@ class _NutritionTabState extends State<NutritionTab> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Periwinkle coach card — m-food mascot + an HONEST message derived from the
+  // real remaining calories. Hidden until a real calorie goal is set.
+  Widget _nutritionCoachCard() {
+    final goal = _goals.calories;
+    if (goal <= 0) return const SizedBox.shrink();
+    final consumed = _totals.calories.round();
+    final remaining = goal - consumed;
+    final String msg;
+    if (remaining > 200) {
+      msg = "You're $remaining kcal short. Add protein before the day gets messy.";
+    } else if (remaining >= 0) {
+      msg = "Almost there — $remaining kcal to your goal. Keep it clean.";
+    } else {
+      msg = "You're ${-remaining} kcal over today. Tomorrow is a fresh log.";
+    }
+    return Container(
+      decoration: BoxDecoration(
+        gradient: ZveltTokens.gradBrand,
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        boxShadow: ZveltTokens.glowBrand,
+      ),
+      padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+      child: Row(
+        children: [
+          Image.asset(
+            'assets/mascot/m-food.png',
+            height: 92,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const SizedBox(width: 92),
+          ),
+          const SizedBox(width: ZveltTokens.s2),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ZVELT COACH',
+                  style: ZType.bodyS.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    letterSpacing: 0.06 * 11,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  msg,
+                  style: ZType.bodyS.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
