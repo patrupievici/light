@@ -31,6 +31,10 @@ class ProgramSummary {
     required this.daysPerWeek,
     required this.sessionsInRotation,
     required this.requiresTrainingMax,
+    required this.exercisesPerDay,
+    required this.sessionTime,
+    required this.equipment,
+    required this.thumbnails,
   });
 
   final String id, title, description, level, scheme, split;
@@ -38,6 +42,12 @@ class ProgramSummary {
   final List<int> weeksOptions;
   final int defaultWeeks, daysPerWeek, sessionsInRotation;
   final bool requiresTrainingMax;
+
+  /// Card metadata (Liftosaur-style library).
+  final String exercisesPerDay; // "3" or "3-5"
+  final String sessionTime; // "45-60 mins"
+  final List<String> equipment; // ["Barbell", "Dumbbell"]
+  final List<String> thumbnails; // per-exercise GIF urls
 
   static ProgramSummary fromJson(Map<String, dynamic> j) => ProgramSummary(
         id: j['id'] as String,
@@ -52,6 +62,10 @@ class ProgramSummary {
         daysPerWeek: _toInt(j['daysPerWeek'], 3),
         sessionsInRotation: _toInt(j['sessionsInRotation'], 3),
         requiresTrainingMax: j['requiresTrainingMax'] == true,
+        exercisesPerDay: j['exercisesPerDay'] as String? ?? '—',
+        sessionTime: j['sessionTime'] as String? ?? '',
+        equipment: _toStrList(j['equipment']),
+        thumbnails: _toStrList(j['thumbnails']),
       );
 }
 
