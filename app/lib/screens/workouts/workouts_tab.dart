@@ -17,6 +17,8 @@ import 'quick_launch_sheet.dart';
 import 'exercise_library_screen.dart';
 import 'program_builder_screen.dart';
 import 'programs_library_screen.dart';
+import 'program_detail_screen.dart';
+import '../../services/program_service.dart';
 import 'workout_tracker_screen.dart';
 import '../../services/routine_service.dart';
 // workout_tracker_screen import removed — QuickLaunchSheet handles the tracker.
@@ -505,7 +507,19 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   }
 
   // ── Programe — multi-week programs ────────────────────────────────────────
+  // Program templates for the Programs sub-tab — fetched once, memoized so the
+  // lazy/kept-alive pane doesn't refetch on every rebuild.
+  Future<List<ProgramSummary>>? _programsFuture;
+
+  Future<void> _openTemplate(ProgramSummary t) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => ProgramDetailScreen(templateId: t.id)),
+    );
+    if (mounted) _load();
+  }
+
   Widget _programeTab() {
+    _programsFuture ??= ProgramService().getTemplates();
     return _subTabScroll([
       _AiPlanBuilderCard(
         onTap: () => Navigator.of(context).push<void>(
@@ -513,6 +527,37 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
         ),
       ),
       const SizedBox(height: ZveltTokens.s5),
+      Text('CHOOSE A PROGRAM', style: ZType.eyebrow),
+      const SizedBox(height: ZveltTokens.s3),
+      FutureBuilder<List<ProgramSummary>>(
+        future: _programsFuture,
+        builder: (context, snap) {
+          if (!snap.hasData && snap.connectionState != ConnectionState.done) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: ZveltTokens.s8),
+              child: Center(child: CircularProgressIndicator(color: ZveltTokens.brand)),
+            );
+          }
+          if (snap.hasError) {
+            return Text('Could not load programs. Pull to retry.',
+                style: ZType.bodyS.copyWith(color: ZveltTokens.text2));
+          }
+          final programs = snap.data ?? const <ProgramSummary>[];
+          if (programs.isEmpty) {
+            return Text('No programs available yet.',
+                style: ZType.bodyS.copyWith(color: ZveltTokens.text2));
+          }
+          return Column(
+            children: [
+              for (final p in programs) ...[
+                _ProgramSummaryCard(summary: p, onTap: () => _openTemplate(p)),
+                const SizedBox(height: ZveltTokens.cardGap),
+              ],
+            ],
+          );
+        },
+      ),
+      const SizedBox(height: ZveltTokens.s2),
       _ProgramsEntryCard(
         onTap: () => Navigator.of(context).push<void>(
           MaterialPageRoute<void>(builder: (_) => const ProgramsLibraryScreen()),
@@ -1012,10 +1057,10 @@ class _ProgramsEntryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Programs', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+                Text('Program library', style: ZType.h4.copyWith(color: ZveltTokens.text)),
                 const SizedBox(height: 2),
                 Text(
-                  '3–8 week plans: 5×5, PPL, 5/3/1, nSuns…',
+                  'Search, filter & sort all plans',
                   style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
                 ),
               ],
@@ -1023,6 +1068,91 @@ class _ProgramsEntryCard extends StatelessWidget {
           ),
           Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 22),
         ],
+      ),
+    );
+  }
+}
+
+/// A single program template card in the Programs sub-tab list. Opens the
+/// program detail/preview. Periwinkle: soft card + meta chips.
+class _ProgramSummaryCard extends StatelessWidget {
+  const _ProgramSummaryCard({required this.summary, required this.onTap});
+
+  final ProgramSummary summary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <String>[
+      '${summary.daysPerWeek}×/week',
+      if (summary.exercisesPerDay.isNotEmpty && summary.exercisesPerDay != '—')
+        '${summary.exercisesPerDay} ex/day',
+      programSchemeLabel(summary.scheme),
+      programLevelLabel(summary.level),
+    ];
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        child: Container(
+          decoration: BoxDecoration(
+            color: ZveltTokens.surface,
+            borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+            boxShadow: ZveltTokens.shadowCard,
+          ),
+          padding: const EdgeInsets.all(ZveltTokens.s5),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      summary.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ZType.h3.copyWith(color: ZveltTokens.text),
+                    ),
+                  ),
+                  Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 22),
+                ],
+              ),
+              if (summary.description.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  summary.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2, height: 1.45),
+                ),
+              ],
+              const SizedBox(height: ZveltTokens.s3),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final c in chips)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: ZveltTokens.bg2,
+                        borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                      ),
+                      child: Text(
+                        c,
+                        style: ZType.bodyS.copyWith(
+                          color: ZveltTokens.text2,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
