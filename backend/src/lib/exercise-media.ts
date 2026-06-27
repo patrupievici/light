@@ -70,13 +70,139 @@ export function gifMediaPayload(exerciseId: string, url: string): Record<string,
   }
 }
 
+// ─── ExerciseDB (RapidAPI) fallback ──────────────────────────────────────────
+// When the dedicated media DB has no GIF for an exercise, resolve the name
+// against the ExerciseDB catalog (fetched once per process) and serve the GIF
+// through the public image proxy (/v1/exercises/db/image/:id), which injects
+// EXERCISEDB_KEY server-side. Requires PUBLIC_BASE_URL so the URL the app loads
+// is absolute (the client renders media[].url directly, no prefixing).
+const EXDB_HOST = 'exercisedb.p.rapidapi.com'
+
+/** Aggressive normalize for cross-source name matching (lowercase, alnum+space). */
+function normForMatch(s: string): string {
+  return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/** Map a Zvelt equipment value → the ExerciseDB equipment token (best-effort). */
+function exdbEquip(equipment: string | null | undefined): string | null {
+  const e = (equipment ?? '').toLowerCase()
+  if (!e) return null
+  if (e.includes('barbell')) return 'barbell'
+  if (e.includes('dumbbell')) return 'dumbbell'
+  if (e.includes('cable')) return 'cable'
+  if (e.includes('kettlebell')) return 'kettlebell'
+  if (e.includes('band')) return 'band'
+  if (e.includes('smith')) return 'smith machine'
+  if (e.includes('machine')) return 'machine' // also matches ExerciseDB "leverage machine"
+  if (e.includes('body') || e === 'none' || e === 'bodyweight') return 'body weight'
+  return null
+}
+
+export type ExdbEntry = { id: string; norm: string; tokens: string[]; eq: string }
+
+/** Build an ExdbEntry from a raw {id,name,equipment} (exported for tests). */
+export function exdbEntry(id: string, name: string, equipment = ''): ExdbEntry {
+  const norm = normForMatch(name)
+  return { id, norm, tokens: norm.split(' '), eq: equipment.toLowerCase() }
+}
+
+let exdbCatalogPromise: Promise<ExdbEntry[]> | null = null
+
+/** ExerciseDB catalog (id + normalized name + tokens + equipment). 1 API call/process. */
+async function loadExdbCatalog(): Promise<ExdbEntry[]> {
+  const key = process.env.EXERCISEDB_KEY?.trim()
+  if (!key) return []
+  try {
+    const res = await fetch(`https://${EXDB_HOST}/exercises?limit=1500&offset=0`, {
+      headers: { 'X-RapidAPI-Key': key, 'X-RapidAPI-Host': EXDB_HOST },
+    })
+    if (!res.ok) {
+      console.warn('[exercise-media] ExerciseDB catalog fetch failed:', res.status)
+      return []
+    }
+    const arr = (await res.json()) as Array<{ id?: string; name?: string; equipment?: string }>
+    if (!Array.isArray(arr)) return []
+    const out: ExdbEntry[] = []
+    for (const e of arr) {
+      if (e?.id && e?.name) {
+        const norm = normForMatch(e.name)
+        if (norm) out.push({ id: e.id, norm, tokens: norm.split(' '), eq: (e.equipment ?? '').toLowerCase() })
+      }
+    }
+    console.log(`[exercise-media] ExerciseDB catalog loaded: ${out.length} exercises`)
+    return out
+  } catch (e) {
+    console.warn('[exercise-media] ExerciseDB catalog error:', e instanceof Error ? e.message : e)
+    return []
+  }
+}
+
+function getExdbCatalog(): Promise<ExdbEntry[]> {
+  exdbCatalogPromise ??= loadExdbCatalog()
+  return exdbCatalogPromise
+}
+
+/**
+ * Best-effort match of a Zvelt exercise (name + equipment) to an ExerciseDB id.
+ * Exact normalized-name match wins; otherwise the best name where every Zvelt
+ * token is present, strongly preferring the matching equipment, then the fewest
+ * extra tokens, then the shortest name.
+ */
+export function matchExdb(catalog: ExdbEntry[], name: string, equipment: string | null | undefined): string | null {
+  const norm = normForMatch(name)
+  if (!norm) return null
+  const wantTokens = norm.split(' ')
+  const wantEq = exdbEquip(equipment)
+
+  let best: ExdbEntry | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+  for (const c of catalog) {
+    if (c.norm === norm) return c.id
+    let subset = true
+    for (const t of wantTokens) {
+      if (!c.tokens.includes(t)) { subset = false; break }
+    }
+    if (!subset) continue
+    const eqMatch = wantEq != null && (c.eq.includes(wantEq) || c.tokens.includes(wantEq.split(' ')[0]))
+    const extra = c.tokens.length - wantTokens.length
+    const score = (eqMatch ? 0 : 1000) + extra * 10 + c.norm.length
+    if (score < bestScore) {
+      bestScore = score
+      best = c
+    }
+  }
+  return best?.id ?? null
+}
+
+function exdbProxyUrl(exdbId: string): string | null {
+  const base = process.env.PUBLIC_BASE_URL?.trim().replace(/\/+$/, '')
+  if (!base) return null
+  return `${base}/v1/exercises/db/image/${encodeURIComponent(exdbId)}?resolution=360`
+}
+
 export async function buildMediaByExerciseId(exercises: Exercise[]): Promise<Map<string, unknown[]>> {
   const byId = new Map<string, unknown[]>()
   const norms = exercises.map((e) => e.name.trim().toLowerCase())
   const urlByNorm = await lookupGifUrls(norms)
+
+  const useExdb = !!process.env.EXERCISEDB_KEY?.trim() && !!process.env.PUBLIC_BASE_URL?.trim()
+  const catalog = useExdb ? await getExdbCatalog() : []
+
   for (const ex of exercises) {
     const url = urlByNorm.get(ex.name.trim().toLowerCase())
-    byId.set(ex.id, url ? [gifMediaPayload(ex.id, url)] : [])
+    if (url) {
+      byId.set(ex.id, [gifMediaPayload(ex.id, url)])
+      continue
+    }
+    if (catalog.length > 0) {
+      const exdbId = matchExdb(catalog, ex.name, ex.equipment)
+      const proxied = exdbId ? exdbProxyUrl(exdbId) : null
+      if (proxied) {
+        byId.set(ex.id, [gifMediaPayload(ex.id, proxied)])
+        continue
+      }
+    }
+    byId.set(ex.id, [])
   }
   return byId
 }
