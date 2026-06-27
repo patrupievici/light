@@ -313,20 +313,9 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
         _InlineWarning(message: _error!),
         const SizedBox(height: ZveltTokens.s4),
       ],
-      SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: _starting ? null : _startWorkout,
-          icon: _starting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: ZveltTokens.onBrand),
-                )
-              : const Icon(AppIcons.play),
-          label: Text(_starting ? 'Starting…' : 'Start workout'),
-        ),
-      ),
+      _trainCoachCard(),
+      const SizedBox(height: ZveltTokens.s3),
+      _trainStartHero(),
       const SizedBox(height: ZveltTokens.s5),
       _calendarCard(),
       const SizedBox(height: ZveltTokens.s5),
@@ -336,6 +325,110 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
         onStart: _startRoutine,
       ),
     ]);
+  }
+
+  // Coach card — 3D rabbit mascot + a line of honest, dry coach copy.
+  Widget _trainCoachCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        boxShadow: ZveltTokens.shadowCard,
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 12, 16, 12),
+      child: Row(
+        children: [
+          Image.asset(
+            'assets/mascot/m8.png',
+            height: 74,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const SizedBox(width: 74),
+          ),
+          const SizedBox(width: ZveltTokens.s3),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ZVELT COACH',
+                  style: ZType.bodyS.copyWith(
+                    color: ZveltTokens.brand,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    letterSpacing: 0.06 * 11,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Show up and start light. Keep it clean, not heroic.',
+                  style: ZType.bodyS.copyWith(
+                    color: ZveltTokens.text,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Periwinkle gradient "Today's Workout" hero — honest (no fabricated session).
+  Widget _trainStartHero() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _starting ? null : _startWorkout,
+        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            gradient: ZveltTokens.gradBrand,
+            borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+            boxShadow: ZveltTokens.glowBrand,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "TODAY'S WORKOUT",
+                style: ZType.bodyS.copyWith(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 0.1 * 12,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Ready to train',
+                style: ZType.h2.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                ),
+                child: Text(
+                  _starting ? 'Starting…' : 'Start Workout →',
+                  style: ZType.bodyM.copyWith(
+                    color: ZveltTokens.brand,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Calendar + selected-day summary. Lives in Azi so "what's on for today" is
