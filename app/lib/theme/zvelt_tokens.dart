@@ -83,9 +83,15 @@ class ZveltTokens {
   static const Color error = Color(0xFFE5484D);
 
   // ─── Typography families ────────────────────────────────────────────────────
-  /// Inter — UI, headings, body, buttons
+  /// Inter — UI, body, buttons, labels. (Kept for body: visually near-identical
+  /// to the prototype's DM Sans but without the wider metrics that overflowed
+  /// tight layouts at large text scales.)
   static const String fontPrimary = 'Inter';
-  /// IBM Plex Mono — BPM · pace · calories · distance · workout metrics
+  /// Barlow Condensed — display headings + big metrics (the condensed, sporty
+  /// face that gives ZVELT its premium character). It's narrower than Inter, so
+  /// it carries the design signature with no overflow risk.
+  static const String fontDisplay = 'BarlowCondensed';
+  /// IBM Plex Mono — BPM · pace · calories · distance · technical readouts
   static const String fontMono = 'IBMPlexMono';
 
   // ─── Radii ─────────────────────────────────────────────────────────────────
@@ -161,7 +167,7 @@ class ZType {
 
   /// Display heading — Inter 600, tight tracking. For large hero text.
   static TextStyle get display => TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.022 * 16,
         height: 1.2,
@@ -170,7 +176,7 @@ class ZType {
 
   /// Clean sans heading — Inter 600. Card titles, section headers.
   static TextStyle get clean => TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.02 * 16,
         height: 1.2,
@@ -179,7 +185,7 @@ class ZType {
 
   /// KPI stat number — Inter 600 tabular. Welcome total, big counts.
   static TextStyle get stat => const TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         fontFeatures: [FontFeature.tabularFigures()],
         letterSpacing: -0.02 * 16,
@@ -207,49 +213,49 @@ class ZType {
 
   // ── Inter scale (matches design-system.md §1) ───────────────────────────────
   static TextStyle get displayXL => TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         fontSize: 52,
         height: 1.2,
         color: ZveltTokens.text,
       );
   static TextStyle get displayL => TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         fontSize: 42,
         height: 1.2,
         color: ZveltTokens.text,
       );
   static TextStyle get displayM => TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         fontSize: 34,
         height: 1.2,
         color: ZveltTokens.text,
       );
   static TextStyle get h1 => TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         fontSize: 28,
         height: 1.2,
         color: ZveltTokens.text,
       );
   static TextStyle get h2 => TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         fontSize: 24,
         height: 1.2,
         color: ZveltTokens.text,
       );
   static TextStyle get h3 => TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         fontSize: 20,
         height: 1.4,
         color: ZveltTokens.text,
       );
   static TextStyle get h4 => TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
+        fontFamily: ZveltTokens.fontDisplay,
         fontWeight: FontWeight.w600,
         fontSize: 18,
         height: 1.4,
