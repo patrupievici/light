@@ -294,48 +294,36 @@ class _HomeTabState extends State<HomeTab> {
         onTap: _startWorkout,
         borderRadius: BorderRadius.circular(22),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 104),
+          height: 116,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: ZveltTokens.surface,
             borderRadius: BorderRadius.circular(22),
             boxShadow: ZveltTokens.shadowCard,
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // mascot panel (overflows upward like the prototype)
+              // mascot panel — fixed-size box, gradient fills, rabbit at bottom
               SizedBox(
                 width: 104,
+                height: 116,
                 child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.bottomCenter,
+                  fit: StackFit.expand,
                   children: [
-                    Container(
+                    DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [ZveltTokens.brandTint, ZveltTokens.surface],
                         ),
-                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(22)),
                       ),
                     ),
-                    Positioned(
-                      bottom: 12,
-                      child: Container(
-                        width: 70,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: const Color(0x22282850),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 6,
+                    Align(
+                      alignment: Alignment.bottomCenter,
                       child: Image.asset(
                         'assets/mascot/m-think.png',
-                        height: 124,
+                        height: 108,
                         fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       ),
@@ -345,7 +333,7 @@ class _HomeTabState extends State<HomeTab> {
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 16, 18, 16),
+                  padding: const EdgeInsets.fromLTRB(6, 16, 18, 16),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,12 +348,16 @@ class _HomeTabState extends State<HomeTab> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        msg,
-                        style: ZType.bodyM.copyWith(
-                          color: ZveltTokens.text,
-                          fontWeight: FontWeight.w600,
-                          height: 1.4,
+                      Flexible(
+                        child: Text(
+                          msg,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: ZType.bodyM.copyWith(
+                            color: ZveltTokens.text,
+                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                          ),
                         ),
                       ),
                     ],
