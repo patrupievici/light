@@ -36,7 +36,7 @@ import 'services/report_outbox_service.dart';
 import 'services/retention_reminder_service.dart';
 import 'services/settings_store.dart';
 import 'screens/main_screen.dart';
-import 'screens/onboarding/onboarding2.dart' show kOnboarding2CompletedKey;
+import 'screens/onboarding/onboarding_keys.dart' show kOnboarding2CompletedKey;
 import 'screens/onboarding/light_onboarding_flow.dart';
 import 'screens/splash_screen.dart';
 import 'screens/workouts/workout_tracker_screen.dart';

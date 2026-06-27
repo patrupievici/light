@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { computeRanks } from '../services/ranking.service'
+import { evaluateWeightJump } from '../services/anti-cheat.service'
 import { checkAndAward } from '../services/achievement.service'
 import { recordWorkoutProgress } from '../services/session-reconcile.service'
 import { clearWorkoutSuggestionCache } from '../services/workout-suggestion-cache.service'
@@ -47,6 +48,9 @@ const AddSetSchema = z.object({
   /// Idempotency token de la client (UUID): retry-urile cu același clientSetId
   /// returnează setul existent în loc să creeze duplicate.
   clientSetId: z.string().uuid().optional(),
+  /// Optional justification note. REQUIRED (anti-cheat) when the weight is a >2x
+  /// jump vs the user's recent (<7d) personal max for this exercise.
+  note: z.string().max(500).optional(),
 })
 
 const UpdateSetSchema = z
@@ -313,6 +317,42 @@ export async function workoutRoutes(app: FastifyInstance) {
       if (existing) return reply.code(200).send({ set: existing, idempotent: true })
     }
 
+    // Anti-cheat (CLAUDE.md "Weight >2× max istoric personal + <7 zile → confirm +
+    // notă obligatorie"): a WORK set whose weight is more than 2× the user's
+    // recent personal max for THIS exercise (and that max is <7 days old) needs a
+    // written justification note. Same pure validator as the edit path so add/edit
+    // can't drift. The current workout is excluded so the baseline is the genuine
+    // historical max, not a set just logged in this session.
+    const note = parsed.data.note?.trim() ? parsed.data.note.trim() : null
+    if ((parsed.data.tag ?? 'WORK') !== 'WARMUP' && parsed.data.weightKg > 0) {
+      const pmax = await prisma.workoutSet.findFirst({
+        where: {
+          tag: 'WORK',
+          weightKg: { gt: 0 },
+          workoutExercise: {
+            exerciseId: we.exerciseId,
+            workout: { userId, id: { not: workoutId } },
+          },
+        },
+        orderBy: { weightKg: 'desc' },
+        select: { weightKg: true, createdAt: true },
+      })
+      const jump = evaluateWeightJump({
+        newWeightKg: parsed.data.weightKg,
+        personalMaxKg: pmax ? Number(pmax.weightKg) : null,
+        personalMaxAt: pmax?.createdAt ?? null,
+        hasNote: !!note,
+      })
+      if (jump.rejected) {
+        return reply.code(422).send({
+          error: 'WEIGHT_JUMP_REQUIRES_NOTE',
+          message:
+            'A weight more than 2× your recent personal record needs an explanatory note.',
+          requestId: request.id,
+        })
+      }
+    }
+
     // Determina index-ul urmatorului set
     const lastSet = await prisma.workoutSet.findFirst({
       where: { workoutExerciseId: weId },
@@ -331,6 +371,7 @@ export async function workoutRoutes(app: FastifyInstance) {
           tag: parsed.data.tag,
           isCompleted: parsed.data.isCompleted ?? true,
           clientSetId: parsed.data.clientSetId,
+          note,
         },
       })
       return reply.code(201).send({ set })
@@ -383,22 +424,28 @@ export async function workoutRoutes(app: FastifyInstance) {
       })
     }
 
-    // Anti-cheat (CLAUDE.md "Weight >2× ... + nota obligatorie"): if the new
-    // weight is a >2x jump vs the OLD weight, a written note is MANDATORY. Check
-    // BEFORE mutating the DB so a suspicious edit without justification is
-    // rejected outright (and the audit's `note`/`flagged` columns get populated
-    // when it is justified). Backward-safe: only blocks when the jump is real
-    // AND no note was supplied — every non-jump edit is unaffected.
+    // Anti-cheat (CLAUDE.md "Weight >2× ... + nota obligatorie"): a >2x jump vs
+    // the OLD weight requires a written note. The pure validator
+    // (anti-cheat.service.evaluateWeightJump) is the single source of truth — the
+    // prior set weight is the baseline and `personalMaxAt = now` keeps the 7-day
+    // recency gate open for an in-place edit. Checked BEFORE mutating the DB so a
+    // suspicious edit without justification is rejected outright; every non-jump
+    // edit is unaffected.
     const beforeW = Number(existing.weightKg)
     const proposedW = parsed.data.weightKg !== undefined ? parsed.data.weightKg : beforeW
-    const isWeightJump = beforeW > 0 && proposedW > beforeW * 2
     const note = parsed.data.note?.trim() ? parsed.data.note.trim() : null
+    const jump = evaluateWeightJump({
+      newWeightKg: proposedW,
+      personalMaxKg: beforeW > 0 ? beforeW : null,
+      personalMaxAt: new Date(),
+      hasNote: !!note,
+    })
 
-    if (isWeightJump && !note) {
+    if (jump.rejected) {
       return reply.code(422).send({
         error: 'WEIGHT_JUMP_REQUIRES_NOTE',
         message:
-          'O creștere de greutate de peste 2× față de setul anterior necesită o notă explicativă.',
+          'A weight increase of more than 2× over the previous set needs an explanatory note.',
         requestId: request.id,
       })
     }
@@ -440,7 +487,7 @@ export async function workoutRoutes(app: FastifyInstance) {
             isCompleted: set.isCompleted,
           },
           note,
-          flagged: beforeW > 0 && afterW > beforeW * 2,
+          flagged: jump.requiresConfirmation,
         },
       })
       .catch((err: unknown) =>

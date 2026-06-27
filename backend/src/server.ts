@@ -12,11 +12,13 @@ import { profileRoutes } from './routes/profile'
 import { exerciseRoutes } from './routes/exercises'
 import { workoutRoutes } from './routes/workouts'
 import { routineRoutes } from './routes/routines'
+import { programRoutes } from './routes/programs'
 import { postRoutes } from './routes/posts'
 import { challengeRoutes } from './routes/challenges'
 import { rankRoutes } from './routes/ranks'
 import { achievementsRoutes } from './routes/achievements'
 import { statsRoutes } from './routes/stats'
+import { muscleLevelsRoutes } from './routes/muscle-levels'
 import { trainingProfileRoutes } from './routes/training-profile'
 import { workoutSuggestionRoutes } from './routes/workout-suggestion'
 import { weeklyCoachReadRoutes } from './routes/weekly-coach-read'
@@ -28,6 +30,7 @@ import { weatherRoutes } from './routes/weather'
 import { aiRoutes } from './routes/ai'
 import { pushRoutes } from './routes/push'
 import { nutritionRoutes } from './routes/nutrition'
+import { nutritionFoodsRoutes } from './routes/nutrition-foods'
 import { plannedWorkoutsRoutes } from './routes/planned-workouts'
 import { bodyMeasurementRoutes } from './routes/body-measurements'
 import { gdprRoutes } from './routes/gdpr'
@@ -40,6 +43,7 @@ import { startGlobalDailyQuoteCron } from './services/global-daily-quote'
 import { startWeeklyPlanRegenCron } from './services/weekly-plan-cron.service'
 import { startGoalAwarePushCron } from './services/goal-aware-push.service'
 import { startStoriesCleanupCron } from './services/stories-cleanup.service'
+import { startOfficialRoomsSeed } from './services/official-rooms.service'
 import { startWebhookReconcileCron } from './services/webhook-reconcile-cron.service'
 import { startSoftDeleteCron } from './services/soft-delete-cron.service'
 import { adminRoutes } from './routes/admin'
@@ -122,6 +126,7 @@ async function main() {
   app.register(exerciseRoutes, { prefix: '/v1/exercises' })
   app.register(workoutRoutes, { prefix: '/v1/workouts' })
   app.register(routineRoutes, { prefix: '/v1/routines' })
+  app.register(programRoutes, { prefix: '/v1/programs' })
   app.register(postRoutes, { prefix: '/v1/posts' })
   app.register(challengeRoutes, { prefix: '/v1/challenges' })
   app.register(friendRoutes, { prefix: '/v1/friends' })
@@ -130,6 +135,7 @@ async function main() {
   app.register(rankRoutes, { prefix: '/v1/ranks' })
   app.register(achievementsRoutes, { prefix: '/v1/achievements' })
   app.register(statsRoutes, { prefix: '/v1/me' })
+  app.register(muscleLevelsRoutes, { prefix: '/v1/me' })
   app.register(trainingProfileRoutes, { prefix: '/v1/me' })
   app.register(workoutSuggestionRoutes, { prefix: '/v1/me' })
   app.register(weeklyCoachReadRoutes, { prefix: '/v1/me' })
@@ -140,6 +146,7 @@ async function main() {
   app.register(weatherRoutes, { prefix: '/v1/weather' })
   app.register(aiRoutes, { prefix: '/v1/ai' })
   app.register(nutritionRoutes, { prefix: '/v1/nutrition' })
+  app.register(nutritionFoodsRoutes, { prefix: '/v1/nutrition' })
   app.register(integrationsRoutes, { prefix: '/v1/integrations' })
   app.register(adminRoutes, { prefix: '/v1/admin' })
   // storyRoutes is Razvan's expanded version (post-merge canonical name)
@@ -152,6 +159,7 @@ async function main() {
   startWeeklyPlanRegenCron(app.log)
   startGoalAwarePushCron(app.log)
   startStoriesCleanupCron(app.log)
+  startOfficialRoomsSeed(app.log)
   startWebhookReconcileCron(app.log)
   startSoftDeleteCron(app.log)
 

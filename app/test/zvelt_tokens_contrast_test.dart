@@ -38,31 +38,39 @@ double _contrast(Color a, Color b) {
 
 void main() {
   group('ZveltTokens muted-text contrast (WCAG AA)', () {
-    test('text3 meets 4.5:1 against both bg and surface (normal-text AA)', () {
-      expect(
-        _contrast(ZveltTokens.text3, ZveltTokens.bg),
-        greaterThanOrEqualTo(4.5),
-        reason: 'text3 carries caption copy on the page background',
-      );
-      expect(
-        _contrast(ZveltTokens.text3, ZveltTokens.surface),
-        greaterThanOrEqualTo(4.5),
-        reason: 'text3 carries caption copy on card surfaces',
-      );
-    });
+    // Both themes are first-class now (light + premium dark), so check each.
+    tearDown(() => ZveltTokens.isDark = false);
 
-    test('text4 meets 3:1 against both bg and surface (large/UI AA)', () {
-      expect(
-        _contrast(ZveltTokens.text4, ZveltTokens.bg),
-        greaterThanOrEqualTo(3.0),
-        reason: 'text4 is the most-muted text token on the page background',
-      );
-      expect(
-        _contrast(ZveltTokens.text4, ZveltTokens.surface),
-        greaterThanOrEqualTo(3.0),
-        reason: 'text4 is the most-muted text token on card surfaces',
-      );
-    });
+    for (final dark in [false, true]) {
+      final mode = dark ? 'dark' : 'light';
+      test('[$mode] text3 meets 4.5:1 against both bg and surface (normal-text AA)', () {
+        ZveltTokens.isDark = dark;
+        expect(
+          _contrast(ZveltTokens.text3, ZveltTokens.bg),
+          greaterThanOrEqualTo(4.5),
+          reason: '[$mode] text3 carries caption copy on the page background',
+        );
+        expect(
+          _contrast(ZveltTokens.text3, ZveltTokens.surface),
+          greaterThanOrEqualTo(4.5),
+          reason: '[$mode] text3 carries caption copy on card surfaces',
+        );
+      });
+
+      test('[$mode] text4 meets 3:1 against both bg and surface (large/UI AA)', () {
+        ZveltTokens.isDark = dark;
+        expect(
+          _contrast(ZveltTokens.text4, ZveltTokens.bg),
+          greaterThanOrEqualTo(3.0),
+          reason: '[$mode] text4 is the most-muted text token on the page background',
+        );
+        expect(
+          _contrast(ZveltTokens.text4, ZveltTokens.surface),
+          greaterThanOrEqualTo(3.0),
+          reason: '[$mode] text4 is the most-muted text token on card surfaces',
+        );
+      });
+    }
 
     test('contrast helper matches a hand-computed reference (black on white)', () {
       // Pure black on pure white is exactly 21:1 — sanity-checks the formula so

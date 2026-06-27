@@ -11,10 +11,12 @@ import '../../services/workout_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/z/z_card.dart';
 import '../../widgets/z/z_eyebrow.dart';
+import '../../widgets/zvelt_main_nav_bar.dart';
 import '../calendar/activity_calendar_screen.dart';
 import 'quick_launch_sheet.dart';
 import 'exercise_library_screen.dart';
 import 'program_builder_screen.dart';
+import 'programs_library_screen.dart';
 import 'workout_tracker_screen.dart';
 import '../../services/routine_service.dart';
 // workout_tracker_screen import removed — QuickLaunchSheet handles the tracker.
@@ -39,6 +41,11 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
 
   int _cardioTab = 0;
   int _strengthTab = 0;
+  // Train sub-tabs: 0 Azi · 1 Programe · 2 Exerciții · 3 Istoric. Each pane is
+  // built lazily on first visit, then kept alive (Offstage) so scroll + state
+  // survive switches.
+  int _trainTab = 0;
+  final List<bool> _trainVisited = [true, false, false, false];
   DateTime _focusedDay = DateUtils.dateOnly(DateTime.now());
   DateTime _selectedDay = DateUtils.dateOnly(DateTime.now());
 
@@ -198,147 +205,260 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
 
   @override
   Widget build(BuildContext context) {
-    // Hoist the strain delta once per build: it was computed three times
-    // (label + sign color + above/below copy). Inputs only change in _load(),
-    // so a single local is behavior-identical within one build pass.
-    final strainDelta = _strainDelta();
-    final strainDeltaRounded = strainDelta.round();
-    final strainDeltaLabel = '${strainDeltaRounded >= 0 ? '+' : ''}$strainDeltaRounded%';
-    final selectedDayEvents = _eventsForDay(_selectedDay);
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator(color: ZveltTokens.brand))
-            : RefreshIndicator(
-                onRefresh: _load,
+            : Column(
+                children: [
+                  _trainHeader(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(ZveltTokens.screenPaddingH, 0,
+                        ZveltTokens.screenPaddingH, ZveltTokens.s3),
+                    child: _SegmentedControl(
+                      labels: const ['Today', 'Programs', 'Exercises', 'History'],
+                      selected: _trainTab,
+                      onChanged: _selectTrainTab,
+                    ),
+                  ),
+                  Expanded(child: _trainBody()),
+                ],
+              ),
+      ),
+    );
+  }
+
+  void _selectTrainTab(int i) {
+    setState(() {
+      _trainVisited[i] = true;
+      _trainTab = i;
+    });
+  }
+
+  Widget _trainHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(ZveltTokens.screenPaddingH, ZveltTokens.s3,
+          ZveltTokens.screenPaddingH, ZveltTokens.s3),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text('Fitness', style: ZType.h1.copyWith(color: ZveltTokens.text)),
+          ),
+          _CircleIconButton(
+            icon: AppIcons.plus,
+            loading: _starting,
+            onTap: _starting ? null : _startWorkout,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Lazy + state-preserving sub-tabs (zvelt-flutter perf guidance): a pane is
+  // built on first visit and then kept in the tree (Offstage preserves its
+  // scroll + state); off-screen panes pause their animations (TickerMode).
+  Widget _trainBody() {
+    return Stack(
+      // Tight constraints for the active pane so its ListView always has a
+      // bounded height (no "unbounded height" ambiguity from a loose Stack).
+      fit: StackFit.expand,
+      children: [
+        for (var i = 0; i < 4; i++)
+          Offstage(
+            offstage: _trainTab != i,
+            child: TickerMode(
+              enabled: _trainTab == i,
+              child: _trainVisited[i] ? _trainSubTab(i) : const SizedBox.shrink(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _trainSubTab(int i) {
+    switch (i) {
+      case 0:
+        return _aziTab();
+      case 1:
+        return _programeTab();
+      case 2:
+        return _exercitiiTab();
+      case 3:
+        return _istoricTab();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _subTabScroll(List<Widget> children) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: ZveltTokens.brand,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        // Bottom reserves the nav-pill height so the last item clears it.
+        padding: EdgeInsets.fromLTRB(ZveltTokens.screenPaddingH, ZveltTokens.s2,
+            ZveltTokens.screenPaddingH,
+            ZveltMainNavBar.reservedBottomHeight(context) + ZveltTokens.s4),
+        children: children,
+      ),
+    );
+  }
+
+  // ── Azi — train now ───────────────────────────────────────────────────────
+  Widget _aziTab() {
+    return _subTabScroll([
+      if (_error != null) ...[
+        _InlineWarning(message: _error!),
+        const SizedBox(height: ZveltTokens.s4),
+      ],
+      SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: _starting ? null : _startWorkout,
+          icon: _starting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: ZveltTokens.onBrand),
+                )
+              : const Icon(AppIcons.play),
+          label: Text(_starting ? 'Starting…' : 'Start workout'),
+        ),
+      ),
+      const SizedBox(height: ZveltTokens.s5),
+      _calendarCard(),
+      const SizedBox(height: ZveltTokens.s5),
+      _RoutinesSection(
+        routines: _routines,
+        startingId: _startingRoutine?.id,
+        onStart: _startRoutine,
+      ),
+    ]);
+  }
+
+  /// Calendar + selected-day summary. Lives in Azi so "what's on for today" is
+  /// in the Today tab, not buried in historical analytics.
+  Widget _calendarCard() {
+    final selectedDayEvents = _eventsForDay(_selectedDay);
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Calendar',
+            style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
+          ),
+          const SizedBox(height: ZveltTokens.s4),
+          TableCalendar<int>(
+            firstDay: DateTime.utc(2023, 1, 1),
+            lastDay: DateTime.utc(2030, 12, 31),
+            focusedDay: _focusedDay,
+            selectedDayPredicate: (day) => isSameDay(day, _selectedDay),
+            headerStyle: HeaderStyle(
+              titleCentered: false,
+              formatButtonVisible: false,
+              leftChevronIcon: Icon(AppIcons.angle_small_left, color: ZveltTokens.text2),
+              rightChevronIcon: Icon(AppIcons.angle_small_right, color: ZveltTokens.text2),
+              titleTextStyle: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
+            ),
+            calendarStyle: CalendarStyle(
+              defaultTextStyle: TextStyle(color: ZveltTokens.text),
+              weekendTextStyle: TextStyle(color: ZveltTokens.text),
+              outsideTextStyle: TextStyle(color: ZveltTokens.text4),
+              selectedDecoration: const BoxDecoration(
                 color: ZveltTokens.brand,
-                child: CustomScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          ZveltTokens.screenPaddingH,
-                          ZveltTokens.s3,
-                          ZveltTokens.screenPaddingH,
-                          ZveltTokens.s6,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Fitness',
-                                        style: ZType.h1.copyWith(color: ZveltTokens.text),
-                                      ),
-                                      const SizedBox(height: ZveltTokens.s1),
-                                      Text(
-                                        'Last 30 days',
-                                        style: ZType.bodyL.copyWith(color: ZveltTokens.text2),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                _CircleIconButton(
-                                  icon: AppIcons.plus,
-                                  loading: _starting,
-                                  onTap: _starting ? null : _startWorkout,
-                                ),
-                              ],
-                            ),
-                            if (_error != null) ...[
-                              const SizedBox(height: ZveltTokens.s4),
-                              _InlineWarning(message: _error!),
-                            ],
-                            const SizedBox(height: ZveltTokens.s5),
-                            _AiPlanBuilderCard(
-                              onTap: () => Navigator.of(context).push<void>(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const ProgramBuilderScreen(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: ZveltTokens.s5),
-                            _RoutinesSection(
-                              routines: _routines,
-                              startingId: _startingRoutine?.id,
-                              onStart: _startRoutine,
-                            ),
-                            const SizedBox(height: ZveltTokens.s5),
-                            _SectionCard(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Calendar',
-                                    style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-                                  ),
-                                  const SizedBox(height: ZveltTokens.s4),
-                                  TableCalendar<int>(
-                                    firstDay: DateTime.utc(2023, 1, 1),
-                                    lastDay: DateTime.utc(2030, 12, 31),
-                                    focusedDay: _focusedDay,
-                                    selectedDayPredicate: (day) => isSameDay(day, _selectedDay),
-                                    headerStyle: HeaderStyle(
-                                      titleCentered: false,
-                                      formatButtonVisible: false,
-                                      leftChevronIcon: Icon(AppIcons.angle_small_left, color: ZveltTokens.text2),
-                                      rightChevronIcon: Icon(AppIcons.angle_small_right, color: ZveltTokens.text2),
-                                      titleTextStyle: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-                                    ),
-                                    calendarStyle: CalendarStyle(
-                                      defaultTextStyle: TextStyle(color: ZveltTokens.text),
-                                      weekendTextStyle: TextStyle(color: ZveltTokens.text),
-                                      outsideTextStyle: TextStyle(color: ZveltTokens.text4),
-                                      selectedDecoration: const BoxDecoration(
-                                        color: ZveltTokens.brand,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      todayDecoration: BoxDecoration(
-                                        color: ZveltTokens.brandTint,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      todayTextStyle: const TextStyle(color: ZveltTokens.brandDeep, fontWeight: FontWeight.w600),
-                                      markerDecoration: const BoxDecoration(
-                                        color: ZveltTokens.brand,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    eventLoader: (day) {
-                                      final count = _eventsForDay(day);
-                                      return List<int>.generate(count, (index) => index);
-                                    },
-                                    onDaySelected: (selectedDay, focusedDay) {
-                                      setState(() {
-                                        _selectedDay = DateUtils.dateOnly(selectedDay);
-                                        _focusedDay = DateUtils.dateOnly(focusedDay);
-                                      });
-                                      Navigator.of(context).push<void>(
-                                        MaterialPageRoute(
-                                          builder: (_) => const ActivityCalendarScreen(),
-                                        ),
-                                      );
-                                    },
-                                    onPageChanged: (focusedDay) {
-                                      _focusedDay = DateUtils.dateOnly(focusedDay);
-                                    },
-                                  ),
-                                  const SizedBox(height: ZveltTokens.s4),
-                                  _SelectedDaySummary(
-                                    day: _selectedDay,
-                                    activityCount: selectedDayEvents,
-                                    label: _selectedDayLabel(),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: ZveltTokens.s5),
+                shape: BoxShape.circle,
+              ),
+              todayDecoration: BoxDecoration(
+                color: ZveltTokens.brandTint,
+                shape: BoxShape.circle,
+              ),
+              todayTextStyle: const TextStyle(color: ZveltTokens.brandDeep, fontWeight: FontWeight.w600),
+              markerDecoration: const BoxDecoration(
+                color: ZveltTokens.brand,
+                shape: BoxShape.circle,
+              ),
+            ),
+            eventLoader: (day) {
+              final count = _eventsForDay(day);
+              return List<int>.generate(count, (index) => index);
+            },
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
+                _selectedDay = DateUtils.dateOnly(selectedDay);
+                _focusedDay = DateUtils.dateOnly(focusedDay);
+              });
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => const ActivityCalendarScreen(),
+                ),
+              );
+            },
+            onPageChanged: (focusedDay) {
+              _focusedDay = DateUtils.dateOnly(focusedDay);
+            },
+          ),
+          const SizedBox(height: ZveltTokens.s4),
+          _SelectedDaySummary(
+            day: _selectedDay,
+            activityCount: selectedDayEvents,
+            label: _selectedDayLabel(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Programe — multi-week programs ────────────────────────────────────────
+  Widget _programeTab() {
+    return _subTabScroll([
+      _AiPlanBuilderCard(
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(builder: (_) => const ProgramBuilderScreen()),
+        ),
+      ),
+      const SizedBox(height: ZveltTokens.s5),
+      _ProgramsEntryCard(
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(builder: (_) => const ProgramsLibraryScreen()),
+        ),
+      ),
+    ]);
+  }
+
+  // ── Exerciții — exercise library ──────────────────────────────────────────
+  Widget _exercitiiTab() {
+    return _subTabScroll([
+      Text(
+        'Search any exercise with a GIF demo, filter by muscle group and equipment, or add your own exercises.',
+        style: ZType.bodyM.copyWith(color: ZveltTokens.text2),
+      ),
+      const SizedBox(height: ZveltTokens.s4),
+      _ExerciseLibraryEntryCard(
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()),
+        ),
+      ),
+      const SizedBox(height: ZveltTokens.s4),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _starting ? null : _startWorkout,
+          icon: const Icon(AppIcons.play),
+          label: const Text('Start an empty workout'),
+        ),
+      ),
+    ]);
+  }
+
+  // ── Istoric — calendar + analytics ────────────────────────────────────────
+  Widget _istoricTab() {
+    final strainDelta = _strainDelta();
+    final strainDeltaRounded = strainDelta.round();
+    final strainDeltaLabel = '${strainDeltaRounded >= 0 ? '+' : ''}$strainDeltaRounded%';
+    return _subTabScroll([
                             _SectionCard(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,46 +576,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                             ),
                             const SizedBox(height: ZveltTokens.s4),
                             _buildStrengthPanel(),
-                            const SizedBox(height: ZveltTokens.s5),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () => Navigator.of(context).push<void>(
-                                      MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()),
-                                    ),
-                                    icon: const Icon(AppIcons.gym),
-                                    label: const Text('Exercise library'),
-                                  ),
-                                ),
-                                const SizedBox(width: ZveltTokens.s3),
-                                Expanded(
-                                  child: FilledButton.icon(
-                                    onPressed: _starting ? null : _startWorkout,
-                                    icon: _starting
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: ZveltTokens.onBrand,
-                                            ),
-                                          )
-                                        : const Icon(AppIcons.play),
-                                    label: Text(_starting ? 'Starting…' : 'Start workout'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-      ),
-    );
+    ]);
   }
 
   Widget _buildCardioPanel() {
@@ -806,6 +887,92 @@ class _AiPlanBuilderCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Entry to the multi-week program library ("Programe"): 5x5, PPL, 5/3/1,
+/// nSuns, etc. Opens [ProgramsLibraryScreen].
+class _ProgramsEntryCard extends StatelessWidget {
+  const _ProgramsEntryCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ZCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: ZveltTokens.brandTint,
+              borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+            ),
+            child: const Icon(AppIcons.gym, color: ZveltTokens.brandDeep, size: 22),
+          ),
+          const SizedBox(width: ZveltTokens.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Programs', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+                const SizedBox(height: 2),
+                Text(
+                  '3–8 week plans: 5×5, PPL, 5/3/1, nSuns…',
+                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                ),
+              ],
+            ),
+          ),
+          Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 22),
+        ],
+      ),
+    );
+  }
+}
+
+/// Entry into the exercise library (the "Exerciții" sub-tab) — browse exercises
+/// with GIF demos, filters, and per-muscle grouping.
+class _ExerciseLibraryEntryCard extends StatelessWidget {
+  const _ExerciseLibraryEntryCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ZCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: ZveltTokens.brandTint,
+              borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+            ),
+            child: const Icon(AppIcons.gym, color: ZveltTokens.brandDeep, size: 22),
+          ),
+          const SizedBox(width: ZveltTokens.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Exercise library', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+                const SizedBox(height: 2),
+                Text(
+                  'Search exercises with GIF demos, by muscle group and equipment.',
+                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                ),
+              ],
+            ),
+          ),
+          Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 22),
+        ],
       ),
     );
   }

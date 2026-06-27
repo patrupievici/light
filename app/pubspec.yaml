@@ -57,7 +57,6 @@ dependencies:
   home_widget: ^0.9.1
   connectivity_plus: ^6.0.5
   uuid: ^4.5.1
-  google_fonts: ^6.2.1
   intl: any
   package_info_plus: ^9.0.1
   # Health Connect incremental sync (Wave 8). Android-only WorkManager wrapper.
@@ -84,9 +83,7 @@ flutter:
   generate: true
   assets:
     - assets/dotenv
-    - assets/images/welcome_wordmark.png
     - assets/images/zvelt_logo.png
-    - assets/images/zvelt_z.png
   fonts:
     - family: Inter
       fonts:
@@ -111,6 +108,22 @@ flutter:
           weight: 400
         - asset: assets/fonts/IBMPlexMono-Medium.ttf
           weight: 500
+    # ZVELT Premium typography (Claude Design handoff): Barlow Condensed =
+    # display headings + big metrics (body stays Inter to avoid overflow).
+    - family: BarlowCondensed
+      fonts:
+        - asset: assets/fonts/BarlowCondensed-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/BarlowCondensed-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/BarlowCondensed-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/BarlowCondensed-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/BarlowCondensed-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/BarlowCondensed-Black.ttf
+          weight: 900
 
 flutter_launcher_icons:
   android: true

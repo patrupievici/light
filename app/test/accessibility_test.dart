@@ -187,12 +187,12 @@ void main() {
           ZveltMainNavBar(
             currentIndex: 0,
             onTap: (_) {},
+            onCenterTap: () {},
             items: const [
               ZveltNavItem(label: 'Home', icon: Icons.home),
               ZveltNavItem(label: 'Train', icon: Icons.fitness_center),
-              ZveltNavItem(label: 'Social', icon: Icons.people),
-              ZveltNavItem(label: 'Stats', icon: Icons.bar_chart),
-              ZveltNavItem(label: 'Profile', icon: Icons.person),
+              ZveltNavItem(label: 'Feed', icon: Icons.people),
+              ZveltNavItem(label: 'Nutrition', icon: Icons.restaurant),
             ],
           ),
         ),
@@ -207,7 +207,7 @@ void main() {
           .where((s) => s.properties.button == true)
           .map((s) => s.properties.label)
           .toSet();
-      for (final label in ['Home', 'Train', 'Social', 'Stats']) {
+      for (final label in ['Home', 'Train', 'Feed', 'Nutrition']) {
         expect(
           navSemantics,
           contains('$label tab'),
@@ -224,12 +224,12 @@ void main() {
           ZveltMainNavBar(
             currentIndex: 1,
             onTap: (_) {},
+            onCenterTap: () {},
             items: const [
               ZveltNavItem(label: 'Home', icon: Icons.home),
               ZveltNavItem(label: 'Train', icon: Icons.fitness_center),
-              ZveltNavItem(label: 'Social', icon: Icons.people),
-              ZveltNavItem(label: 'Stats', icon: Icons.bar_chart),
-              ZveltNavItem(label: 'Profile', icon: Icons.person),
+              ZveltNavItem(label: 'Feed', icon: Icons.people),
+              ZveltNavItem(label: 'Nutrition', icon: Icons.restaurant),
             ],
           ),
         ),
@@ -259,8 +259,8 @@ void main() {
       handle.dispose();
     });
 
-    // The center Play FAB + ZveltQuickActionsHeroTarget were removed in the
-    // light redesign (5 equal tabs, no FAB) — their a11y tests went with them.
+    // The nav is 4 destinations + a center ⚡ Quick-Start action; the center
+    // button carries its own "Start — quick start" semantic label.
   });
 
   group('Large textScaleFactor survival (1.6x)', () {

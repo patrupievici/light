@@ -27,6 +27,7 @@ import '../../services/settings_store.dart';
 import '../../services/cardio_flow_helper.dart';
 import '../../services/route_tracker.dart';
 import '../../widgets/map_metrics_overlay.dart';
+import '../../widgets/weight_jump_note_sheet.dart';
 import 'package:uuid/uuid.dart';
 import 'xp_complete_screen.dart';
 import 'workout_tracker_screen.dart';
@@ -1318,41 +1319,61 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
       // creating duplicate sets when the network blip resolves.
       final clientSetId = const Uuid().v4();
       final we = _workoutExercises[_currentExIdx];
-      try {
-        await _workoutService.addSet(
-          _workoutId!,
-          we.id,
-          weightKg: _currentWeightKg,
-          reps: _currentReps,
-          rpe: _currentRpe,
-          clientSetId: clientSetId,
-        );
-        await _saveDraftSnapshot();
-      } catch (_) {
-        // Honor offline-first: enqueue the set and tell the user it'll sync.
-        // Coordinator's connectivity listener flushes automatically on reconnect.
-        await OfflineSyncCoordinator.instance.enqueue(
-          PendingSetEntry(
-            workoutId: _workoutId!,
-            weId: we.id,
+      // Anti-cheat retry loop: a >2× weight jump vs the recent personal max is
+      // rejected until a justification note is attached. On cancel we stay on
+      // this set (don't advance) so the user can adjust or note it.
+      String? note;
+      var cancelled = false;
+      var done = false;
+      while (!done && !cancelled) {
+        try {
+          await _workoutService.addSet(
+            _workoutId!,
+            we.id,
             weightKg: _currentWeightKg,
             reps: _currentReps,
             rpe: _currentRpe,
             clientSetId: clientSetId,
-          ),
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Saved offline — will sync when back online.'),
-              backgroundColor: ZveltTokens.warn,
+            note: note,
+          );
+          await _saveDraftSnapshot();
+          done = true;
+        } on WeightJumpNoteRequiredException catch (ex) {
+          if (!mounted) return;
+          final entered = await showWeightJumpNoteSheet(context, message: ex.message);
+          if (entered == null) {
+            cancelled = true;
+          } else {
+            note = entered;
+          }
+        } catch (_) {
+          // Honor offline-first: enqueue the set (with any note) and tell the
+          // user it'll sync. Coordinator flushes automatically on reconnect.
+          await OfflineSyncCoordinator.instance.enqueue(
+            PendingSetEntry(
+              workoutId: _workoutId!,
+              weId: we.id,
+              weightKg: _currentWeightKg,
+              reps: _currentReps,
+              rpe: _currentRpe,
+              clientSetId: clientSetId,
+              note: note,
             ),
           );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Saved offline — will sync when back online.'),
+                backgroundColor: ZveltTokens.warn,
+              ),
+            );
+          }
+          await _saveDraftSnapshot();
+          done = true;
         }
-        await _saveDraftSnapshot();
-      } finally {
-        if (mounted) setState(() => _loggingSet = false);
       }
+      if (mounted) setState(() => _loggingSet = false);
+      if (cancelled) return; // user declined the note → stay on this set
     }
 
     final ex = presetEx;

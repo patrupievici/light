@@ -6,17 +6,23 @@ import '../../models/social_challenge.dart';
 import '../../models/social_feed_post.dart';
 import '../../services/_crash_reporter.dart';
 import '../../services/feed_refresh_notifier.dart';
+import '../../services/auth_service.dart';
 import '../../services/social_challenge_service.dart';
 import '../../services/social_feed_service.dart';
+import '../../services/stories_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/social_challenge_card.dart';
 import '../../widgets/social_feed_post_card.dart';
+import '../../widgets/stories_tray.dart';
 import '../../widgets/zvelt_empty_state.dart';
 import '../../widgets/zvelt_error_state.dart';
 import 'circle_screen.dart';
 import 'create_challenge_sheet.dart';
 import 'gallery_screen.dart';
 import 'challenges_screen.dart';
+import 'discover_rooms_screen.dart';
+import 'story_composer_screen.dart';
+import 'story_viewer_screen.dart';
 import '../workouts/post_workout_screen.dart';
 
 class SocialPlusScreen extends StatefulWidget {
@@ -29,9 +35,16 @@ class SocialPlusScreen extends StatefulWidget {
 class _SocialPlusScreenState extends State<SocialPlusScreen> {
   final _feedService = SocialFeedService();
   final _challengeService = SocialChallengeService();
+  final _storiesService = StoriesService();
+  final _authService = AuthService();
 
   List<SocialFeedPost> _posts = [];
   List<SocialChallenge> _challenges = [];
+
+  // Ephemeral 24h stories shown in the top rail. Loaded separately from (and
+  // never blocking) the main feed — a stories failure leaves an empty rail.
+  List<StoryAuthorGroup> _storyGroups = const [];
+  String? _meId;
   bool _loading = true;
   String? _error;
   SocialFeedException? _feedError;
@@ -185,6 +198,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
         _loading = false;
       });
       _loadHeroParticipants(gen);
+      _loadStories(gen);
     } on SocialFeedException catch (e) {
       if (!mounted || gen != _loadGen) return;
       setState(() {
@@ -201,6 +215,104 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       });
       _snackIfContentVisible("Couldn't refresh the feed.");
     }
+  }
+
+  /// Loads the stories rail out-of-band so it never blocks (or breaks) the main
+  /// feed. Resolves the current user id once so the rail can flag "your story"
+  /// and the viewer can offer delete.
+  Future<void> _loadStories(int gen) async {
+    try {
+      final results = await Future.wait([
+        _storiesService.getFeed(),
+        if (_meId == null) _authService.getCurrentUserId() else Future.value(_meId),
+      ]);
+      if (!mounted || gen != _loadGen) return;
+      final stories = results[0] as List<Story>;
+      final meId = results.length > 1 ? results[1] as String? : _meId;
+      setState(() {
+        _meId = meId;
+        _storyGroups = groupStoriesByAuthor(stories, meId: meId);
+      });
+    } catch (e, st) {
+      // Stories are non-critical — log and leave the rail empty.
+      reportError(e, st, reason: 'social:loadStories');
+    }
+  }
+
+  Future<void> _openStoryComposer() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => StoryComposerScreen(service: _storiesService)),
+    );
+    if (created == true && mounted) _loadStories(_loadGen);
+  }
+
+  void _openDiscoverRooms() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const DiscoverRoomsScreen()),
+    );
+  }
+
+  /// Always-visible entry into "Camere publice" (public rooms / official rooms).
+  Widget _buildRoomsEntry() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+      child: Material(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+          onTap: _openDiscoverRooms,
+          child: Padding(
+            padding: const EdgeInsets.all(ZveltTokens.s3),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(ZveltTokens.s3),
+                  decoration: BoxDecoration(
+                    color: ZveltTokens.brandTint.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                  ),
+                  child: const Icon(AppIcons.globe, color: ZveltTokens.brand, size: 20),
+                ),
+                const SizedBox(width: ZveltTokens.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Public rooms',
+                          style: ZType.bodyM.copyWith(
+                              color: ZveltTokens.text, fontWeight: FontWeight.w700)),
+                      Text('Join public challenges and official rooms',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ZType.bodyS.copyWith(color: ZveltTokens.text3, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openStoryGroup(int groupIndex) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => StoryViewerScreen(
+          groups: _storyGroups,
+          initialGroup: groupIndex,
+          service: _storiesService,
+          meId: _meId,
+          onChanged: () {
+            if (mounted) _loadStories(_loadGen);
+          },
+        ),
+      ),
+    );
   }
 
   /// Background-refresh failures with content on screen get a snackbar —
@@ -410,7 +522,15 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                       controller: _scrollController,
                       slivers: [
                         SliverToBoxAdapter(child: _buildHeader()),
+                        SliverToBoxAdapter(
+                          child: StoriesTray(
+                            groups: _storyGroups,
+                            onAddStory: _openStoryComposer,
+                            onOpenGroup: _openStoryGroup,
+                          ),
+                        ),
                         SliverToBoxAdapter(child: _buildRaceHeroCard()),
+                        SliverToBoxAdapter(child: _buildRoomsEntry()),
                         SliverToBoxAdapter(child: _buildFeedControls()),
                         if (_challenges.isNotEmpty) ...[
                           SliverToBoxAdapter(child: _buildChallengeHeader()),

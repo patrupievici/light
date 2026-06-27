@@ -41,6 +41,42 @@ class MuscleStatus {
   }
 }
 
+/// Per-muscle LEVEL (from GET /v1/me/muscle-levels): volume-RPG + strength.
+/// Keyed by the same SVG slug as [MuscleStatus] so the map can pair them.
+class MuscleLevel {
+  const MuscleLevel({
+    required this.slug,
+    required this.level,
+    required this.volumeXp,
+    required this.volumeKg,
+    required this.workSets,
+    required this.bestLp,
+    required this.tier,
+    required this.lastTrainedAt,
+  });
+
+  final String slug;
+  final int level;
+  final int volumeXp, volumeKg, workSets, bestLp;
+  final String tier;
+  final DateTime? lastTrainedAt;
+
+  static int _i(Object? v) => v is num ? v.toInt() : 0;
+
+  static MuscleLevel fromJson(Map<String, dynamic> j) => MuscleLevel(
+        slug: j['slug'] as String? ?? '',
+        level: _i(j['level']),
+        volumeXp: _i(j['volumeXp']),
+        volumeKg: _i(j['volumeKg']),
+        workSets: _i(j['workSets']),
+        bestLp: _i(j['bestLp']),
+        tier: j['tier'] as String? ?? 'Iron',
+        lastTrainedAt: j['lastTrainedAt'] != null
+            ? DateTime.tryParse(j['lastTrainedAt'] as String)
+            : null,
+      );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RECOVERY TIMES (hours) — based on NSCA guidelines
 // ─────────────────────────────────────────────────────────────────────────────
@@ -268,6 +304,30 @@ class MuscleRecoveryService {
       }));
     } catch (e) {
       debugPrint('[MuscleRecovery._saveCache] best-effort skip: $e');
+    }
+  }
+
+  /// Per-muscle levels (volume-RPG + strength), keyed by SVG slug. Trained
+  /// muscles only by default. Returns {} on any error / signed-out.
+  Future<Map<String, MuscleLevel>> getMuscleLevels({int? windowDays}) async {
+    final token = await _auth.getAccessToken();
+    if (token == null) return {};
+    try {
+      final qp = <String, String>{if (windowDays != null) 'window': '$windowDays'};
+      final uri = Uri.parse('$v1Base/me/muscle-levels')
+          .replace(queryParameters: qp.isEmpty ? null : qp);
+      final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'}).withTimeout();
+      if (res.statusCode != 200) return {};
+      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
+      final out = <String, MuscleLevel>{};
+      for (final e in data.whereType<Map>()) {
+        final m = MuscleLevel.fromJson(Map<String, dynamic>.from(e));
+        if (m.slug.isNotEmpty) out[m.slug] = m;
+      }
+      return out;
+    } catch (e, st) {
+      reportError(e, st, reason: 'muscle-levels:fetch');
+      return {};
     }
   }
 

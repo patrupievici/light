@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { getUserDisplayHints } from '../lib/user-display'
-import { decodePostPhotoBase64, savePostPhoto } from '../lib/post-photo'
+import { decodePostPhotoBase64, saveStoryPhoto, deleteStoryPhoto } from '../lib/post-photo'
 import { acceptedFriendIds } from '../lib/friendships'
 
 const CreateStorySchema = z.object({
@@ -39,7 +39,7 @@ export async function storyRoutes(app: FastifyInstance) {
     if (imageBase64) {
       try {
         const buf = decodePostPhotoBase64(imageBase64)
-        const rel = await savePostPhoto(story.id, buf)
+        const rel = await saveStoryPhoto(story.id, buf)
         await prisma.story.update({ where: { id: story.id }, data: { imageUrl: rel } })
         return reply.code(201).send({ data: { ...story, imageUrl: rel } })
       } catch (err) {
@@ -142,6 +142,9 @@ export async function storyRoutes(app: FastifyInstance) {
     if (story.userId !== me) return reply.code(403).send({ error: 'FORBIDDEN', message: 'Nu poți șterge story-ul altcuiva', requestId: request.id })
 
     await prisma.story.delete({ where: { id } })
+    // Best-effort: remove the on-disk photo too so a manual delete doesn't leave
+    // an orphaned file for the TTL cron to never reach (the row is already gone).
+    if (story.imageUrl) await deleteStoryPhoto(story.imageUrl)
     return reply.code(204).send()
   })
 }

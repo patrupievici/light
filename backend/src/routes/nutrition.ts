@@ -112,17 +112,29 @@ function usableUsdaFoodCount(parsed: unknown): number {
 }
 
 /**
- * Splice Open Food Facts fallback rows into a USDA-shaped search response. OFF
- * is a strict fallback: it is only queried when USDA yields no usable hit, and
- * its rows are appended AFTER any USDA rows so the primary source always wins.
- * On any OFF failure the original USDA response is returned unchanged.
+ * Minimum usable USDA hits before we SKIP the Open Food Facts merge. Below this,
+ * OFF is queried and its rows appended — this is the EU-coverage fix: a search
+ * like "Nutella" often returns one generic USDA spread entry (so the old
+ * `> 0`-only fallback hid OFF entirely), while OFF carries the actual branded
+ * EU product. USDA rows still come first (clean generic macros); OFF fills the
+ * branded/European long tail. When USDA already returns a rich page we skip OFF
+ * to avoid the extra call.
+ */
+const MIN_USDA_HITS_BEFORE_OFF = 8
+
+/**
+ * Splice Open Food Facts rows into a USDA-shaped search response. OFF rows are
+ * appended AFTER any USDA rows so clean generic macros stay on top, but OFF is
+ * now merged whenever USDA is thin (< MIN_USDA_HITS_BEFORE_OFF) — not only when
+ * USDA is empty — so European branded products are findable. On any OFF failure
+ * the original USDA response is returned unchanged.
  */
 async function withOffFallback(
   parsed: unknown,
   query: string,
   log: FastifyInstance['log'],
 ): Promise<unknown> {
-  if (usableUsdaFoodCount(parsed) > 0) return parsed
+  if (usableUsdaFoodCount(parsed) >= MIN_USDA_HITS_BEFORE_OFF) return parsed
   let offFoods: UsdaShapedFood[] = []
   try {
     offFoods = await searchOffByName(query, { pageSize: 25 })

@@ -47,6 +47,7 @@ export async function createWorkoutFromPlanned(
     throw new PlannedConvertError('NO_EXERCISES', 'Planned workout has no exercises (likely a rest day)')
   }
 
+  type SeedDetail = { weightKg?: number | null; reps?: number }
   type PlannedEx = {
     name?: string
     sets?: number
@@ -55,6 +56,10 @@ export async function createWorkoutFromPlanned(
     exerciseId?: string | null
     suggestedWeightKg?: number | null
     notes?: string
+    /** Program materializer: explicit per-set WORK targets (overrides uniform). */
+    setsDetail?: SeedDetail[]
+    /** Program materializer: warm-up ramp seeded as WARMUP sets before the work sets. */
+    warmups?: SeedDetail[]
   }
   const exercises = rawExercises
     .filter((e): e is PlannedEx => !!e && typeof e === 'object')
@@ -90,20 +95,41 @@ export async function createWorkoutFromPlanned(
         },
       })
 
-      const setCount = clampInt(ex.sets, 1, 10, 3)
-      const reps = clampInt(ex.reps, 1, 50, 8)
-      const weight = typeof ex.suggestedWeightKg === 'number' && ex.suggestedWeightKg >= 0
-        ? ex.suggestedWeightKg
-        : 0
+      // Seed sets: warm-ups first (WARMUP), then the working sets. The working
+      // sets come from an explicit per-set `setsDetail` (percentage waves like
+      // 5/3/1 / nSuns) when present, otherwise a uniform expansion of sets×reps×
+      // weight (the original behavior for AI plans / straight-set programs).
+      type SeedSet = { weightKg: number; reps: number; tag: 'WORK' | 'WARMUP' }
+      const seedSets: SeedSet[] = []
 
-      for (let si = 0; si < setCount; si++) {
+      const cleanWeight = (w: unknown): number =>
+        typeof w === 'number' && Number.isFinite(w) && w >= 0 ? w : 0
+
+      if (Array.isArray(ex.warmups)) {
+        for (const w of ex.warmups) {
+          seedSets.push({ weightKg: cleanWeight(w?.weightKg), reps: clampInt(w?.reps, 1, 50, 5), tag: 'WARMUP' })
+        }
+      }
+
+      if (Array.isArray(ex.setsDetail) && ex.setsDetail.length > 0) {
+        for (const d of ex.setsDetail) {
+          seedSets.push({ weightKg: cleanWeight(d?.weightKg), reps: clampInt(d?.reps, 1, 50, 8), tag: 'WORK' })
+        }
+      } else {
+        const setCount = clampInt(ex.sets, 1, 12, 3)
+        const reps = clampInt(ex.reps, 1, 50, 8)
+        const weight = cleanWeight(ex.suggestedWeightKg)
+        for (let si = 0; si < setCount; si++) seedSets.push({ weightKg: weight, reps, tag: 'WORK' })
+      }
+
+      for (let si = 0; si < seedSets.length; si++) {
         await tx.workoutSet.create({
           data: {
             workoutExerciseId: we.id,
             setIndex: si,
-            weightKg: weight,
-            reps,
-            tag: 'WORK',
+            weightKg: seedSets[si].weightKg,
+            reps: seedSets[si].reps,
+            tag: seedSets[si].tag,
             isCompleted: false,
           },
         })

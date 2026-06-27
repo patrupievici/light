@@ -4,10 +4,17 @@ import '../../models/social_feed_post.dart';
 import '../../services/nutrition_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/social_feed_service.dart';
+import '../../services/muscle_recovery_service.dart';
 import '../../services/workout_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
+import '../../widgets/muscle_map_widget.dart';
+import '../../widgets/z/z_card.dart';
+import '../../widgets/z/z_collapsible_chart_card.dart';
+import '../../widgets/charts/cumulative_volume_card.dart';
+import '../../widgets/charts/recent_prs_card.dart';
+import '../../widgets/charts/workout_consistency_heatmap.dart';
 import '../workouts/workout_tracker_screen.dart';
 
 /// HOME — the "today dashboard" from Razvan's light redesign (brief §7, mockup
@@ -42,8 +49,10 @@ class _HomeTabState extends State<HomeTab> {
   final _profile = ProfileService();
   final _workouts = WorkoutService();
   final _feed = SocialFeedService();
+  final _recovery = MuscleRecoveryService();
 
   bool _loading = true;
+  Map<String, MuscleLevel> _muscleLevels = const {};
 
   String _displayName = 'Athlete';
   double _kcal = 0, _kcalGoal = 0;
@@ -82,6 +91,7 @@ class _HomeTabState extends State<HomeTab> {
       _safe(NutritionService.instance.getGoals()),
       _safe(_workouts.getWorkoutCalendar(from: monday, to: sunday)),
       _safe(_feed.getFeed()),
+      _safe(_recovery.getMuscleLevels(windowDays: 90)),
     ]);
     if (!mounted) return;
 
@@ -90,6 +100,7 @@ class _HomeTabState extends State<HomeTab> {
     final goals = results[2] as NutritionGoals?;
     final calendar = (results[3] as List<DateTime>?) ?? const [];
     final posts = (results[4] as List<SocialFeedPost>?) ?? const [];
+    final muscleLevels = (results[5] as Map<String, MuscleLevel>?) ?? const {};
 
     final profile = me?['profile'] as Map<String, dynamic>?;
     final name = profile?['displayName'] as String?;
@@ -121,6 +132,7 @@ class _HomeTabState extends State<HomeTab> {
       _weekCount = week.where((e) => e).length;
       _weekGoal = (daysPerWeek != null && daysPerWeek > 0) ? daysPerWeek : 5;
       _workoutToday = workedOutToday;
+      _muscleLevels = muscleLevels;
       // "Friend activity" must be a FRIEND's post — the friends feed includes
       // the user's own posts, so drop those before taking the latest.
       final friendPosts =
@@ -191,6 +203,14 @@ class _HomeTabState extends State<HomeTab> {
             const _Eyebrow('THIS WEEK'),
             const SizedBox(height: ZveltTokens.s3),
             _weekCard(),
+            const SizedBox(height: ZveltTokens.s6),
+            const _Eyebrow('MUSCLES'),
+            const SizedBox(height: ZveltTokens.s3),
+            _muscleSection(),
+            const SizedBox(height: ZveltTokens.s6),
+            const _Eyebrow('PROGRESS'),
+            const SizedBox(height: ZveltTokens.s3),
+            _progressCharts(),
             const SizedBox(height: ZveltTokens.s6),
             const _Eyebrow('FRIEND ACTIVITY'),
             const SizedBox(height: ZveltTokens.s3),
@@ -406,6 +426,54 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
+  // ── Muscle map + per-muscle levels ─────────────────────────────────────────
+  Widget _muscleSection() {
+    final levels = _muscleLevels.values.where((m) => m.level > 0).toList()
+      ..sort((a, b) => b.level.compareTo(a.level));
+    return Column(
+      children: [
+        const MuscleMapCard(),
+        if (levels.isNotEmpty) ...[
+          const SizedBox(height: ZveltTokens.cardGap),
+          SizedBox(
+            height: 66,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: levels.length > 8 ? 8 : levels.length,
+              separatorBuilder: (_, __) => const SizedBox(width: ZveltTokens.s2),
+              itemBuilder: (_, i) => _MuscleLevelChip(level: levels[i]),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Collapsible progress charts (open on tap) ──────────────────────────────
+  Widget _progressCharts() {
+    return const Column(
+      children: [
+        ZCollapsibleChartCard(
+          title: 'Volum cumulativ',
+          icon: AppIcons.chart_line_up,
+          child: CumulativeVolumeCard(),
+        ),
+        SizedBox(height: ZveltTokens.cardGap),
+        ZCollapsibleChartCard(
+          title: 'Recorduri recente',
+          icon: AppIcons.trophy,
+          child: RecentPrsCard(),
+        ),
+        SizedBox(height: ZveltTokens.cardGap),
+        ZCollapsibleChartCard(
+          title: 'Consistență',
+          icon: AppIcons.calendar_check,
+          child: WorkoutConsistencyHeatmap(),
+        ),
+      ],
+    );
+  }
+
   // ── Latest friend activity ─────────────────────────────────────────────────
   Widget _friendCard() {
     final post = _friendPost;
@@ -515,6 +583,41 @@ class _Eyebrow extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) => Text(text, style: ZType.eyebrow);
+}
+
+class _MuscleLevelChip extends StatelessWidget {
+  const _MuscleLevelChip({required this.level});
+  final MuscleLevel level;
+
+  String get _label {
+    final s = level.slug.replaceAll('-', ' ').trim();
+    return s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ZCard(
+      padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s3, vertical: ZveltTokens.s2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+                color: ZveltTokens.brandTint, borderRadius: BorderRadius.circular(ZveltTokens.rPill)),
+            child: Text('Lvl ${level.level}', style: ZType.monoXS.copyWith(color: ZveltTokens.brandDeep)),
+          ),
+          const SizedBox(height: 3),
+          Text(_label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ZType.bodyS.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w600, fontSize: 12)),
+          Text(level.tier, style: ZType.monoXS.copyWith(color: ZveltTokens.text3)),
+        ],
+      ),
+    );
+  }
 }
 
 class _Card extends StatelessWidget {

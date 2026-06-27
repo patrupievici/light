@@ -586,6 +586,204 @@ class NutritionXpClaimLine {
   final String macro;
 }
 
+double? _nullableDouble(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toDouble();
+  return double.tryParse(v.toString());
+}
+
+/// One ingredient in a recipe (macros canonical per-100g, like FoodItem).
+class RecipeIngredient {
+  const RecipeIngredient({
+    required this.name,
+    required this.grams,
+    required this.caloriesPer100g,
+    required this.proteinPer100g,
+    required this.carbsPer100g,
+    required this.fatPer100g,
+    this.foodId,
+  });
+
+  final String name;
+  final double grams;
+  final double caloriesPer100g, proteinPer100g, carbsPer100g, fatPer100g;
+  final String? foodId;
+
+  double get calories => caloriesPer100g * grams / 100;
+  double get protein => proteinPer100g * grams / 100;
+  double get carbs => carbsPer100g * grams / 100;
+  double get fat => fatPer100g * grams / 100;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'grams': grams,
+        if (foodId != null) 'foodId': foodId,
+        'caloriesPer100g': caloriesPer100g,
+        'proteinPer100g': proteinPer100g,
+        'carbsPer100g': carbsPer100g,
+        'fatPer100g': fatPer100g,
+      };
+
+  static RecipeIngredient fromJson(Map<String, dynamic> j) => RecipeIngredient(
+        name: j['name'] as String? ?? '',
+        grams: FoodItem._d(j['grams']),
+        caloriesPer100g: FoodItem._d(j['caloriesPer100g']),
+        proteinPer100g: FoodItem._d(j['proteinPer100g']),
+        carbsPer100g: FoodItem._d(j['carbsPer100g']),
+        fatPer100g: FoodItem._d(j['fatPer100g']),
+        foodId: j['foodId'] as String?,
+      );
+
+  static RecipeIngredient fromFood(FoodItem f, double grams) => RecipeIngredient(
+        name: f.name,
+        grams: grams,
+        caloriesPer100g: f.caloriesPer100g,
+        proteinPer100g: f.proteinPer100g,
+        carbsPer100g: f.carbsPer100g,
+        fatPer100g: f.fatPer100g,
+        foodId: f.id,
+      );
+}
+
+/// A saved multi-ingredient recipe. Per-serving macros derived from totals.
+class Recipe {
+  const Recipe({
+    required this.id,
+    required this.name,
+    required this.servings,
+    required this.ingredients,
+    required this.totalCalories,
+    required this.totalProtein,
+    required this.totalCarbs,
+    required this.totalFat,
+  });
+
+  final String id, name;
+  final int servings;
+  final List<RecipeIngredient> ingredients;
+  final double totalCalories, totalProtein, totalCarbs, totalFat;
+
+  double get perServingCalories => servings > 0 ? totalCalories / servings : totalCalories;
+  double get perServingProtein => servings > 0 ? totalProtein / servings : totalProtein;
+  double get perServingCarbs => servings > 0 ? totalCarbs / servings : totalCarbs;
+  double get perServingFat => servings > 0 ? totalFat / servings : totalFat;
+
+  /// Client-side apply: build a diary entry for `servingsToLog` servings. The
+  /// logged amount is encoded as a 100g "food" whose per-100g equals the macros
+  /// for those servings, so MealEntry's grams=100 math reproduces them exactly.
+  MealEntry toMealEntry({required String meal, double servingsToLog = 1}) {
+    final food = FoodItem(
+      id: 'recipe:$id',
+      name: name,
+      brand: 'Rețetă',
+      caloriesPer100g: perServingCalories * servingsToLog,
+      proteinPer100g: perServingProtein * servingsToLog,
+      fatPer100g: perServingFat * servingsToLog,
+      carbsPer100g: perServingCarbs * servingsToLog,
+    );
+    return MealEntry(
+      id: 'r${DateTime.now().microsecondsSinceEpoch}',
+      food: food,
+      grams: 100,
+      meal: meal,
+      loggedAt: DateTime.now(),
+    );
+  }
+
+  static Recipe fromJson(Map<String, dynamic> j) => Recipe(
+        id: j['id'] as String,
+        name: j['name'] as String? ?? 'Rețetă',
+        servings: (j['servings'] as num?)?.toInt() ?? 1,
+        ingredients: ((j['ingredientsJson'] ?? j['ingredients']) as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map((e) => RecipeIngredient.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+        totalCalories: FoodItem._d(j['totalCalories']),
+        totalProtein: FoodItem._d(j['totalProtein']),
+        totalCarbs: FoodItem._d(j['totalCarbs']),
+        totalFat: FoodItem._d(j['totalFat']),
+      );
+}
+
+/// One item in a saved meal template (the backend NutritionMealTemplate item shape).
+class MealTemplateItem {
+  const MealTemplateItem({
+    required this.name,
+    this.grams,
+    this.calories,
+    this.proteinG,
+    this.carbsG,
+    this.fatG,
+    this.meal,
+  });
+
+  final String name;
+  final double? grams, calories, proteinG, carbsG, fatG;
+  final String? meal;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        if (grams != null) 'grams': grams,
+        if (calories != null) 'calories': calories,
+        if (proteinG != null) 'proteinG': proteinG,
+        if (carbsG != null) 'carbsG': carbsG,
+        if (fatG != null) 'fatG': fatG,
+        if (meal != null) 'meal': meal,
+      };
+
+  static MealTemplateItem fromJson(Map<String, dynamic> j) => MealTemplateItem(
+        name: j['name'] as String? ?? '',
+        grams: _nullableDouble(j['grams']),
+        calories: _nullableDouble(j['calories']),
+        proteinG: _nullableDouble(j['proteinG']),
+        carbsG: _nullableDouble(j['carbsG']),
+        fatG: _nullableDouble(j['fatG']),
+        meal: j['meal'] as String?,
+      );
+
+  /// Client-side apply: derive per-100g from grams+totals, like the backend's
+  /// templateItemToDiaryEntry, and build a diary entry.
+  MealEntry toMealEntry(String fallbackMeal) {
+    final g = (grams != null && grams! > 0) ? grams! : 100.0;
+    final per = g > 0 ? 100 / g : 1.0;
+    final food = FoodItem(
+      id: 'tpl:$name',
+      name: name,
+      brand: 'Mesele mele',
+      caloriesPer100g: (calories ?? 0) * per,
+      proteinPer100g: (proteinG ?? 0) * per,
+      fatPer100g: (fatG ?? 0) * per,
+      carbsPer100g: (carbsG ?? 0) * per,
+    );
+    return MealEntry(
+      id: 't${DateTime.now().microsecondsSinceEpoch}_${name.hashCode}',
+      food: food,
+      grams: g,
+      meal: meal ?? fallbackMeal,
+      loggedAt: DateTime.now(),
+    );
+  }
+}
+
+/// A saved meal (multiple foods) for one-tap re-logging.
+class MealTemplate {
+  const MealTemplate({required this.id, required this.name, required this.items});
+  final String id, name;
+  final List<MealTemplateItem> items;
+
+  double get totalCalories => items.fold(0, (s, i) => s + (i.calories ?? 0));
+  int get itemCount => items.length;
+
+  static MealTemplate fromJson(Map<String, dynamic> j) => MealTemplate(
+        id: j['id'] as String,
+        name: j['name'] as String? ?? '',
+        items: (j['items'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map((e) => MealTemplateItem.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+      );
+}
+
 class NutritionService {
   NutritionService._([AuthService? auth]) : _auth = auth ?? AuthService();
   static final NutritionService instance = NutritionService._();
@@ -1131,6 +1329,289 @@ class NutritionService {
     ).withTimeout();
     if (res.statusCode != 200) {
       throw Exception(_nutritionApiErrorDetail(res));
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // MyFitnessPal-parity: custom foods, favorites, recipes, recent, templates.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  Future<Map<String, String>?> _jsonAuthHeaders() async {
+    final token = await _auth.getAccessToken();
+    if (token == null) return null;
+    return {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'};
+  }
+
+  Map<String, dynamic> _customFoodBody({
+    required String name,
+    String? brand,
+    required double caloriesPer100g,
+    required double proteinPer100g,
+    required double carbsPer100g,
+    required double fatPer100g,
+    double? servingGrams,
+    String? servingLabel,
+  }) =>
+      {
+        'name': name,
+        if (brand != null && brand.isNotEmpty) 'brand': brand,
+        'caloriesPer100g': caloriesPer100g,
+        'proteinPer100g': proteinPer100g,
+        'carbsPer100g': carbsPer100g,
+        'fatPer100g': fatPer100g,
+        if (servingGrams != null) 'servingGrams': servingGrams,
+        if (servingLabel != null && servingLabel.isNotEmpty) 'servingLabel': servingLabel,
+      };
+
+  /// User's custom food catalog. `FoodItem.id` is `custom:<uuid>`.
+  Future<List<FoodItem>> getCustomFoods() async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return [];
+    try {
+      final res = await http.get(Uri.parse('$v1Base/nutrition/custom-foods'), headers: headers).withTimeout();
+      if (res.statusCode != 200) return [];
+      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
+      return data.whereType<Map>().map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e))).toList();
+    } catch (e, st) {
+      reportError(e, st, reason: 'nutrition:custom-foods-list');
+      return [];
+    }
+  }
+
+  Future<FoodItem> createCustomFood({
+    required String name,
+    String? brand,
+    required double caloriesPer100g,
+    required double proteinPer100g,
+    required double carbsPer100g,
+    required double fatPer100g,
+    double? servingGrams,
+    String? servingLabel,
+  }) async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    final res = await http
+        .post(Uri.parse('$v1Base/nutrition/custom-foods'),
+            headers: headers,
+            body: jsonEncode(_customFoodBody(
+              name: name,
+              brand: brand,
+              caloriesPer100g: caloriesPer100g,
+              proteinPer100g: proteinPer100g,
+              carbsPer100g: carbsPer100g,
+              fatPer100g: fatPer100g,
+              servingGrams: servingGrams,
+              servingLabel: servingLabel,
+            )))
+        .withTimeout();
+    if (res.statusCode != 201) throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    return FoodItem.fromJson((jsonDecode(res.body) as Map<String, dynamic>)['food'] as Map<String, dynamic>);
+  }
+
+  /// `customId` is the raw uuid (strip the `custom:` prefix from FoodItem.id).
+  Future<FoodItem> updateCustomFood(
+    String customId, {
+    required String name,
+    String? brand,
+    required double caloriesPer100g,
+    required double proteinPer100g,
+    required double carbsPer100g,
+    required double fatPer100g,
+    double? servingGrams,
+    String? servingLabel,
+  }) async {
+    final id = customId.startsWith('custom:') ? customId.substring(7) : customId;
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    final res = await http
+        .put(Uri.parse('$v1Base/nutrition/custom-foods/$id'),
+            headers: headers,
+            body: jsonEncode(_customFoodBody(
+              name: name,
+              brand: brand,
+              caloriesPer100g: caloriesPer100g,
+              proteinPer100g: proteinPer100g,
+              carbsPer100g: carbsPer100g,
+              fatPer100g: fatPer100g,
+              servingGrams: servingGrams,
+              servingLabel: servingLabel,
+            )))
+        .withTimeout();
+    if (res.statusCode != 200) throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    return FoodItem.fromJson((jsonDecode(res.body) as Map<String, dynamic>)['food'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteCustomFood(String customId) async {
+    final id = customId.startsWith('custom:') ? customId.substring(7) : customId;
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return;
+    final res =
+        await http.delete(Uri.parse('$v1Base/nutrition/custom-foods/$id'), headers: headers).withTimeout();
+    if (res.statusCode != 204 && res.statusCode != 200) {
+      throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    }
+  }
+
+  // ── Favorites ──────────────────────────────────────────────────────────────
+  Future<List<FoodItem>> getFavoriteFoods() async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return [];
+    try {
+      final res = await http.get(Uri.parse('$v1Base/nutrition/favorite-foods'), headers: headers).withTimeout();
+      if (res.statusCode != 200) return [];
+      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
+      return data.whereType<Map>().map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e))).toList();
+    } catch (e, st) {
+      reportError(e, st, reason: 'nutrition:favorites-list');
+      return [];
+    }
+  }
+
+  Future<void> addFavorite(FoodItem f) async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return;
+    final res = await http
+        .post(Uri.parse('$v1Base/nutrition/favorite-foods'),
+            headers: headers,
+            body: jsonEncode({
+              'foodId': f.id,
+              'name': f.name,
+              if (f.brand.isNotEmpty) 'brand': f.brand,
+              'caloriesPer100g': f.caloriesPer100g,
+              'proteinPer100g': f.proteinPer100g,
+              'carbsPer100g': f.carbsPer100g,
+              'fatPer100g': f.fatPer100g,
+              if (f.servingGrams != null) 'servingGrams': f.servingGrams,
+            }))
+        .withTimeout();
+    if (res.statusCode != 201) throw NutritionPlanException(_nutritionApiErrorDetail(res));
+  }
+
+  Future<void> removeFavorite(String foodId) async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return;
+    await http
+        .delete(Uri.parse('$v1Base/nutrition/favorite-foods/${Uri.encodeComponent(foodId)}'), headers: headers)
+        .withTimeout();
+  }
+
+  // ── Recipes ────────────────────────────────────────────────────────────────
+  Future<List<Recipe>> getRecipes() async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return [];
+    try {
+      final res = await http.get(Uri.parse('$v1Base/nutrition/recipes'), headers: headers).withTimeout();
+      if (res.statusCode != 200) return [];
+      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
+      return data.whereType<Map>().map((e) => Recipe.fromJson(Map<String, dynamic>.from(e))).toList();
+    } catch (e, st) {
+      reportError(e, st, reason: 'nutrition:recipes-list');
+      return [];
+    }
+  }
+
+  Future<Recipe> createRecipe({
+    required String name,
+    required int servings,
+    required List<RecipeIngredient> ingredients,
+  }) async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    final res = await http
+        .post(Uri.parse('$v1Base/nutrition/recipes'),
+            headers: headers,
+            body: jsonEncode({
+              'name': name,
+              'servings': servings,
+              'ingredients': ingredients.map((i) => i.toJson()).toList(),
+            }))
+        .withTimeout();
+    if (res.statusCode != 201) throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    return Recipe.fromJson((jsonDecode(res.body) as Map<String, dynamic>)['recipe'] as Map<String, dynamic>);
+  }
+
+  Future<Recipe> updateRecipe(
+    String id, {
+    required String name,
+    required int servings,
+    required List<RecipeIngredient> ingredients,
+  }) async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    final res = await http
+        .put(Uri.parse('$v1Base/nutrition/recipes/$id'),
+            headers: headers,
+            body: jsonEncode({
+              'name': name,
+              'servings': servings,
+              'ingredients': ingredients.map((i) => i.toJson()).toList(),
+            }))
+        .withTimeout();
+    if (res.statusCode != 200) throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    return Recipe.fromJson((jsonDecode(res.body) as Map<String, dynamic>)['recipe'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteRecipe(String id) async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return;
+    final res = await http.delete(Uri.parse('$v1Base/nutrition/recipes/$id'), headers: headers).withTimeout();
+    if (res.statusCode != 204 && res.statusCode != 200) {
+      throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    }
+  }
+
+  // ── Recent foods (derived from diary history) ──────────────────────────────
+  Future<List<FoodItem>> getRecentFoods({int limit = 20}) async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return [];
+    try {
+      final res = await http
+          .get(Uri.parse('$v1Base/nutrition/recent-foods?limit=$limit'), headers: headers)
+          .withTimeout();
+      if (res.statusCode != 200) return [];
+      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
+      return data.whereType<Map>().map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e))).toList();
+    } catch (e, st) {
+      reportError(e, st, reason: 'nutrition:recent-foods');
+      return [];
+    }
+  }
+
+  // ── Meal templates ("Mesele mele") ─────────────────────────────────────────
+  Future<List<MealTemplate>> getMealTemplates() async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return [];
+    try {
+      final res = await http.get(Uri.parse('$v1Base/nutrition/templates'), headers: headers).withTimeout();
+      if (res.statusCode != 200) return [];
+      final list = (jsonDecode(res.body) as Map<String, dynamic>)['templates'] as List<dynamic>? ?? [];
+      return list.whereType<Map>().map((e) => MealTemplate.fromJson(Map<String, dynamic>.from(e))).toList();
+    } catch (e, st) {
+      reportError(e, st, reason: 'nutrition:templates-list');
+      return [];
+    }
+  }
+
+  Future<MealTemplate> createMealTemplate(String name, List<MealTemplateItem> items) async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    final res = await http
+        .post(Uri.parse('$v1Base/nutrition/templates'),
+            headers: headers,
+            body: jsonEncode({'name': name, 'items': items.map((i) => i.toJson()).toList()}))
+        .withTimeout();
+    if (res.statusCode != 201) throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final tpl = body['template'] ?? body;
+    return MealTemplate.fromJson(Map<String, dynamic>.from(tpl as Map));
+  }
+
+  Future<void> deleteMealTemplate(String id) async {
+    final headers = await _jsonAuthHeaders();
+    if (headers == null) return;
+    final res = await http.delete(Uri.parse('$v1Base/nutrition/templates/$id'), headers: headers).withTimeout();
+    if (res.statusCode != 204 && res.statusCode != 200) {
+      throw NutritionPlanException(_nutritionApiErrorDetail(res));
     }
   }
 }

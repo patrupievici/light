@@ -5,21 +5,27 @@ import Fastify from 'fastify'
 // Mock prisma so the REAL visibility gate (loadVisibleChallenge → acceptedFriendIds
 // → prisma.friendship) runs end-to-end.
 const challengeFindUnique = vi.fn()
+const challengeFindMany = vi.fn()
 const friendshipFindMany = vi.fn()
 const participantFindUnique = vi.fn()
 const participantCreate = vi.fn()
 const participantDeleteMany = vi.fn()
 const participantFindMany = vi.fn()
+const participantGroupBy = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
-    challenge: { findUnique: (...a: unknown[]) => challengeFindUnique(...a) },
+    challenge: {
+      findUnique: (...a: unknown[]) => challengeFindUnique(...a),
+      findMany: (...a: unknown[]) => challengeFindMany(...a),
+    },
     friendship: { findMany: (...a: unknown[]) => friendshipFindMany(...a) },
     challengeParticipant: {
       findUnique: (...a: unknown[]) => participantFindUnique(...a),
       create: (...a: unknown[]) => participantCreate(...a),
       deleteMany: (...a: unknown[]) => participantDeleteMany(...a),
       findMany: (...a: unknown[]) => participantFindMany(...a),
+      groupBy: (...a: unknown[]) => participantGroupBy(...a),
     },
   },
 }))
@@ -47,12 +53,85 @@ const PAST = new Date(Date.now() - 86_400_000)
 beforeEach(() => {
   meId = 'me'
   challengeFindUnique.mockReset()
+  challengeFindMany.mockReset()
   friendshipFindMany.mockReset()
   participantFindUnique.mockReset()
   participantCreate.mockReset()
   participantDeleteMany.mockReset()
   participantFindMany.mockReset()
+  participantGroupBy.mockReset()
   friendshipFindMany.mockResolvedValue([]) // no friends unless a test says so
+})
+
+describe('GET /v1/challenges/discover', () => {
+  const officialRow = {
+    id: '00000000-0000-4000-8000-000000000101',
+    creatorId: 'system',
+    kind: 'pullUps',
+    customTitle: null,
+    visibility: 'public',
+    isOfficial: true,
+    targetHint: 'reps',
+    durationDays: 3650,
+    endsAt: new Date('2099-12-31T00:00:00.000Z'),
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    creator: { profile: { username: 'zvelt_official', displayName: 'Zvelt' } },
+  }
+  const userRow = {
+    id: CID,
+    creatorId: 'other',
+    kind: 'custom',
+    customTitle: 'Burpee Bonanza',
+    visibility: 'public',
+    isOfficial: false,
+    targetHint: null,
+    durationDays: 30,
+    endsAt: FUTURE,
+    createdAt: new Date(),
+    creator: { profile: { username: 'bob', displayName: 'Bob' } },
+  }
+
+  it('returns public rooms with isOfficial, participantsCount and joined', async () => {
+    challengeFindMany.mockResolvedValue([officialRow, userRow])
+    participantGroupBy.mockResolvedValue([
+      { challengeId: officialRow.id, _count: { challengeId: 42 } },
+    ])
+    participantFindMany.mockResolvedValue([{ challengeId: userRow.id }]) // I'm in the user room
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/challenges/discover' })
+    expect(res.statusCode).toBe(200)
+    const data = res.json().data as Array<Record<string, unknown>>
+
+    const official = data.find((d) => d.id === officialRow.id)!
+    expect(official.isOfficial).toBe(true)
+    expect(official.title).toBe('Pull-up challenge')
+    expect(official.participantsCount).toBe(42)
+    expect(official.joined).toBe(false)
+
+    const user = data.find((d) => d.id === userRow.id)!
+    expect(user.isOfficial).toBe(false)
+    expect(user.title).toBe('Burpee Bonanza')
+    expect(user.participantsCount).toBe(0) // no group row → 0
+    expect(user.joined).toBe(true)
+
+    // The where-clause restricts to public + active.
+    const where = challengeFindMany.mock.calls[0][0].where
+    expect(where.visibility).toBe('public')
+    expect(where.endsAt.gt).toBeInstanceOf(Date)
+    await app.close()
+  })
+
+  it('returns an empty page (no participant queries) when there are no public rooms', async () => {
+    challengeFindMany.mockResolvedValue([])
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/challenges/discover?page=3&limit=10' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().data).toEqual([])
+    expect(res.json().meta).toMatchObject({ page: 3, limit: 10 })
+    expect(participantGroupBy).not.toHaveBeenCalled()
+    await app.close()
+  })
 })
 
 describe('POST /v1/challenges/:id/join', () => {

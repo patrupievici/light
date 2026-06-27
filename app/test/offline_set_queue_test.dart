@@ -43,6 +43,9 @@ class _FakeWorkouts extends WorkoutService {
   int addCount = 0;
   int updateCount = 0;
   final List<String> updatedSetIds = [];
+  // Notes seen on replay, so a test can assert the anti-cheat justification
+  // rides the offline ADD/UPDATE replay instead of being dropped.
+  final List<String?> seenNotes = [];
 
   @override
   Future<WorkoutSetDto> addSet(
@@ -54,10 +57,12 @@ class _FakeWorkouts extends WorkoutService {
     String tag = 'WORK',
     bool isCompleted = true,
     String? clientSetId,
+    String? note,
   }) async {
     callCount++;
     addCount++;
     seenClientSetIds.add(clientSetId);
+    seenNotes.add(note);
     if (error != null) throw error!;
     return WorkoutSetDto(
       id: 'srv-$callCount',
@@ -78,10 +83,12 @@ class _FakeWorkouts extends WorkoutService {
     int? reps,
     double? rpe,
     bool? isCompleted,
+    String? note,
   }) async {
     callCount++;
     updateCount++;
     updatedSetIds.add(setId);
+    seenNotes.add(note);
     if (error != null) throw error!;
     return WorkoutSetDto(
       id: setId,
@@ -101,6 +108,7 @@ PendingSetEntry _entry({
   int reps = 5,
   double? rpe = 8,
   String tag = 'WORK',
+  String? note,
   String clientSetId = 'cid-1',
   DateTime? queuedAt,
   int retryCount = 0,
@@ -113,6 +121,7 @@ PendingSetEntry _entry({
     reps: reps,
     rpe: rpe,
     tag: tag,
+    note: note,
     clientSetId: clientSetId,
     queuedAt: queuedAt,
     retryCount: retryCount,
@@ -162,6 +171,14 @@ void main() {
       final restored =
           PendingSetEntry.fromJson(_entry(rpe: null).toJson())!;
       expect(restored.rpe, isNull);
+    });
+
+    test('anti-cheat note survives the roundtrip (null stays null)', () {
+      final withNote =
+          PendingSetEntry.fromJson(_entry(note: 'PR with belt').toJson())!;
+      expect(withNote.note, 'PR with belt');
+      final without = PendingSetEntry.fromJson(_entry().toJson())!;
+      expect(without.note, isNull);
     });
 
     test('legacy entry (no clientSetId) derives a DETERMINISTIC id', () {
@@ -237,6 +254,37 @@ void main() {
       expect(await q.pendingCount(), 0);
       // The idempotency token is forwarded to the API (server dedupes on it).
       expect(fake.seenClientSetIds, containsAll(['cid-ok-1', 'cid-ok-2']));
+    });
+
+    test('anti-cheat note rides the replay (re-sent, not dropped)', () async {
+      final fake = _FakeWorkouts();
+      final q = OfflineSetQueue(auth: _FakeAuth(), workouts: fake);
+      await q.enqueue(_entry(clientSetId: 'cid-note', note: 'belt PR'));
+
+      final res = await q.flush();
+
+      expect(res.synced, 1);
+      expect(fake.seenNotes, contains('belt PR'),
+          reason: 'the justification note must survive offline replay');
+    });
+
+    test('WEIGHT_JUMP_REQUIRES_NOTE on replay → DROPPED (cannot prompt offline)',
+        () async {
+      // A queued set the server rejects for a missing note can never succeed
+      // from a background flush — it must be dropped like a 4xx, not retried
+      // forever.
+      final fake =
+          _FakeWorkouts(error: const WeightJumpNoteRequiredException());
+      final q = OfflineSetQueue(auth: _FakeAuth(), workouts: fake);
+      await q.enqueue(_entry());
+
+      final res = await q.flush();
+
+      expect(res.dropped, 1);
+      expect(res.synced, 0);
+      expect(res.deferred, 0);
+      expect(await q.pendingCount(), 0,
+          reason: 'weight-jump rejection is permanent for a background flush');
     });
 
     test('4xx (422) → entry DROPPED, not kept', () async {
