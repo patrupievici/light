@@ -521,5 +521,58 @@ export function programTemplateSummaries() {
     daysPerWeek: t.daysPerWeek,
     sessionsInRotation: t.days.length,
     requiresTrainingMax: (t.trainingMaxLifts?.length ?? 0) > 0,
+    // Card metadata (Liftosaur-style library). Equipment + thumbnails need the
+    // catalog (resolved in the service); these three are pure from the template.
+    exercisesPerDay: exercisesPerDayLabel(t),
+    sessionTime: sessionTimeLabel(t),
+    exerciseNames: templateExerciseNames(t),
   }))
+}
+
+/** Ordered, de-duplicated exercise names across all of a template's days. */
+export function templateExerciseNames(t: ProgramTemplate): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const d of t.days) {
+    for (const s of d.slots) {
+      if (!seen.has(s.exercise)) {
+        seen.add(s.exercise)
+        out.push(s.exercise)
+      }
+    }
+  }
+  return out
+}
+
+/** "3" or "3-5" — slots (exercises) per training day. */
+export function exercisesPerDayLabel(t: ProgramTemplate): string {
+  const counts = t.days.map((d) => d.slots.length)
+  const lo = Math.min(...counts)
+  const hi = Math.max(...counts)
+  return lo === hi ? `${lo}` : `${lo}-${hi}`
+}
+
+/** Per-set count of a slot (nominal for percentage waves). */
+function slotSetCount(s: ProgramSlot): number {
+  if (s.sets.kind === 'straight' || s.sets.kind === 'range') return s.sets.sets
+  switch (s.sets.wave) {
+    case 'nsuns_t1':
+      return 9
+    case 'nsuns_t2':
+      return 8
+    case '531_bbb':
+      return 8 // 3 main + 5 supplemental
+    default:
+      return 3 // 531_main
+  }
+}
+
+/** Rough per-session time bucket from the average working-set count. */
+export function sessionTimeLabel(t: ProgramTemplate): string {
+  const perDay = t.days.map((d) => d.slots.reduce((a, s) => a + slotSetCount(s), 0))
+  const avg = perDay.reduce((a, b) => a + b, 0) / Math.max(1, perDay.length)
+  if (avg <= 12) return '30-45 mins'
+  if (avg <= 18) return '45-60 mins'
+  if (avg <= 26) return '60-90 mins'
+  return '90+ mins'
 }

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
-import { getProgramTemplate, programTemplateSummaries } from '../programming/program-templates'
+import { getProgramTemplate } from '../programming/program-templates'
 import {
   startProgram,
   getActiveProgram,
@@ -12,6 +12,7 @@ import {
   startProgramDay,
   advanceProgram,
   readState,
+  getEnrichedTemplateSummaries,
   ProgramError,
 } from '../services/program.service'
 
@@ -66,9 +67,10 @@ function serializeProgram(p: {
 }
 
 export async function programRoutes(app: FastifyInstance) {
-  // GET /v1/programs/templates — the program library (summaries, no day detail).
+  // GET /v1/programs/templates — the program library (summaries + card metadata:
+  // exercise GIF thumbnails, equipment, time + exercises/day).
   app.get('/templates', { preHandler: authenticate }, async (_request, reply) => {
-    return reply.send({ data: programTemplateSummaries() })
+    return reply.send({ data: await getEnrichedTemplateSummaries() })
   })
 
   // GET /v1/programs/templates/:id — full template (weeks × days × slots) for preview.

@@ -18,6 +18,10 @@ const userProgram = {
   updateMany: vi.fn(),
   delete: vi.fn(),
 }
+// Catalog lookup for the enriched library cards (equipment + thumbnails). The
+// media DB env is unset in tests, so buildMediaByExerciseId returns empty — the
+// summaries still render, just without thumbnails.
+const exerciseFindMany = vi.fn(async () => [] as unknown[])
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
@@ -29,6 +33,7 @@ vi.mock('../lib/prisma', () => ({
       updateMany: (...a: unknown[]) => userProgram.updateMany(...a),
       delete: (...a: unknown[]) => userProgram.delete(...a),
     },
+    exercise: { findMany: (...a: unknown[]) => exerciseFindMany(...a) },
   },
 }))
 
@@ -84,6 +89,14 @@ describe('GET /v1/programs/templates', () => {
     const data = res.json().data
     expect(data).toHaveLength(8)
     expect(data.map((t: { id: string }) => t.id)).toContain('531_bbb')
+    // Card metadata is present (Liftosaur-style library).
+    const sl = data.find((t: { id: string }) => t.id === 'stronglifts_5x5')
+    expect(sl.exercisesPerDay).toBe('3')
+    expect(sl.sessionTime).toMatch(/mins/)
+    expect(Array.isArray(sl.equipment)).toBe(true)
+    expect(Array.isArray(sl.thumbnails)).toBe(true)
+    // exerciseNames is an internal field — must NOT leak to the client.
+    expect(sl.exerciseNames).toBeUndefined()
     await app.close()
   })
 })

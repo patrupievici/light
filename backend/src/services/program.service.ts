@@ -3,8 +3,10 @@ import { resolveExerciseByName } from '../lib/exercise-resolver'
 import { computeProgressiveLoads, type ProgressionLevel } from '../lib/progressive-overload'
 import {
   getProgramTemplate,
+  programTemplateSummaries,
   type ProgramTemplate,
 } from '../programming/program-templates'
+import { buildMediaByExerciseId } from '../lib/exercise-media'
 import {
   buildDayExercises,
   sessionToWeekAndDay,
@@ -17,6 +19,62 @@ import { trainingMaxFromOneRm, incrementTrainingMax } from '../programming/progr
 import { exerciseFitsUserEquipment } from '../programming/equipment-compatibility'
 import { rankSubstitutes, type SubstitutionExercise } from '../lib/exercise-substitution'
 import { createWorkoutFromPlanned } from './planned-workout-converter.service'
+
+/** First GIF URL from a media[] payload, or null. */
+function firstGifUrl(media: unknown[] | undefined): string | null {
+  if (!media || media.length === 0) return null
+  const m = media[0] as { url?: unknown }
+  return typeof m?.url === 'string' ? m.url : null
+}
+
+/** Display order for the equipment chips (most "primary" first). */
+const EQUIPMENT_ORDER = [
+  'Barbell', 'Dumbbell', 'EZ Bar', 'Kettlebell', 'Cable',
+  'Leverage Machine', 'Smith Machine', 'Band', 'Bodyweight',
+]
+
+/**
+ * Library summaries enriched with catalog-derived card data: per-exercise GIF
+ * thumbnails + the distinct equipment list (Liftosaur-style cards). Resolves the
+ * union of template exercises against the catalog + media DB in two batch queries.
+ * Degrades gracefully — an exercise missing from the catalog or media just yields
+ * no thumbnail/equipment for that slot.
+ */
+export async function getEnrichedTemplateSummaries() {
+  const summaries = programTemplateSummaries()
+
+  const namesOriginal = new Set<string>()
+  for (const s of summaries) for (const n of s.exerciseNames) namesOriginal.add(n)
+
+  const catalog = await prisma.exercise.findMany({
+    where: { name: { in: [...namesOriginal] } },
+    select: { id: true, name: true, equipment: true },
+  })
+  const byNorm = new Map<string, { id: string; name: string; equipment: string | null }>()
+  for (const e of catalog) byNorm.set(e.name.trim().toLowerCase(), e)
+
+  const mediaById = await buildMediaByExerciseId(catalog as never)
+
+  return summaries.map((s) => {
+    const thumbnails: string[] = []
+    const equip = new Set<string>()
+    for (const name of s.exerciseNames) {
+      const ex = byNorm.get(name.trim().toLowerCase())
+      if (!ex) continue
+      if (ex.equipment && ex.equipment.trim()) equip.add(ex.equipment.trim())
+      const gif = firstGifUrl(mediaById.get(ex.id))
+      if (gif) thumbnails.push(gif)
+    }
+    const equipment = [...equip].sort((a, b) => {
+      const ia = EQUIPMENT_ORDER.indexOf(a)
+      const ib = EQUIPMENT_ORDER.indexOf(b)
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b)
+    })
+    // exerciseNames was only needed to resolve catalog rows — drop from the wire.
+    const { exerciseNames: _names, ...rest } = s
+    return { ...rest, equipment, thumbnails }
+  })
+}
 
 /**
  * Program service — the Prisma glue that turns a code template + a user's
