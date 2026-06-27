@@ -21,30 +21,31 @@ class ZveltTokens {
   static Color _d(Color light, Color dark) => isDark ? dark : light;
 
   // ─── Neutral backgrounds ───────────────────────────────────────────────────
+  // Dark = the "ZVELT Premium" palette (deep black surfaces, layered s1–s4).
   /// Page background
-  static Color get bg => _d(const Color(0xFFF6F7F5), const Color(0xFF11100E));
+  static Color get bg => _d(const Color(0xFFF6F7F5), const Color(0xFF050505));
   /// Inset block bg / secondary card
-  static Color get bg2 => _d(const Color(0xFFEEF1ED), const Color(0xFF24211D));
+  static Color get bg2 => _d(const Color(0xFFEEF1ED), const Color(0xFF0D0D0F));
   /// Card surface
-  static Color get surface => _d(const Color(0xFFFFFFFF), const Color(0xFF1B1916));
+  static Color get surface => _d(const Color(0xFFFFFFFF), const Color(0xFF18181B));
   /// Subtle inset inside cards
-  static Color get surface2 => _d(const Color(0xFFFCFCFA), const Color(0xFF211E1A));
+  static Color get surface2 => _d(const Color(0xFFFCFCFA), const Color(0xFF222226));
   /// Track behind progress / muted thumb
-  static Color get surface3 => _d(const Color(0xFFE6E8E4), const Color(0xFF2E2A25));
-  /// Peach hero surface — accent-soft
-  static Color get surfaceTinted => _d(const Color(0xFFFFE4D2), const Color(0xFF3A2A1E));
+  static Color get surface3 => _d(const Color(0xFFE6E8E4), const Color(0xFF2A2A2E));
+  /// Peach hero surface — accent-soft (deep brand wash in dark)
+  static Color get surfaceTinted => _d(const Color(0xFFFFE4D2), const Color(0xFF2A1408));
 
   // ─── Text ───────────────────────────────────────────────────────────────────
-  static Color get text => _d(const Color(0xFF111111), const Color(0xFFF4F1EA));
-  static Color get text2 => _d(const Color(0xFF5F6360), const Color(0xFFA9A198));
-  static Color get text3 => _d(const Color(0xFF6E726C), const Color(0xFF8C877E));
-  static Color get text4 => _d(const Color(0xFF8A8E88), const Color(0xFF6A655D));
+  static Color get text => _d(const Color(0xFF111111), const Color(0xFFFFFFFF));
+  static Color get text2 => _d(const Color(0xFF5F6360), const Color(0xFFC0C0C2));
+  static Color get text3 => _d(const Color(0xFF6E726C), const Color(0xFF97979F));
+  static Color get text4 => _d(const Color(0xFF8A8E88), const Color(0xFF6E6E78));
 
   // ─── Borders — used very sparingly ─────────────────────────────────────────
-  static Color get border => _d(const Color(0xFFECEEEA), const Color(0xFF34302A));
-  static Color get borderStrong => _d(const Color(0xFFDADCD7), const Color(0xFF44403A));
+  static Color get border => _d(const Color(0xFFECEEEA), const Color(0x14FFFFFF));
+  static Color get borderStrong => _d(const Color(0xFFDADCD7), const Color(0x24FFFFFF));
   /// Hairline divider
-  static Color get hairline => _d(const Color(0x0D111111), const Color(0x10F4F1EA));
+  static Color get hairline => _d(const Color(0x0D111111), const Color(0x0FFFFFFF));
 
   // ─── Accent (orange = signal only; constant across modes) ──────────────────
   /// accent-primary
@@ -137,6 +138,19 @@ class ZveltTokens {
     end: Alignment.centerRight,
     colors: [brand, brandDeep],
   );
+
+  /// Premium dark hero wash (ZVELT prototype: 175° red→orange→near-black).
+  static const LinearGradient gradHero = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    stops: [0.0, 0.30, 0.55, 1.0],
+    colors: [Color(0xFFC93010), Color(0xFFE8480E), Color(0xFFFF5A1F), Color(0xFF1A0A04)],
+  );
+
+  /// Orange glow for primary actions / FAB on the dark theme.
+  static const List<BoxShadow> glowBrand = [
+    BoxShadow(color: Color(0x66FF5A1F), blurRadius: 28, spreadRadius: -2, offset: Offset(0, 6)),
+  ];
 }
 
 /// V2 text-style utility roles. Mirror the `.z-display .z-clean .z-stat .z-num
