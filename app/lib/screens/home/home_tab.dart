@@ -194,7 +194,7 @@ class _HomeTabState extends State<HomeTab> {
           children: [
             _header(),
             const SizedBox(height: ZveltTokens.s5),
-            _startWorkoutHero(),
+            _coachCard(),
             const SizedBox(height: ZveltTokens.s6),
             const _Eyebrow('TODAY'),
             const SizedBox(height: ZveltTokens.s3),
@@ -221,113 +221,156 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  // ── Header ────────────────────────────────────────────────────────────────
+  // ── Header — avatar (→ profile) + settings, then greeting block ────────────
   Widget _header() {
     final initial = _displayName.trim().isNotEmpty
         ? _displayName.trim()[0].toUpperCase()
         : 'A';
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('$_greeting,', style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      _displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ZType.h1,
-                    ),
+        Row(
+          children: [
+            InkWell(
+              onTap: widget.onOpenProfile,
+              customBorder: const CircleBorder(),
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFC9CDF2), Color(0xFF9AA0E8)],
                   ),
-                  const SizedBox(width: 6),
-                  const Text('👋', style: TextStyle(fontSize: 22)),
-                ],
+                  boxShadow: ZveltTokens.shadowCard,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  initial,
+                  style: ZType.h4.copyWith(color: Colors.white),
+                ),
               ),
-              const SizedBox(height: 2),
-              Text(_todayLabel, style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
-            ],
-          ),
-        ),
-        _CircleButton(
-          icon: AppIcons.bell,
-          onTap: widget.onOpenNotifications,
-          semanticLabel: 'Notifications',
-        ),
-        const SizedBox(width: ZveltTokens.s2),
-        InkWell(
-          onTap: widget.onOpenProfile,
-          customBorder: const CircleBorder(),
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: ZveltTokens.gradBrand,
             ),
-            alignment: Alignment.center,
-            child: Text(
-              initial,
-              style: ZType.h4.copyWith(color: ZveltTokens.onBrand),
+            const Spacer(),
+            _CircleButton(
+              icon: AppIcons.settings,
+              onTap: widget.onOpenSettings,
+              semanticLabel: 'Settings',
             ),
-          ),
+          ],
         ),
+        const SizedBox(height: ZveltTokens.s5),
+        Text('$_greeting,', style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                _displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: ZType.h1,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Text('👋', style: TextStyle(fontSize: 22)),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(_todayLabel, style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
       ],
     );
   }
 
-  // ── Start Workout hero — the most prominent element on the screen ──────────
-  Widget _startWorkoutHero() {
+  // ── Coach card — periwinkle gradient panel + 3D rabbit mascot ──────────────
+  Widget _coachCard() {
+    final msg = _workoutToday
+        ? 'Nice work today. Recovery is where the muscle is built.'
+        : "Ready to move? You're 1 workout away from keeping your streak.";
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: _startWorkout,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        borderRadius: BorderRadius.circular(22),
         child: Container(
-          padding: const EdgeInsets.all(ZveltTokens.s5),
+          constraints: const BoxConstraints(minHeight: 104),
           decoration: BoxDecoration(
-            gradient: ZveltTokens.gradBtn,
-            borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-            boxShadow: [
-              BoxShadow(
-                color: ZveltTokens.brand.withValues(alpha: 0.32),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
+            color: ZveltTokens.surface,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: ZveltTokens.shadowCard,
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // mascot panel (overflows upward like the prototype)
+              SizedBox(
+                width: 104,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.bottomCenter,
                   children: [
-                    Text(
-                      'Start Workout',
-                      style: ZType.h2.copyWith(color: ZveltTokens.onBrand),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [ZveltTokens.brandTint, ZveltTokens.surface],
+                        ),
+                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(22)),
+                      ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _workoutToday ? 'Logged today — go again?' : 'Pick up where you left off',
-                      style: ZType.bodyS.copyWith(
-                        color: ZveltTokens.onBrand.withValues(alpha: 0.85),
+                    Positioned(
+                      bottom: 12,
+                      child: Container(
+                        width: 70,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: const Color(0x22282850),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 6,
+                      child: Image.asset(
+                        'assets/mascot/m-think.png',
+                        height: 124,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: ZveltTokens.onBrand.withValues(alpha: 0.22),
-                  shape: BoxShape.circle,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 16, 18, 16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ZVELT COACH',
+                        style: ZType.bodyS.copyWith(
+                          color: ZveltTokens.brand,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.06 * 11,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        msg,
+                        style: ZType.bodyM.copyWith(
+                          color: ZveltTokens.text,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: const Icon(AppIcons.arrow_small_right, color: ZveltTokens.onBrand),
               ),
             ],
           ),

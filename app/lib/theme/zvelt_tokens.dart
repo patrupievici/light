@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-/// ZVELT design tokens — **light + dark** (brief: "bun in light si dark mode").
+/// ZVELT design tokens — **light + dark**, "De ce ai nevoie?" periwinkle system.
 ///
-/// Neutrals (backgrounds, surfaces, text, borders, accent-soft) resolve at
-/// runtime against [isDark]; the brand orange + semantic colors + shadows stay
-/// constant across modes (the brief keeps orange as the single signal in both).
-/// Because the neutrals + [ZType] styles are now runtime getters, they are NO
-/// longer usable inside `const` expressions — widgets that color/style from them
-/// must drop `const`.
+/// Single accent = **periwinkle `#7C84EC`** (signal only). Inter everywhere,
+/// soft shadows define cards (no heavy borders), off-white surfaces. Neutrals +
+/// accent-soft resolve at runtime against [isDark]; the periwinkle brand +
+/// status colors + shadows stay constant across modes. Because the neutrals +
+/// [ZType] styles are runtime getters, they are NOT usable inside `const`
+/// expressions — widgets that color/style from them must drop `const`.
 ///
 /// Flip [isDark] from the app root (see main.dart) on theme-mode / platform
 /// brightness change; the surrounding ValueListenableBuilder rebuilds the tree.
@@ -20,85 +20,83 @@ class ZveltTokens {
   /// Pick the light or dark value for the active brightness.
   static Color _d(Color light, Color dark) => isDark ? dark : light;
 
-  // ─── Neutral backgrounds ───────────────────────────────────────────────────
-  // Dark = the "ZVELT Premium" palette (deep black surfaces, layered s1–s4).
-  /// Page background
-  static Color get bg => _d(const Color(0xFFF6F7F5), const Color(0xFF050505));
-  /// Inset block bg / secondary card
-  static Color get bg2 => _d(const Color(0xFFEEF1ED), const Color(0xFF0D0D0F));
-  /// Card surface
-  static Color get surface => _d(const Color(0xFFFFFFFF), const Color(0xFF18181B));
-  /// Subtle inset inside cards
-  static Color get surface2 => _d(const Color(0xFFFCFCFA), const Color(0xFF222226));
-  /// Track behind progress / muted thumb
-  static Color get surface3 => _d(const Color(0xFFE6E8E4), const Color(0xFF2A2A2E));
-  /// Peach hero surface — accent-soft (deep brand wash in dark)
-  static Color get surfaceTinted => _d(const Color(0xFFFFE4D2), const Color(0xFF2A1408));
+  // ─── Neutral backgrounds (periwinkle "De ce ai nevoie?" system) ────────────
+  /// Page background  (--bg)
+  static Color get bg => _d(const Color(0xFFF4F5F9), const Color(0xFF131419));
+  /// Inset block bg / secondary card  (--card2)
+  static Color get bg2 => _d(const Color(0xFFF2F3F8), const Color(0xFF25262F));
+  /// Card surface  (--card)
+  static Color get surface => _d(const Color(0xFFFFFFFF), const Color(0xFF1D1E25));
+  /// Subtle inset inside cards  (--card2)
+  static Color get surface2 => _d(const Color(0xFFF2F3F8), const Color(0xFF25262F));
+  /// Track behind progress / muted thumb  (--card3)
+  static Color get surface3 => _d(const Color(0xFFE9EAF1), const Color(0xFF2F313B));
+  /// Accent-soft hero surface  (--acsoft)
+  static Color get surfaceTinted => _d(const Color(0xFFEEEFFD), const Color(0xFF262838));
 
-  // ─── Text ───────────────────────────────────────────────────────────────────
-  static Color get text => _d(const Color(0xFF111111), const Color(0xFFFFFFFF));
-  static Color get text2 => _d(const Color(0xFF5F6360), const Color(0xFFC0C0C2));
-  static Color get text3 => _d(const Color(0xFF6E726C), const Color(0xFF97979F));
-  static Color get text4 => _d(const Color(0xFF8A8E88), const Color(0xFF6E6E78));
+  // ─── Text (3 levels in the design; text3/text4 are tertiary/decorative) ─────
+  static Color get text => _d(const Color(0xFF2A2B3A), const Color(0xFFF1F2F7));
+  static Color get text2 => _d(const Color(0xFF82849A), const Color(0xFF9698A8));
+  static Color get text3 => _d(const Color(0xFF9A9CAE), const Color(0xFF7E8090));
+  static Color get text4 => _d(const Color(0xFFB7B8C6), const Color(0xFF5E606C));
 
-  // ─── Borders — used very sparingly ─────────────────────────────────────────
-  static Color get border => _d(const Color(0xFFECEEEA), const Color(0x14FFFFFF));
-  static Color get borderStrong => _d(const Color(0xFFDADCD7), const Color(0x24FFFFFF));
+  // ─── Borders — used very sparingly (shadows define cards) ───────────────────
+  static Color get border => _d(const Color(0xFFEDEEF4), const Color(0xFF292B34));
+  static Color get borderStrong => _d(const Color(0xFFDEDFEA), const Color(0xFF3A3C46));
   /// Hairline divider
-  static Color get hairline => _d(const Color(0x0D111111), const Color(0x0FFFFFFF));
+  static Color get hairline => _d(const Color(0x0F2D2D50), const Color(0x14FFFFFF));
 
-  // ─── Accent (orange = signal only; constant across modes) ──────────────────
-  /// accent-primary
-  static const Color brand = Color(0xFFFF7A2F);
-  static const Color brand2 = Color(0xFFFF8A45);
-  /// light variant — halo, XP, gradient top
-  static const Color brand3 = Color(0xFFFFB088);
-  /// accent-hover — press / gradient anchor
-  static const Color brandDeep = Color(0xFFE86B24);
-  /// accent-soft — chip bg, hero halo (warm tint, theme-aware)
-  static Color get brandTint => _d(const Color(0xFFFFE4D2), const Color(0xFF3A2A1E));
-  /// accent-glow — rgba(255,122,47,0.18)
-  static const Color brandGlow = Color(0x2EFF7A2F);
+  // ─── Accent — Periwinkle (signal only; constant across modes) ──────────────
+  /// accent-primary  (--ac)
+  static const Color brand = Color(0xFF7C84EC);
+  /// --ac2
+  static const Color brand2 = Color(0xFF9DA3F1);
+  /// light variant — halo, gradient top
+  static const Color brand3 = Color(0xFFB6BAF5);
+  /// accent-hover — press / gradient anchor  (--ac-dark)
+  static const Color brandDeep = Color(0xFF5D66D9);
+  /// accent-soft — chip bg, hero halo  (--acsoft, theme-aware)
+  static Color get brandTint => _d(const Color(0xFFEEEFFD), const Color(0x297C84EC));
+  /// accent-glow — rgba(124,132,236,0.38) for CTA glow
+  static const Color brandGlow = Color(0x617C84EC);
   static const Color onBrand = Color(0xFFFFFFFF);
 
-  // ─── Biometric / category palette ──────────────────────────────────────────
-  static const Color recovery = Color(0xFF7BC6FF);
-  static const Color recovery2 = Color(0xFFDCEFFF);
-  static const Color sleep = Color(0xFFA58BFF);
-  static const Color sleep2 = Color(0xFFE6DEFF);
-  static const Color stress = Color(0xFFFFB86B);
-  static const Color stress2 = Color(0xFFFFE9D1);
-  static const Color strain = Color(0xFFFFB86B); // alias to stress
-  static const Color strain2 = Color(0xFFFFE9D1);
-  static const Color strength = Color(0xFF2EC27E);
-  static const Color strength2 = Color(0xFFD2F2E2);
-  static const Color cardio = Color(0xFFFF6B6B);
-  static const Color cardio2 = Color(0xFFFFDADA);
+  // ─── Status / category palette (periwinkle design) ─────────────────────────
+  static const Color recovery = Color(0xFF5B8DEF); // blue
+  static const Color recovery2 = Color(0xFFDCE7FB);
+  static const Color sleep = Color(0xFFA78BFA); // purple
+  static const Color sleep2 = Color(0xFFEAE3FE);
+  static const Color stress = Color(0xFFF2C94C); // amber
+  static const Color stress2 = Color(0xFFFCEFC9);
+  static const Color strain = Color(0xFFF2C94C); // alias to stress
+  static const Color strain2 = Color(0xFFFCEFC9);
+  static const Color strength = Color(0xFF5FC97D); // green
+  static const Color strength2 = Color(0xFFD7F2DF);
+  static const Color cardio = Color(0xFFF05252); // red
+  static const Color cardio2 = Color(0xFFFBD7D7);
+  /// challenge / "ready" accent — orange
+  static const Color challenge = Color(0xFFF2994A);
 
   // ─── Semantic ───────────────────────────────────────────────────────────────
-  static const Color success = Color(0xFF2EC27E);
-  static const Color successSoft = Color(0xFFE2F6EC);
-  static const Color info = Color(0xFF7BC6FF);
-  static const Color warn = Color(0xFFFFB86B);
-  static const Color error = Color(0xFFE5484D);
+  static const Color success = Color(0xFF5FC97D);
+  static const Color successSoft = Color(0xFFD7F2DF);
+  static const Color info = Color(0xFF5B8DEF);
+  static const Color warn = Color(0xFFF2C94C);
+  static const Color error = Color(0xFFF05252);
 
-  // ─── Typography families ────────────────────────────────────────────────────
-  /// Inter — UI, body, buttons, labels. (Kept for body: visually near-identical
-  /// to the prototype's DM Sans but without the wider metrics that overflowed
-  /// tight layouts at large text scales.)
+  // ─── Typography families — Inter everywhere (periwinkle design) ────────────
+  /// Inter — UI, body, buttons, labels.
   static const String fontPrimary = 'Inter';
-  /// Barlow Condensed — display headings + big metrics (the condensed, sporty
-  /// face that gives ZVELT its premium character). It's narrower than Inter, so
-  /// it carries the design signature with no overflow risk.
-  static const String fontDisplay = 'BarlowCondensed';
-  /// IBM Plex Mono — BPM · pace · calories · distance · technical readouts
-  static const String fontMono = 'IBMPlexMono';
+  /// Inter — headings/display (the design is type-driven on a single family).
+  static const String fontDisplay = 'Inter';
+  /// Inter — metrics/labels too (the "De ce ai nevoie?" design is Inter-only).
+  static const String fontMono = 'Inter';
 
-  // ─── Radii ─────────────────────────────────────────────────────────────────
-  static const double rSm = 10; // tiles, inputs, small buttons
-  static const double rMd = 16; // mid chips & rows
-  static const double rLg = 24; // ALL cards
-  static const double rXl = 32; // modal sheets
+  // ─── Radii (periwinkle design: sm8 · md12 · lg18-26 · pill) ────────────────
+  static const double rSm = 8; // small chips / inputs / badges
+  static const double rMd = 12; // icon tiles, mid rows
+  static const double rLg = 20; // default card radius
+  static const double rXl = 26; // large feature cards / sheets
   static const double rPill = 999;
 
   // ─── Spacing rhythm (4pt) ──────────────────────────────────────────────────
@@ -117,45 +115,44 @@ class ZveltTokens {
   /// Default card-to-card gap per design system §3
   static const double cardGap = 12;
 
-  // ─── Shadows (subtle; constant across modes for v1) ────────────────────────
+  // ─── Shadows — soft, periwinkle-tinted (--sh / --sh2 / --sh-float) ─────────
+  // Cards separate by shadow + spacing (the design forbids heavy borders). On
+  // dark the surface sits lighter than the page, so cards still read clearly.
   static const List<BoxShadow> shadowCard = [
-    BoxShadow(color: Color(0x05111111), offset: Offset(0, 1), blurRadius: 2),
-    BoxShadow(color: Color(0x08111111), offset: Offset(0, 4), blurRadius: 12),
+    BoxShadow(color: Color(0x0D2D2D50), offset: Offset(0, 3), blurRadius: 12),
   ];
 
   static const List<BoxShadow> shadowHero = [
-    BoxShadow(color: Color(0x0A111111), offset: Offset(0, 8), blurRadius: 24),
-    BoxShadow(color: Color(0x05111111), offset: Offset(0, 2), blurRadius: 6),
+    BoxShadow(color: Color(0x122D2D50), offset: Offset(0, 8), blurRadius: 28),
   ];
 
   static const List<BoxShadow> shadowFloat = [
-    BoxShadow(color: Color(0x14111111), offset: Offset(0, 12), blurRadius: 36),
+    BoxShadow(color: Color(0x142D2D50), offset: Offset(0, 12), blurRadius: 36),
   ];
 
-  // ─── Gradients (brand signal only — constant across modes) ─────────────────
+  // ─── Gradients — periwinkle accent (135° ac2 → ac) ─────────────────────────
   static const LinearGradient gradBrand = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [brand3, brand],
+    colors: [brand2, brand],
   );
 
   static const LinearGradient gradBtn = LinearGradient(
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-    colors: [brand, brandDeep],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [brand2, brand],
   );
 
-  /// Premium dark hero wash (ZVELT prototype: 175° red→orange→near-black).
+  /// Accent feature card wash (135° ac2 → ac), e.g. active-challenge card.
   static const LinearGradient gradHero = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    stops: [0.0, 0.30, 0.55, 1.0],
-    colors: [Color(0xFFC93010), Color(0xFFE8480E), Color(0xFFFF5A1F), Color(0xFF1A0A04)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [brand2, brand],
   );
 
-  /// Orange glow for primary actions / FAB on the dark theme.
+  /// Periwinkle glow for primary CTAs / FAB — rgba(124,132,236,0.38).
   static const List<BoxShadow> glowBrand = [
-    BoxShadow(color: Color(0x66FF5A1F), blurRadius: 28, spreadRadius: -2, offset: Offset(0, 6)),
+    BoxShadow(color: Color(0x617C84EC), blurRadius: 26, offset: Offset(0, 10)),
   ];
 }
 
