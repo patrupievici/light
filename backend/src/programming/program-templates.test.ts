@@ -15,14 +15,15 @@ function seededExerciseNames(): Set<string> {
 }
 
 describe('program templates — structure', () => {
-  it('ships the expected 8 templates with unique ids', () => {
-    expect(PROGRAM_TEMPLATES).toHaveLength(8)
+  it('ships the expected templates with unique ids', () => {
+    expect(PROGRAM_TEMPLATES).toHaveLength(11)
     const ids = PROGRAM_TEMPLATES.map((t) => t.id)
     expect(new Set(ids).size).toBe(ids.length)
     expect(ids).toEqual(
       expect.arrayContaining([
         'stronglifts_5x5', 'full_body_3day', 'upper_lower_4day', 'ppl_6day',
         'phul', 'arnold_split', 'nsuns_4day', '531_bbb',
+        'basic_beginner', 'gzclp', '531_monolith',
       ]),
     )
   })
@@ -110,7 +111,7 @@ describe('program templates — helpers', () => {
 
   it('summaries expose library metadata without day detail', () => {
     const s = programTemplateSummaries()
-    expect(s).toHaveLength(8)
+    expect(s).toHaveLength(11)
     const nsuns = s.find((x) => x.id === 'nsuns_4day')!
     expect(nsuns.requiresTrainingMax).toBe(true)
     expect(nsuns.daysPerWeek).toBe(4)

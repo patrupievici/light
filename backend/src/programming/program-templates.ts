@@ -499,6 +499,145 @@ export const PROGRAM_TEMPLATES: ProgramTemplate[] = [
       },
     ],
   },
+
+  // ── 9. Basic Beginner Routine (linear, absolute beginner) ──────────────────
+  {
+    id: 'basic_beginner',
+    title: 'Basic Beginner Routine',
+    description: 'Simple 3-day full-body barbell program to build your first foundation of strength. Add weight every session you hit all your reps.',
+    goalTags: ['strength', 'hypertrophy'],
+    level: 'beginner',
+    scheme: 'linear',
+    split: 'full_body',
+    weeksOptions: [8, 10, 12],
+    defaultWeeks: 12,
+    deloadCadence: 0,
+    daysPerWeek: 3,
+    days: [
+      {
+        dayKey: 'A',
+        title: 'Workout A',
+        slots: [
+          { slotKey: 'a_squat', exercise: 'Squat', role: 'main', sets: { kind: 'straight', sets: 3, reps: 5 }, restSeconds: 180, warmup: true, isLowerBody: true },
+          { slotKey: 'a_bench', exercise: 'Bench Press', role: 'main', sets: { kind: 'straight', sets: 3, reps: 5 }, restSeconds: 180, warmup: true },
+          { slotKey: 'a_row', exercise: 'Barbell Row', role: 'main', sets: { kind: 'straight', sets: 3, reps: 5 }, restSeconds: 120, warmup: true },
+        ],
+      },
+      {
+        dayKey: 'B',
+        title: 'Workout B',
+        slots: [
+          { slotKey: 'b_squat', exercise: 'Squat', role: 'main', sets: { kind: 'straight', sets: 3, reps: 5 }, restSeconds: 180, warmup: true, isLowerBody: true },
+          { slotKey: 'b_ohp', exercise: 'Overhead Press', role: 'main', sets: { kind: 'straight', sets: 3, reps: 5 }, restSeconds: 180, warmup: true },
+          { slotKey: 'b_dead', exercise: 'Deadlift', role: 'main', sets: { kind: 'straight', sets: 1, reps: 5 }, restSeconds: 210, warmup: true, isLowerBody: true },
+        ],
+      },
+    ],
+  },
+
+  // ── 10. GZCLP (Cody LeFever, linear T1/T2/T3) ──────────────────────────────
+  {
+    id: 'gzclp',
+    title: 'GZCLP',
+    description: "Cody LeFever's GZCL linear beginner program: a heavy T1 main lift (5×3), a T2 secondary (3×10), and a high-rep T3 accessory (3×15+). A great next step after a basic novice routine.",
+    goalTags: ['strength', 'hypertrophy'],
+    level: 'beginner',
+    scheme: 'linear',
+    split: 'full_body',
+    weeksOptions: [8, 12, 16],
+    defaultWeeks: 12,
+    deloadCadence: 0,
+    daysPerWeek: 3,
+    days: [
+      {
+        dayKey: 'D1',
+        title: 'Squat · Bench · Pulldown',
+        slots: [
+          { slotKey: 'd1_t1', exercise: 'Squat', role: 'main', sets: { kind: 'straight', sets: 5, reps: 3 }, restSeconds: 180, warmup: true, isLowerBody: true },
+          { slotKey: 'd1_t2', exercise: 'Bench Press', role: 'main', sets: { kind: 'straight', sets: 3, reps: 10 }, restSeconds: 120 },
+          r('d1_t3', 'Lat Pulldown', 3, 15, 25, 90),
+        ],
+      },
+      {
+        dayKey: 'D2',
+        title: 'OHP · Deadlift · Row',
+        slots: [
+          { slotKey: 'd2_t1', exercise: 'Overhead Press', role: 'main', sets: { kind: 'straight', sets: 5, reps: 3 }, restSeconds: 180, warmup: true },
+          { slotKey: 'd2_t2', exercise: 'Deadlift', role: 'main', sets: { kind: 'straight', sets: 3, reps: 10 }, restSeconds: 150, isLowerBody: true },
+          r('d2_t3', 'Seated Cable Row', 3, 15, 25, 90),
+        ],
+      },
+      {
+        dayKey: 'D3',
+        title: 'Bench · Squat · Pulldown',
+        slots: [
+          { slotKey: 'd3_t1', exercise: 'Bench Press', role: 'main', sets: { kind: 'straight', sets: 5, reps: 3 }, restSeconds: 180, warmup: true },
+          { slotKey: 'd3_t2', exercise: 'Squat', role: 'main', sets: { kind: 'straight', sets: 3, reps: 10 }, restSeconds: 120, isLowerBody: true },
+          r('d3_t3', 'Lat Pulldown', 3, 15, 25, 90),
+        ],
+      },
+      {
+        dayKey: 'D4',
+        title: 'Deadlift · OHP · Row',
+        slots: [
+          { slotKey: 'd4_t1', exercise: 'Deadlift', role: 'main', sets: { kind: 'straight', sets: 5, reps: 3 }, restSeconds: 210, warmup: true, isLowerBody: true },
+          { slotKey: 'd4_t2', exercise: 'Overhead Press', role: 'main', sets: { kind: 'straight', sets: 3, reps: 10 }, restSeconds: 120 },
+          r('d4_t3', 'Seated Cable Row', 3, 15, 25, 90),
+        ],
+      },
+    ],
+  },
+
+  // ── 11. 5/3/1 Building the Monolith (percentage, advanced mass) ─────────────
+  {
+    id: '531_monolith',
+    title: '5/3/1: Building the Monolith',
+    description: "Wendler's brutal 6-week mass template: 5/3/1 main work plus high-volume 5×10 supplemental and heavy accessory work. Demands big eating — not for beginners.",
+    goalTags: ['hypertrophy', 'strength'],
+    level: 'advanced',
+    scheme: 'percentage',
+    split: 'full_body',
+    weeksOptions: [6, 12],
+    defaultWeeks: 6,
+    deloadCadence: 0,
+    daysPerWeek: 3,
+    trainingMaxLifts: ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press'],
+    days: [
+      {
+        dayKey: 'M1',
+        title: 'Press emphasis',
+        slots: [
+          { slotKey: 'm1_ohp', exercise: 'Overhead Press', role: 'main', sets: { kind: 'wave', wave: '531_main' }, restSeconds: 180, warmup: true },
+          { slotKey: 'm1_ohp_bbb', exercise: 'Overhead Press', role: 'main', sets: { kind: 'wave', wave: '531_bbb' }, restSeconds: 120 },
+          { slotKey: 'm1_squat', exercise: 'Squat', role: 'main', sets: { kind: 'wave', wave: '531_main' }, restSeconds: 210, warmup: true, isLowerBody: true },
+          r('m1_chin', 'Chin-up', 5, 8, 15, 90),
+          r('m1_face', 'Face Pull', 5, 15, 20, 60),
+        ],
+      },
+      {
+        dayKey: 'M2',
+        title: 'Pull emphasis',
+        slots: [
+          { slotKey: 'm2_bench', exercise: 'Bench Press', role: 'main', sets: { kind: 'wave', wave: '531_main' }, restSeconds: 180, warmup: true },
+          { slotKey: 'm2_bench_bbb', exercise: 'Bench Press', role: 'main', sets: { kind: 'wave', wave: '531_bbb' }, restSeconds: 120 },
+          { slotKey: 'm2_dead', exercise: 'Deadlift', role: 'main', sets: { kind: 'wave', wave: '531_main' }, restSeconds: 210, warmup: true, isLowerBody: true },
+          r('m2_row', 'Dumbbell Row', 5, 10, 15, 90),
+          r('m2_dip', 'Dip', 5, 8, 15, 90),
+        ],
+      },
+      {
+        dayKey: 'M3',
+        title: 'Squat emphasis',
+        slots: [
+          { slotKey: 'm3_squat', exercise: 'Squat', role: 'main', sets: { kind: 'wave', wave: '531_main' }, restSeconds: 210, warmup: true, isLowerBody: true },
+          { slotKey: 'm3_squat_bbb', exercise: 'Squat', role: 'main', sets: { kind: 'wave', wave: '531_bbb' }, restSeconds: 150, isLowerBody: true },
+          { slotKey: 'm3_ohp', exercise: 'Overhead Press', role: 'main', sets: { kind: 'wave', wave: '531_main' }, restSeconds: 180, warmup: true },
+          r('m3_legcurl', 'Leg Curl', 5, 12, 20, 90),
+          r('m3_abs', 'Cable Crunch', 5, 15, 25, 60),
+        ],
+      },
+    ],
+  },
 ]
 
 /** Lookup a template by id. */

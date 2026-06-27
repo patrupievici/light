@@ -21,7 +21,7 @@ const userProgram = {
 // Catalog lookup for the enriched library cards (equipment + thumbnails). The
 // media DB env is unset in tests, so buildMediaByExerciseId returns empty — the
 // summaries still render, just without thumbnails.
-const exerciseFindMany = vi.fn(async () => [] as unknown[])
+const exerciseFindMany = vi.fn(async (..._a: unknown[]) => [] as unknown[])
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
@@ -82,13 +82,16 @@ beforeEach(() => {
 })
 
 describe('GET /v1/programs/templates', () => {
-  it('returns the 8-program library', async () => {
+  it('returns the program library', async () => {
     const app = await buildApp()
     const res = await app.inject({ method: 'GET', url: '/v1/programs/templates' })
     expect(res.statusCode).toBe(200)
     const data = res.json().data
-    expect(data).toHaveLength(8)
-    expect(data.map((t: { id: string }) => t.id)).toContain('531_bbb')
+    expect(data).toHaveLength(11)
+    const ids = data.map((t: { id: string }) => t.id)
+    expect(ids).toContain('531_bbb')
+    // The famous programs added for Liftosaur parity.
+    expect(ids).toEqual(expect.arrayContaining(['basic_beginner', 'gzclp', '531_monolith']))
     // Card metadata is present (Liftosaur-style library).
     const sl = data.find((t: { id: string }) => t.id === 'stronglifts_5x5')
     expect(sl.exercisesPerDay).toBe('3')
