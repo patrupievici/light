@@ -9,6 +9,34 @@ import '../models/social_challenge.dart';
 import '_crash_reporter.dart';
 import 'auth_service.dart';
 
+/// A pending challenge invite (status='invited') — surfaced in the Challenges
+/// sub-tab so the user can accept/decline without opening the detail screen.
+class ChallengeInvite {
+  ChallengeInvite({
+    required this.id,
+    required this.title,
+    this.scoringType,
+    this.endsAt,
+    this.fromName,
+  });
+
+  final String id;
+  final String title;
+  final String? scoringType;
+  final DateTime? endsAt;
+  final String? fromName;
+
+  static ChallengeInvite fromJson(Map<String, dynamic> m) => ChallengeInvite(
+        id: m['id'] as String,
+        title: (m['title'] as String?)?.trim().isNotEmpty == true
+            ? (m['title'] as String).trim()
+            : 'Challenge',
+        scoringType: m['scoringType'] as String?,
+        endsAt: DateTime.tryParse(m['endsAt'] as String? ?? ''),
+        fromName: (m['creatorDisplayName'] as String?)?.trim(),
+      );
+}
+
 /// Provocări sociale: `GET/POST/DELETE /v1/challenges`; fallback local dacă nu e token sau rețea.
 class SocialChallengeService {
   SocialChallengeService({AuthService? auth}) : _auth = auth ?? AuthService();
@@ -275,6 +303,28 @@ class SocialChallengeService {
         .timeout(const Duration(seconds: 22));
     if (res.statusCode == 204 || res.statusCode == 200) return;
     throw Exception('Could not decline (${res.statusCode})');
+  }
+
+  /// GET /v1/challenges/invites — challenges you've been invited to but haven't
+  /// accepted/declined yet. Best-effort: empty list on auth/network/non-200.
+  Future<List<ChallengeInvite>> listInvites() async {
+    final headers = await _headersAuth();
+    if (headers.isEmpty) return const [];
+    try {
+      final res = await http
+          .get(Uri.parse('$v1Base/challenges/invites'), headers: headers)
+          .timeout(const Duration(seconds: 22));
+      if (res.statusCode != 200) return const [];
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final list = data['data'] as List<dynamic>? ?? [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(ChallengeInvite.fromJson)
+          .toList();
+    } catch (e, st) {
+      reportError(e, st, reason: 'challenges:list-invites');
+      return const [];
+    }
   }
 
   /// DELETE /v1/challenges/:id/leave

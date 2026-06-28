@@ -42,6 +42,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   // PRs tab — the user's real recent personal records (from ranking/stats).
   final _statsService = StatsChartsService();
   List<RecentPr> _recentPrs = const [];
+  // Challenges tab — pending invites awaiting accept/decline.
+  List<ChallengeInvite> _invites = const [];
   List<SocialChallenge> _challenges = [];
 
   // Ephemeral 24h stories shown in the top rail. Loaded separately from (and
@@ -147,6 +149,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     _feedRefreshTrigger.addListener(_onFeedRefreshHint);
     _load();
     _loadRecentPrs();
+    _loadInvites();
   }
 
   Future<void> _loadRecentPrs() async {
@@ -155,6 +158,38 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       if (mounted) setState(() => _recentPrs = prs);
     } catch (_) {
       // PRs are a best-effort enrichment of the PRs tab — empty is fine.
+    }
+  }
+
+  Future<void> _loadInvites() async {
+    try {
+      final invites = await _challengeService.listInvites();
+      if (mounted) setState(() => _invites = invites);
+    } catch (_) {
+      // Pending invites are best-effort — empty is fine.
+    }
+  }
+
+  Future<void> _acceptInvite(ChallengeInvite inv) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _invites = _invites.where((i) => i.id != inv.id).toList());
+    try {
+      await _challengeService.joinChallenge(inv.id);
+      messenger.showSnackBar(const SnackBar(content: Text('Joined the challenge.')));
+      _load(); // the accepted challenge now belongs in the active list
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      _loadInvites(); // restore on failure
+    }
+  }
+
+  Future<void> _declineInvite(ChallengeInvite inv) async {
+    setState(() => _invites = _invites.where((i) => i.id != inv.id).toList());
+    try {
+      await _challengeService.declineChallenge(inv.id);
+    } catch (_) {
+      if (mounted) _loadInvites(); // restore on failure
     }
   }
 
@@ -333,6 +368,114 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       ),
     );
     if (mounted) _load(); // refresh after returning from the flow/detail
+  }
+
+  // ── Challenges tab — pending invites (accept/decline inline) ──────────────
+  Widget _buildPendingInvites() {
+    if (_invites.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('PENDING INVITES', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+          const SizedBox(height: 12),
+          for (final inv in _invites) ...[
+            _inviteCard(inv),
+            const SizedBox(height: ZveltTokens.cardGap),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _inviteSubtitle(ChallengeInvite inv) {
+    final from = inv.fromName?.trim();
+    final type = _challengeTypeLabel(inv.scoringType);
+    if (from != null && from.isNotEmpty) return '$from invited you · $type';
+    return type;
+  }
+
+  String _challengeTypeLabel(String? scoringType) {
+    switch (scoringType) {
+      case 'workout_streak':
+        return 'Workout Streak';
+      case 'most_workouts':
+        return 'Most Workouts';
+      case 'total_volume':
+        return 'Total Volume';
+      case 'pr_battle':
+        return 'PR Battle';
+      case 'consistency':
+        return 'Consistency';
+      default:
+        return 'Challenge';
+    }
+  }
+
+  Widget _inviteCard(ChallengeInvite inv) {
+    return Container(
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        boxShadow: ZveltTokens.shadowCard,
+      ),
+      padding: const EdgeInsets.all(ZveltTokens.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brandTint,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                ),
+                child: const Icon(AppIcons.trophy, size: 20, color: ZveltTokens.brand),
+              ),
+              const SizedBox(width: ZveltTokens.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(inv.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(_inviteSubtitle(inv),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s3),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _declineInvite(inv),
+                  child: const Text('Decline'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: FilledButton(
+                  onPressed: () => _acceptInvite(inv),
+                  child: const Text('Accept'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   // ── PRs tab — your real recent records + "Challenge this PR" ───────────────
@@ -589,6 +732,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                         ),
                         SliverToBoxAdapter(child: _buildRaceHeroCard()),
                         SliverToBoxAdapter(child: _buildFeedControls()),
+                        if (_feedFilter == 'races' && _invites.isNotEmpty)
+                          SliverToBoxAdapter(child: _buildPendingInvites()),
                         if (_challenges.isNotEmpty) ...[
                           SliverToBoxAdapter(child: _buildChallengeHeader()),
                           SliverList(

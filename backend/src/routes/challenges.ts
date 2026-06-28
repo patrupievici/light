@@ -242,6 +242,44 @@ export async function challengeRoutes(app: FastifyInstance) {
     return reply.send({ data, requestId: request.id })
   })
 
+  // GET /v1/challenges/invites — challenges you've been invited to but haven't
+  // accepted/declined yet (participant status = 'invited'), still active. Powers
+  // the pending-invites strip at the top of the Challenges sub-tab so a user can
+  // accept/decline without opening each challenge.
+  app.get('/invites', { preHandler: authenticate }, async (request, reply) => {
+    const { userId: me } = request.user
+    const now = new Date()
+    const rows = await prisma.challengeParticipant.findMany({
+      where: {
+        userId: me,
+        status: 'invited',
+        challenge: { endsAt: { gt: now } },
+      },
+      orderBy: { challenge: { createdAt: 'desc' } },
+      take: 50,
+      include: {
+        challenge: {
+          include: {
+            creator: { select: { profile: { select: { username: true, displayName: true } } } },
+          },
+        },
+      },
+    })
+    const data = rows.map((p) => {
+      const c = p.challenge
+      const title =
+        c.kind === 'custom' && c.customTitle?.trim() ? c.customTitle.trim() : defaultTitle(c.kind)
+      return {
+        id: c.id,
+        title,
+        scoringType: c.scoringType ?? null,
+        endsAt: c.endsAt.toISOString(),
+        creatorDisplayName: creatorLabel(c.creator.profile),
+      }
+    })
+    return reply.send({ data, requestId: request.id })
+  })
+
   // GET /v1/challenges/discover — public rooms (Camere publice): every PUBLIC,
   // still-active challenge regardless of friendship, official rooms first, with
   // real participant counts + the viewer's joined flag so the browse UI can show
