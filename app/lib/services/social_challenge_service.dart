@@ -183,6 +183,54 @@ class SocialChallengeService {
     }
   }
 
+  /// Create an auto-scored challenge (Feed & Challenges v1). Sends the scoring
+  /// config so the backend engine takes over. Returns the new challenge id.
+  Future<String> createScoredChallenge({
+    required String scoringType, // workout_streak|most_workouts|total_volume|pr_battle|consistency
+    required String title,
+    required int durationDays,
+    String visibility = 'friends',
+    bool startTomorrow = false,
+    String? exerciseId, // pr_battle target
+    int? targetDays, // consistency target
+    List<String> inviteUserIds = const [],
+  }) async {
+    final headers = await _headersAuth();
+    if (headers.isEmpty) throw Exception('Sign in to create a challenge.');
+
+    final body = <String, dynamic>{
+      'kind': 'custom',
+      'customTitle': title.trim().isEmpty ? 'Challenge' : title.trim(),
+      'visibility': visibility,
+      'durationDays': durationDays,
+      'scoringType': scoringType,
+      if (startTomorrow)
+        'startsAt': DateTime.now().add(const Duration(days: 1)).toUtc().toIso8601String(),
+      if (exerciseId != null) 'exerciseId': exerciseId,
+      if (targetDays != null) 'targetDays': targetDays,
+      if (inviteUserIds.isNotEmpty) 'inviteUserIds': inviteUserIds,
+    };
+
+    final res = await http
+        .post(Uri.parse('$v1Base/challenges'), headers: headers, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 25));
+
+    if (res.statusCode == 201) {
+      try {
+        final map = jsonDecode(res.body) as Map<String, dynamic>;
+        return (map['data'] as Map<String, dynamic>?)?['id'] as String? ?? '';
+      } catch (_) {
+        return '';
+      }
+    }
+    var msg = 'Could not create challenge (${res.statusCode})';
+    try {
+      final j = jsonDecode(res.body);
+      if (j is Map && j['message'] is String) msg = j['message'] as String;
+    } catch (_) {}
+    throw Exception(msg);
+  }
+
   Future<void> remove(String id) async {
     final headers = await _headersAuth();
     if (headers.isNotEmpty && _looksLikeUuid(id)) {

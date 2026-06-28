@@ -17,7 +17,7 @@ import '../../widgets/stories_tray.dart';
 import '../../widgets/zvelt_empty_state.dart';
 import '../../widgets/zvelt_error_state.dart';
 import 'circle_screen.dart';
-import 'create_challenge_sheet.dart';
+import 'create_challenge_flow.dart';
 import 'gallery_screen.dart';
 import 'challenges_screen.dart';
 import 'story_composer_screen.dart';
@@ -312,11 +312,11 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   }
 
   Future<void> _createChallenge() async {
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const CreateChallengeSheet(),
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        fullscreenDialog: true,
+        builder: (_) => const CreateChallengeFlow(),
+      ),
     );
     if (ok == true && mounted) _load();
   }
