@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { acceptedFriendIds } from '../lib/friendships'
+import { recomputeChallenge } from '../services/challenge-recalc.service'
 
 const CreateChallengeSchema = z
   .object({
@@ -11,6 +12,23 @@ const CreateChallengeSchema = z
     visibility: z.enum(['friends', 'public']),
     targetHint: z.string().max(60).optional(),
     durationDays: z.number().int().min(1).max(365),
+    // ── Auto-scoring (Feed & Challenges v1) — optional; absent = legacy/manual.
+    scoringType: z
+      .enum(['workout_streak', 'most_workouts', 'total_volume', 'pr_battle', 'consistency'])
+      .optional(),
+    startsAt: z.string().datetime().optional(),
+    rules: z
+      .object({
+        minDurationMin: z.number().int().min(0).max(600),
+        minSets: z.number().int().min(0).max(100),
+        minExercises: z.number().int().min(0).max(50),
+        maxPerDay: z.number().int().min(1).max(10),
+      })
+      .partial()
+      .optional(),
+    exerciseId: z.string().uuid().optional(), // pr_battle target
+    targetDays: z.number().int().min(1).max(31).optional(), // consistency target
+    inviteUserIds: z.array(z.string().uuid()).max(20).optional(),
   })
   .superRefine((val, ctx) => {
     if (val.kind === 'custom') {
@@ -119,12 +137,22 @@ export async function challengeRoutes(app: FastifyInstance) {
       })
     }
 
-    const { kind, customTitle, visibility, targetHint, durationDays } = parsed.data
+    const { kind, customTitle, visibility, targetHint, durationDays, scoringType, startsAt, rules, exerciseId, targetDays, inviteUserIds } = parsed.data
+
+    // Cross-validate the scoring config.
+    if (scoringType === 'pr_battle' && !exerciseId) {
+      return reply.code(400).send({ error: 'EXERCISE_REQUIRED', message: 'PR Battle needs a target exercise.', requestId: request.id })
+    }
+    if (scoringType === 'consistency' && !targetDays) {
+      return reply.code(400).send({ error: 'TARGET_REQUIRED', message: 'Consistency needs a target number of days.', requestId: request.id })
+    }
+
     const customDb = kind === 'custom' ? customTitle!.trim() : customTitle?.trim() ? customTitle.trim() : null
     const hintDb = targetHint?.trim() ? targetHint.trim().slice(0, 120) : null
 
     const createdAt = new Date()
-    const endsAt = new Date(createdAt.getTime() + durationDays * 86_400_000)
+    const startDate = startsAt ? new Date(startsAt) : createdAt
+    const endsAt = new Date(startDate.getTime() + durationDays * 86_400_000)
 
     const row = await prisma.challenge.create({
       data: {
@@ -135,6 +163,15 @@ export async function challengeRoutes(app: FastifyInstance) {
         targetHint: hintDb,
         durationDays,
         endsAt,
+        // Auto-scoring config (null when legacy/manual).
+        scoringType: scoringType ?? null,
+        startsAt: scoringType ? startDate : null,
+        ruleMinDurationMin: rules?.minDurationMin ?? null,
+        ruleMinSets: rules?.minSets ?? null,
+        ruleMinExercises: rules?.minExercises ?? null,
+        ruleMaxPerDay: rules?.maxPerDay ?? null,
+        ruleExerciseId: exerciseId ?? null,
+        ruleTargetDays: targetDays ?? null,
       },
       include: {
         creator: {
@@ -144,6 +181,28 @@ export async function challengeRoutes(app: FastifyInstance) {
         },
       },
     })
+
+    // Creator auto-joins as accepted; invited friends start as 'invited'.
+    await prisma.challengeParticipant.create({
+      data: { challengeId: row.id, userId, status: 'accepted', acceptedAt: createdAt },
+    })
+    if (inviteUserIds?.length) {
+      await prisma.challengeParticipant.createMany({
+        data: inviteUserIds
+          .filter((uid) => uid !== userId)
+          .map((uid) => ({ challengeId: row.id, userId: uid, status: 'invited' })),
+        skipDuplicates: true,
+      })
+    }
+
+    // Seed the standings snapshot for auto-scored challenges.
+    if (scoringType) {
+      try {
+        await recomputeChallenge(row.id)
+      } catch (err) {
+        request.log.warn({ err, challengeId: row.id }, 'Initial challenge recompute failed')
+      }
+    }
 
     return reply.code(201).send({
       data: serializeChallenge(row, userId),
@@ -239,16 +298,41 @@ export async function challengeRoutes(app: FastifyInstance) {
     if (challenge.endsAt <= new Date()) {
       return reply.code(400).send({ error: 'CHALLENGE_EXPIRED', message: 'Provocarea a expirat', requestId: request.id })
     }
-    const existing = await prisma.challengeParticipant.findUnique({
+    // Join == accept (also accepts a pending invite). Idempotent.
+    const now = new Date()
+    const participant = await prisma.challengeParticipant.upsert({
       where: { challengeId_userId: { challengeId: challenge.id, userId: me } },
+      create: { challengeId: challenge.id, userId: me, status: 'accepted', acceptedAt: now },
+      update: { status: 'accepted', acceptedAt: now },
     })
-    if (existing) {
-      return reply.send({ message: 'already joined', data: { challengeId: challenge.id, userId: me, joinedAt: existing.joinedAt.toISOString() } })
+    // Recompute standings so the new participant is scored/ranked immediately.
+    // recomputeChallenge is a no-op for legacy/manual challenges, so it's safe
+    // to call unconditionally.
+    try {
+      await recomputeChallenge(challenge.id)
+    } catch (err) {
+      request.log.warn({ err, challengeId: challenge.id }, 'Recompute on join failed')
     }
-    const participant = await prisma.challengeParticipant.create({
-      data: { challengeId: challenge.id, userId: me },
+    return reply.code(201).send({
+      data: {
+        challengeId: challenge.id,
+        userId: me,
+        status: 'accepted',
+        joinedAt: participant.joinedAt.toISOString(),
+      },
     })
-    return reply.code(201).send({ data: { challengeId: challenge.id, userId: me, joinedAt: participant.joinedAt.toISOString() } })
+  })
+
+  // POST /v1/challenges/:id/decline — decline a pending invite.
+  app.post('/:id/decline', { preHandler: authenticate }, async (request, reply) => {
+    const { userId: me } = request.user
+    const id = requireUuidParam(request, reply)
+    if (!id) return
+    await prisma.challengeParticipant.updateMany({
+      where: { challengeId: id, userId: me },
+      data: { status: 'declined' },
+    })
+    return reply.code(204).send()
   })
 
   // DELETE /v1/challenges/:id/leave

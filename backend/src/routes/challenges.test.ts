@@ -9,9 +9,13 @@ const challengeFindMany = vi.fn()
 const friendshipFindMany = vi.fn()
 const participantFindUnique = vi.fn()
 const participantCreate = vi.fn()
+const participantUpsert = vi.fn()
+const participantUpdate = vi.fn()
+const participantUpdateMany = vi.fn()
 const participantDeleteMany = vi.fn()
 const participantFindMany = vi.fn()
 const participantGroupBy = vi.fn()
+const workoutFindMany = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
@@ -23,10 +27,15 @@ vi.mock('../lib/prisma', () => ({
     challengeParticipant: {
       findUnique: (...a: unknown[]) => participantFindUnique(...a),
       create: (...a: unknown[]) => participantCreate(...a),
+      createMany: (...a: unknown[]) => participantCreate(...a),
+      upsert: (...a: unknown[]) => participantUpsert(...a),
+      update: (...a: unknown[]) => participantUpdate(...a),
+      updateMany: (...a: unknown[]) => participantUpdateMany(...a),
       deleteMany: (...a: unknown[]) => participantDeleteMany(...a),
       findMany: (...a: unknown[]) => participantFindMany(...a),
       groupBy: (...a: unknown[]) => participantGroupBy(...a),
     },
+    workout: { findMany: (...a: unknown[]) => workoutFindMany(...a) },
   },
 }))
 
@@ -57,9 +66,14 @@ beforeEach(() => {
   friendshipFindMany.mockReset()
   participantFindUnique.mockReset()
   participantCreate.mockReset()
+  participantUpsert.mockReset()
+  participantUpdate.mockReset()
+  participantUpdateMany.mockReset()
   participantDeleteMany.mockReset()
   participantFindMany.mockReset()
   participantGroupBy.mockReset()
+  workoutFindMany.mockReset()
+  workoutFindMany.mockResolvedValue([])
   friendshipFindMany.mockResolvedValue([]) // no friends unless a test says so
 })
 
@@ -135,30 +149,29 @@ describe('GET /v1/challenges/discover', () => {
 })
 
 describe('POST /v1/challenges/:id/join', () => {
-  it('joins a public challenge (201) and creates a participant row', async () => {
+  it('joins a public challenge (201) as an accepted participant (upsert)', async () => {
     challengeFindUnique.mockResolvedValue({ id: CID, creatorId: 'other', visibility: 'public', endsAt: FUTURE })
-    participantFindUnique.mockResolvedValue(null) // not yet joined
-    participantCreate.mockResolvedValue({ joinedAt: new Date('2026-06-01T00:00:00Z') })
+    participantUpsert.mockResolvedValue({ joinedAt: new Date('2026-06-01T00:00:00Z') })
 
     const app = await buildApp()
     const res = await app.inject({ method: 'POST', url: `/v1/challenges/${CID}/join` })
 
     expect(res.statusCode).toBe(201)
-    expect(res.json().data).toMatchObject({ challengeId: CID, userId: 'me' })
-    expect(participantCreate).toHaveBeenCalledOnce()
+    expect(res.json().data).toMatchObject({ challengeId: CID, userId: 'me', status: 'accepted' })
+    expect(participantUpsert).toHaveBeenCalledOnce()
     await app.close()
   })
 
-  it('is idempotent — joining when already a participant returns "already joined" (no duplicate create)', async () => {
+  it('is idempotent — join upserts (accept), no duplicate participant', async () => {
     challengeFindUnique.mockResolvedValue({ id: CID, creatorId: 'other', visibility: 'public', endsAt: FUTURE })
-    participantFindUnique.mockResolvedValue({ joinedAt: new Date('2026-05-01T00:00:00Z') })
+    participantUpsert.mockResolvedValue({ joinedAt: new Date('2026-05-01T00:00:00Z') })
 
     const app = await buildApp()
     const res = await app.inject({ method: 'POST', url: `/v1/challenges/${CID}/join` })
 
-    expect(res.statusCode).toBe(200)
-    expect(res.json()).toMatchObject({ message: 'already joined' })
-    expect(participantCreate).not.toHaveBeenCalled()
+    expect(res.statusCode).toBe(201)
+    expect(res.json().data).toMatchObject({ status: 'accepted' })
+    expect(participantUpsert).toHaveBeenCalledOnce()
     await app.close()
   })
 
@@ -201,14 +214,13 @@ describe('POST /v1/challenges/:id/join', () => {
     challengeFindUnique.mockResolvedValue({ id: CID, creatorId: 'buddy', visibility: 'friends', endsAt: FUTURE })
     // viewer `me` is friends with `buddy`.
     friendshipFindMany.mockResolvedValue([{ userId: 'me', friendUserId: 'buddy', status: 'accepted' }])
-    participantFindUnique.mockResolvedValue(null)
-    participantCreate.mockResolvedValue({ joinedAt: new Date('2026-06-01T00:00:00Z') })
+    participantUpsert.mockResolvedValue({ joinedAt: new Date('2026-06-01T00:00:00Z') })
 
     const app = await buildApp()
     const res = await app.inject({ method: 'POST', url: `/v1/challenges/${CID}/join` })
 
     expect(res.statusCode).toBe(201)
-    expect(participantCreate).toHaveBeenCalledOnce()
+    expect(participantUpsert).toHaveBeenCalledOnce()
     await app.close()
   })
 
