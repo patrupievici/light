@@ -20,7 +20,6 @@ import 'circle_screen.dart';
 import 'create_challenge_sheet.dart';
 import 'gallery_screen.dart';
 import 'challenges_screen.dart';
-import 'discover_rooms_screen.dart';
 import 'story_composer_screen.dart';
 import 'story_viewer_screen.dart';
 import '../workouts/post_workout_screen.dart';
@@ -246,58 +245,6 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     if (created == true && mounted) _loadStories(_loadGen);
   }
 
-  void _openDiscoverRooms() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => const DiscoverRoomsScreen()),
-    );
-  }
-
-  /// Always-visible entry into "Camere publice" (public rooms / official rooms).
-  Widget _buildRoomsEntry() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-      child: Material(
-        color: ZveltTokens.surface,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-          onTap: _openDiscoverRooms,
-          child: Padding(
-            padding: const EdgeInsets.all(ZveltTokens.s3),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(ZveltTokens.s3),
-                  decoration: BoxDecoration(
-                    color: ZveltTokens.brandTint.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-                  ),
-                  child: const Icon(AppIcons.globe, color: ZveltTokens.brand, size: 20),
-                ),
-                const SizedBox(width: ZveltTokens.s3),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Public rooms',
-                          style: ZType.bodyM.copyWith(
-                              color: ZveltTokens.text, fontWeight: FontWeight.w700)),
-                      Text('Join public challenges and official rooms',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: ZType.bodyS.copyWith(color: ZveltTokens.text3, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 20),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   void _openStoryGroup(int groupIndex) {
     Navigator.of(context).push<void>(
@@ -530,7 +477,6 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                           ),
                         ),
                         SliverToBoxAdapter(child: _buildRaceHeroCard()),
-                        SliverToBoxAdapter(child: _buildRoomsEntry()),
                         SliverToBoxAdapter(child: _buildFeedControls()),
                         if (_challenges.isNotEmpty) ...[
                           SliverToBoxAdapter(child: _buildChallengeHeader()),
@@ -729,7 +675,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
 
     // ── Design (screens-social.jsx hero): quiet white card r20 p18 —
     // trophy eyebrow, title 18/600, "N athletes · ends in X" meta, then a
-    // compact dark "Join the race" pill + overlapping REAL participant
+    // compact dark "Join challenge" pill + overlapping REAL participant
     // initials. Replaces the V1 take (900-italic title, TRENDING/PUBLIC
     // badges, full-width CTA). Whole card taps into the Race Hub.
     final initials = _heroParticipantInitials;
@@ -755,7 +701,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   const Icon(AppIcons.trophy, size: 12, color: Colors.white),
                   const SizedBox(width: 4),
                   Text(
-                    'RACE OF THE WEEK',
+                    'ACTIVE CHALLENGE',
                     style: ZType.eyebrow.copyWith(
                       fontSize: 11,
                       color: Colors.white.withValues(alpha: 0.85),
@@ -785,7 +731,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   // Compact dark join pill (design PillBtn dark/sm + bolt).
                   Semantics(
                     button: true,
-                    label: 'Join the race',
+                    label: 'Join challenge',
                     child: GestureDetector(
                     onTap: () => _joinAndOpenRace(top),
                     child: Container(
@@ -801,7 +747,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                           Icon(AppIcons.bolt, size: 14, color: ZveltTokens.brand),
                           SizedBox(width: 6),
                           Text(
-                            'Join the race',
+                            'Join challenge',
                             style: TextStyle(
                               fontFamily: ZveltTokens.fontPrimary,
                               fontSize: 12,
@@ -936,64 +882,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Trending / Friends segmented toggle
-          Row(
-            children: [
-              // Design: quiet segmented control — surface-2 track (padding 2),
-              // active pill = surface + soft shadow, 10.5px/500. The old
-              // orange-gradient + hardcoded grays were V1 leftovers.
-              Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: ZveltTokens.surface2,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final t in const ['trending', 'friends'])
-                      Builder(builder: (context) {
-                        final sel = _trendingFilter == t;
-                        final label = t == 'trending' ? 'Trending' : 'Friends';
-                        return Semantics(
-                          button: true,
-                          selected: sel,
-                          label: '$label feed',
-                          child: GestureDetector(
-                            onTap: () {
-                              if (_trendingFilter == t) return;
-                              _trendingFilter = t;
-                              _onFilterChanged();
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: sel ? ZveltTokens.surface : Colors.transparent,
-                                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                                boxShadow: sel ? ZveltTokens.shadowCard : null,
-                              ),
-                              child: Text(
-                                label,
-                                style: TextStyle(
-                                  color: sel ? ZveltTokens.text : ZveltTokens.text3,
-                                  fontSize: 11,
-                                  fontWeight:
-                                      sel ? FontWeight.w600 : FontWeight.w500,
-                                  fontFamily: ZveltTokens.fontPrimary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          // Single filter row (spec): All / Following / PRs / Challenges
           // Filter pills
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
