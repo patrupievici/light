@@ -312,13 +312,13 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   }
 
   Future<void> _createChallenge() async {
-    final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
         fullscreenDialog: true,
         builder: (_) => const CreateChallengeFlow(),
       ),
     );
-    if (ok == true && mounted) _load();
+    if (mounted) _load(); // refresh after returning from the flow/detail
   }
 
   Future<void> _confirmRemoveChallenge(SocialChallenge c) async {

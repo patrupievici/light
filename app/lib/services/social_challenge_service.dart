@@ -266,6 +266,17 @@ class SocialChallengeService {
     throw Exception(msg);
   }
 
+  /// POST /v1/challenges/:id/decline — decline a pending invite.
+  Future<void> declineChallenge(String challengeId) async {
+    final headers = await _headersAuth();
+    if (headers.isEmpty) throw Exception('Not signed in');
+    final res = await http
+        .post(Uri.parse('$v1Base/challenges/$challengeId/decline'), headers: headers)
+        .timeout(const Duration(seconds: 22));
+    if (res.statusCode == 204 || res.statusCode == 200) return;
+    throw Exception('Could not decline (${res.statusCode})');
+  }
+
   /// DELETE /v1/challenges/:id/leave
   Future<void> leaveChallenge(String challengeId) async {
     final headers = await _headersAuth();

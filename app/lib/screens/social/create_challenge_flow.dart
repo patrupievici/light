@@ -5,6 +5,7 @@ import '../../services/friends_service.dart';
 import '../../services/workout_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
+import 'challenge_detail_screen.dart';
 
 /// Create Challenge flow (Feed & Challenges v1) — Type → Setup → Friends →
 /// Review → Send. Sends the scoring config so the backend engine auto-scores
@@ -113,7 +114,7 @@ class _CreateChallengeFlowState extends State<CreateChallengeFlow> {
     setState(() => _sending = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await _challenges.createScoredChallenge(
+      final id = await _challenges.createScoredChallenge(
         scoringType: _type!,
         title: _titleCtrl.text.trim(),
         durationDays: _durationDays,
@@ -123,8 +124,20 @@ class _CreateChallengeFlowState extends State<CreateChallengeFlow> {
         inviteUserIds: _selectedFriends.toList(),
       );
       if (!mounted) return;
-      messenger.showSnackBar(const SnackBar(content: Text('Challenge sent. Waiting for friends to accept.')));
-      Navigator.of(context).pop(true);
+      messenger.showSnackBar(const SnackBar(content: Text('Challenge created.')));
+      if (id.isEmpty) {
+        Navigator.of(context).pop(true);
+        return;
+      }
+      // Land on the new challenge's detail + leaderboard.
+      Navigator.of(context).pushReplacement(MaterialPageRoute<void>(
+        builder: (_) => ChallengeDetailScreen(
+          challengeId: id,
+          title: _titleCtrl.text.trim(),
+          scoringType: _type,
+          endsAt: DateTime.now().add(Duration(days: _durationDays + (_startTomorrow ? 1 : 0))),
+        ),
+      ));
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
