@@ -604,6 +604,23 @@ model Notification {
   @@map("notifications")
 }
 
+/// Idempotency ledger for SCHEDULED notifications (streak-risk, challenge
+/// ending/ended). Each row claims "this notification was already sent" so a
+/// cron re-run or a service restart mid-batch never double-notifies. dedupeKey
+/// is per-type: a UTC date (YYYY-MM-DD) for streak-risk, the challengeId for
+/// challenge ending/ended. FK-less; an eventual cleanup prunes old rows.
+model NotificationSentLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String   @db.VarChar(40)
+  dedupeKey String   @map("dedupe_key") @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, type, dedupeKey])
+  @@index([createdAt])
+  @@map("notification_sent_logs")
+}
+
 model PostLike {
   postId    String   @map("post_id")
   userId    String   @map("user_id")

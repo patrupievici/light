@@ -46,6 +46,8 @@ import { startStoriesCleanupCron } from './services/stories-cleanup.service'
 import { startOfficialRoomsSeed } from './services/official-rooms.service'
 import { startWebhookReconcileCron } from './services/webhook-reconcile-cron.service'
 import { startSoftDeleteCron } from './services/soft-delete-cron.service'
+import { startStreakRiskNotificationCron } from './services/streak-risk-notification.service'
+import { startChallengeEndingNotificationCron } from './services/challenge-ending-notification.service'
 import { adminRoutes } from './routes/admin'
 
 const app = Fastify({
@@ -162,6 +164,8 @@ async function main() {
   startOfficialRoomsSeed(app.log)
   startWebhookReconcileCron(app.log)
   startSoftDeleteCron(app.log)
+  startStreakRiskNotificationCron(app.log)
+  startChallengeEndingNotificationCron(app.log)
 
   // ─── Error handler global ─────────────────────────────────────────────────
 

@@ -10,6 +10,9 @@ export const NotificationType = {
   POST_COMMENT: 'post_comment',
   DM_MESSAGE: 'dm_message',
   CHALLENGE_INVITE: 'challenge_invite',
+  STREAK_RISK: 'streak_risk',
+  CHALLENGE_ENDING_SOON: 'challenge_ending_soon',
+  CHALLENGE_ENDED: 'challenge_ended',
 } as const
 
 /** Nu aruncă — notificarea nu trebuie să blocheze fluxul principal. */
@@ -33,5 +36,26 @@ export async function createNotificationSafe(params: {
     void sendPushForInAppNotification(row).catch((e) => console.error('[fcm] push', e))
   } catch (err) {
     console.error('[notification] create failed', err)
+  }
+}
+
+/**
+ * Atomically claim a scheduled-notification slot. Inserts a NotificationSentLog
+ * row (unique on userId+type+dedupeKey); returns true if this caller won the
+ * slot (should send), false if it was already claimed (a cron re-run / restart
+ * already sent it). The unique-constraint insert is the lock — no read-then-write
+ * race.
+ */
+export async function claimScheduledNotification(
+  userId: string,
+  type: string,
+  dedupeKey: string,
+): Promise<boolean> {
+  try {
+    await prisma.notificationSentLog.create({ data: { userId, type, dedupeKey } })
+    return true
+  } catch {
+    // Unique violation (already claimed) — or any DB hiccup; treat as "skip".
+    return false
   }
 }

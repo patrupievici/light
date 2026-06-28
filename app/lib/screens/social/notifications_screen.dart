@@ -144,6 +144,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return '${n.actorLabel} sent you a message';
       case 'challenge_invite':
         return '${n.actorLabel} invited you to a challenge';
+      case 'streak_risk':
+        return 'Your streak is at risk';
+      case 'challenge_ending_soon':
+        return 'A challenge ends soon';
+      case 'challenge_ended':
+        final won = n.payload['youWon'] == true;
+        return won ? 'You won a challenge! 🏆' : 'A challenge just ended';
       default:
         return 'Notification';
     }
@@ -157,6 +164,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (n.type == 'challenge_invite') {
       final t = n.payload['title'] as String?;
       if (t != null && t.trim().isNotEmpty) return t.trim();
+    }
+    if (n.type == 'streak_risk') {
+      return 'Post a workout today to keep it going';
+    }
+    if (n.type == 'challenge_ending_soon') {
+      final t = n.payload['title'] as String?;
+      return (t != null && t.trim().isNotEmpty) ? '${t.trim()} — sprint to the finish' : 'Less than 24h left';
+    }
+    if (n.type == 'challenge_ended') {
+      final title = (n.payload['title'] as String?)?.trim();
+      final winner = (n.payload['winnerName'] as String?)?.trim();
+      final rank = n.payload['myRank'];
+      if (n.payload['youWon'] == true) return title != null && title.isNotEmpty ? '$title — you finished #1' : 'You finished #1';
+      if (winner != null && winner.isNotEmpty) return 'Winner: $winner${rank is num ? ' · you placed #${rank.toInt()}' : ''}';
+      return title;
     }
     return null;
   }
@@ -226,6 +248,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
           );
         }
+        break;
+      case 'challenge_ending_soon':
+      case 'challenge_ended':
+        final challengeId = n.payload['challengeId'] as String?;
+        if (challengeId != null && challengeId.isNotEmpty) {
+          final endsRaw = n.payload['endsAt'] as String?;
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => ChallengeDetailScreen(
+                challengeId: challengeId,
+                title: n.payload['title'] as String?,
+                scoringType: n.payload['scoringType'] as String?,
+                endsAt: endsRaw != null ? DateTime.tryParse(endsRaw) : null,
+              ),
+            ),
+          );
+        }
+        break;
+      case 'streak_risk':
+        // No deep target — the user just needs to log/post today. Marking read
+        // (handled above) is enough; tapping dismisses.
         break;
     }
   }
@@ -410,7 +453,12 @@ class _NotifCard extends StatelessWidget {
       case 'dm_message':
         return AppIcons.envelope;
       case 'challenge_invite':
+      case 'challenge_ended':
         return AppIcons.trophy;
+      case 'challenge_ending_soon':
+        return AppIcons.clock;
+      case 'streak_risk':
+        return AppIcons.flame;
       default:
         return AppIcons.bell;
     }
