@@ -1,20 +1,21 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:zvelt_app/theme/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../models/activity_kind.dart';
 import '../../services/activity_calendar_store.dart';
-import '../../services/health_service.dart';
 import '../../services/stats_charts_service.dart';
 import '../../services/workout_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/z/z_card.dart';
-import '../../widgets/z/z_eyebrow.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
 import '../calendar/activity_calendar_screen.dart';
 import 'quick_launch_sheet.dart';
 import 'exercise_library_screen.dart';
+import 'train/train_exercises_tab.dart';
+import 'train/train_exercise_detail.dart';
+import 'train/train_history_tab.dart';
+import 'train/create_custom_exercise_screen.dart';
 import 'program_builder_screen.dart';
 import 'programs_library_screen.dart';
 import 'program_detail_screen.dart';
@@ -36,14 +37,11 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   final RoutineService _routineService = RoutineService();
   final StatsChartsService _stats = StatsChartsService();
   final ActivityCalendarStore _calendarStore = ActivityCalendarStore();
-  final HealthService _health = HealthService.instance;
 
   bool _loading = true;
   bool _starting = false;
   String? _error;
 
-  int _cardioTab = 0;
-  int _strengthTab = 0;
   // Train sub-tabs: 0 Azi · 1 Programe · 2 Exerciții · 3 Istoric. Each pane is
   // built lazily on first visit, then kept alive (Offstage) so scroll + state
   // survive switches.
@@ -56,11 +54,24 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   List<Routine> _routines = [];
   Routine? _startingRoutine;
   List<DailyTrainingPoint> _dailyTraining = [];
-  List<WeeklyEffortPoint> _weeklyEffort = [];
   List<ManualCardioDayPoint> _manualCardio = [];
   Map<String, List<ActivityKind>> _activities = {};
   Map<String, List<PlannedWorkoutEntry>> _planned = {};
-  HealthSummary _healthSummary = HealthSummary.empty;
+
+  // Derived view-models for the Exercises + History sub-tabs, recomputed from
+  // the loaded workouts in [_computeDerived]. _exDtos / _exDetailBars run
+  // parallel to _exVms so a tapped Exercises row opens its real detail.
+  List<TrainExerciseVM> _exVms = const [];
+  List<ExerciseDto> _exDtos = const [];
+  List<List<double>> _exDetailBars = const [];
+  int _histStreak = 0;
+  int _histWorkoutsThisWeek = 0;
+  int _lastWorkoutPrs = 0;
+  Set<DateTime> _histTrainedDays = const {};
+  List<HistorySession> _histSessions = const [];
+  List<HistoryLogEntry> _histLog = const [];
+  List<HistoryPr> _histPrs = const [];
+  List<HistoryProgress> _histProgress = const [];
 
   @override
   void initState() {
@@ -74,6 +85,11 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
       _error = null;
     });
 
+    // Drop the memoized Programs futures so pull-to-refresh refetches templates
+    // + the active-program banner instead of showing stale data.
+    _programsFuture = null;
+    _activeFuture = null;
+
     // Settle every fetch independently so one failing endpoint (e.g. a
     // getWorkouts 5xx) no longer collapses the whole screen into the error
     // state and throws away the other (often locally-cached) results. Each
@@ -83,11 +99,9 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     final settled = await Future.wait<Object?>([
       _settle(_workoutService.getWorkouts()),
       _settle(_stats.getDailyTraining(days: 30)),
-      _settle(_stats.getWeeklyEffort(weeks: 6)),
       _settle(_calendarStore.loadManualCardioHistory(days: 30)),
       _settle(_calendarStore.loadAll()),
       _settle(_calendarStore.loadPlannedWorkouts()),
-      _settle(_health.getSummary()),
       _settle(_routineService.getRoutines()),
     ]);
 
@@ -107,19 +121,16 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     setState(() {
       _workouts = (workoutsResult.value as WorkoutsResponse).data;
       final daily = settled[1] as _SettleResult;
-      final weekly = settled[2] as _SettleResult;
-      final cardio = settled[3] as _SettleResult;
-      final activities = settled[4] as _SettleResult;
-      final planned = settled[5] as _SettleResult;
-      final health = settled[6] as _SettleResult;
-      final routines = settled[7] as _SettleResult;
+      final cardio = settled[2] as _SettleResult;
+      final activities = settled[3] as _SettleResult;
+      final planned = settled[4] as _SettleResult;
+      final routines = settled[5] as _SettleResult;
       if (routines.ok) _routines = routines.value as List<Routine>;
       if (daily.ok) _dailyTraining = daily.value as List<DailyTrainingPoint>;
-      if (weekly.ok) _weeklyEffort = weekly.value as List<WeeklyEffortPoint>;
       if (cardio.ok) _manualCardio = cardio.value as List<ManualCardioDayPoint>;
       if (activities.ok) _activities = activities.value as Map<String, List<ActivityKind>>;
       if (planned.ok) _planned = planned.value as Map<String, List<PlannedWorkoutEntry>>;
-      if (health.ok) _healthSummary = health.value as HealthSummary;
+      _computeDerived();
       _error = null;
       _loading = false;
     });
@@ -211,7 +222,10 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
       body: SafeArea(
-        child: _loading
+        // Full-screen spinner only on the FIRST load — on pull-to-refresh the
+        // lazy Offstage panes stay mounted so their search/calendar/scroll
+        // state survives (and the RefreshIndicator isn't torn down mid-gesture).
+        child: _loading && _workouts.isEmpty
             ? const Center(child: CircularProgressIndicator(color: ZveltTokens.brand))
             : Column(
                 children: [
@@ -457,16 +471,17 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   Widget _todaysWorkoutHero() {
     final planned = _plannedToday();
     final title = planned?.title ?? 'Ready to train';
+    final routine = _matchedRoutineForToday();
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: _starting ? null : _startWorkout,
-        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             gradient: ZveltTokens.gradBrand,
-            borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+            borderRadius: BorderRadius.circular(24),
             boxShadow: ZveltTokens.glowBrand,
           ),
           child: Column(
@@ -486,8 +501,38 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: ZType.h2.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                style: ZType.h2.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 26,
+                    letterSpacing: -0.02 * 26),
               ),
+              if (routine != null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(AppIcons.gym, size: 15, color: Colors.white.withValues(alpha: 0.9)),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${routine.exerciseCount} exercise${routine.exerciseCount == 1 ? '' : 's'}',
+                      style: ZType.bodyS.copyWith(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                if ((routine.focus ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final c in _focusChips(routine.focus!)) _heroMetaChip(c),
+                    ],
+                  ),
+                ],
+              ],
               const SizedBox(height: 18),
               Container(
                 width: double.infinity,
@@ -495,7 +540,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
                   _starting ? 'Starting…' : 'Start Workout →',
@@ -518,22 +563,32 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     final dur = w.endedAt != null ? _durLabel(w.endedAt!.difference(w.startedAt)) : '—';
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(ZveltTokens.s5),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: ZveltTokens.surface,
-        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: ZveltTokens.shadowCard,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('LAST WORKOUT',
-              style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+              style: ZType.bodyS.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 0.1 * 12,
+                  color: ZveltTokens.text2)),
+          const SizedBox(height: 6),
+          Text(_sessionLabel(w),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ZType.h4.copyWith(
+                  color: ZveltTokens.text, fontSize: 18, fontWeight: FontWeight.w700)),
           const SizedBox(height: 14),
           Row(
             children: [
               Expanded(child: _miniStat(_fmtInt(vol), 'kg volume')),
-              Expanded(child: _miniStat('${w.exercises.length}', 'exercises')),
+              Expanded(child: _miniStat('$_lastWorkoutPrs', 'PRs')),
               Expanded(child: _miniStat(dur, 'duration')),
             ],
           ),
@@ -560,7 +615,12 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('QUICK ACTIONS', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+        Text('QUICK ACTIONS',
+            style: ZType.bodyS.copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                letterSpacing: 0.1 * 12,
+                color: ZveltTokens.text2)),
         const SizedBox(height: ZveltTokens.s3),
         _quickActionRow(AppIcons.plus, 'Start empty workout',
             _starting ? null : _startWorkout),
@@ -575,6 +635,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   Widget _quickActionRow(IconData icon, String label, VoidCallback? onTap) {
     return ZCard(
       onTap: onTap,
+      radius: 18,
       child: Row(
         children: [
           Container(
@@ -603,10 +664,10 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     final streak = _currentStreak();
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(ZveltTokens.s5),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: ZveltTokens.surface,
-        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: ZveltTokens.shadowCard,
       ),
       child: Column(
@@ -767,12 +828,12 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
               onTap: () => Navigator.of(context).push<void>(
                 MaterialPageRoute<void>(builder: (_) => const ActiveProgramScreen()),
               ),
-              borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+              borderRadius: BorderRadius.circular(22),
               child: Container(
                 padding: const EdgeInsets.all(ZveltTokens.s4),
                 decoration: BoxDecoration(
                   color: ZveltTokens.brandTint,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+                  borderRadius: BorderRadius.circular(22),
                 ),
                 child: Row(
                   children: [
@@ -832,7 +893,12 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
         ),
       ),
       const SizedBox(height: ZveltTokens.s5),
-      Text('CHOOSE A PROGRAM', style: ZType.eyebrow),
+      Text('CHOOSE A PROGRAM',
+          style: ZType.bodyS.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 0.1 * 11,
+              color: ZveltTokens.text2)),
       const SizedBox(height: ZveltTokens.s3),
       FutureBuilder<List<ProgramSummary>>(
         future: _programsFuture,
@@ -871,272 +937,450 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     ]);
   }
 
-  // ── Exerciții — exercise library ──────────────────────────────────────────
+  // ── Exerciții — exercise library (design handoff: inline list, real data) ──
   Widget _exercitiiTab() {
     return _subTabScroll([
-      Text(
-        'Search any exercise with a GIF demo, filter by muscle group and equipment, or add your own exercises.',
-        style: ZType.bodyM.copyWith(color: ZveltTokens.text2),
-      ),
-      const SizedBox(height: ZveltTokens.s4),
-      _ExerciseLibraryEntryCard(
-        onTap: () => Navigator.of(context).push<void>(
+      TrainExercisesTab(
+        exercises: _exVms,
+        onOpenExercise: _openExerciseDetail,
+        onBrowseLibrary: () => Navigator.of(context).push<void>(
           MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()),
         ),
-      ),
-      const SizedBox(height: ZveltTokens.s4),
-      SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: _starting ? null : _startWorkout,
-          icon: const Icon(AppIcons.play),
-          label: const Text('Start an empty workout'),
-        ),
+        onCreateCustom: _openCreateCustom,
       ),
     ]);
   }
 
-  // ── Istoric — calendar + analytics ────────────────────────────────────────
+  // Opens the real create-custom-exercise form; on success surface a confirm.
+  Future<void> _openCreateCustom() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final created = await Navigator.of(context).push<ExerciseDto>(
+      MaterialPageRoute(builder: (_) => const CreateCustomExerciseScreen()),
+    );
+    if (created == null || !mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Created "${created.name}".'),
+        backgroundColor: ZveltTokens.success,
+      ),
+    );
+  }
+
+  // Opens the tapped exercise's real detail. [index] is the position in the
+  // _exVms list passed to [TrainExercisesTab]; _exDtos / _exDetailBars run
+  // parallel to it.
+  void _openExerciseDetail(int index) {
+    if (index < 0 || index >= _exDtos.length) return;
+    final ex = _exDtos[index];
+    final vm = _exVms[index];
+    final muscles = <String>[
+      if ((ex.primaryMuscle ?? '').trim().isNotEmpty) ex.primaryMuscle!.trim(),
+      ...ex.secondaryMuscles.where((m) => m.trim().isNotEmpty),
+    ];
+    final instructions = ex.instructions.isNotEmpty
+        ? ex.instructions.join('\n')
+        : (ex.description ?? 'No instructions available for this exercise yet.');
+    Navigator.of(context).push<void>(MaterialPageRoute(
+      builder: (_) => TrainExerciseDetailScreen(
+        name: ex.name,
+        lastSet: vm.lastLabel,
+        best: vm.bestLabel,
+        volumeDeltaLabel: '${vm.trendLabel} mo.',
+        bars: index < _exDetailBars.length && _exDetailBars[index].isNotEmpty
+            ? _exDetailBars[index]
+            : const [0.4, 0.55, 0.48, 0.7, 0.6, 0.88, 1.0],
+        muscles: muscles.isEmpty ? const ['Full body'] : muscles,
+        instructions: instructions,
+        onAddToWorkout: _starting
+            ? null
+            : () {
+                Navigator.of(context).maybePop();
+                _startWorkout();
+              },
+      ),
+    ));
+  }
+
+  // ── Istoric — design handoff bound to real workouts. Monthly summary / log /
+  // PRs / progress all derive from completed workouts; the coach card uses the
+  // real streak + workouts-this-week.
   Widget _istoricTab() {
-    final strainDelta = _strainDelta();
-    final strainDeltaRounded = strainDelta.round();
-    final strainDeltaLabel = '${strainDeltaRounded >= 0 ? '+' : ''}$strainDeltaRounded%';
     return _subTabScroll([
-                            _SectionCard(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          'Activity Summary',
-                                          style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-                                        ),
-                                      ),
-                                      Text(
-                                        '${_totalStrengthMinutes()}m',
-                                        style: ZType.num_.copyWith(color: ZveltTokens.text, fontSize: 34),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: ZveltTokens.s1),
-                                  Text(
-                                    'Sessions and volume across the last month.',
-                                    style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-                                  ),
-                                  const SizedBox(height: ZveltTokens.s5),
-                                  SizedBox(
-                                    height: 220,
-                                    child: _ActivitySummaryChart(points: _dailyTraining),
-                                  ),
-                                  const SizedBox(height: ZveltTokens.s4),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _MiniStat(
-                                          label: 'Sessions',
-                                          value: '${_dailyTraining.fold<int>(0, (sum, item) => sum + item.sessions)}',
-                                        ),
-                                      ),
-                                      const SizedBox(width: ZveltTokens.s3),
-                                      Expanded(
-                                        child: _MiniStat(
-                                          label: 'Volume',
-                                          value: '${_dailyTraining.fold<double>(0, (sum, item) => sum + item.volumeKg).round()} kg',
-                                        ),
-                                      ),
-                                      const SizedBox(width: ZveltTokens.s3),
-                                      Expanded(
-                                        child: _MiniStat(
-                                          label: 'Sets',
-                                          value: '${_dailyTraining.fold<int>(0, (sum, item) => sum + item.workSets)}',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: ZveltTokens.s5),
-                            _SectionCard(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          'Strain Performance',
-                                          style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-                                        ),
-                                      ),
-                                      Text(
-                                        strainDeltaLabel,
-                                        style: ZType.num_.copyWith(
-                                          color: strainDelta >= 0 ? ZveltTokens.success : ZveltTokens.warn,
-                                          fontSize: 24,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: ZveltTokens.s2),
-                                  Text(
-                                    strainDelta >= 0 ? 'Above recent target' : 'Below recent target',
-                                    style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-                                  ),
-                                  const SizedBox(height: ZveltTokens.s4),
-                                  SizedBox(
-                                    height: 210,
-                                    child: _StrainPerformanceChart(points: _weeklyEffort),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: ZveltTokens.s8),
-                            Text(
-                              'Cardio',
-                              style: ZType.h1.copyWith(color: ZveltTokens.text),
-                            ),
-                            const SizedBox(height: ZveltTokens.s4),
-                            _SegmentedControl(
-                              labels: const ['Cardio Load', 'Cardio Focus', 'HRR'],
-                              selected: _cardioTab,
-                              onChanged: (index) => setState(() => _cardioTab = index),
-                            ),
-                            const SizedBox(height: ZveltTokens.s4),
-                            _buildCardioPanel(),
-                            const SizedBox(height: ZveltTokens.s8),
-                            Text(
-                              'Strength',
-                              style: ZType.h1.copyWith(color: ZveltTokens.text),
-                            ),
-                            const SizedBox(height: ZveltTokens.s4),
-                            _SegmentedControl(
-                              labels: const ['Total Volume', 'Strength Progression'],
-                              selected: _strengthTab,
-                              onChanged: (index) => setState(() => _strengthTab = index),
-                            ),
-                            const SizedBox(height: ZveltTokens.s4),
-                            _buildStrengthPanel(),
+      TrainHistoryTab(
+        dayStreak: _histStreak,
+        workoutsThisWeek: _histWorkoutsThisWeek,
+        trainedDays: _histTrainedDays,
+        monthSessions: _histSessions,
+        workoutLog: _histLog,
+        personalRecords: _histPrs,
+        progressCharts: _histProgress,
+        onOpenWorkout: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const ActivityCalendarScreen()),
+        ),
+        onOpenExerciseProgress: () => _selectTrainTab(2),
+      ),
     ]);
   }
 
-  Widget _buildCardioPanel() {
-    switch (_cardioTab) {
-      case 0:
-        return _SectionCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Cardio Load',
-                      style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-                    ),
-                  ),
-                  Text(
-                    '${_manualCardio.fold<int>(0, (sum, item) => sum + item.totalMinutes)} min',
-                    style: ZType.num_.copyWith(color: ZveltTokens.text, fontSize: 20),
-                  ),
-                ],
-              ),
-              const SizedBox(height: ZveltTokens.s4),
-              SizedBox(height: 210, child: _CardioLoadChart(points: _manualCardio)),
-            ],
-          ),
-        );
-      case 1:
-        return _SectionCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Cardio Focus',
-                style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-              ),
-              const SizedBox(height: ZveltTokens.s2),
-              Text(
-                'Distribution of logged non-gym activities.',
-                style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-              ),
-              const SizedBox(height: ZveltTokens.s5),
-              SizedBox(height: 240, child: _CardioFocusChart(activityCounts: _activityCounts())),
-            ],
-          ),
-        );
-      default:
-        return _SectionCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'HRR',
-                style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-              ),
-              const SizedBox(height: ZveltTokens.s2),
-              Text(
-                'Resting heart-rate recovery window from your recent baseline.',
-                style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-              ),
-              const SizedBox(height: ZveltTokens.s5),
-              _BaselineGauge(
-                title: 'Resting HR',
-                valueLabel: _healthSummary.restingHeartRateBpm == null
-                    ? 'No data'
-                    : '${_healthSummary.restingHeartRateBpm!.toStringAsFixed(0)} bpm',
-                low: _healthSummary.rhrBaselineLowBpm,
-                high: _healthSummary.rhrBaselineHighBpm,
-                value: _healthSummary.restingHeartRateBpm,
-                accent: ZveltTokens.recovery,
-              ),
-            ],
-          ),
-        );
+  // ════════════════════════════════════════════════════════════════════════
+  // Derived data for the Exercises + History sub-tabs. Real where the API has
+  // it; honest logic where it doesn't — a workout carries no name, so the log
+  // label comes from the dominant muscle group, and there's no PR table, so PRs
+  // are computed from Epley e1RM (CLAUDE.md ranking spec).
+  // ════════════════════════════════════════════════════════════════════════
+  void _computeDerived() {
+    final completed = _completedWorkouts(); // newest first
+
+    final meta = <String, ExerciseDto>{};
+    final sessionCount = <String, int>{};
+    final bestE1rm = <String, double>{};
+    final bestWReps = <String, (double, int)>{};
+    final bestReps = <String, int>{};
+    final exSessionVols = <String, List<double>>{}; // oldest → newest
+
+    for (final w in completed.reversed) {
+      for (final we in w.exercises) {
+        meta[we.exerciseId] = we.exercise;
+        sessionCount[we.exerciseId] = (sessionCount[we.exerciseId] ?? 0) + 1;
+        var sv = 0.0;
+        for (final s in we.sets) {
+          if (s.tag != 'WARMUP') sv += s.weightKg * s.reps;
+          if (s.tag == 'WORK') {
+            final e = _setE1rm(s);
+            if (e > (bestE1rm[we.exerciseId] ?? 0)) {
+              bestE1rm[we.exerciseId] = e;
+              bestWReps[we.exerciseId] = (s.weightKg, s.reps);
+            }
+            // Only track best reps for genuine bodyweight sets (weight ≤ 0) so a
+            // loaded high-rep lift (e.g. 60 kg × 15, out of the e1RM window) is
+            // never shown as "BW × N" in Personal Records.
+            if (s.weightKg <= 0 && s.reps > (bestReps[we.exerciseId] ?? 0)) {
+              bestReps[we.exerciseId] = s.reps;
+            }
+          }
+        }
+        exSessionVols.putIfAbsent(we.exerciseId, () => []).add(sv);
+      }
     }
+
+    // PR count per workout: oldest → newest, count exercises beating their
+    // running-best e1RM.
+    final running = <String, double>{};
+    final prCountById = <String, int>{};
+    for (final w in completed.reversed) {
+      final wBest = <String, double>{};
+      for (final we in w.exercises) {
+        for (final s in we.sets) {
+          final e = _setE1rm(s);
+          if (e > (wBest[we.exerciseId] ?? 0)) wBest[we.exerciseId] = e;
+        }
+      }
+      var prs = 0;
+      wBest.forEach((id, b) {
+        if (b > (running[id] ?? 0)) {
+          prs++;
+          running[id] = b;
+        }
+      });
+      prCountById[w.id] = prs;
+    }
+    _lastWorkoutPrs = completed.isNotEmpty ? (prCountById[completed.first.id] ?? 0) : 0;
+
+    // Exercises tab VMs (+ parallel dtos / detail bars), most-trained first.
+    final order = meta.keys.toList()
+      ..sort((a, b) {
+        final va = exSessionVols[a]?.fold<double>(0, (s, x) => s + x) ?? 0;
+        final vb = exSessionVols[b]?.fold<double>(0, (s, x) => s + x) ?? 0;
+        return vb.compareTo(va);
+      });
+    final vms = <TrainExerciseVM>[];
+    final dtos = <ExerciseDto>[];
+    final detailBars = <List<double>>[];
+    for (final id in order) {
+      final ex = meta[id]!;
+      WorkoutSetDto? top;
+      for (final w in completed) {
+        WorkoutExerciseDto? we;
+        for (final x in w.exercises) {
+          if (x.exerciseId == id) {
+            we = x;
+            break;
+          }
+        }
+        if (we == null) continue;
+        for (final s in we.sets) {
+          if (s.tag != 'WORK') continue;
+          if (top == null ||
+              s.weightKg > top.weightKg ||
+              (s.weightKg == top.weightKg && s.reps > top.reps)) {
+            top = s;
+          }
+        }
+        break; // most recent session only
+      }
+      final lastLabel = top == null ? '—' : _fmtSet(top.weightKg, top.reps);
+      final bestLabel = (bestE1rm[id] ?? 0) > 0
+          ? _fmtSet(bestWReps[id]!.$1, bestWReps[id]!.$2)
+          : lastLabel;
+      final vols = exSessionVols[id] ?? const <double>[];
+      final recent = vols.length > 7 ? vols.sublist(vols.length - 7) : vols;
+      vms.add(TrainExerciseVM(
+        name: ex.name,
+        equipment: (ex.equipment ?? '').trim(),
+        level: ex.beginnerSuitable ? 'Beginner' : '',
+        lastLabel: lastLabel,
+        bestLabel: bestLabel,
+        trendLabel: _trendPct(recent),
+        group: _muscleGroup(ex.primaryMuscle).toLowerCase(),
+        bars: _normalizeBars(recent),
+      ));
+      dtos.add(ex);
+      detailBars.add(_normalizeBarsD(recent));
+    }
+
+    // Personal records: weighted by e1RM first, bodyweight by reps to fill.
+    final prs = <HistoryPr>[];
+    final weighted = bestE1rm.entries.where((e) => e.value > 0).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    for (final e in weighted.take(5)) {
+      final wr = bestWReps[e.key]!;
+      prs.add(HistoryPr(
+        exercise: meta[e.key]!.name,
+        value: _fmtSet(wr.$1, wr.$2),
+        category: 'Best weight',
+      ));
+    }
+    if (prs.length < 5) {
+      final bw = bestReps.entries
+          .where((e) => (bestE1rm[e.key] ?? 0) == 0 && e.value > 0)
+          .toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      for (final e in bw.take(5 - prs.length)) {
+        prs.add(HistoryPr(
+          exercise: meta[e.key]!.name,
+          value: 'BW × ${e.value}',
+          category: 'Best reps',
+        ));
+      }
+    }
+
+    // Progress charts: top 2 exercises with ≥2 sessions.
+    final progress = <HistoryProgress>[];
+    final topEx = sessionCount.entries.where((e) => e.value >= 2).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    for (final e in topEx.take(2)) {
+      final vols = exSessionVols[e.key]!;
+      final recent = vols.length > 7 ? vols.sublist(vols.length - 7) : vols;
+      progress.add(HistoryProgress(
+        name: meta[e.key]!.name,
+        trendLabel: _trendPct(recent),
+        bars: _normalizeBarsD(recent),
+      ));
+    }
+
+    // Monthly sessions for the calendar's monthly summary (filtered per month
+    // inside the widget).
+    final sessions = <HistorySession>[];
+    for (final w in completed) {
+      var vol = 0.0;
+      var sets = 0;
+      final mv = <String, double>{};
+      for (final we in w.exercises) {
+        final g = _muscleGroup(we.exercise.primaryMuscle);
+        for (final s in we.sets) {
+          if (s.tag == 'WARMUP') continue;
+          vol += s.weightKg * s.reps;
+          sets++;
+          if (g != 'Other') mv[g] = (mv[g] ?? 0) + s.weightKg * s.reps + s.reps;
+        }
+      }
+      sessions.add(HistorySession(
+        date: DateUtils.dateOnly(w.endedAt ?? w.startedAt),
+        volumeKg: vol,
+        sets: sets,
+        muscleVolume: mv,
+      ));
+    }
+
+    // Workout log (newest 10).
+    final log = <HistoryLogEntry>[];
+    for (final w in completed.take(10)) {
+      final d = w.endedAt ?? w.startedAt;
+      final dur =
+          w.endedAt != null ? _durLabel(w.endedAt!.difference(w.startedAt)) : '—';
+      log.add(HistoryLogEntry(
+        label: _sessionLabel(w),
+        subtitle: '${_monShort(d.month)} ${d.day} · $dur · ${_fmtInt(_workoutVolume(w))} kg',
+        prCount: prCountById[w.id] ?? 0,
+      ));
+    }
+
+    // Trained days (strength + tracked activities), for the calendar.
+    final trained = <DateTime>{};
+    for (final w in completed) {
+      trained.add(DateUtils.dateOnly(w.endedAt ?? w.startedAt));
+    }
+    for (final p in _dailyTraining) {
+      if (p.sessions > 0) {
+        final dt = _parseYmd(p.day);
+        if (dt != null) trained.add(dt);
+      }
+    }
+    _activities.forEach((k, v) {
+      if (v.isNotEmpty) {
+        final dt = _parseYmd(k);
+        if (dt != null) trained.add(dt);
+      }
+    });
+
+    // Workouts this week (Monday-anchored).
+    final now = DateTime.now();
+    final monday =
+        DateUtils.dateOnly(now).subtract(Duration(days: now.weekday - 1));
+    var wtw = 0;
+    for (final w in completed) {
+      final d = DateUtils.dateOnly(w.endedAt ?? w.startedAt);
+      if (!d.isBefore(monday)) wtw++;
+    }
+
+    _exVms = vms;
+    _exDtos = dtos;
+    _exDetailBars = detailBars;
+    _histStreak = _currentStreak();
+    _histWorkoutsThisWeek = wtw;
+    _histTrainedDays = trained;
+    _histSessions = sessions;
+    _histLog = log;
+    _histPrs = prs;
+    _histProgress = progress;
   }
 
-  Widget _buildStrengthPanel() {
-    if (_strengthTab == 0) {
-      final muscleVolumes = _muscleVolumes();
-      return _SectionCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Total Volume',
-              style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-            ),
-            const SizedBox(height: ZveltTokens.s2),
-            Text(
-              'Body-part distribution built from completed workout sets.',
-              style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-            ),
-            const SizedBox(height: ZveltTokens.s5),
-            _TotalVolumePanel(muscleVolumes: muscleVolumes),
-          ],
-        ),
-      );
-    }
+  List<WorkoutDto> _completedWorkouts() {
+    return _workouts
+        .where((w) => w.status == 'completed' || w.endedAt != null)
+        .toList()
+      ..sort((a, b) =>
+          (b.endedAt ?? b.startedAt).compareTo(a.endedAt ?? a.startedAt));
+  }
 
-    return _SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Strength Progression',
-            style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-          ),
-          const SizedBox(height: ZveltTokens.s2),
-          Text(
-            'Daily volume trend over the last month.',
-            style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-          ),
-          const SizedBox(height: ZveltTokens.s5),
-          SizedBox(height: 220, child: _StrengthProgressionChart(points: _dailyTraining)),
-        ],
+  // Epley e1RM for a WORK set in the 1..12 window (CLAUDE.md ranking spec); 0
+  // for warmup/drop, out-of-window reps, or bodyweight (0 kg).
+  double _setE1rm(WorkoutSetDto s) {
+    if (s.tag != 'WORK' || s.reps < 1 || s.reps > 12 || s.weightKg <= 0) return 0;
+    return s.weightKg * (1 + s.reps / 30);
+  }
+
+  String _muscleGroup(String? raw) {
+    final v = (raw ?? '').toLowerCase();
+    if (v.contains('chest') || v.contains('pec')) return 'Chest';
+    if (v.contains('back') || v.contains('lat') || v.contains('trap') || v.contains('rhom')) return 'Back';
+    if (v.contains('quad') || v.contains('glute') || v.contains('ham') || v.contains('calf') || v.contains('leg')) return 'Legs';
+    if (v.contains('delt') || v.contains('shoulder')) return 'Shoulders';
+    if (v.contains('bicep') || v.contains('tricep') || v.contains('forearm') || v.contains('arm')) return 'Arms';
+    if (v.contains('ab') || v.contains('core') || v.contains('oblique')) return 'Core';
+    return 'Other';
+  }
+
+  String _fmtSet(double weightKg, int reps) =>
+      weightKg <= 0 ? 'BW × $reps' : '${_fmtWeight(weightKg)} kg × $reps';
+
+  String _fmtWeight(double kg) =>
+      kg % 1 == 0 ? kg.toStringAsFixed(0) : kg.toStringAsFixed(1);
+
+  String _monShort(int m) => const [
+        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ][m];
+
+  String _trendPct(List<double> oldestToNewest) {
+    if (oldestToNewest.length < 2) return '0%';
+    final first = oldestToNewest.firstWhere((x) => x > 0, orElse: () => 0.0);
+    final last = oldestToNewest.last;
+    if (first <= 0) return '0%';
+    final pct = ((last - first) / first * 100).round();
+    return '${pct > 0 ? '+' : ''}$pct%';
+  }
+
+  List<int> _normalizeBars(List<double> v) {
+    if (v.isEmpty) return const [];
+    final max = v.reduce((a, b) => a > b ? a : b);
+    if (max <= 0) return List<int>.filled(v.length, 6);
+    return v.map((x) => ((x / max) * 100).round().clamp(6, 100).toInt()).toList();
+  }
+
+  List<double> _normalizeBarsD(List<double> v) {
+    if (v.isEmpty) return const [];
+    final max = v.reduce((a, b) => a > b ? a : b);
+    if (max <= 0) return List<double>.filled(v.length, 0.06);
+    return v.map((x) => (x / max).clamp(0.06, 1.0).toDouble()).toList();
+  }
+
+  DateTime? _parseYmd(String s) {
+    final p = s.split('-');
+    if (p.length < 3) return null;
+    final y = int.tryParse(p[0]);
+    final mo = int.tryParse(p[1]);
+    final da = int.tryParse(p[2].length > 2 ? p[2].substring(0, 2) : p[2]);
+    if (y == null || mo == null || da == null) return null;
+    return DateTime(y, mo, da);
+  }
+
+  // No workout name in the API → label from the dominant muscle group.
+  String _sessionLabel(WorkoutDto w) {
+    final vol = <String, double>{};
+    for (final we in w.exercises) {
+      final g = _muscleGroup(we.exercise.primaryMuscle);
+      if (g == 'Other') continue;
+      var sv = 0.0;
+      for (final s in we.sets) {
+        if (s.tag == 'WARMUP') continue;
+        sv += s.weightKg * s.reps + s.reps;
+      }
+      vol[g] = (vol[g] ?? 0) + sv;
+    }
+    if (vol.isEmpty) return 'Workout';
+    final top = vol.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    return '$top Day';
+  }
+
+  // Maps today's planned session to a saved routine (so the hero can show its
+  // real exercise count + focus chips); null when nothing matches.
+  Routine? _matchedRoutineForToday() {
+    final title = (_plannedToday()?.title ?? '').toLowerCase().trim();
+    if (title.isEmpty) return null;
+    for (final r in _routines) {
+      if (r.name.toLowerCase().trim() == title) return r;
+    }
+    for (final r in _routines) {
+      final n = r.name.toLowerCase().trim();
+      if (n.isNotEmpty && (title.contains(n) || n.contains(title))) return r;
+    }
+    return null;
+  }
+
+  List<String> _focusChips(String focus) {
+    return focus
+        .split(RegExp(r'[,/·•&]|\band\b'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .take(3)
+        .toList();
+  }
+
+  Widget _heroMetaChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Text(
+        label,
+        style: ZType.bodyS.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -1168,70 +1412,6 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
       labels.add('${planned.length} planned');
     }
     return labels.isEmpty ? 'No activity logged for this day yet.' : labels.join(' • ');
-  }
-
-  int _totalStrengthMinutes() {
-    var total = 0;
-    for (final workout in _workouts) {
-      if (workout.endedAt == null) continue;
-      final dayCutoff = DateTime.now().subtract(const Duration(days: 30));
-      if (workout.startedAt.isBefore(dayCutoff)) continue;
-      total += workout.endedAt!.difference(workout.startedAt).inMinutes;
-    }
-    return total;
-  }
-
-  double _strainDelta() {
-    if (_weeklyEffort.length < 2) return 0;
-    final latest = _weeklyEffort.last.volumeKg;
-    final previous = _weeklyEffort.sublist(0, _weeklyEffort.length - 1);
-    if (previous.isEmpty) return 0;
-    final baseline = previous.fold<double>(0, (sum, item) => sum + item.volumeKg) / previous.length;
-    if (baseline == 0) return 0;
-    return ((latest - baseline) / baseline) * 100;
-  }
-
-  Map<String, double> _muscleVolumes() {
-    final map = <String, double>{
-      'Chest': 0,
-      'Back': 0,
-      'Legs': 0,
-      'Shoulders': 0,
-      'Core': 0,
-      'Arms': 0,
-    };
-    for (final workout in _workouts) {
-      for (final exercise in workout.exercises) {
-        final muscle = _normalizeMuscle(exercise.exercise.primaryMuscle);
-        final volume = exercise.sets.fold<double>(
-          0,
-          (sum, set) => sum + (set.weightKg * set.reps),
-        );
-        map[muscle] = (map[muscle] ?? 0) + volume;
-      }
-    }
-    return map;
-  }
-
-  Map<ActivityKind, int> _activityCounts() {
-    final counts = <ActivityKind, int>{};
-    for (final dayActivities in _activities.values) {
-      for (final kind in dayActivities) {
-        counts[kind] = (counts[kind] ?? 0) + 1;
-      }
-    }
-    return counts;
-  }
-
-  String _normalizeMuscle(String? raw) {
-    final value = (raw ?? '').toLowerCase();
-    if (value.contains('chest') || value.contains('pec')) return 'Chest';
-    if (value.contains('back') || value.contains('lat')) return 'Back';
-    if (value.contains('leg') || value.contains('quad') || value.contains('glute') || value.contains('ham')) return 'Legs';
-    if (value.contains('shoulder') || value.contains('delt')) return 'Shoulders';
-    if (value.contains('core') || value.contains('ab') || value.contains('oblique')) return 'Core';
-    if (value.contains('arm') || value.contains('bicep') || value.contains('tricep') || value.contains('forearm')) return 'Arms';
-    return 'Core';
   }
 
   String _dayKey(DateTime day) =>
@@ -1397,11 +1577,11 @@ class _ProgramSummaryCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        borderRadius: BorderRadius.circular(22),
         child: Container(
           decoration: BoxDecoration(
             color: ZveltTokens.surface,
-            borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+            borderRadius: BorderRadius.circular(22),
             boxShadow: ZveltTokens.shadowCard,
           ),
           padding: const EdgeInsets.all(ZveltTokens.s5),
@@ -1415,7 +1595,10 @@ class _ProgramSummaryCard extends StatelessWidget {
                       summary.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: ZType.h3.copyWith(color: ZveltTokens.text),
+                      style: ZType.h3.copyWith(
+                          color: ZveltTokens.text,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w700),
                     ),
                   ),
                   Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 22),
@@ -1427,7 +1610,8 @@ class _ProgramSummaryCard extends StatelessWidget {
                   summary.description,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2, height: 1.45),
+                  style: ZType.bodyS.copyWith(
+                      color: ZveltTokens.text2, fontSize: 14, height: 1.45),
                 ),
               ],
               const SizedBox(height: ZveltTokens.s3),
@@ -1463,49 +1647,6 @@ class _ProgramSummaryCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Entry into the exercise library (the "Exerciții" sub-tab) — browse exercises
-/// with GIF demos, filters, and per-muscle grouping.
-class _ExerciseLibraryEntryCard extends StatelessWidget {
-  const _ExerciseLibraryEntryCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ZCard(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: ZveltTokens.brandTint,
-              borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-            ),
-            child: const Icon(AppIcons.gym, color: ZveltTokens.brandDeep, size: 22),
-          ),
-          const SizedBox(width: ZveltTokens.s3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Exercise library', style: ZType.h4.copyWith(color: ZveltTokens.text)),
-                const SizedBox(height: 2),
-                Text(
-                  'Search exercises with GIF demos, by muscle group and equipment.',
-                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-                ),
-              ],
-            ),
-          ),
-          Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 22),
-        ],
       ),
     );
   }
@@ -1754,35 +1895,6 @@ class _SelectedDaySummary extends StatelessWidget {
   }
 }
 
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s4, vertical: ZveltTokens.s4),
-      decoration: BoxDecoration(
-        color: ZveltTokens.bg2,
-        borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: ZType.stat.copyWith(color: ZveltTokens.text, fontSize: 20),
-          ),
-          const SizedBox(height: ZveltTokens.s2),
-          ZEyebrow(label),
-        ],
-      ),
-    );
-  }
-}
-
 class _SegmentedControl extends StatelessWidget {
   const _SegmentedControl({
     required this.labels,
@@ -1800,7 +1912,7 @@ class _SegmentedControl extends StatelessWidget {
       padding: const EdgeInsets.all(ZveltTokens.s1),
       decoration: BoxDecoration(
         color: ZveltTokens.bg2,
-        borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
@@ -1813,7 +1925,7 @@ class _SegmentedControl extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: ZveltTokens.s3, horizontal: ZveltTokens.s3),
                   decoration: BoxDecoration(
                     color: selected == i ? ZveltTokens.surface : Colors.transparent,
-                    borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                    borderRadius: BorderRadius.circular(9),
                     boxShadow: selected == i ? ZveltTokens.shadowCard : null,
                   ),
                   child: Text(
@@ -1821,6 +1933,7 @@ class _SegmentedControl extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: ZType.bodyS.copyWith(
                       color: selected == i ? ZveltTokens.text : ZveltTokens.text2,
+                      fontSize: 12,
                       fontWeight: selected == i ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
@@ -1828,649 +1941,6 @@ class _SegmentedControl extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActivitySummaryChart extends StatelessWidget {
-  const _ActivitySummaryChart({required this.points});
-
-  final List<DailyTrainingPoint> points;
-
-  @override
-  Widget build(BuildContext context) {
-    if (points.isEmpty) {
-      return const _EmptyChartState(label: 'No activity data yet');
-    }
-    final maxY = points.fold<double>(0, (max, item) => item.volumeKg > max ? item.volumeKg : max);
-    return BarChart(
-      BarChartData(
-        minY: 0,
-        maxY: maxY == 0 ? 10 : maxY * 1.2,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (value) => FlLine(color: ZveltTokens.border),
-        ),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 34,
-              getTitlesWidget: (value, meta) => Text(
-                value >= 1000 ? '${(value / 1000).toStringAsFixed(1)}k' : value.toInt().toString(),
-                style: ZType.monoXS.copyWith(color: ZveltTokens.text2, fontSize: 11),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 24,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= points.length || index % 5 != 0) {
-                  return const SizedBox.shrink();
-                }
-                final day = points[index].day;
-                return Text(
-                  day.length >= 10 ? day.substring(8) : day,
-                  style: ZType.monoXS.copyWith(color: ZveltTokens.text2, fontSize: 11),
-                );
-              },
-            ),
-          ),
-        ),
-        barGroups: [
-          for (var i = 0; i < points.length; i++)
-            BarChartGroupData(
-              x: i,
-              barRods: [
-                BarChartRodData(
-                  toY: points[i].volumeKg,
-                  width: 8,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                  gradient: const LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [ZveltTokens.brand, ZveltTokens.info],
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StrainPerformanceChart extends StatelessWidget {
-  const _StrainPerformanceChart({required this.points});
-
-  final List<WeeklyEffortPoint> points;
-
-  @override
-  Widget build(BuildContext context) {
-    if (points.isEmpty) {
-      return const _EmptyChartState(label: 'No strain performance data yet');
-    }
-    final values = points.map((item) => item.volumeKg).toList();
-    final maxY = values.reduce((a, b) => a > b ? a : b);
-    final avg = values.fold<double>(0, (sum, item) => sum + item) / values.length;
-    return LineChart(
-      LineChartData(
-        minX: 0,
-        maxX: (values.length - 1).toDouble(),
-        minY: 0,
-        maxY: maxY == 0 ? 10 : maxY * 1.2,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (value) => FlLine(color: ZveltTokens.border),
-        ),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 40,
-              getTitlesWidget: (value, meta) => Text(
-                value >= 1000 ? '${(value / 1000).toStringAsFixed(1)}k' : value.toInt().toString(),
-                style: ZType.monoXS.copyWith(color: ZveltTokens.text2, fontSize: 11),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= points.length) return const SizedBox.shrink();
-                final label = points[index].weekStart;
-                return Text(
-                  label.length >= 10 ? label.substring(5, 10) : label,
-                  style: ZType.monoXS.copyWith(color: ZveltTokens.text2, fontSize: 11),
-                );
-              },
-            ),
-          ),
-        ),
-        extraLinesData: ExtraLinesData(
-          horizontalLines: [
-            HorizontalLine(
-              y: avg,
-              color: ZveltTokens.warn.withValues(alpha: 0.6),
-              dashArray: const [6, 4],
-              strokeWidth: 1.4,
-            ),
-          ],
-        ),
-        lineBarsData: [
-          LineChartBarData(
-            isCurved: true,
-            barWidth: 3.5,
-            color: ZveltTokens.brand,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                radius: index == values.length - 1 ? 6 : 3,
-                color: ZveltTokens.surface,
-                strokeWidth: 2.5,
-                strokeColor: ZveltTokens.brand,
-              ),
-            ),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  ZveltTokens.brand.withValues(alpha: 0.28),
-                  ZveltTokens.brand.withValues(alpha: 0.02),
-                ],
-              ),
-            ),
-            spots: [
-              for (var i = 0; i < values.length; i++) FlSpot(i.toDouble(), values[i]),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CardioLoadChart extends StatelessWidget {
-  const _CardioLoadChart({required this.points});
-
-  final List<ManualCardioDayPoint> points;
-
-  @override
-  Widget build(BuildContext context) {
-    if (points.every((item) => item.totalMinutes == 0)) {
-      return const _EmptyChartState(label: 'No cardio sessions logged yet');
-    }
-    final maxY = points.fold<int>(0, (max, item) => item.totalMinutes > max ? item.totalMinutes : max);
-    return BarChart(
-      BarChartData(
-        minY: 0,
-        maxY: (maxY == 0 ? 10 : maxY * 1.25).toDouble(),
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (value) => FlLine(color: ZveltTokens.border),
-        ),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 28,
-              getTitlesWidget: (value, meta) => Text(
-                value.toInt().toString(),
-                style: ZType.monoXS.copyWith(color: ZveltTokens.text2, fontSize: 11),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= points.length || index % 5 != 0) {
-                  return const SizedBox.shrink();
-                }
-                return Text(
-                  '${points[index].date.day}',
-                  style: ZType.monoXS.copyWith(color: ZveltTokens.text2, fontSize: 11),
-                );
-              },
-            ),
-          ),
-        ),
-        barGroups: [
-          for (var i = 0; i < points.length; i++)
-            BarChartGroupData(
-              x: i,
-              barRods: [
-                BarChartRodData(
-                  toY: points[i].totalMinutes.toDouble(),
-                  width: 8,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                  color: ZveltTokens.strength,
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CardioFocusChart extends StatelessWidget {
-  const _CardioFocusChart({required this.activityCounts});
-
-  final Map<ActivityKind, int> activityCounts;
-
-  @override
-  Widget build(BuildContext context) {
-    if (activityCounts.isEmpty) {
-      return const _EmptyChartState(label: 'No activity mix available yet');
-    }
-    final entries = activityCounts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final colors = <Color>[
-      ZveltTokens.strength,
-      ZveltTokens.recovery,
-      ZveltTokens.warn,
-      ZveltTokens.cardio,
-      ZveltTokens.sleep,
-    ];
-    return Column(
-      children: [
-        Expanded(
-          child: PieChart(
-            PieChartData(
-              centerSpaceRadius: 48,
-              sectionsSpace: 3,
-              sections: [
-                for (var i = 0; i < entries.length; i++)
-                  PieChartSectionData(
-                    value: entries[i].value.toDouble(),
-                    color: colors[i % colors.length],
-                    radius: 46,
-                    title: '${entries[i].value}',
-                    titleStyle: ZType.num_.copyWith(
-                      color: ZveltTokens.onBrand,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: ZveltTokens.s4),
-        Wrap(
-          spacing: ZveltTokens.s3,
-          runSpacing: ZveltTokens.s3,
-          children: [
-            for (var i = 0; i < entries.length; i++)
-              _LegendPill(
-                color: colors[i % colors.length],
-                label: '${entries[i].key.label} (${entries[i].value})',
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _StrengthProgressionChart extends StatelessWidget {
-  const _StrengthProgressionChart({required this.points});
-
-  final List<DailyTrainingPoint> points;
-
-  @override
-  Widget build(BuildContext context) {
-    if (points.isEmpty) {
-      return const _EmptyChartState(label: 'No progression data yet');
-    }
-    final values = points.map((item) => item.volumeKg).toList();
-    final maxY = values.fold<double>(0, (max, item) => item > max ? item : max);
-    return LineChart(
-      LineChartData(
-        minX: 0,
-        maxX: (values.length - 1).toDouble(),
-        minY: 0,
-        maxY: maxY == 0 ? 10 : maxY * 1.25,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (value) => FlLine(color: ZveltTokens.border),
-        ),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 34,
-              getTitlesWidget: (value, meta) => Text(
-                value.toInt().toString(),
-                style: ZType.monoXS.copyWith(color: ZveltTokens.text2, fontSize: 11),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= points.length || index % 5 != 0) {
-                  return const SizedBox.shrink();
-                }
-                final label = points[index].day;
-                return Text(
-                  label.length >= 10 ? label.substring(8) : label,
-                  style: ZType.monoXS.copyWith(color: ZveltTokens.text2, fontSize: 11),
-                );
-              },
-            ),
-          ),
-        ),
-        lineBarsData: [
-          LineChartBarData(
-            isCurved: true,
-            color: ZveltTokens.recovery,
-            barWidth: 3,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  ZveltTokens.recovery.withValues(alpha: 0.2),
-                  ZveltTokens.recovery.withValues(alpha: 0.03),
-                ],
-              ),
-            ),
-            spots: [
-              for (var i = 0; i < values.length; i++) FlSpot(i.toDouble(), values[i]),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TotalVolumePanel extends StatelessWidget {
-  const _TotalVolumePanel({required this.muscleVolumes});
-
-  final Map<String, double> muscleVolumes;
-
-  @override
-  Widget build(BuildContext context) {
-    final entries = muscleVolumes.entries.toList();
-    final total = entries.fold<double>(0, (sum, item) => sum + item.value);
-    final colors = <Color>[
-      ZveltTokens.strength,
-      ZveltTokens.recovery,
-      ZveltTokens.warn,
-      ZveltTokens.cardio,
-      ZveltTokens.sleep,
-      ZveltTokens.info,
-    ];
-
-    return Column(
-      children: [
-        SizedBox(
-          height: 250,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              PieChart(
-                PieChartData(
-                  centerSpaceRadius: 62,
-                  sectionsSpace: 4,
-                  sections: [
-                    for (var i = 0; i < entries.length; i++)
-                      PieChartSectionData(
-                        value: total == 0 ? 1 : entries[i].value,
-                        color: colors[i % colors.length].withValues(
-                          alpha: total == 0 ? 0.12 : 1,
-                        ),
-                        radius: 42,
-                        title: '',
-                      ),
-                  ],
-                ),
-              ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Total',
-                    style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-                  ),
-                  const SizedBox(height: ZveltTokens.s1),
-                  Text(
-                    '${total.round()} kg',
-                    style: ZType.num_.copyWith(color: ZveltTokens.text, fontSize: 24),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: ZveltTokens.s2),
-        Wrap(
-          spacing: ZveltTokens.s3,
-          runSpacing: ZveltTokens.s3,
-          children: [
-            for (var i = 0; i < entries.length; i++)
-              SizedBox(
-                width: 150,
-                child: _VolumeLegendTile(
-                  color: colors[i % colors.length],
-                  label: entries[i].key,
-                  value: '${entries[i].value.round()} kg',
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _BaselineGauge extends StatelessWidget {
-  const _BaselineGauge({
-    required this.title,
-    required this.valueLabel,
-    required this.low,
-    required this.high,
-    required this.value,
-    required this.accent,
-  });
-
-  final String title;
-  final String valueLabel;
-  final double? low;
-  final double? high;
-  final double? value;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasRange = low != null && high != null && high! > low!;
-    final normalized = hasRange && value != null ? ((value! - low!) / (high! - low!)).clamp(0.0, 1.0) : 0.0;
-
-    return Container(
-      padding: const EdgeInsets.all(ZveltTokens.s5),
-      decoration: BoxDecoration(
-        color: ZveltTokens.bg2,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
-          ),
-          const SizedBox(height: ZveltTokens.s3),
-          Text(
-            valueLabel,
-            style: ZType.num_.copyWith(color: ZveltTokens.text, fontSize: 28),
-          ),
-          const SizedBox(height: ZveltTokens.s5),
-          SizedBox(
-            height: 150,
-            child: PieChart(
-              PieChartData(
-                startDegreeOffset: 180,
-                sectionsSpace: 0,
-                centerSpaceRadius: 50,
-                sections: [
-                  PieChartSectionData(
-                    value: normalized * 100,
-                    color: accent,
-                    radius: 18,
-                    title: '',
-                  ),
-                  PieChartSectionData(
-                    value: 100 - (normalized * 100),
-                    color: ZveltTokens.border,
-                    radius: 18,
-                    title: '',
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: ZveltTokens.s2),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  low == null ? 'Low --' : 'Low ${low!.toStringAsFixed(0)}',
-                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-                ),
-              ),
-              Text(
-                high == null ? 'High --' : 'High ${high!.toStringAsFixed(0)}',
-                style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LegendPill extends StatelessWidget {
-  const _LegendPill({required this.color, required this.label});
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s3, vertical: ZveltTokens.s2),
-      decoration: BoxDecoration(
-        color: ZveltTokens.bg2,
-        borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-        border: Border.all(color: ZveltTokens.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: ZveltTokens.s2),
-          Text(
-            label,
-            style: ZType.bodyS.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VolumeLegendTile extends StatelessWidget {
-  const _VolumeLegendTile({
-    required this.color,
-    required this.label,
-    required this.value,
-  });
-
-  final Color color;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s4, vertical: ZveltTokens.s3),
-      decoration: BoxDecoration(
-        color: ZveltTokens.bg2,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        border: Border.all(color: ZveltTokens.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: ZveltTokens.s3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: ZType.bodyS.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(value, style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyChartState extends StatelessWidget {
-  const _EmptyChartState({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        label,
-        style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
       ),
     );
   }
