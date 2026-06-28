@@ -10,6 +10,7 @@ import '../../services/auth_service.dart';
 import '../../services/social_challenge_service.dart';
 import '../../services/social_feed_service.dart';
 import '../../services/stories_service.dart';
+import '../../services/stats_charts_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/social_challenge_card.dart';
 import '../../widgets/social_feed_post_card.dart';
@@ -38,6 +39,9 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   final _authService = AuthService();
 
   List<SocialFeedPost> _posts = [];
+  // PRs tab — the user's real recent personal records (from ranking/stats).
+  final _statsService = StatsChartsService();
+  List<RecentPr> _recentPrs = const [];
   List<SocialChallenge> _challenges = [];
 
   // Ephemeral 24h stories shown in the top rail. Loaded separately from (and
@@ -142,6 +146,16 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     _scrollController.addListener(_onScroll);
     _feedRefreshTrigger.addListener(_onFeedRefreshHint);
     _load();
+    _loadRecentPrs();
+  }
+
+  Future<void> _loadRecentPrs() async {
+    try {
+      final prs = await _statsService.getRecentPrs(days: 90);
+      if (mounted) setState(() => _recentPrs = prs);
+    } catch (_) {
+      // PRs are a best-effort enrichment of the PRs tab — empty is fine.
+    }
   }
 
   @override
@@ -321,6 +335,103 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     if (mounted) _load(); // refresh after returning from the flow/detail
   }
 
+  // ── PRs tab — your real recent records + "Challenge this PR" ───────────────
+  Widget _buildPrRecords() {
+    if (_recentPrs.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('YOUR RECENT PRs', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+          const SizedBox(height: 12),
+          for (final pr in _recentPrs.take(12)) ...[
+            _prCard(pr),
+            const SizedBox(height: ZveltTokens.cardGap),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _prCard(RecentPr pr) {
+    final delta = pr.deltaKg;
+    return Container(
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        boxShadow: ZveltTokens.shadowCard,
+      ),
+      padding: const EdgeInsets.all(ZveltTokens.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brandTint,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                ),
+                child: const Icon(AppIcons.trophy, size: 20, color: ZveltTokens.brand),
+              ),
+              const SizedBox(width: ZveltTokens.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(pr.exerciseName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(pr.headline, style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
+                  ],
+                ),
+              ),
+              if (delta > 0)
+                Text('+${delta % 1 == 0 ? delta.toInt() : delta.toStringAsFixed(1)} kg',
+                    style: ZType.bodyM.copyWith(color: ZveltTokens.success, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s3),
+          SizedBox(
+            width: double.infinity,
+            child: Material(
+              color: ZveltTokens.brandTint,
+              borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                onTap: () => _challengeThisPr(pr),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: Text('Challenge this PR',
+                        style: ZType.bodyS.copyWith(color: ZveltTokens.brand, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _challengeThisPr(RecentPr pr) async {
+    await Navigator.of(context).push<void>(MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => CreateChallengeFlow(
+        initialScoringType: 'pr_battle',
+        initialExerciseId: pr.exerciseId,
+        initialExerciseName: pr.exerciseName,
+      ),
+    ));
+    if (mounted) _load();
+  }
+
   Future<void> _confirmRemoveChallenge(SocialChallenge c) async {
     final remove = await showDialog<bool>(
       context: context,
@@ -491,6 +602,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                             ),
                           ),
                         ],
+                        if (_feedFilter == 'prs')
+                          SliverToBoxAdapter(child: _buildPrRecords()),
                         SliverToBoxAdapter(child: _buildFeedHeader()),
                         if (_posts.isEmpty)
                           SliverToBoxAdapter(

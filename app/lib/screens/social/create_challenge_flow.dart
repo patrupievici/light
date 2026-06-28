@@ -11,7 +11,18 @@ import 'challenge_detail_screen.dart';
 /// Review → Send. Sends the scoring config so the backend engine auto-scores
 /// from real workouts. Pops `true` on success.
 class CreateChallengeFlow extends StatefulWidget {
-  const CreateChallengeFlow({super.key});
+  const CreateChallengeFlow({
+    super.key,
+    this.initialScoringType,
+    this.initialExerciseId,
+    this.initialExerciseName,
+  });
+
+  /// Optional presets — used by "Challenge this PR" to land on a pre-filled
+  /// PR Battle for a specific lift, skipping the type-picker step.
+  final String? initialScoringType;
+  final String? initialExerciseId;
+  final String? initialExerciseName;
 
   @override
   State<CreateChallengeFlow> createState() => _CreateChallengeFlowState();
@@ -61,6 +72,25 @@ class _CreateChallengeFlowState extends State<CreateChallengeFlow> {
   void initState() {
     super.initState();
     _loadFriends();
+    _applyPreset();
+  }
+
+  void _applyPreset() {
+    final preType = widget.initialScoringType;
+    if (preType == null || !_kTypes.any((t) => t.id == preType)) return;
+    _type = preType;
+    _titleCtrl.text = _defaultTitle(preType);
+    if (preType == 'pr_battle') {
+      _exerciseId = widget.initialExerciseId;
+      _exerciseName = widget.initialExerciseName;
+      if (_exerciseId == null) _loadExercisesIfNeeded();
+      if (_exerciseName != null) {
+        // For PR Battle, name the challenge after the lift, e.g. "Bench PR Battle".
+        _titleCtrl.text = '${widget.initialExerciseName} PR Battle';
+      }
+    }
+    // Skip the type picker — the user already chose this from a PR card.
+    _step = 1;
   }
 
   @override
