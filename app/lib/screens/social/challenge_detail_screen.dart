@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../services/social_challenge_service.dart';
+import '../../services/social_feed_service.dart';
+import '../../services/feed_refresh_notifier.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
 
@@ -29,6 +31,7 @@ class ChallengeDetailScreen extends StatefulWidget {
 
 class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
   final _service = SocialChallengeService();
+  final _feed = SocialFeedService();
 
   bool _loading = true;
   String? _error;
@@ -36,6 +39,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
   int _myRank = 0; // 0 = not in standings
   num _myTotal = 0;
   bool _acting = false;
+  bool _sharing = false;
 
   @override
   void initState() {
@@ -82,6 +86,37 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
     } finally {
       if (mounted) setState(() => _acting = false);
+    }
+  }
+
+  /// Opt-in "Share to Feed?" for a challenge result — a caption-only post to
+  /// your friends (privacy-by-default). Reuses the normal post path; renders as
+  /// an ordinary feed card, so no special feed plumbing is needed.
+  String _resultCaption() {
+    final raw = widget.title?.trim();
+    final t = (raw != null && raw.isNotEmpty) ? raw : _typeInfo().$1;
+    final ended = widget.endsAt != null && widget.endsAt!.isBefore(DateTime.now());
+    if (_myRank == 1) {
+      return ended ? 'Won "$t" 🥇 #ZveltChallenge' : 'Leading "$t" at #1 🥇 #ZveltChallenge';
+    }
+    if (ended) return 'Finished #$_myRank in "$t" 🏆 #ZveltChallenge';
+    return 'Currently #$_myRank in "$t" 💪 #ZveltChallenge';
+  }
+
+  Future<void> _shareResult() async {
+    if (_sharing || _myRank <= 0) return;
+    setState(() => _sharing = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _feed.createPost(caption: _resultCaption());
+      FeedRefreshNotifier.instance.bump(RefreshScope.feed);
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(content: Text('Shared to your feed')));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
 
@@ -148,6 +183,20 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
             const SizedBox(height: ZveltTokens.s4),
             if (_myRank > 0) ...[
               _statusCard(),
+              const SizedBox(height: ZveltTokens.s3),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _sharing ? null : _shareResult,
+                  icon: const Icon(AppIcons.paper_plane, size: 18),
+                  label: Text(_sharing ? 'Sharing…' : 'Share result to feed'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ZveltTokens.brand,
+                    side: BorderSide(color: ZveltTokens.brand.withValues(alpha: 0.5)),
+                    minimumSize: const Size.fromHeight(46),
+                  ),
+                ),
+              ),
               const SizedBox(height: ZveltTokens.s4),
             ],
             Text('LEADERBOARD', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
