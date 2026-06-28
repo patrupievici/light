@@ -58,10 +58,14 @@ export async function runStreakRiskNotifications(
   const threeDaysAgo = new Date(now.getTime() - 3 * DAY_MS)
   const dedupeKey = now.toISOString().slice(0, 10) // YYYY-MM-DD (UTC)
 
-  // Most recent post per engaged user (posted in the last 14 days).
+  // Most recent post per engaged user (posted in the last 14 days). Exclude
+  // soft-deleted/disabled authors — those accounts must stay silent.
   const groups = await prisma.post.groupBy({
     by: ['userId'],
-    where: { createdAt: { gt: fourteenDaysAgo } },
+    where: {
+      createdAt: { gt: fourteenDaysAgo },
+      user: { status: 'active', softDeletedAt: null },
+    },
     _max: { createdAt: true },
   })
 

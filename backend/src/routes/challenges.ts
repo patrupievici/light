@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { acceptedFriendIds } from '../lib/friendships'
 import { recomputeChallenge } from '../services/challenge-recalc.service'
-import { createNotificationSafe, NotificationType } from '../services/notification.service'
+import { createNotificationSafe, claimScheduledNotification, NotificationType } from '../services/notification.service'
 
 const CreateChallengeSchema = z
   .object({
@@ -269,7 +269,12 @@ export async function challengeRoutes(app: FastifyInstance) {
       where: {
         userId: me,
         status: 'invited',
-        challenge: { endsAt: { gt: now } },
+        // Hide invites whose creator deleted/disabled their account (don't leak
+        // their profile or surface a dead challenge).
+        challenge: {
+          endsAt: { gt: now },
+          creator: { status: 'active', softDeletedAt: null },
+        },
       },
       orderBy: { challenge: { createdAt: 'desc' } },
       take: 50,
@@ -352,14 +357,6 @@ export async function challengeRoutes(app: FastifyInstance) {
     if (challenge.endsAt <= new Date()) {
       return reply.code(400).send({ error: 'CHALLENGE_EXPIRED', message: 'Provocarea a expirat', requestId: request.id })
     }
-    // Look up prior status so we only notify the creator on a FRESH join, not
-    // an idempotent re-join (status already 'accepted').
-    const prior = await prisma.challengeParticipant.findUnique({
-      where: { challengeId_userId: { challengeId: challenge.id, userId: me } },
-      select: { status: true },
-    })
-    const wasAlreadyAccepted = prior?.status === 'accepted'
-
     // Join == accept (also accepts a pending invite). Idempotent.
     const now = new Date()
     const participant = await prisma.challengeParticipant.upsert({
@@ -376,19 +373,39 @@ export async function challengeRoutes(app: FastifyInstance) {
       request.log.warn({ err, challengeId: challenge.id }, 'Recompute on join failed')
     }
 
-    // Tell the creator when someone new accepts their challenge (fire-and-forget;
-    // skip self-joins and re-joins). actorId=me → app shows "<name> joined…".
-    if (!wasAlreadyAccepted && me !== challenge.creatorId) {
-      const title =
-        challenge.kind === 'custom' && challenge.customTitle?.trim()
-          ? challenge.customTitle.trim()
-          : defaultTitle(challenge.kind)
-      void createNotificationSafe({
-        recipientId: challenge.creatorId,
-        actorId: me,
-        type: NotificationType.CHALLENGE_JOINED,
-        payload: { challengeId: challenge.id, title },
-      })
+    // Tell the creator someone joined — exactly once per (joiner, challenge)
+    // via the dedupe ledger, so a double-tap / leave-then-rejoin never
+    // double-notifies (race-proof, unlike a read-then-write status check).
+    // Skip self-joins and soft-deleted/disabled creators.
+    if (me !== challenge.creatorId) {
+      const claimed = await claimScheduledNotification(
+        challenge.creatorId,
+        NotificationType.CHALLENGE_JOINED,
+        `${challenge.id}:${me}`,
+      )
+      if (claimed) {
+        const creator = await prisma.user.findUnique({
+          where: { id: challenge.creatorId },
+          select: { status: true, softDeletedAt: true },
+        })
+        if (creator && creator.status === 'active' && creator.softDeletedAt == null) {
+          const title =
+            challenge.kind === 'custom' && challenge.customTitle?.trim()
+              ? challenge.customTitle.trim()
+              : defaultTitle(challenge.kind)
+          void createNotificationSafe({
+            recipientId: challenge.creatorId,
+            actorId: me,
+            type: NotificationType.CHALLENGE_JOINED,
+            payload: {
+              challengeId: challenge.id,
+              title,
+              scoringType: challenge.scoringType ?? null,
+              endsAt: challenge.endsAt.toISOString(),
+            },
+          })
+        }
+      }
     }
     return reply.code(201).send({
       data: {
@@ -446,7 +463,7 @@ export async function challengeRoutes(app: FastifyInstance) {
   /// Shared access gate for progress/standings/chat: challenge must exist
   /// and be visible to the viewer (public, mine, or friend's). Returns the
   /// challenge row or replies with the error and returns null.
-  async function loadVisibleChallenge(request: any, reply: any): Promise<{ id: string; creatorId: string; visibility: string; endsAt: Date; kind: string; customTitle: string | null } | null> {
+  async function loadVisibleChallenge(request: any, reply: any): Promise<{ id: string; creatorId: string; visibility: string; endsAt: Date; kind: string; customTitle: string | null; scoringType: string | null } | null> {
     const { userId: me } = request.user
     const id = requireUuidParam(request, reply)
     if (!id) return null

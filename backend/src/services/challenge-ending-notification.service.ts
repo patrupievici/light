@@ -73,11 +73,12 @@ export async function runChallengeEndingNotifications(
   // ── Ending soon (<24h left) ────────────────────────────────────────────
   const soon = await prisma.challenge.findMany({
     where: { endsAt: { gt: now, lte: in24h } },
-    select: { id: true, kind: true, customTitle: true, endsAt: true },
+    select: { id: true, kind: true, customTitle: true, endsAt: true, scoringType: true },
   })
   for (const c of soon) {
     const parts = await prisma.challengeParticipant.findMany({
-      where: { challengeId: c.id, status: 'accepted' },
+      // Skip soft-deleted/disabled participants — they shouldn't be notified.
+      where: { challengeId: c.id, status: 'accepted', user: { status: 'active', softDeletedAt: null } },
       select: { userId: true },
     })
     const title = challengeTitle(c)
@@ -92,7 +93,7 @@ export async function runChallengeEndingNotifications(
         recipientId: p.userId,
         actorId: null,
         type: NotificationType.CHALLENGE_ENDING_SOON,
-        payload: { challengeId: c.id, title, endsAt: c.endsAt.toISOString() },
+        payload: { challengeId: c.id, title, endsAt: c.endsAt.toISOString(), scoringType: c.scoringType ?? null },
       })
       endingSoonSent++
     }
@@ -113,7 +114,11 @@ export async function runChallengeEndingNotifications(
       }
     }
     const parts = await prisma.challengeParticipant.findMany({
-      where: { challengeId: c.id, status: { in: ['accepted', 'completed'] } },
+      where: {
+        challengeId: c.id,
+        status: { in: ['accepted', 'completed'] },
+        user: { status: 'active', softDeletedAt: null },
+      },
       orderBy: [{ rank: 'asc' }],
       include: {
         user: { select: { profile: { select: { displayName: true, username: true } } } },
@@ -140,6 +145,7 @@ export async function runChallengeEndingNotifications(
           winnerName,
           myRank: p.rank ?? null,
           youWon: p.userId === winner.userId,
+          scoringType: c.scoringType ?? null,
         },
       })
       endedSent++

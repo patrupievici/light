@@ -45,6 +45,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   List<RecentPr> _recentPrs = const [];
   // Challenges tab — pending invites awaiting accept/decline.
   List<ChallengeInvite> _invites = const [];
+  // Guards against rapid double-taps firing duplicate accept/decline requests.
+  final Set<String> _mutatingInvites = {};
   // Following tab — circle summary (friend count).
   final _friendsService = FriendsService();
   int _friendCount = 0;
@@ -191,25 +193,33 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   }
 
   Future<void> _acceptInvite(ChallengeInvite inv) async {
+    if (!_mutatingInvites.add(inv.id)) return; // already in flight
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _invites = _invites.where((i) => i.id != inv.id).toList());
     try {
       await _challengeService.joinChallenge(inv.id);
+      if (!mounted) return;
       messenger.showSnackBar(const SnackBar(content: Text('Joined the challenge.')));
       _load(); // the accepted challenge now belongs in the active list
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
       _loadInvites(); // restore on failure
+    } finally {
+      _mutatingInvites.remove(inv.id);
     }
   }
 
   Future<void> _declineInvite(ChallengeInvite inv) async {
+    if (!_mutatingInvites.add(inv.id)) return; // already in flight
     setState(() => _invites = _invites.where((i) => i.id != inv.id).toList());
     try {
       await _challengeService.declineChallenge(inv.id);
     } catch (_) {
-      if (mounted) _loadInvites(); // restore on failure
+      if (!mounted) return;
+      _loadInvites(); // restore on failure
+    } finally {
+      _mutatingInvites.remove(inv.id);
     }
   }
 

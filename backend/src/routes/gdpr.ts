@@ -249,6 +249,9 @@ async function eraseUser(userId: string, log: ErasureLogger = noopLogger): Promi
     await tx.challengeParticipant.deleteMany({ where: { userId } })
     await tx.challenge.deleteMany({ where: { creatorId: userId } })
 
+    // Scheduled-notification dedupe ledger (FK-less) — clean the user's claims.
+    await tx.notificationSentLog.deleteMany({ where: { userId } })
+
     // ── GPS / segments ──
     await tx.segmentEffort.deleteMany({ where: { userId } })
     await tx.gpsActivity.deleteMany({ where: { userId } })

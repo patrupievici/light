@@ -48,6 +48,7 @@ import { startWebhookReconcileCron } from './services/webhook-reconcile-cron.ser
 import { startSoftDeleteCron } from './services/soft-delete-cron.service'
 import { startStreakRiskNotificationCron } from './services/streak-risk-notification.service'
 import { startChallengeEndingNotificationCron } from './services/challenge-ending-notification.service'
+import { startNotificationLogCleanupCron } from './services/notification-log-cleanup.service'
 import { adminRoutes } from './routes/admin'
 
 const app = Fastify({
@@ -166,6 +167,7 @@ async function main() {
   startSoftDeleteCron(app.log)
   startStreakRiskNotificationCron(app.log)
   startChallengeEndingNotificationCron(app.log)
+  startNotificationLogCleanupCron(app.log)
 
   // ─── Error handler global ─────────────────────────────────────────────────
 
