@@ -327,7 +327,8 @@ export async function challengeRoutes(app: FastifyInstance) {
   /// sorted desc. Participants with no logs appear with total 0 (joined
   /// counts — design shows the full roster).
   async function buildStandings(challengeId: string) {
-    const [participants, sums] = await Promise.all([
+    const [challenge, participants] = await Promise.all([
+      prisma.challenge.findUnique({ where: { id: challengeId }, select: { scoringType: true } }),
       prisma.challengeParticipant.findMany({
         where: { challengeId },
         include: {
@@ -335,13 +336,31 @@ export async function challengeRoutes(app: FastifyInstance) {
         },
         orderBy: { joinedAt: 'asc' },
       }),
-      prisma.challengeProgressLog.groupBy({
-        by: ['userId'],
-        where: { challengeId },
-        _sum: { amount: true },
-        _max: { createdAt: true },
-      }),
     ])
+
+    // Auto-scored challenge → official score/rank from challenge-recalc.service.
+    if (challenge?.scoringType) {
+      const rows = participants
+        .filter((p) => p.status === 'accepted')
+        .map((p) => ({
+          userId: p.userId,
+          displayName: p.user.profile?.displayName ?? p.user.profile?.username ?? 'Athlete',
+          username: p.user.profile?.username ?? null,
+          total: p.score,
+          lastLoggedAt: p.lastScoreUpdate?.toISOString() ?? null,
+          joinedAt: p.joinedAt.toISOString(),
+        }))
+      rows.sort((a, b) => b.total - a.total)
+      return rows
+    }
+
+    // Legacy/manual challenge → standings from manual progress logs.
+    const sums = await prisma.challengeProgressLog.groupBy({
+      by: ['userId'],
+      where: { challengeId },
+      _sum: { amount: true },
+      _max: { createdAt: true },
+    })
     const totals = new Map(sums.map((s) => [s.userId, { total: Number(s._sum.amount ?? 0), lastAt: s._max.createdAt }]))
     const rows = participants.map((p) => ({
       userId: p.userId,
