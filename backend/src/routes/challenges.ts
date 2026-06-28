@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { acceptedFriendIds } from '../lib/friendships'
 import { recomputeChallenge } from '../services/challenge-recalc.service'
+import { createNotificationSafe, NotificationType } from '../services/notification.service'
 
 const CreateChallengeSchema = z
   .object({
@@ -187,12 +188,27 @@ export async function challengeRoutes(app: FastifyInstance) {
       data: { challengeId: row.id, userId, status: 'accepted', acceptedAt: createdAt },
     })
     if (inviteUserIds?.length) {
+      const invitees = inviteUserIds.filter((uid) => uid !== userId)
       await prisma.challengeParticipant.createMany({
-        data: inviteUserIds
-          .filter((uid) => uid !== userId)
-          .map((uid) => ({ challengeId: row.id, userId: uid, status: 'invited' })),
+        data: invitees.map((uid) => ({ challengeId: row.id, userId: uid, status: 'invited' })),
         skipDuplicates: true,
       })
+      // Notify each invited friend (fire-and-forget; never blocks create).
+      const inviteTitle =
+        row.kind === 'custom' && row.customTitle?.trim() ? row.customTitle.trim() : defaultTitle(row.kind)
+      for (const uid of invitees) {
+        void createNotificationSafe({
+          recipientId: uid,
+          actorId: userId,
+          type: NotificationType.CHALLENGE_INVITE,
+          payload: {
+            challengeId: row.id,
+            title: inviteTitle,
+            scoringType: scoringType ?? null,
+            endsAt: row.endsAt.toISOString(),
+          },
+        })
+      }
     }
 
     // Seed the standings snapshot for auto-scored challenges.

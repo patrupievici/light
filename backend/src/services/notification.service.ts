@@ -9,6 +9,7 @@ export const NotificationType = {
   POST_LIKE: 'post_like',
   POST_COMMENT: 'post_comment',
   DM_MESSAGE: 'dm_message',
+  CHALLENGE_INVITE: 'challenge_invite',
 } as const
 
 /** Nu aruncă — notificarea nu trebuie să blocheze fluxul principal. */

@@ -9,6 +9,7 @@ import '../../utils/relative_time.dart';
 import '../../widgets/zvelt_empty_state.dart';
 import '../../widgets/zvelt_error_state.dart';
 import '../../widgets/zvelt_tertiary_button.dart';
+import 'challenge_detail_screen.dart';
 import 'direct_chat_screen.dart';
 import 'friends_screen.dart';
 import 'post_detail_screen.dart';
@@ -141,6 +142,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return '${n.actorLabel} commented on your post';
       case 'dm_message':
         return '${n.actorLabel} sent you a message';
+      case 'challenge_invite':
+        return '${n.actorLabel} invited you to a challenge';
       default:
         return 'Notification';
     }
@@ -150,6 +153,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (n.type == 'post_comment' || n.type == 'dm_message') {
       final p = n.payload['bodyPreview'] as String?;
       if (p != null && p.isNotEmpty) return p;
+    }
+    if (n.type == 'challenge_invite') {
+      final t = n.payload['title'] as String?;
+      if (t != null && t.trim().isNotEmpty) return t.trim();
     }
     return null;
   }
@@ -198,6 +205,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   username: n.actorUsername,
                   displayName: n.actorDisplayName,
                 ),
+              ),
+            ),
+          );
+        }
+        break;
+      case 'challenge_invite':
+        final challengeId = n.payload['challengeId'] as String?;
+        if (challengeId != null && challengeId.isNotEmpty) {
+          final endsRaw = n.payload['endsAt'] as String?;
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => ChallengeDetailScreen(
+                challengeId: challengeId,
+                title: n.payload['title'] as String?,
+                scoringType: n.payload['scoringType'] as String?,
+                endsAt: endsRaw != null ? DateTime.tryParse(endsRaw) : null,
+                showAcceptDecline: true,
               ),
             ),
           );
@@ -385,6 +409,8 @@ class _NotifCard extends StatelessWidget {
         return AppIcons.comment_alt;
       case 'dm_message':
         return AppIcons.envelope;
+      case 'challenge_invite':
+        return AppIcons.trophy;
       default:
         return AppIcons.bell;
     }
