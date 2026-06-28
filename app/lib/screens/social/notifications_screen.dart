@@ -144,6 +144,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return '${n.actorLabel} sent you a message';
       case 'challenge_invite':
         return '${n.actorLabel} invited you to a challenge';
+      case 'challenge_joined':
+        return '${n.actorLabel} joined your challenge';
       case 'streak_risk':
         return 'Your streak is at risk';
       case 'challenge_ending_soon':
@@ -161,7 +163,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final p = n.payload['bodyPreview'] as String?;
       if (p != null && p.isNotEmpty) return p;
     }
-    if (n.type == 'challenge_invite') {
+    if (n.type == 'challenge_invite' || n.type == 'challenge_joined') {
       final t = n.payload['title'] as String?;
       if (t != null && t.trim().isNotEmpty) return t.trim();
     }
@@ -249,6 +251,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           );
         }
         break;
+      case 'challenge_joined':
       case 'challenge_ending_soon':
       case 'challenge_ended':
         final challengeId = n.payload['challengeId'] as String?;
@@ -455,6 +458,8 @@ class _NotifCard extends StatelessWidget {
       case 'challenge_invite':
       case 'challenge_ended':
         return AppIcons.trophy;
+      case 'challenge_joined':
+        return AppIcons.user_add;
       case 'challenge_ending_soon':
         return AppIcons.clock;
       case 'streak_risk':

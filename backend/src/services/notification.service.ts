@@ -10,6 +10,7 @@ export const NotificationType = {
   POST_COMMENT: 'post_comment',
   DM_MESSAGE: 'dm_message',
   CHALLENGE_INVITE: 'challenge_invite',
+  CHALLENGE_JOINED: 'challenge_joined',
   STREAK_RISK: 'streak_risk',
   CHALLENGE_ENDING_SOON: 'challenge_ending_soon',
   CHALLENGE_ENDED: 'challenge_ended',
