@@ -11,6 +11,7 @@ import '../../services/social_challenge_service.dart';
 import '../../services/social_feed_service.dart';
 import '../../services/stories_service.dart';
 import '../../services/stats_charts_service.dart';
+import '../../services/friends_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/social_challenge_card.dart';
 import '../../widgets/social_feed_post_card.dart';
@@ -44,6 +45,10 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   List<RecentPr> _recentPrs = const [];
   // Challenges tab — pending invites awaiting accept/decline.
   List<ChallengeInvite> _invites = const [];
+  // Following tab — circle summary (friend count).
+  final _friendsService = FriendsService();
+  int _friendCount = 0;
+  bool _friendCountLoaded = false;
   List<SocialChallenge> _challenges = [];
 
   // Ephemeral 24h stories shown in the top rail. Loaded separately from (and
@@ -150,6 +155,21 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     _load();
     _loadRecentPrs();
     _loadInvites();
+    _loadFriendCount();
+  }
+
+  Future<void> _loadFriendCount() async {
+    try {
+      final friends = await _friendsService.listFriends();
+      if (mounted) {
+        setState(() {
+          _friendCount = friends.length;
+          _friendCountLoaded = true;
+        });
+      }
+    } catch (_) {
+      // Best-effort — the circle summary just won't show a count.
+    }
   }
 
   Future<void> _loadRecentPrs() async {
@@ -368,6 +388,78 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       ),
     );
     if (mounted) _load(); // refresh after returning from the flow/detail
+  }
+
+  // ── Following tab — circle summary (count + entry to your circle) ─────────
+  Widget _buildCircleSummary() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+          onTap: _openCircle,
+          child: Container(
+            decoration: BoxDecoration(
+              color: ZveltTokens.surface,
+              borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+              boxShadow: ZveltTokens.shadowCard,
+            ),
+            padding: const EdgeInsets.all(ZveltTokens.s4),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: ZveltTokens.brandTint,
+                    borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                  ),
+                  child: const Icon(AppIcons.users, size: 20, color: ZveltTokens.brand),
+                ),
+                const SizedBox(width: ZveltTokens.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('YOUR CIRCLE',
+                          style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+                      const SizedBox(height: 2),
+                      Text(
+                        _friendCount == 0
+                            ? (_friendCountLoaded ? 'Add friends to fill your feed' : 'Loading your circle…')
+                            : 'Posts from your $_friendCount friend${_friendCount == 1 ? '' : 's'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_friendCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: ZveltTokens.success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                      border: Border.all(color: ZveltTokens.success.withValues(alpha: 0.22)),
+                    ),
+                    child: Text('$_friendCount IN CIRCLE',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: ZveltTokens.success,
+                          letterSpacing: 1.6,
+                        )),
+                  )
+                else
+                  Icon(AppIcons.angle_small_right, size: 20, color: ZveltTokens.text3),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   // ── Challenges tab — pending invites (accept/decline inline) ──────────────
@@ -732,6 +824,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                         ),
                         SliverToBoxAdapter(child: _buildRaceHeroCard()),
                         SliverToBoxAdapter(child: _buildFeedControls()),
+                        if (_feedFilter == 'following')
+                          SliverToBoxAdapter(child: _buildCircleSummary()),
                         if (_feedFilter == 'races' && _invites.isNotEmpty)
                           SliverToBoxAdapter(child: _buildPendingInvites()),
                         if (_challenges.isNotEmpty) ...[
