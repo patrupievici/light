@@ -181,6 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context, setLocal) {
           Future<void> save() async {
             final prefs = await SharedPreferences.getInstance();
+            if (!mounted) return;
             await prefs.setInt(SettingsKeys.restSeconds, _restSeconds);
             await prefs.setBool(SettingsKeys.restAutostart, _restAutostart);
             await prefs.setBool(SettingsKeys.restVibrate, _restVibrate);
