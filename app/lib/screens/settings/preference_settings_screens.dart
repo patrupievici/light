@@ -143,19 +143,6 @@ class _NotificationSettingsScreenState
               ),
           ],
         ),
-        const SettingsSectionTitle('Quiet hours'),
-        const SettingsCard(
-          children: [
-            SettingsRow(
-              icon: AppIcons.moon,
-              tint: SettingsTint.violet,
-              title: 'Do not disturb',
-              subtitle: '22:00 - 07:00, no alerts overnight',
-              trailingText: 'Active',
-              chevron: false,
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -180,7 +167,6 @@ class _CustomizationScreenState extends State<CustomizationScreen> {
 
   int _accent = 0xFFFF7A2F;
   String _start = 'home';
-  bool _compact = false;
   bool _reduceMotion = false;
 
   @override
@@ -195,7 +181,6 @@ class _CustomizationScreenState extends State<CustomizationScreen> {
     setState(() {
       _accent = prefs.getInt(SettingsKeys.accent) ?? 0xFFFF7A2F;
       _start = prefs.getString(SettingsKeys.startScreen) ?? 'home';
-      _compact = prefs.getBool(SettingsKeys.compact) ?? false;
       _reduceMotion = prefs.getBool(SettingsKeys.reduceMotion) ?? false;
     });
   }
@@ -211,16 +196,9 @@ class _CustomizationScreenState extends State<CustomizationScreen> {
     await prefs.setString(key, value);
   }
 
-  Future<void> _setBool(String key, bool value) async {
-    setState(() {
-      if (key == SettingsKeys.compact) _compact = value;
-      if (key == SettingsKeys.reduceMotion) _reduceMotion = value;
-    });
-    if (key == SettingsKeys.compact) {
-      await AppPreferencesNotifier.setCompact(value);
-    } else if (key == SettingsKeys.reduceMotion) {
-      await AppPreferencesNotifier.setReduceMotion(value);
-    }
+  Future<void> _setReduceMotion(bool value) async {
+    setState(() => _reduceMotion = value);
+    await AppPreferencesNotifier.setReduceMotion(value);
   }
 
   @override
@@ -297,24 +275,16 @@ class _CustomizationScreenState extends State<CustomizationScreen> {
             ),
           ],
         ),
-        const SettingsSectionTitle('Layout & motion'),
+        const SettingsSectionTitle('Motion'),
         SettingsCard(
           children: [
-            SettingsSwitchRow(
-              icon: AppIcons.list,
-              tint: SettingsTint.amber,
-              title: 'Compact cards',
-              subtitle: 'Tighter spacing, more on screen',
-              value: _compact,
-              onChanged: (value) => _setBool(SettingsKeys.compact, value),
-            ),
             SettingsSwitchRow(
               icon: AppIcons.cross_circle,
               tint: SettingsTint.violet,
               title: 'Reduce motion',
               subtitle: 'Minimise animations and transitions',
               value: _reduceMotion,
-              onChanged: (value) => _setBool(SettingsKeys.reduceMotion, value),
+              onChanged: _setReduceMotion,
             ),
           ],
         ),
@@ -336,8 +306,6 @@ class UnitsScreen extends StatefulWidget {
 class _UnitsScreenState extends State<UnitsScreen> {
   final _profile = ProfileService();
   String _system = UnitsNotifier.system.value;
-  String _energy = 'kcal';
-  String _distance = 'km';
   bool _saving = false;
 
   @override
@@ -352,9 +320,6 @@ class _UnitsScreenState extends State<UnitsScreen> {
     setState(() {
       _system = prefs.getString(SettingsKeys.unitSystem) ??
           UnitsNotifier.system.value;
-      _energy = prefs.getString(SettingsKeys.energyUnit) ?? 'kcal';
-      _distance = prefs.getString(SettingsKeys.distanceUnit) ??
-          (_system == 'imperial' ? 'mi' : 'km');
     });
   }
 
@@ -363,9 +328,6 @@ class _UnitsScreenState extends State<UnitsScreen> {
     try {
       await _profile.updateProfile(unitSystem: _system);
       await UnitsNotifier.set(_system);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(SettingsKeys.energyUnit, _energy);
-      await prefs.setString(SettingsKeys.distanceUnit, _distance);
       if (!mounted) return;
       settingsSnack(context, 'Units updated across Zvelt.');
       Navigator.of(context).pop();
@@ -399,10 +361,7 @@ class _UnitsScreenState extends State<UnitsScreen> {
                   (value: 'metric', label: 'Metric'),
                   (value: 'imperial', label: 'Imperial'),
                 ],
-                onChanged: (value) => setState(() {
-                  _system = value;
-                  _distance = value == 'imperial' ? 'mi' : 'km';
-                }),
+                onChanged: (value) => setState(() => _system = value),
               ),
             ),
           ],
@@ -424,40 +383,6 @@ class _UnitsScreenState extends State<UnitsScreen> {
                 child: _PreviewMetric(
                     label: 'Distance',
                     value: _system == 'metric' ? '5.0 km' : '3.1 mi')),
-          ],
-        ),
-        const SettingsSectionTitle('Energy'),
-        SettingsCard(
-          divided: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(ZveltTokens.s4),
-              child: SettingsSegmented<String>(
-                value: _energy,
-                options: const [
-                  (value: 'kcal', label: 'kcal'),
-                  (value: 'kj', label: 'kJ')
-                ],
-                onChanged: (value) => setState(() => _energy = value),
-              ),
-            ),
-          ],
-        ),
-        const SettingsSectionTitle('Running & cardio'),
-        SettingsCard(
-          divided: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(ZveltTokens.s4),
-              child: SettingsSegmented<String>(
-                value: _distance,
-                options: const [
-                  (value: 'km', label: 'Kilometres'),
-                  (value: 'mi', label: 'Miles')
-                ],
-                onChanged: (value) => setState(() => _distance = value),
-              ),
-            ),
           ],
         ),
       ],
@@ -713,30 +638,6 @@ class _CloudSyncScreenState extends State<CloudSyncScreen> {
               subtitle: 'May use your mobile data allowance',
               value: _cellular,
               onChanged: (value) => _set(SettingsKeys.cloudCellular, value),
-            ),
-          ],
-        ),
-        const SettingsSectionTitle('Cloud storage'),
-        SettingsCard(
-          divided: false,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(ZveltTokens.s4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('1.8 GB of 5 GB used',
-                      style: ZType.bodyM.copyWith(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: ZveltTokens.s3),
-                  LinearProgressIndicator(
-                    value: .36,
-                    minHeight: 7,
-                    color: ZveltTokens.recovery,
-                    backgroundColor: ZveltTokens.surface3,
-                    borderRadius: const BorderRadius.all(Radius.circular(99)),
-                  ),
-                ],
-              ),
             ),
           ],
         ),

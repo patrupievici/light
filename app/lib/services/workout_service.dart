@@ -263,6 +263,21 @@ class WorkoutService {
     return WorkoutSetDto.fromJson(data['set'] as Map<String, dynamic>);
   }
 
+  /// DELETE /v1/workouts/:id/exercises/:weId/sets/:setId — remove a set.
+  ///
+  /// 404 is treated as success: for a delete, "the set is already gone" IS the
+  /// desired end state (e.g. an offline delete replayed after the row was
+  /// removed from another device, or a retry after a response was lost).
+  /// Server returns 204 on success.
+  Future<void> deleteSet(String workoutId, String weId, String setId) async {
+    final res = await http.delete(
+      Uri.parse('$v1Base/workouts/$workoutId/exercises/$weId/sets/$setId'),
+      headers: await _headers(),
+    ).withTimeout();
+    if (res.statusCode == 404) return;
+    if (res.statusCode < 200 || res.statusCode >= 300) _throw(res);
+  }
+
   /// GET /v1/workouts/:id/insight — post-workout AI coach commentary.
   ///
   /// Returns null on any error (offline, AI disabled, model failure) so the

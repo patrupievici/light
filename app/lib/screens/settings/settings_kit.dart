@@ -274,7 +274,6 @@ class SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = AppPreferencesNotifier.compact.value;
     final semantic = subtitle == null ? title : '$title, $subtitle';
     return Semantics(
       button: onTap != null,
@@ -282,9 +281,9 @@ class SettingsRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             horizontal: ZveltTokens.s4,
-            vertical: compact ? ZveltTokens.s2 : ZveltTokens.s3 + 2,
+            vertical: ZveltTokens.s3 + 2,
           ),
           child: Row(
             children: [
@@ -369,14 +368,13 @@ class SettingsSwitchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = AppPreferencesNotifier.compact.value;
     final accent = AppPreferencesNotifier.accentColor;
     return Opacity(
       opacity: enabled ? 1 : 0.45,
       child: Padding(
-        padding: EdgeInsets.symmetric(
+        padding: const EdgeInsets.symmetric(
           horizontal: ZveltTokens.s4,
-          vertical: compact ? ZveltTokens.s2 : ZveltTokens.s3,
+          vertical: ZveltTokens.s3,
         ),
         child: Row(
           children: [
@@ -434,7 +432,6 @@ class SettingsRadioRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = AppPreferencesNotifier.compact.value;
     final accent = AppPreferencesNotifier.accentColor;
     return Semantics(
       selected: selected,
@@ -443,9 +440,9 @@ class SettingsRadioRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             horizontal: ZveltTokens.s4,
-            vertical: compact ? ZveltTokens.s2 : ZveltTokens.s3 + 2,
+            vertical: ZveltTokens.s3 + 2,
           ),
           child: Row(
             children: [

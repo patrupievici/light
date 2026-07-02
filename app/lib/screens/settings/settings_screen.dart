@@ -58,7 +58,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   String _goal = 'Strength \u00b7 6 days';
   String _units = 'Metric';
   String _visibility = 'Friends only';
-  String _language = 'English';
   bool _notifications = true;
   bool _diagnostics = false;
   int _shortcutCount = 3;
@@ -136,23 +135,11 @@ class _SettingsScreenState extends State<SettingsScreen>
       SettingsKeys.gsWorkout,
       SettingsKeys.gsFriends,
     ];
-    const languageNames = {
-      'en': 'English',
-      'ro': 'Romana',
-      'es': 'Espanol',
-      'fr': 'Francais',
-      'de': 'Deutsch',
-      'it': 'Italiano',
-      'pt': 'Portugues',
-      'sv': 'Svenska',
-    };
     final rawLast = prefs.getString(SettingsKeys.cloudLastSync);
     if (!mounted) return;
     setState(() {
       _notifications = prefs.getBool(SettingsKeys.notifMaster) ?? true;
       _diagnostics = prefs.getBool(SettingsKeys.diagnostics) ?? false;
-      _language =
-          languageNames[prefs.getString(SettingsKeys.language)] ?? 'English';
       _units =
           (prefs.getString(SettingsKeys.unitSystem) ?? _units.toLowerCase()) ==
                   'imperial'
@@ -500,7 +487,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               icon: AppIcons.settings_sliders,
               tint: SettingsTint.amber,
               title: 'Customization',
-              subtitle: 'Accent \u00b7 start screen \u00b7 layout',
+              subtitle: 'Accent \u00b7 start screen \u00b7 motion',
               onTap: () => _open(const CustomizationScreen()),
             ),
             SettingsRow(
@@ -514,7 +501,8 @@ class _SettingsScreenState extends State<SettingsScreen>
               icon: AppIcons.globe,
               tint: SettingsTint.green,
               title: 'Language',
-              subtitle: _language,
+              // English is the only shipped translation (see LanguageScreen).
+              subtitle: 'English',
               onTap: () => _open(const LanguageScreen()),
             ),
             SettingsRow(
@@ -588,14 +576,6 @@ class _SettingsScreenState extends State<SettingsScreen>
         const SettingsSectionTitle('Resources'),
         SettingsCard(
           children: [
-            SettingsRow(
-              icon: AppIcons.sparkles,
-              tint: SettingsTint.violet,
-              title: "What's new",
-              subtitle: 'v2.4 - 6 updates',
-              badge: '6',
-              onTap: () => _open(const WhatsNewScreen()),
-            ),
             SettingsRow(
               icon: AppIcons.flag,
               tint: SettingsTint.green,
