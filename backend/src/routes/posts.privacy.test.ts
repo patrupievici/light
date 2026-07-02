@@ -13,6 +13,8 @@ const friendshipFindFirst = vi.fn()
 const friendshipFindMany = vi.fn()
 const postHideFindMany = vi.fn()
 const postLikeFindUnique = vi.fn()
+const postLikeFindMany = vi.fn()
+const postLikeCount = vi.fn()
 const postLikeCreate = vi.fn()
 const postLikeDelete = vi.fn()
 const postCommentCreate = vi.fn()
@@ -45,6 +47,8 @@ vi.mock('../lib/prisma', () => ({
     },
     postLike: {
       findUnique: (...a: unknown[]) => postLikeFindUnique(...a),
+      findMany: (...a: unknown[]) => postLikeFindMany(...a),
+      count: (...a: unknown[]) => postLikeCount(...a),
       create: (...a: unknown[]) => postLikeCreate(...a),
       delete: (...a: unknown[]) => postLikeDelete(...a),
     },
@@ -110,6 +114,8 @@ beforeEach(() => {
   friendshipFindMany.mockReset()
   postHideFindMany.mockReset()
   postLikeFindUnique.mockReset()
+  postLikeFindMany.mockReset().mockResolvedValue([]) // default: viewer liked nothing
+  postLikeCount.mockReset().mockResolvedValue(0)
   postLikeCreate.mockReset()
   postLikeDelete.mockReset()
   postCommentCreate.mockReset()
@@ -376,6 +382,115 @@ describe('GET /v1/posts/feed — friend-scoped, no private/stranger leakage', ()
     const friendBranch = where.OR.find((c) => c.visibility !== undefined)!
     expect(friendBranch.userId).toEqual({ in: ['friendA'] })
     expect(friendBranch.userId!.in).not.toContain('friendB')
+    await app.close()
+  })
+})
+
+describe('likedByMe — every post response reports whether the VIEWER liked it', () => {
+  it('GET /:id — likedByMe=true when the viewer has liked the post', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    authedAs('owner') // owner short-circuits the privacy gate
+    postLikeFindMany.mockResolvedValue([{ postId: 'p1' }])
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/p1' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().data.likedByMe).toBe(true)
+    // The like lookup MUST be scoped to the viewer — that's what stops other
+    // users' likes from leaking into likedByMe.
+    const where = (postLikeFindMany.mock.calls[0][0] as { where: { userId: string } }).where
+    expect(where.userId).toBe('owner')
+    await app.close()
+  })
+
+  it('GET /:id — likedByMe=false when only OTHER users liked it (no leak)', async () => {
+    // 3 likes from other people (_count.likes=3), none from the viewer.
+    postFindUnique.mockResolvedValue({ ...FRIENDS_ONLY_POST, _count: { likes: 3, comments: 0 } })
+    authedAs('owner')
+    postLikeFindMany.mockResolvedValue([]) // viewer-scoped query finds nothing
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/p1' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().data.likedByMe).toBe(false)
+    expect(res.json().data._count.likes).toBe(3) // count untouched
+    await app.close()
+  })
+
+  it('GET /feed — seeds likedByMe per post from ONE viewer-scoped query (no N+1)', async () => {
+    friendshipFindMany.mockResolvedValue([])
+    postHideFindMany.mockResolvedValue([])
+    userProfileFindMany.mockResolvedValue([])
+    postFindMany.mockResolvedValue([
+      { ...FRIENDS_ONLY_POST, id: 'p1', userId: 'me' },
+      { ...FRIENDS_ONLY_POST, id: 'p2', userId: 'me' },
+    ])
+    postLikeFindMany.mockResolvedValue([{ postId: 'p2' }]) // viewer liked only p2
+
+    authedAs('me')
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts/feed' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json().data as Array<{ id: string; likedByMe: boolean }>
+    expect(data.find((p) => p.id === 'p1')!.likedByMe).toBe(false)
+    expect(data.find((p) => p.id === 'p2')!.likedByMe).toBe(true)
+    // Exactly ONE like query for the whole page, scoped to the viewer.
+    expect(postLikeFindMany).toHaveBeenCalledOnce()
+    const where = (postLikeFindMany.mock.calls[0][0] as {
+      where: { userId: string; postId: { in: string[] } }
+    }).where
+    expect(where.userId).toBe('me')
+    expect(where.postId.in).toEqual(['p1', 'p2'])
+    await app.close()
+  })
+
+  it('GET / (gallery) — seeds likedByMe the same way', async () => {
+    friendshipFindMany.mockResolvedValue([])
+    postHideFindMany.mockResolvedValue([])
+    postFindMany.mockResolvedValue([
+      { ...FRIENDS_ONLY_POST, id: 'p1', userId: 'me', visibility: 'public' },
+    ])
+    postLikeFindMany.mockResolvedValue([{ postId: 'p1' }])
+
+    authedAs('me')
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/posts' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().data[0].likedByMe).toBe(true)
+    await app.close()
+  })
+
+  it('POST /:id/likes — returns the new liked state AND the fresh likeCount', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    authedAs('owner') // liking own post → no notification path
+    postLikeFindUnique.mockResolvedValue(null) // not yet liked → toggle ON
+    postLikeCreate.mockResolvedValue({ postId: 'p1', userId: 'owner' })
+    postLikeCount.mockResolvedValue(4)
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: '/v1/posts/p1/likes' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ liked: true, likeCount: 4 })
+    await app.close()
+  })
+
+  it('POST /:id/likes — unlike returns liked=false with the decremented count', async () => {
+    postFindUnique.mockResolvedValue(FRIENDS_ONLY_POST)
+    authedAs('owner')
+    postLikeFindUnique.mockResolvedValue({ postId: 'p1', userId: 'owner' }) // already liked → toggle OFF
+    postLikeDelete.mockResolvedValue({})
+    postLikeCount.mockResolvedValue(0)
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: '/v1/posts/p1/likes' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ liked: false, likeCount: 0 })
     await app.close()
   })
 })

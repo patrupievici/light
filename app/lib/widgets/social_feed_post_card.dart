@@ -61,6 +61,10 @@ class _SocialFeedPostCardState extends State<SocialFeedPostCard> {
   @override
   void initState() {
     super.initState();
+    // Seed heart state + count from the model — the backend now reports
+    // `likedByMe` per post, so a post the viewer already liked renders with
+    // a filled heart instead of the previously hardcoded `false`.
+    _liked = widget.post.likedByMe;
     _likeCount = widget.post.likeCount;
     _bookmarked = widget.initiallyBookmarked;
     AuthService().getCurrentUserId().then((id) {
@@ -71,8 +75,21 @@ class _SocialFeedPostCardState extends State<SocialFeedPostCard> {
   @override
   void didUpdateWidget(covariant SocialFeedPostCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.post.id == widget.post.id && oldWidget.post.likeCount != widget.post.likeCount) {
+    if (oldWidget.post.id != widget.post.id) {
+      // Card recycled for a different post — reseed everything.
+      _liked = widget.post.likedByMe;
       _likeCount = widget.post.likeCount;
+      return;
+    }
+    if (oldWidget.post.likeCount != widget.post.likeCount) {
+      _likeCount = widget.post.likeCount;
+    }
+    // Reconcile the heart with fresh server data (e.g. PostDetailScreen
+    // reloads the post after onLike) — but never while our own optimistic
+    // toggle is still in flight, or the server's pre-toggle snapshot would
+    // stomp the flip.
+    if (!_liking && oldWidget.post.likedByMe != widget.post.likedByMe) {
+      _liked = widget.post.likedByMe;
     }
   }
 
