@@ -5,6 +5,7 @@ import { OAuth2Client } from 'google-auth-library'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
+import { sendPasswordResetEmail } from '../services/mail.service'
 
 const SignupSchema = z.object({
   email: z.string().email(),
@@ -30,7 +31,67 @@ const ChangePasswordSchema = z.object({
   newPassword: z.string().min(8).max(128),
 })
 
+const ForgotPasswordSchema = z.object({
+  email: z.string().email(),
+})
+
+const ResetPasswordSchema = z.object({
+  email: z.string().email(),
+  code: z.string().regex(/^\d{6}$/),
+  new_password: z.string().min(8).max(128),
+})
+
 const SALT_ROUNDS = 12
+
+// ── Stateless password-reset codes ───────────────────────────────────────────
+// No DB table: the 6-digit code is an HMAC over (userId, current passwordHash,
+// time window), keyed with JWT_SECRET. Properties:
+//   • time-boxed  — window = floor(now / 15min); verify accepts the current and
+//     previous window, so a code lives 15–30 minutes;
+//   • single-use  — the CURRENT password hash is part of the HMAC input, so the
+//     moment the password changes every outstanding code is invalidated;
+//   • unforgeable — deriving a code requires JWT_SECRET (server-only).
+
+const RESET_WINDOW_MS = 15 * 60 * 1000
+
+export function resetCodeWindow(nowMs: number = Date.now()): number {
+  return Math.floor(nowMs / RESET_WINDOW_MS)
+}
+
+/** Derive the 6-digit reset code for a given time window (HOTP-style truncation). */
+export function resetCodeForWindow(
+  userId: string,
+  passwordHash: string,
+  window: number,
+): string {
+  const secret = process.env.JWT_SECRET ?? ''
+  const digest = crypto
+    .createHmac('sha256', secret)
+    .update(`pwreset:${userId}:${passwordHash}:${window}`)
+    .digest()
+  // Dynamic truncation (RFC 4226 style): 31-bit slice → 6 decimal digits.
+  const offset = digest[digest.length - 1] & 0x0f
+  const bin =
+    ((digest[offset] & 0x7f) << 24) |
+    (digest[offset + 1] << 16) |
+    (digest[offset + 2] << 8) |
+    digest[offset + 3]
+  return (bin % 1_000_000).toString().padStart(6, '0')
+}
+
+/** Timing-safe check of a submitted code against the current AND previous window. */
+function verifyResetCode(userId: string, passwordHash: string, code: string): boolean {
+  const now = resetCodeWindow()
+  let valid = false
+  for (const window of [now, now - 1]) {
+    const expected = resetCodeForWindow(userId, passwordHash, window)
+    // Both buffers are always 6 bytes (zod enforces /^\d{6}$/ on the input).
+    if (crypto.timingSafeEqual(Buffer.from(code), Buffer.from(expected))) {
+      valid = true // no early exit — keep comparisons constant-count
+    }
+  }
+  return valid
+}
 
 /**
  * Reject sign-in for an account in the soft-delete grace window. Returns true
@@ -288,6 +349,125 @@ export async function authRoutes(app: FastifyInstance) {
       refreshToken,
       user: { id: identity.userId, email },
     })
+    },
+  )
+
+  // POST /v1/auth/password/forgot — request a reset code by email.
+  // ALWAYS answers 200 with the same generic message so account existence is
+  // never leaked. Tight limit (3 / 15 min, keyed IP+email like login/signup)
+  // because each request can trigger an outbound email.
+  app.post(
+    '/password/forgot',
+    {
+      config: {
+        rateLimit: {
+          max: 3,
+          timeWindow: '15 minutes',
+          keyGenerator: emailIpKeyGenerator,
+        },
+      },
+    },
+    async (request, reply) => {
+      const parsed = ForgotPasswordSchema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_ERROR',
+          message: 'Date invalide',
+          requestId: request.id,
+        })
+      }
+
+      const { email } = parsed.data
+
+      const identity = await prisma.authIdentity.findFirst({
+        where: { provider: 'email', email },
+        include: { user: true },
+      })
+
+      // Only email+password accounts in good standing get a code; every other
+      // case still falls through to the same generic 200 below.
+      const eligible =
+        identity?.passwordHash &&
+        identity.user.status === 'active' &&
+        identity.user.softDeletedAt == null
+
+      if (eligible) {
+        const code = resetCodeForWindow(
+          identity.userId,
+          identity.passwordHash!,
+          resetCodeWindow(),
+        )
+        // Best-effort by design: the mail service never throws, and even if it
+        // did we must not turn it into a signal about account existence.
+        await sendPasswordResetEmail(email, code).catch(() => {})
+      }
+
+      return reply.send({
+        ok: true,
+        message: 'If that email exists, we sent a code.',
+      })
+    },
+  )
+
+  // POST /v1/auth/password/reset — set a new password using the emailed code.
+  // 5 attempts / 15 min per IP+email keeps brute force of a 6-digit code far
+  // below feasibility (codes also rotate every 15 minutes).
+  app.post(
+    '/password/reset',
+    {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: '15 minutes',
+          keyGenerator: emailIpKeyGenerator,
+        },
+      },
+    },
+    async (request, reply) => {
+      const parsed = ResetPasswordSchema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_ERROR',
+          message: 'The new password must contain 8-128 characters.',
+          requestId: request.id,
+          details: parsed.error.flatten(),
+        })
+      }
+
+      const { email, code, new_password } = parsed.data
+
+      const identity = await prisma.authIdentity.findFirst({
+        where: { provider: 'email', email },
+        include: { user: true },
+      })
+
+      // Unknown email, provider-only account, or deleted/disabled user all
+      // collapse into the same INVALID_CODE as a wrong code — no enumeration.
+      const eligible =
+        identity?.passwordHash &&
+        identity.user.status === 'active' &&
+        identity.user.softDeletedAt == null
+
+      if (!eligible || !verifyResetCode(identity!.userId, identity!.passwordHash!, code)) {
+        return reply.code(400).send({
+          error: 'INVALID_CODE',
+          message: 'The code is incorrect or has expired.',
+          requestId: request.id,
+        })
+      }
+
+      // Same pattern as change-password: swap the hash and revoke every
+      // refresh token so stolen sessions die with the old password. Changing
+      // the hash also invalidates all outstanding reset codes (see HMAC input).
+      await prisma.$transaction([
+        prisma.authIdentity.update({
+          where: { id: identity!.id },
+          data: { passwordHash: await hashPassword(new_password) },
+        }),
+        prisma.refreshToken.deleteMany({ where: { userId: identity!.userId } }),
+      ])
+
+      return reply.send({ ok: true })
     },
   )
 

@@ -407,6 +407,58 @@ class AuthService {
     );
   }
 
+  /// POST /v1/auth/password/forgot — asks the server to email a 6-digit reset
+  /// code. The server ALWAYS answers a generic 200 (never reveals whether the
+  /// email exists), so this only throws on network/rate-limit/server errors.
+  Future<void> requestPasswordReset(String email) async {
+    await _authPost(
+      '/auth/password/forgot',
+      {'email': email},
+      failLabel: 'Could not request a reset code',
+    );
+  }
+
+  /// POST /v1/auth/password/reset — sets a new password using the emailed code.
+  ///
+  /// Throws [PasswordResetException] with `invalidCode == true` when the
+  /// server rejects the code (wrong or expired) so the UI can show an inline
+  /// field error, and with `invalidCode == false` for every other failure
+  /// (network → retry, rate limit, server error).
+  Future<void> resetPassword(String email, String code, String newPassword) async {
+    final uri = Uri.parse('$v1Base/auth/password/reset');
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email,
+              'code': code,
+              'new_password': newPassword,
+            }),
+          )
+          .timeout(httpTimeout);
+    } catch (e) {
+      if (_looksLikeNetworkFailure(e)) {
+        throw PasswordResetException(_authNetworkHint());
+      }
+      throw PasswordResetException('Network error: $e');
+    }
+    if (res.statusCode == 200) return;
+    final decoded = _tryDecodeJsonObject(res.body);
+    if (decoded?['error'] == 'INVALID_CODE') {
+      throw PasswordResetException(
+        'That code is incorrect or has expired. Check the email or request a new code.',
+        invalidCode: true,
+      );
+    }
+    throw PasswordResetException(
+      decoded?['message']?.toString() ??
+          'Could not reset the password (${res.statusCode}). Please try again.',
+    );
+  }
+
   /// SharedPreferences flag marking the current session as an anonymous "guest"
   /// (no real email/Google identity), so the UI can later offer to save it.
   static const String _keyIsGuest = 'zvelt_is_guest';
@@ -535,6 +587,17 @@ class AuthService {
 class AccountDeletionException implements Exception {
   AccountDeletionException(this.message);
   final String message;
+  @override
+  String toString() => message;
+}
+
+/// Typed failure for [AuthService.resetPassword]. `invalidCode` distinguishes
+/// "the 6-digit code was rejected" (inline field error) from transport/server
+/// failures (banner + retry).
+class PasswordResetException implements Exception {
+  PasswordResetException(this.message, {this.invalidCode = false});
+  final String message;
+  final bool invalidCode;
   @override
   String toString() => message;
 }
