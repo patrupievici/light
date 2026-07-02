@@ -1,16 +1,27 @@
-import 'package:zvelt_app/theme/app_icons.dart';
-import 'package:flutter/material.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
+import 'package:zvelt_app/theme/app_icons.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../config/api_config.dart' show v1Base;
+import '../../services/auth_service.dart';
 import '../../services/moderation_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/settings_store.dart';
+import '../../theme/locale_notifier.dart';
 import '../../theme/zvelt_theme_notifier.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../social/blocked_users_screen.dart';
 import 'account_settings_screens.dart';
 import 'delete_account_screen.dart';
+import 'language_screen.dart';
 import 'preference_settings_screens.dart';
 import 'resource_settings_screens.dart';
 import 'settings_kit.dart';
@@ -45,6 +56,7 @@ const _accents = <({String name, Color color})>[
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _profile = ProfileService();
+  final _auth = AuthService();
 
   String _goal = 'Build Strength';
   int _daysPerWeek = 4;
@@ -291,6 +303,113 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok) await widget.onLogout();
   }
 
+  String get _languageLabel => switch (LocaleNotifier.preference.value) {
+        'ro' => 'Română',
+        'en' => 'English',
+        _ => 'System default',
+      };
+
+  // ── Rate ─────────────────────────────────────────────────────────────────
+  Future<void> _rate() async {
+    var rating = 0;
+    await showSettingsSheet<void>(
+      context,
+      StatefulBuilder(
+        builder: (context, setLocal) => SettingsSheet(
+          title: 'Rate Zvelt',
+          eyebrow: 'YOUR FEEDBACK',
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 1; i <= 5; i++)
+                    IconButton(
+                      tooltip: '$i stars',
+                      onPressed: () => setLocal(() => rating = i),
+                      icon: Icon(AppIcons.star,
+                          color: i <= rating ? ZveltTokens.warn : ZveltTokens.surface3, size: 34),
+                    ),
+                ],
+              ),
+              const SizedBox(height: ZveltTokens.s4),
+              SettingsActionButton(
+                label: rating >= 4 ? 'Rate in the store' : 'Submit feedback',
+                icon: rating >= 4 ? AppIcons.arrow_up_right_from_square : AppIcons.paper_plane,
+                onTap: () async {
+                  if (rating == 0) {
+                    settingsSnack(context, 'Pick a rating first.', error: true);
+                    return;
+                  }
+                  Navigator.of(context).pop();
+                  if (rating >= 4) {
+                    await _openStore();
+                  } else {
+                    await _open(const FeedbackScreen(kind: FeedbackKind.feature));
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openStore() async {
+    const appStoreId = String.fromEnvironment('APP_STORE_ID', defaultValue: '');
+    final uri = !kIsWeb && Platform.isIOS && appStoreId.isNotEmpty
+        ? Uri.parse('https://apps.apple.com/app/id$appStoreId')
+        : Uri.parse('https://play.google.com/store/apps/details?id=com.lunaoscar.zvelt');
+    await _launch(uri);
+  }
+
+  Future<void> _launch(Uri uri) async {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      settingsSnack(context, 'Could not open this link.', error: true);
+    }
+  }
+
+  // ── GDPR: export a portable copy of the account ──────────────────────────
+  Future<void> _exportData() async {
+    final ok = await settingsConfirm(
+      context,
+      title: 'Export your data?',
+      body: 'Zvelt will create a portable JSON copy of your account, training, '
+          'social and health data (GDPR data portability).',
+      confirmLabel: 'Create export',
+    );
+    if (!ok) return;
+    final token = await _auth.getAccessToken();
+    if (token == null || !mounted) return;
+    try {
+      final res = await http.get(Uri.parse('$v1Base/me/export-data'),
+          headers: {'Authorization': 'Bearer $token'}).timeout(const Duration(seconds: 20));
+      if (!mounted) return;
+      if (res.statusCode == 200) {
+        if (kIsWeb) {
+          settingsSnack(context, 'Export generated. Use the mobile app to share the file.');
+          return;
+        }
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}${Platform.pathSeparator}zvelt-data-export.json');
+        await file.writeAsString(res.body, flush: true);
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(file.path, mimeType: 'application/json')],
+            text: 'Your Zvelt data export',
+          ),
+        );
+      } else {
+        settingsSnack(context, 'Export request failed (${res.statusCode}).', error: true);
+      }
+    } catch (_) {
+      if (mounted) settingsSnack(context, 'Export request failed. Try again online.', error: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SettingsModalShell(
@@ -333,6 +452,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: 'Units',
             subtitle: _units == 'Imperial' ? 'lb · in · mi · kcal' : 'kg · cm · km · kcal',
             onTap: () => _open(const UnitsScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.globe,
+            tint: SettingsTint.green,
+            title: 'Language',
+            subtitle: _languageLabel,
+            onTap: () => _open(const LanguageScreen()),
           ),
           _accentRow(),
         ]),
@@ -487,6 +613,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             tint: SettingsTint.green,
             title: 'Help & Feedback',
             onTap: () => _open(const FeedbackScreen(kind: FeedbackKind.feature)),
+          ),
+          SettingsRow(
+            icon: AppIcons.star,
+            tint: SettingsTint.amber,
+            title: 'Rate Zvelt',
+            subtitle: 'Tell us how we’re doing',
+            onTap: _rate,
+          ),
+          SettingsRow(
+            icon: AppIcons.download,
+            tint: SettingsTint.blue,
+            title: 'Export My Data',
+            subtitle: 'Download a copy (GDPR)',
+            onTap: _exportData,
           ),
           SettingsRow(
             icon: AppIcons.document,
