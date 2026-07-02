@@ -10,6 +10,8 @@ import '../../services/auth_service.dart';
 import '../../services/social_challenge_service.dart';
 import '../../services/social_feed_service.dart';
 import '../../services/stories_service.dart';
+import '../../services/stats_charts_service.dart';
+import '../../services/friends_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/social_challenge_card.dart';
 import '../../widgets/social_feed_post_card.dart';
@@ -17,10 +19,9 @@ import '../../widgets/stories_tray.dart';
 import '../../widgets/zvelt_empty_state.dart';
 import '../../widgets/zvelt_error_state.dart';
 import 'circle_screen.dart';
-import 'create_challenge_sheet.dart';
+import 'create_challenge_flow.dart';
 import 'gallery_screen.dart';
 import 'challenges_screen.dart';
-import 'discover_rooms_screen.dart';
 import 'story_composer_screen.dart';
 import 'story_viewer_screen.dart';
 import '../workouts/post_workout_screen.dart';
@@ -39,6 +40,17 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   final _authService = AuthService();
 
   List<SocialFeedPost> _posts = [];
+  // PRs tab — the user's real recent personal records (from ranking/stats).
+  final _statsService = StatsChartsService();
+  List<RecentPr> _recentPrs = const [];
+  // Challenges tab — pending invites awaiting accept/decline.
+  List<ChallengeInvite> _invites = const [];
+  // Guards against rapid double-taps firing duplicate accept/decline requests.
+  final Set<String> _mutatingInvites = {};
+  // Following tab — circle summary (friend count).
+  final _friendsService = FriendsService();
+  int _friendCount = 0;
+  bool _friendCountLoaded = false;
   List<SocialChallenge> _challenges = [];
 
   // Ephemeral 24h stories shown in the top rail. Loaded separately from (and
@@ -143,6 +155,72 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     _scrollController.addListener(_onScroll);
     _feedRefreshTrigger.addListener(_onFeedRefreshHint);
     _load();
+    _loadRecentPrs();
+    _loadInvites();
+    _loadFriendCount();
+  }
+
+  Future<void> _loadFriendCount() async {
+    try {
+      final friends = await _friendsService.listFriends();
+      if (mounted) {
+        setState(() {
+          _friendCount = friends.length;
+          _friendCountLoaded = true;
+        });
+      }
+    } catch (_) {
+      // Best-effort — the circle summary just won't show a count.
+    }
+  }
+
+  Future<void> _loadRecentPrs() async {
+    try {
+      final prs = await _statsService.getRecentPrs(days: 90);
+      if (mounted) setState(() => _recentPrs = prs);
+    } catch (_) {
+      // PRs are a best-effort enrichment of the PRs tab — empty is fine.
+    }
+  }
+
+  Future<void> _loadInvites() async {
+    try {
+      final invites = await _challengeService.listInvites();
+      if (mounted) setState(() => _invites = invites);
+    } catch (_) {
+      // Pending invites are best-effort — empty is fine.
+    }
+  }
+
+  Future<void> _acceptInvite(ChallengeInvite inv) async {
+    if (!_mutatingInvites.add(inv.id)) return; // already in flight
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _invites = _invites.where((i) => i.id != inv.id).toList());
+    try {
+      await _challengeService.joinChallenge(inv.id);
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(content: Text('Joined the challenge.')));
+      _load(); // the accepted challenge now belongs in the active list
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      _loadInvites(); // restore on failure
+    } finally {
+      _mutatingInvites.remove(inv.id);
+    }
+  }
+
+  Future<void> _declineInvite(ChallengeInvite inv) async {
+    if (!_mutatingInvites.add(inv.id)) return; // already in flight
+    setState(() => _invites = _invites.where((i) => i.id != inv.id).toList());
+    try {
+      await _challengeService.declineChallenge(inv.id);
+    } catch (_) {
+      if (!mounted) return;
+      _loadInvites(); // restore on failure
+    } finally {
+      _mutatingInvites.remove(inv.id);
+    }
   }
 
   @override
@@ -246,58 +324,6 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     if (created == true && mounted) _loadStories(_loadGen);
   }
 
-  void _openDiscoverRooms() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => const DiscoverRoomsScreen()),
-    );
-  }
-
-  /// Always-visible entry into "Camere publice" (public rooms / official rooms).
-  Widget _buildRoomsEntry() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-      child: Material(
-        color: ZveltTokens.surface,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-          onTap: _openDiscoverRooms,
-          child: Padding(
-            padding: const EdgeInsets.all(ZveltTokens.s3),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(ZveltTokens.s3),
-                  decoration: BoxDecoration(
-                    color: ZveltTokens.brandTint.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-                  ),
-                  child: const Icon(AppIcons.globe, color: ZveltTokens.brand, size: 20),
-                ),
-                const SizedBox(width: ZveltTokens.s3),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Public rooms',
-                          style: ZType.bodyM.copyWith(
-                              color: ZveltTokens.text, fontWeight: FontWeight.w700)),
-                      Text('Join public challenges and official rooms',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: ZType.bodyS.copyWith(color: ZveltTokens.text3, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                Icon(AppIcons.angle_small_right, color: ZveltTokens.text3, size: 20),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   void _openStoryGroup(int groupIndex) {
     Navigator.of(context).push<void>(
@@ -365,13 +391,290 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   }
 
   Future<void> _createChallenge() async {
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const CreateChallengeSheet(),
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => const CreateChallengeFlow(),
+      ),
     );
-    if (ok == true && mounted) _load();
+    if (mounted) _load(); // refresh after returning from the flow/detail
+  }
+
+  // ── Following tab — circle summary (count + entry to your circle) ─────────
+  Widget _buildCircleSummary() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+          onTap: _openCircle,
+          child: Container(
+            decoration: BoxDecoration(
+              color: ZveltTokens.surface,
+              borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+              boxShadow: ZveltTokens.shadowCard,
+            ),
+            padding: const EdgeInsets.all(ZveltTokens.s4),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: ZveltTokens.brandTint,
+                    borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                  ),
+                  child: const Icon(AppIcons.users, size: 20, color: ZveltTokens.brand),
+                ),
+                const SizedBox(width: ZveltTokens.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('YOUR CIRCLE',
+                          style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+                      const SizedBox(height: 2),
+                      Text(
+                        _friendCount == 0
+                            ? (_friendCountLoaded ? 'Add friends to fill your feed' : 'Loading your circle…')
+                            : 'Posts from your $_friendCount friend${_friendCount == 1 ? '' : 's'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_friendCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: ZveltTokens.success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                      border: Border.all(color: ZveltTokens.success.withValues(alpha: 0.22)),
+                    ),
+                    child: Text('$_friendCount IN CIRCLE',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: ZveltTokens.success,
+                          letterSpacing: 1.6,
+                        )),
+                  )
+                else
+                  Icon(AppIcons.angle_small_right, size: 20, color: ZveltTokens.text3),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Challenges tab — pending invites (accept/decline inline) ──────────────
+  Widget _buildPendingInvites() {
+    if (_invites.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('PENDING INVITES', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+          const SizedBox(height: 12),
+          for (final inv in _invites) ...[
+            _inviteCard(inv),
+            const SizedBox(height: ZveltTokens.cardGap),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _inviteSubtitle(ChallengeInvite inv) {
+    final from = inv.fromName?.trim();
+    final type = _challengeTypeLabel(inv.scoringType);
+    if (from != null && from.isNotEmpty) return '$from invited you · $type';
+    return type;
+  }
+
+  String _challengeTypeLabel(String? scoringType) {
+    switch (scoringType) {
+      case 'workout_streak':
+        return 'Workout Streak';
+      case 'most_workouts':
+        return 'Most Workouts';
+      case 'total_volume':
+        return 'Total Volume';
+      case 'pr_battle':
+        return 'PR Battle';
+      case 'consistency':
+        return 'Consistency';
+      default:
+        return 'Challenge';
+    }
+  }
+
+  Widget _inviteCard(ChallengeInvite inv) {
+    return Container(
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        boxShadow: ZveltTokens.shadowCard,
+      ),
+      padding: const EdgeInsets.all(ZveltTokens.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brandTint,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                ),
+                child: const Icon(AppIcons.trophy, size: 20, color: ZveltTokens.brand),
+              ),
+              const SizedBox(width: ZveltTokens.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(inv.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(_inviteSubtitle(inv),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s3),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _declineInvite(inv),
+                  child: const Text('Decline'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: FilledButton(
+                  onPressed: () => _acceptInvite(inv),
+                  child: const Text('Accept'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── PRs tab — your real recent records + "Challenge this PR" ───────────────
+  Widget _buildPrRecords() {
+    if (_recentPrs.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('YOUR RECENT PRs', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+          const SizedBox(height: 12),
+          for (final pr in _recentPrs.take(12)) ...[
+            _prCard(pr),
+            const SizedBox(height: ZveltTokens.cardGap),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _prCard(RecentPr pr) {
+    final delta = pr.deltaKg;
+    return Container(
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        boxShadow: ZveltTokens.shadowCard,
+      ),
+      padding: const EdgeInsets.all(ZveltTokens.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brandTint,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                ),
+                child: const Icon(AppIcons.trophy, size: 20, color: ZveltTokens.brand),
+              ),
+              const SizedBox(width: ZveltTokens.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(pr.exerciseName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(pr.headline, style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
+                  ],
+                ),
+              ),
+              if (delta > 0)
+                Text('+${delta % 1 == 0 ? delta.toInt() : delta.toStringAsFixed(1)} kg',
+                    style: ZType.bodyM.copyWith(color: ZveltTokens.success, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s3),
+          SizedBox(
+            width: double.infinity,
+            child: Material(
+              color: ZveltTokens.brandTint,
+              borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                onTap: () => _challengeThisPr(pr),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: Text('Challenge this PR',
+                        style: ZType.bodyS.copyWith(color: ZveltTokens.brand, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _challengeThisPr(RecentPr pr) async {
+    await Navigator.of(context).push<void>(MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => CreateChallengeFlow(
+        initialScoringType: 'pr_battle',
+        initialExerciseId: pr.exerciseId,
+        initialExerciseName: pr.exerciseName,
+      ),
+    ));
+    if (mounted) _load();
   }
 
   Future<void> _confirmRemoveChallenge(SocialChallenge c) async {
@@ -530,8 +833,11 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                           ),
                         ),
                         SliverToBoxAdapter(child: _buildRaceHeroCard()),
-                        SliverToBoxAdapter(child: _buildRoomsEntry()),
                         SliverToBoxAdapter(child: _buildFeedControls()),
+                        if (_feedFilter == 'following')
+                          SliverToBoxAdapter(child: _buildCircleSummary()),
+                        if (_feedFilter == 'races' && _invites.isNotEmpty)
+                          SliverToBoxAdapter(child: _buildPendingInvites()),
                         if (_challenges.isNotEmpty) ...[
                           SliverToBoxAdapter(child: _buildChallengeHeader()),
                           SliverList(
@@ -545,6 +851,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                             ),
                           ),
                         ],
+                        if (_feedFilter == 'prs')
+                          SliverToBoxAdapter(child: _buildPrRecords()),
                         SliverToBoxAdapter(child: _buildFeedHeader()),
                         if (_posts.isEmpty)
                           SliverToBoxAdapter(
@@ -729,7 +1037,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
 
     // ── Design (screens-social.jsx hero): quiet white card r20 p18 —
     // trophy eyebrow, title 18/600, "N athletes · ends in X" meta, then a
-    // compact dark "Join the race" pill + overlapping REAL participant
+    // compact dark "Join challenge" pill + overlapping REAL participant
     // initials. Replaces the V1 take (900-italic title, TRENDING/PUBLIC
     // badges, full-width CTA). Whole card taps into the Race Hub.
     final initials = _heroParticipantInitials;
@@ -755,7 +1063,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   const Icon(AppIcons.trophy, size: 12, color: Colors.white),
                   const SizedBox(width: 4),
                   Text(
-                    'RACE OF THE WEEK',
+                    'ACTIVE CHALLENGE',
                     style: ZType.eyebrow.copyWith(
                       fontSize: 11,
                       color: Colors.white.withValues(alpha: 0.85),
@@ -785,7 +1093,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   // Compact dark join pill (design PillBtn dark/sm + bolt).
                   Semantics(
                     button: true,
-                    label: 'Join the race',
+                    label: 'Join challenge',
                     child: GestureDetector(
                     onTap: () => _joinAndOpenRace(top),
                     child: Container(
@@ -801,7 +1109,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                           Icon(AppIcons.bolt, size: 14, color: ZveltTokens.brand),
                           SizedBox(width: 6),
                           Text(
-                            'Join the race',
+                            'Join challenge',
                             style: TextStyle(
                               fontFamily: ZveltTokens.fontPrimary,
                               fontSize: 12,
@@ -936,64 +1244,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Trending / Friends segmented toggle
-          Row(
-            children: [
-              // Design: quiet segmented control — surface-2 track (padding 2),
-              // active pill = surface + soft shadow, 10.5px/500. The old
-              // orange-gradient + hardcoded grays were V1 leftovers.
-              Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: ZveltTokens.surface2,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final t in const ['trending', 'friends'])
-                      Builder(builder: (context) {
-                        final sel = _trendingFilter == t;
-                        final label = t == 'trending' ? 'Trending' : 'Friends';
-                        return Semantics(
-                          button: true,
-                          selected: sel,
-                          label: '$label feed',
-                          child: GestureDetector(
-                            onTap: () {
-                              if (_trendingFilter == t) return;
-                              _trendingFilter = t;
-                              _onFilterChanged();
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: sel ? ZveltTokens.surface : Colors.transparent,
-                                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                                boxShadow: sel ? ZveltTokens.shadowCard : null,
-                              ),
-                              child: Text(
-                                label,
-                                style: TextStyle(
-                                  color: sel ? ZveltTokens.text : ZveltTokens.text3,
-                                  fontSize: 11,
-                                  fontWeight:
-                                      sel ? FontWeight.w600 : FontWeight.w500,
-                                  fontFamily: ZveltTokens.fontPrimary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          // Single filter row (spec): All / Following / PRs / Challenges
           // Filter pills
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,

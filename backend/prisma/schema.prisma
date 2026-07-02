@@ -506,6 +506,19 @@ model Challenge {
   endsAt       DateTime @map("ends_at")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  // ── Scoring engine (Feed & Challenges v1). NULL scoringType = legacy/manual
+  //    challenge (scored from manual progress logs). Set = auto-scored from
+  //    workouts via challenge-scoring.service + challenge-recalc.service.
+  scoringType        String?   @map("scoring_type") // workout_streak|most_workouts|total_volume|pr_battle|consistency
+  startsAt           DateTime? @map("starts_at")
+  ruleMinDurationMin Int?      @map("rule_min_duration_min")
+  ruleMinSets        Int?      @map("rule_min_sets")
+  ruleMinExercises   Int?      @map("rule_min_exercises")
+  ruleMaxPerDay      Int?      @map("rule_max_per_day")
+  ruleExerciseId     String?   @map("rule_exercise_id") // pr_battle target exercise
+  ruleTargetDays     Int?      @map("rule_target_days") // consistency target
+  scoringVersion     Int       @default(1) @map("scoring_version")
+
   creator      User                   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   participants ChallengeParticipant[]
   progressLogs ChallengeProgressLog[]
@@ -589,6 +602,23 @@ model Notification {
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, readAt])
   @@map("notifications")
+}
+
+/// Idempotency ledger for SCHEDULED notifications (streak-risk, challenge
+/// ending/ended). Each row claims "this notification was already sent" so a
+/// cron re-run or a service restart mid-batch never double-notifies. dedupeKey
+/// is per-type: a UTC date (YYYY-MM-DD) for streak-risk, the challengeId for
+/// challenge ending/ended. FK-less; an eventual cleanup prunes old rows.
+model NotificationSentLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String   @db.VarChar(40)
+  dedupeKey String   @map("dedupe_key") @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, type, dedupeKey])
+  @@index([createdAt])
+  @@map("notification_sent_logs")
 }
 
 model PostLike {
@@ -972,6 +1002,13 @@ model ChallengeParticipant {
   challengeId String   @map("challenge_id")
   userId      String   @map("user_id")
   joinedAt    DateTime @default(now()) @map("joined_at")
+
+  // Lifecycle + official score (computed by challenge-recalc.service).
+  status          String    @default("accepted") // invited|accepted|declined|left|completed
+  acceptedAt      DateTime? @map("accepted_at")
+  score           Int       @default(0)
+  rank            Int?
+  lastScoreUpdate DateTime? @map("last_score_update")
 
   challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)

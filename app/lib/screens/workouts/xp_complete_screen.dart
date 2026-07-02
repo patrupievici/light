@@ -9,6 +9,7 @@ import '../../services/activity_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/zvelt_secondary_button.dart';
 import '../../services/social_feed_service.dart';
+import '../../services/stats_charts_service.dart';
 import '../../widgets/post_prompt_sheet.dart';
 
 /// Mesaj când [GET /v1/ranks/me] e gol (nu există `userExerciseRank` încă).
@@ -76,6 +77,10 @@ class _XpCompleteScreenState extends State<XpCompleteScreen> with SingleTickerPr
   bool _ranksLoaded = false;
   _RankEmptyHint _rankEmptyHint = _RankEmptyHint.generic;
 
+  /// A personal record set in the last day — almost certainly from the workout
+  /// just completed. Drives the "NEW PR" badge + a celebratory share caption.
+  RecentPr? _todayPr;
+
   /// AI coach commentary on the workout just completed. Null while loading,
   /// stays null on AI failure (the card just doesn't render).
   String? _insight;
@@ -105,7 +110,27 @@ class _XpCompleteScreenState extends State<XpCompleteScreen> with SingleTickerPr
       // Small delay so the celebratory XP animation plays first; the coach
       // commentary then fades in once attention has settled.
       Future.delayed(const Duration(milliseconds: 900), _loadInsight);
+      _loadTodayPr();
     }
+  }
+
+  Future<void> _loadTodayPr() async {
+    try {
+      final prs = await StatsChartsService().getRecentPrs(days: 1);
+      if (!mounted || prs.isEmpty) return;
+      setState(() => _todayPr = prs.first);
+    } catch (_) {
+      // Best-effort celebration — no PR badge if this fails.
+    }
+  }
+
+  /// Caption used when sharing: caller-supplied wins, else a PR shout-out, else
+  /// the share screens fall back to their own default.
+  String? get _shareCaption {
+    if (widget.shareCaption != null) return widget.shareCaption;
+    final pr = _todayPr;
+    if (pr != null) return 'New PR — ${pr.exerciseName}! ${pr.headline} 💪';
+    return null;
   }
 
   Future<void> _loadInsight() async {
@@ -155,7 +180,7 @@ class _XpCompleteScreenState extends State<XpCompleteScreen> with SingleTickerPr
     await PostPromptSheet.open(
       context,
       workoutId: widget.workoutId,
-      initialCaption: widget.shareCaption,
+      initialCaption: _shareCaption,
     );
   }
 
@@ -167,7 +192,7 @@ class _XpCompleteScreenState extends State<XpCompleteScreen> with SingleTickerPr
     try {
       await SocialFeedService().createWorkoutPost(
         workoutId: widget.workoutId!,
-        caption: widget.shareCaption ?? 'Workout logged 💪',
+        caption: _shareCaption ?? 'Workout logged 💪',
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -331,6 +356,37 @@ class _XpCompleteScreenState extends State<XpCompleteScreen> with SingleTickerPr
                                           fontWeight: FontWeight.w700,
                                           letterSpacing: 0.4,
                                         ),
+                                      ),
+                                    ),
+                                  ],
+                                  if (_todayPr != null) ...[
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: ZveltTokens.success.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                                        border: Border.all(color: ZveltTokens.success.withValues(alpha: 0.5)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(AppIcons.trophy, size: 14, color: ZveltTokens.success),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Text(
+                                              'NEW PR · ${_todayPr!.exerciseName}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: ZveltTokens.success,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.4,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],

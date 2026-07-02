@@ -50,6 +50,7 @@ const txSpies = {
   refreshToken: { deleteMany: vi.fn() },
   challengeParticipant: { deleteMany: vi.fn() },
   challenge: { deleteMany: vi.fn() },
+  notificationSentLog: { deleteMany: vi.fn() },
   segmentEffort: { deleteMany: vi.fn() },
   gpsActivity: { deleteMany: vi.fn() },
   userTrainingProfile: { deleteMany: vi.fn() },

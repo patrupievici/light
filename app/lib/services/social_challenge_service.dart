@@ -9,6 +9,34 @@ import '../models/social_challenge.dart';
 import '_crash_reporter.dart';
 import 'auth_service.dart';
 
+/// A pending challenge invite (status='invited') — surfaced in the Challenges
+/// sub-tab so the user can accept/decline without opening the detail screen.
+class ChallengeInvite {
+  ChallengeInvite({
+    required this.id,
+    required this.title,
+    this.scoringType,
+    this.endsAt,
+    this.fromName,
+  });
+
+  final String id;
+  final String title;
+  final String? scoringType;
+  final DateTime? endsAt;
+  final String? fromName;
+
+  static ChallengeInvite fromJson(Map<String, dynamic> m) => ChallengeInvite(
+        id: m['id'] as String,
+        title: (m['title'] as String?)?.trim().isNotEmpty == true
+            ? (m['title'] as String).trim()
+            : 'Challenge',
+        scoringType: m['scoringType'] as String?,
+        endsAt: DateTime.tryParse(m['endsAt'] as String? ?? ''),
+        fromName: (m['creatorDisplayName'] as String?)?.trim(),
+      );
+}
+
 /// Provocări sociale: `GET/POST/DELETE /v1/challenges`; fallback local dacă nu e token sau rețea.
 class SocialChallengeService {
   SocialChallengeService({AuthService? auth}) : _auth = auth ?? AuthService();
@@ -183,6 +211,54 @@ class SocialChallengeService {
     }
   }
 
+  /// Create an auto-scored challenge (Feed & Challenges v1). Sends the scoring
+  /// config so the backend engine takes over. Returns the new challenge id.
+  Future<String> createScoredChallenge({
+    required String scoringType, // workout_streak|most_workouts|total_volume|pr_battle|consistency
+    required String title,
+    required int durationDays,
+    String visibility = 'friends',
+    bool startTomorrow = false,
+    String? exerciseId, // pr_battle target
+    int? targetDays, // consistency target
+    List<String> inviteUserIds = const [],
+  }) async {
+    final headers = await _headersAuth();
+    if (headers.isEmpty) throw Exception('Sign in to create a challenge.');
+
+    final body = <String, dynamic>{
+      'kind': 'custom',
+      'customTitle': title.trim().isEmpty ? 'Challenge' : title.trim(),
+      'visibility': visibility,
+      'durationDays': durationDays,
+      'scoringType': scoringType,
+      if (startTomorrow)
+        'startsAt': DateTime.now().add(const Duration(days: 1)).toUtc().toIso8601String(),
+      if (exerciseId != null) 'exerciseId': exerciseId,
+      if (targetDays != null) 'targetDays': targetDays,
+      if (inviteUserIds.isNotEmpty) 'inviteUserIds': inviteUserIds,
+    };
+
+    final res = await http
+        .post(Uri.parse('$v1Base/challenges'), headers: headers, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 25));
+
+    if (res.statusCode == 201) {
+      try {
+        final map = jsonDecode(res.body) as Map<String, dynamic>;
+        return (map['data'] as Map<String, dynamic>?)?['id'] as String? ?? '';
+      } catch (_) {
+        return '';
+      }
+    }
+    var msg = 'Could not create challenge (${res.statusCode})';
+    try {
+      final j = jsonDecode(res.body);
+      if (j is Map && j['message'] is String) msg = j['message'] as String;
+    } catch (_) {}
+    throw Exception(msg);
+  }
+
   Future<void> remove(String id) async {
     final headers = await _headersAuth();
     if (headers.isNotEmpty && _looksLikeUuid(id)) {
@@ -216,6 +292,39 @@ class SocialChallengeService {
       debugPrint('[SocialChallenge.join] error-body decode best-effort skip: $e');
     }
     throw Exception(msg);
+  }
+
+  /// POST /v1/challenges/:id/decline — decline a pending invite.
+  Future<void> declineChallenge(String challengeId) async {
+    final headers = await _headersAuth();
+    if (headers.isEmpty) throw Exception('Not signed in');
+    final res = await http
+        .post(Uri.parse('$v1Base/challenges/$challengeId/decline'), headers: headers)
+        .timeout(const Duration(seconds: 22));
+    if (res.statusCode == 204 || res.statusCode == 200) return;
+    throw Exception('Could not decline (${res.statusCode})');
+  }
+
+  /// GET /v1/challenges/invites — challenges you've been invited to but haven't
+  /// accepted/declined yet. Best-effort: empty list on auth/network/non-200.
+  Future<List<ChallengeInvite>> listInvites() async {
+    final headers = await _headersAuth();
+    if (headers.isEmpty) return const [];
+    try {
+      final res = await http
+          .get(Uri.parse('$v1Base/challenges/invites'), headers: headers)
+          .timeout(const Duration(seconds: 22));
+      if (res.statusCode != 200) return const [];
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final list = data['data'] as List<dynamic>? ?? [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(ChallengeInvite.fromJson)
+          .toList();
+    } catch (e, st) {
+      reportError(e, st, reason: 'challenges:list-invites');
+      return const [];
+    }
   }
 
   /// DELETE /v1/challenges/:id/leave

@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { acceptedFriendIds } from '../lib/friendships'
+import { recomputeChallenge } from '../services/challenge-recalc.service'
+import { createNotificationSafe, claimScheduledNotification, NotificationType } from '../services/notification.service'
 
 const CreateChallengeSchema = z
   .object({
@@ -11,6 +13,23 @@ const CreateChallengeSchema = z
     visibility: z.enum(['friends', 'public']),
     targetHint: z.string().max(60).optional(),
     durationDays: z.number().int().min(1).max(365),
+    // ── Auto-scoring (Feed & Challenges v1) — optional; absent = legacy/manual.
+    scoringType: z
+      .enum(['workout_streak', 'most_workouts', 'total_volume', 'pr_battle', 'consistency'])
+      .optional(),
+    startsAt: z.string().datetime().optional(),
+    rules: z
+      .object({
+        minDurationMin: z.number().int().min(0).max(600),
+        minSets: z.number().int().min(0).max(100),
+        minExercises: z.number().int().min(0).max(50),
+        maxPerDay: z.number().int().min(1).max(10),
+      })
+      .partial()
+      .optional(),
+    exerciseId: z.string().uuid().optional(), // pr_battle target
+    targetDays: z.number().int().min(1).max(31).optional(), // consistency target
+    inviteUserIds: z.array(z.string().uuid()).max(20).optional(),
   })
   .superRefine((val, ctx) => {
     if (val.kind === 'custom') {
@@ -119,12 +138,22 @@ export async function challengeRoutes(app: FastifyInstance) {
       })
     }
 
-    const { kind, customTitle, visibility, targetHint, durationDays } = parsed.data
+    const { kind, customTitle, visibility, targetHint, durationDays, scoringType, startsAt, rules, exerciseId, targetDays, inviteUserIds } = parsed.data
+
+    // Cross-validate the scoring config.
+    if (scoringType === 'pr_battle' && !exerciseId) {
+      return reply.code(400).send({ error: 'EXERCISE_REQUIRED', message: 'PR Battle needs a target exercise.', requestId: request.id })
+    }
+    if (scoringType === 'consistency' && !targetDays) {
+      return reply.code(400).send({ error: 'TARGET_REQUIRED', message: 'Consistency needs a target number of days.', requestId: request.id })
+    }
+
     const customDb = kind === 'custom' ? customTitle!.trim() : customTitle?.trim() ? customTitle.trim() : null
     const hintDb = targetHint?.trim() ? targetHint.trim().slice(0, 120) : null
 
     const createdAt = new Date()
-    const endsAt = new Date(createdAt.getTime() + durationDays * 86_400_000)
+    const startDate = startsAt ? new Date(startsAt) : createdAt
+    const endsAt = new Date(startDate.getTime() + durationDays * 86_400_000)
 
     const row = await prisma.challenge.create({
       data: {
@@ -135,6 +164,15 @@ export async function challengeRoutes(app: FastifyInstance) {
         targetHint: hintDb,
         durationDays,
         endsAt,
+        // Auto-scoring config (null when legacy/manual).
+        scoringType: scoringType ?? null,
+        startsAt: scoringType ? startDate : null,
+        ruleMinDurationMin: rules?.minDurationMin ?? null,
+        ruleMinSets: rules?.minSets ?? null,
+        ruleMinExercises: rules?.minExercises ?? null,
+        ruleMaxPerDay: rules?.maxPerDay ?? null,
+        ruleExerciseId: exerciseId ?? null,
+        ruleTargetDays: targetDays ?? null,
       },
       include: {
         creator: {
@@ -144,6 +182,43 @@ export async function challengeRoutes(app: FastifyInstance) {
         },
       },
     })
+
+    // Creator auto-joins as accepted; invited friends start as 'invited'.
+    await prisma.challengeParticipant.create({
+      data: { challengeId: row.id, userId, status: 'accepted', acceptedAt: createdAt },
+    })
+    if (inviteUserIds?.length) {
+      const invitees = inviteUserIds.filter((uid) => uid !== userId)
+      await prisma.challengeParticipant.createMany({
+        data: invitees.map((uid) => ({ challengeId: row.id, userId: uid, status: 'invited' })),
+        skipDuplicates: true,
+      })
+      // Notify each invited friend (fire-and-forget; never blocks create).
+      const inviteTitle =
+        row.kind === 'custom' && row.customTitle?.trim() ? row.customTitle.trim() : defaultTitle(row.kind)
+      for (const uid of invitees) {
+        void createNotificationSafe({
+          recipientId: uid,
+          actorId: userId,
+          type: NotificationType.CHALLENGE_INVITE,
+          payload: {
+            challengeId: row.id,
+            title: inviteTitle,
+            scoringType: scoringType ?? null,
+            endsAt: row.endsAt.toISOString(),
+          },
+        })
+      }
+    }
+
+    // Seed the standings snapshot for auto-scored challenges.
+    if (scoringType) {
+      try {
+        await recomputeChallenge(row.id)
+      } catch (err) {
+        request.log.warn({ err, challengeId: row.id }, 'Initial challenge recompute failed')
+      }
+    }
 
     return reply.code(201).send({
       data: serializeChallenge(row, userId),
@@ -180,6 +255,49 @@ export async function challengeRoutes(app: FastifyInstance) {
     })
 
     const data = rows.map((r) => serializeChallenge(r, me))
+    return reply.send({ data, requestId: request.id })
+  })
+
+  // GET /v1/challenges/invites — challenges you've been invited to but haven't
+  // accepted/declined yet (participant status = 'invited'), still active. Powers
+  // the pending-invites strip at the top of the Challenges sub-tab so a user can
+  // accept/decline without opening each challenge.
+  app.get('/invites', { preHandler: authenticate }, async (request, reply) => {
+    const { userId: me } = request.user
+    const now = new Date()
+    const rows = await prisma.challengeParticipant.findMany({
+      where: {
+        userId: me,
+        status: 'invited',
+        // Hide invites whose creator deleted/disabled their account (don't leak
+        // their profile or surface a dead challenge).
+        challenge: {
+          endsAt: { gt: now },
+          creator: { status: 'active', softDeletedAt: null },
+        },
+      },
+      orderBy: { challenge: { createdAt: 'desc' } },
+      take: 50,
+      include: {
+        challenge: {
+          include: {
+            creator: { select: { profile: { select: { username: true, displayName: true } } } },
+          },
+        },
+      },
+    })
+    const data = rows.map((p) => {
+      const c = p.challenge
+      const title =
+        c.kind === 'custom' && c.customTitle?.trim() ? c.customTitle.trim() : defaultTitle(c.kind)
+      return {
+        id: c.id,
+        title,
+        scoringType: c.scoringType ?? null,
+        endsAt: c.endsAt.toISOString(),
+        creatorDisplayName: creatorLabel(c.creator.profile),
+      }
+    })
     return reply.send({ data, requestId: request.id })
   })
 
@@ -239,16 +357,76 @@ export async function challengeRoutes(app: FastifyInstance) {
     if (challenge.endsAt <= new Date()) {
       return reply.code(400).send({ error: 'CHALLENGE_EXPIRED', message: 'Provocarea a expirat', requestId: request.id })
     }
-    const existing = await prisma.challengeParticipant.findUnique({
+    // Join == accept (also accepts a pending invite). Idempotent.
+    const now = new Date()
+    const participant = await prisma.challengeParticipant.upsert({
       where: { challengeId_userId: { challengeId: challenge.id, userId: me } },
+      create: { challengeId: challenge.id, userId: me, status: 'accepted', acceptedAt: now },
+      update: { status: 'accepted', acceptedAt: now },
     })
-    if (existing) {
-      return reply.send({ message: 'already joined', data: { challengeId: challenge.id, userId: me, joinedAt: existing.joinedAt.toISOString() } })
+    // Recompute standings so the new participant is scored/ranked immediately.
+    // recomputeChallenge is a no-op for legacy/manual challenges, so it's safe
+    // to call unconditionally.
+    try {
+      await recomputeChallenge(challenge.id)
+    } catch (err) {
+      request.log.warn({ err, challengeId: challenge.id }, 'Recompute on join failed')
     }
-    const participant = await prisma.challengeParticipant.create({
-      data: { challengeId: challenge.id, userId: me },
+
+    // Tell the creator someone joined — exactly once per (joiner, challenge)
+    // via the dedupe ledger, so a double-tap / leave-then-rejoin never
+    // double-notifies (race-proof, unlike a read-then-write status check).
+    // Skip self-joins and soft-deleted/disabled creators.
+    if (me !== challenge.creatorId) {
+      const claimed = await claimScheduledNotification(
+        challenge.creatorId,
+        NotificationType.CHALLENGE_JOINED,
+        `${challenge.id}:${me}`,
+      )
+      if (claimed) {
+        const creator = await prisma.user.findUnique({
+          where: { id: challenge.creatorId },
+          select: { status: true, softDeletedAt: true },
+        })
+        if (creator && creator.status === 'active' && creator.softDeletedAt == null) {
+          const title =
+            challenge.kind === 'custom' && challenge.customTitle?.trim()
+              ? challenge.customTitle.trim()
+              : defaultTitle(challenge.kind)
+          void createNotificationSafe({
+            recipientId: challenge.creatorId,
+            actorId: me,
+            type: NotificationType.CHALLENGE_JOINED,
+            payload: {
+              challengeId: challenge.id,
+              title,
+              scoringType: challenge.scoringType ?? null,
+              endsAt: challenge.endsAt.toISOString(),
+            },
+          })
+        }
+      }
+    }
+    return reply.code(201).send({
+      data: {
+        challengeId: challenge.id,
+        userId: me,
+        status: 'accepted',
+        joinedAt: participant.joinedAt.toISOString(),
+      },
     })
-    return reply.code(201).send({ data: { challengeId: challenge.id, userId: me, joinedAt: participant.joinedAt.toISOString() } })
+  })
+
+  // POST /v1/challenges/:id/decline — decline a pending invite.
+  app.post('/:id/decline', { preHandler: authenticate }, async (request, reply) => {
+    const { userId: me } = request.user
+    const id = requireUuidParam(request, reply)
+    if (!id) return
+    await prisma.challengeParticipant.updateMany({
+      where: { challengeId: id, userId: me },
+      data: { status: 'declined' },
+    })
+    return reply.code(204).send()
   })
 
   // DELETE /v1/challenges/:id/leave
@@ -285,7 +463,7 @@ export async function challengeRoutes(app: FastifyInstance) {
   /// Shared access gate for progress/standings/chat: challenge must exist
   /// and be visible to the viewer (public, mine, or friend's). Returns the
   /// challenge row or replies with the error and returns null.
-  async function loadVisibleChallenge(request: any, reply: any): Promise<{ id: string; creatorId: string; visibility: string; endsAt: Date } | null> {
+  async function loadVisibleChallenge(request: any, reply: any): Promise<{ id: string; creatorId: string; visibility: string; endsAt: Date; kind: string; customTitle: string | null; scoringType: string | null } | null> {
     const { userId: me } = request.user
     const id = requireUuidParam(request, reply)
     if (!id) return null
@@ -327,7 +505,8 @@ export async function challengeRoutes(app: FastifyInstance) {
   /// sorted desc. Participants with no logs appear with total 0 (joined
   /// counts — design shows the full roster).
   async function buildStandings(challengeId: string) {
-    const [participants, sums] = await Promise.all([
+    const [challenge, participants] = await Promise.all([
+      prisma.challenge.findUnique({ where: { id: challengeId }, select: { scoringType: true } }),
       prisma.challengeParticipant.findMany({
         where: { challengeId },
         include: {
@@ -335,13 +514,31 @@ export async function challengeRoutes(app: FastifyInstance) {
         },
         orderBy: { joinedAt: 'asc' },
       }),
-      prisma.challengeProgressLog.groupBy({
-        by: ['userId'],
-        where: { challengeId },
-        _sum: { amount: true },
-        _max: { createdAt: true },
-      }),
     ])
+
+    // Auto-scored challenge → official score/rank from challenge-recalc.service.
+    if (challenge?.scoringType) {
+      const rows = participants
+        .filter((p) => p.status === 'accepted')
+        .map((p) => ({
+          userId: p.userId,
+          displayName: p.user.profile?.displayName ?? p.user.profile?.username ?? 'Athlete',
+          username: p.user.profile?.username ?? null,
+          total: p.score,
+          lastLoggedAt: p.lastScoreUpdate?.toISOString() ?? null,
+          joinedAt: p.joinedAt.toISOString(),
+        }))
+      rows.sort((a, b) => b.total - a.total)
+      return rows
+    }
+
+    // Legacy/manual challenge → standings from manual progress logs.
+    const sums = await prisma.challengeProgressLog.groupBy({
+      by: ['userId'],
+      where: { challengeId },
+      _sum: { amount: true },
+      _max: { createdAt: true },
+    })
     const totals = new Map(sums.map((s) => [s.userId, { total: Number(s._sum.amount ?? 0), lastAt: s._max.createdAt }]))
     const rows = participants.map((p) => ({
       userId: p.userId,
