@@ -1,40 +1,24 @@
-import 'dart:convert';
 import 'package:zvelt_app/theme/app_icons.dart';
-import 'dart:io';
-
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../config/api_config.dart';
-import '../../services/app_data_cache.dart';
-import '../../services/auth_service.dart';
-import '../../services/health_service.dart';
-import '../../services/messages_service.dart';
 import '../../services/moderation_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/settings_store.dart';
-import '../../services/social_feed_service.dart';
-import '../../services/social_notification_hub.dart';
 import '../../theme/zvelt_theme_notifier.dart';
 import '../../theme/zvelt_tokens.dart';
-import '../profile/integrations_screen.dart';
 import '../social/blocked_users_screen.dart';
-import '../social/bookmarks_screen.dart';
-import '../social/conversations_screen.dart';
 import 'account_settings_screens.dart';
-import 'language_screen.dart';
+import 'delete_account_screen.dart';
 import 'preference_settings_screens.dart';
 import 'resource_settings_screens.dart';
 import 'settings_kit.dart';
-import 'shortcuts_screen.dart';
 
+/// Settings — 1:1 with the Claude Design "Settings" handoff. No bottom nav.
+/// Sections: Account · Preferences · Training · Notifications · Privacy &
+/// Social · Subscription · Connected Data (locked v2) · Support, then Log Out.
+/// Every row is wired to a real destination or a functional persisted control.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
@@ -49,48 +33,42 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen>
-    with WidgetsBindingObserver {
-  final _auth = AuthService();
+/// The six accent options from the handoff. Purple (periwinkle) is default.
+const _accents = <({String name, Color color})>[
+  (name: 'Purple', color: Color(0xFF7C7FF2)),
+  (name: 'Blue', color: Color(0xFF3B82F6)),
+  (name: 'Green', color: Color(0xFF18C48F)),
+  (name: 'Orange', color: Color(0xFFFF9F43)),
+  (name: 'Pink', color: Color(0xFFEC4899)),
+  (name: 'Red', color: Color(0xFFFF4D4D)),
+];
+
+class _SettingsScreenState extends State<SettingsScreen> {
   final _profile = ProfileService();
 
-  String _physical = 'BW \u00b7 height \u00b7 sex';
-  String _goal = 'Strength \u00b7 6 days';
+  String _goal = 'Build Strength';
+  int _daysPerWeek = 4;
   String _units = 'Metric';
   String _visibility = 'Friends only';
-  String _language = 'English';
-  bool _notifications = true;
-  bool _diagnostics = false;
-  int _shortcutCount = 3;
   int _blockedCount = 0;
-  int _bookmarkCount = 0;
-  int _conversationCount = 0;
-  int _deviceCount = 0;
-  int _gettingStartedCount = 0;
-  DateTime? _cloudLastSync;
-  String _version = 'v1.0.0 - build 3';
+  String _version = '1.0.0';
+  bool _accentOpen = false;
+
+  // Local training prefs (subtitles + defaults).
+  bool _autofill = true;
+  bool _showPrevious = true;
+  int _restSeconds = 90;
+  bool _restAutostart = true;
+  bool _restVibrate = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     if (!widget.preview) _load();
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _loadCounts();
-  }
-
   Future<void> _load() async {
-    await Future.wait(
-        [_loadProfile(), _loadPrefs(), _loadAppInfo(), _loadCounts()]);
+    await Future.wait([_loadProfile(), _loadAppInfo(), _loadBlocked(), _loadLocalPrefs()]);
   }
 
   Future<void> _loadProfile() async {
@@ -98,18 +76,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     final p = me?['profile'] as Map<String, dynamic>?;
     final tp = me?['trainingProfile'] as Map<String, dynamic>?;
     if (!mounted) return;
-    final bw = (p?['bodyweightKg'] as num?)?.toDouble();
-    final height = (p?['heightCm'] as num?)?.toDouble();
-    final sex = p?['sex']?.toString();
-    final parts = <String>[
-      if (bw != null) '${bw.toStringAsFixed(bw % 1 == 0 ? 0 : 1)} kg',
-      if (height != null) '${height.round()} cm',
-      if (sex != null && sex.isNotEmpty) sex,
-    ];
     setState(() {
-      if (parts.isNotEmpty) _physical = parts.join(' \u00b7 ');
-      _goal =
-          '${_goalLabel(tp?['primaryGoal']?.toString())} \u00b7 ${(tp?['daysPerWeek'] as num?)?.toInt() ?? 6} days';
+      _goal = _goalLabel(tp?['primaryGoal']?.toString());
+      _daysPerWeek = (tp?['daysPerWeek'] as num?)?.toInt() ?? 4;
       _units = p?['unitSystem'] == 'imperial' ? 'Imperial' : 'Metric';
       _visibility = switch (p?['privacyDefault']) {
         'public' => 'Public',
@@ -119,301 +88,82 @@ class _SettingsScreenState extends State<SettingsScreen>
     });
   }
 
-  Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    const shortcutKeys = [
-      SettingsKeys.scEmpty,
-      SettingsKeys.scAi,
-      SettingsKeys.scRun,
-      SettingsKeys.scMeal,
-      SettingsKeys.scRace,
-      SettingsKeys.scPhoto,
-    ];
-    const setupKeys = [
-      SettingsKeys.gsProfile,
-      SettingsKeys.gsData,
-      SettingsKeys.gsDevice,
-      SettingsKeys.gsWorkout,
-      SettingsKeys.gsFriends,
-    ];
-    const languageNames = {
-      'en': 'English',
-      'ro': 'Romana',
-      'es': 'Espanol',
-      'fr': 'Francais',
-      'de': 'Deutsch',
-      'it': 'Italiano',
-      'pt': 'Portugues',
-      'sv': 'Svenska',
-    };
-    final rawLast = prefs.getString(SettingsKeys.cloudLastSync);
-    if (!mounted) return;
-    setState(() {
-      _notifications = prefs.getBool(SettingsKeys.notifMaster) ?? true;
-      _diagnostics = prefs.getBool(SettingsKeys.diagnostics) ?? false;
-      _language =
-          languageNames[prefs.getString(SettingsKeys.language)] ?? 'English';
-      _units =
-          (prefs.getString(SettingsKeys.unitSystem) ?? _units.toLowerCase()) ==
-                  'imperial'
-              ? 'Imperial'
-              : 'Metric';
-      _shortcutCount = shortcutKeys.indexed.where((entry) {
-        final defaultsOn = entry.$1 < 3;
-        return prefs.getBool(entry.$2) ?? defaultsOn;
-      }).length;
-      _gettingStartedCount =
-          setupKeys.where((key) => prefs.getBool(key) ?? false).length;
-      _cloudLastSync = rawLast == null ? null : DateTime.tryParse(rawLast);
-    });
-  }
-
   Future<void> _loadAppInfo() async {
     try {
       final info = await PackageInfo.fromPlatform();
-      if (mounted) {
-        setState(
-            () => _version = 'v${info.version} - build ${info.buildNumber}');
-      }
+      if (mounted) setState(() => _version = info.version);
     } catch (_) {}
   }
 
-  Future<void> _loadCounts() async {
-    final results = await Future.wait<Object?>([
-      _safeResult(ModerationService().listBlocked(), const <Object>[]),
-      _safeResult(SocialFeedService().getBookmarks(limit: 20), null),
-      _safeResult(MessagesService().listConversations(), const <Object>[]),
-      _integrationCount(),
-    ]);
+  Future<void> _loadBlocked() async {
+    try {
+      final blocked = await ModerationService().listBlocked();
+      if (mounted) setState(() => _blockedCount = blocked.length);
+    } catch (_) {}
+  }
+
+  Future<void> _loadLocalPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
-    final bookmarks = results[1];
     setState(() {
-      _blockedCount = (results[0] as List).length;
-      _bookmarkCount = bookmarks is SocialFeedPage ? bookmarks.posts.length : 0;
-      _conversationCount = (results[2] as List).length;
-      _deviceCount = results[3] as int;
+      _autofill = prefs.getBool(SettingsKeys.logAutofillWeight) ?? true;
+      _showPrevious = prefs.getBool(SettingsKeys.logShowPrevious) ?? true;
+      _restSeconds = prefs.getInt(SettingsKeys.restSeconds) ?? 90;
+      _restAutostart = prefs.getBool(SettingsKeys.restAutostart) ?? true;
+      _restVibrate = prefs.getBool(SettingsKeys.restVibrate) ?? true;
     });
   }
 
-  Future<Object?> _safeResult(Future<Object?> future, Object? fallback) async {
-    try {
-      return await future;
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  Future<int> _integrationCount() async {
-    var count = 0;
-    try {
-      if (!kIsWeb && await HealthService.instance.hasPermissions()) count++;
-    } catch (_) {}
-    final token = await _auth.getAccessToken();
-    if (token == null) return count;
-    try {
-      final res = await http.get(Uri.parse('$v1Base/integrations'), headers: {
-        'Authorization': 'Bearer $token'
-      }).timeout(const Duration(seconds: 12));
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        count += (body['integrations'] as List<dynamic>? ?? const []).length;
-      }
-    } catch (_) {}
-    return count;
-  }
-
   String _goalLabel(String? value) => switch (value) {
-        'hypertrophy' => 'Hypertrophy',
-        'maintenance' => 'Stay healthy',
-        'fat_loss' => 'Fat loss',
+        'hypertrophy' => 'Build Muscle',
+        'maintenance' => 'Maintain',
+        'fat_loss' => 'Fat Loss',
         'calisthenics' => 'Calisthenics',
-        _ => 'Strength',
+        'endurance' => 'Endurance',
+        'explosive_power' => 'Explosive Power',
+        'vertical_jump' => 'Vertical Jump',
+        _ => 'Build Strength',
       };
 
   Future<void> _open(Widget screen) async {
-    await Navigator.of(context)
-        .push<void>(MaterialPageRoute<void>(builder: (_) => screen));
+    await Navigator.of(context).push<void>(MaterialPageRoute<void>(builder: (_) => screen));
     if (mounted) await _load();
   }
 
-  String get _themeLabel => switch (ZveltThemeNotifier.mode.value) {
-        ThemeMode.light => 'Light',
-        ThemeMode.system => 'System',
-        _ => 'Dark',
-      };
-
-  Future<void> _appearance() async {
-    await showSettingsSheet<void>(
-      context,
-      SettingsSheet(
-        title: 'Choose a theme',
-        eyebrow: 'APPEARANCE',
-        child: ValueListenableBuilder<ThemeMode>(
-          valueListenable: ZveltThemeNotifier.mode,
-          builder: (context, mode, _) => SettingsCard(
-            children: [
-              SettingsRadioRow(
-                title: 'Light',
-                subtitle: 'Bright, daytime look',
-                selected: mode == ThemeMode.light,
-                leading: const SettingsIconTile(
-                    icon: AppIcons.sun, tint: SettingsTint.amber),
-                onTap: () => ZveltThemeNotifier.set(ThemeMode.light),
-              ),
-              SettingsRadioRow(
-                title: 'Dark',
-                subtitle: 'Easy on the eyes at night',
-                selected: mode == ThemeMode.dark,
-                leading: const SettingsIconTile(
-                    icon: AppIcons.moon, tint: SettingsTint.violet),
-                onTap: () => ZveltThemeNotifier.set(ThemeMode.dark),
-              ),
-              SettingsRadioRow(
-                title: 'System',
-                subtitle: 'Match your device',
-                selected: mode == ThemeMode.system,
-                leading: const SettingsIconTile(
-                    icon: AppIcons.settings,
-                    tint: SettingsTint.blue),
-                onTap: () => ZveltThemeNotifier.set(ThemeMode.system),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _exportData() async {
-    final ok = await settingsConfirm(
-      context,
-      title: 'Export your data?',
-      body:
-          'Zvelt will create a portable JSON copy of your account, training, social and health data.',
-      confirmLabel: 'Create export',
-    );
-    if (!ok) return;
-    final token = await _auth.getAccessToken();
-    if (token == null || !mounted) return;
-    try {
-      final res = await http.get(Uri.parse('$v1Base/me/export-data'), headers: {
-        'Authorization': 'Bearer $token'
-      }).timeout(const Duration(seconds: 20));
-      if (!mounted) return;
-      if (res.statusCode == 200) {
-        if (kIsWeb) {
-          settingsSnack(context,
-              'Export generated. Use the mobile app to share the file.');
-          return;
-        }
-        final dir = await getTemporaryDirectory();
-        final file =
-            File('${dir.path}${Platform.pathSeparator}zvelt-data-export.json');
-        await file.writeAsString(res.body, flush: true);
-        await SharePlus.instance.share(
-          ShareParams(
-            files: [XFile(file.path, mimeType: 'application/json')],
-            text: 'Your Zvelt data export',
-          ),
-        );
-      } else {
-        settingsSnack(context, 'Export request failed (${res.statusCode}).',
-            error: true);
-      }
-    } catch (_) {
-      if (mounted) {
-        settingsSnack(context, 'Export request failed. Try again online.',
-            error: true);
-      }
-    }
-  }
-
-  Future<void> _clearCache() async {
-    final ok = await settingsConfirm(
-      context,
-      title: 'Clear cache and reload?',
-      body:
-          'Temporary profile, plan and image caches will be cleared. Your account and settings stay intact.',
-      confirmLabel: 'Clear cache',
-    );
-    if (!ok) return;
-    await AppDataCache.instance.clearSessionCaches();
-    PaintingBinding.instance.imageCache
-      ..clear()
-      ..clearLiveImages();
-    await SocialNotificationHub.refresh();
-    if (mounted) settingsSnack(context, 'Cache cleared - data reloaded.');
-    await _load();
-  }
-
-  Future<void> _sendLogs() async {
-    try {
-      if (!kIsWeb) await FirebaseCrashlytics.instance.sendUnsentReports();
-      if (mounted) {
-        settingsSnack(context, 'Diagnostic reports sent to the developer.');
-      }
-    } catch (_) {
-      if (mounted) {
-        settingsSnack(context, 'Could not send diagnostics.', error: true);
-      }
-    }
-  }
-
-  Future<void> _setDiagnostics(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(SettingsKeys.diagnostics, value);
-    if (!kIsWeb) {
-      await FirebaseCrashlytics.instance
-          .setCrashlyticsCollectionEnabled(value && !kDebugMode);
-    }
-    if (mounted) setState(() => _diagnostics = value);
-  }
-
-  Future<void> _rate() async {
-    var rating = 0;
+  // ── Workout logging defaults (functional, persisted) ─────────────────────
+  Future<void> _editWorkoutLogging() async {
     await showSettingsSheet<void>(
       context,
       StatefulBuilder(
         builder: (context, setLocal) => SettingsSheet(
-          title: 'Rate Zvelt',
-          eyebrow: 'YOUR FEEDBACK',
-          child: Column(
+          title: 'Workout logging',
+          eyebrow: 'TRAINING',
+          child: SettingsCard(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 1; i <= 5; i++)
-                    IconButton(
-                      tooltip: '$i stars',
-                      onPressed: () => setLocal(() => rating = i),
-                      icon: Icon(
-                          i <= rating
-                              ? AppIcons.star
-                              : AppIcons.star,
-                          color: ZveltTokens.warn,
-                          size: 34),
-                    ),
-                ],
+              SettingsSwitchRow(
+                icon: AppIcons.balance_scale_left,
+                tint: SettingsTint.green,
+                title: 'Auto-fill last weight',
+                subtitle: 'Pre-fill each set with your previous load',
+                value: _autofill,
+                onChanged: (v) async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool(SettingsKeys.logAutofillWeight, v);
+                  setLocal(() {});
+                  if (mounted) setState(() => _autofill = v);
+                },
               ),
-              const SizedBox(height: ZveltTokens.s4),
-              SettingsActionButton(
-                label: rating >= 4 ? 'Rate in the store' : 'Submit feedback',
-                icon: rating >= 4
-                    ? AppIcons.arrow_up_right_from_square
-                    : AppIcons.paper_plane,
-                onTap: () async {
-                  if (rating == 0) {
-                    settingsSnack(context, 'Pick a rating first.', error: true);
-                    return;
-                  }
-                  Navigator.of(context).pop();
-                  if (rating >= 4) {
-                    await _openStore();
-                  } else {
-                    await _open(
-                        const FeedbackScreen(kind: FeedbackKind.feature));
-                  }
+              SettingsSwitchRow(
+                icon: AppIcons.list,
+                tint: SettingsTint.blue,
+                title: 'Show previous set',
+                subtitle: 'Display last session’s reps × weight',
+                value: _showPrevious,
+                onChanged: (v) async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool(SettingsKeys.logShowPrevious, v);
+                  setLocal(() {});
+                  if (mounted) setState(() => _showPrevious = v);
                 },
               ),
             ],
@@ -423,28 +173,121 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Future<void> _openStore() async {
-    const appStoreId = String.fromEnvironment('APP_STORE_ID', defaultValue: '');
-    final uri = !kIsWeb && Platform.isIOS && appStoreId.isNotEmpty
-        ? Uri.parse('https://apps.apple.com/app/id$appStoreId')
-        : Uri.parse(
-            'https://play.google.com/store/apps/details?id=com.lunaoscar.zvelt');
-    await _launch(uri);
+  // ── Rest timer defaults (functional, persisted) ──────────────────────────
+  Future<void> _editRestTimer() async {
+    await showSettingsSheet<void>(
+      context,
+      StatefulBuilder(
+        builder: (context, setLocal) {
+          Future<void> save() async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setInt(SettingsKeys.restSeconds, _restSeconds);
+            await prefs.setBool(SettingsKeys.restAutostart, _restAutostart);
+            await prefs.setBool(SettingsKeys.restVibrate, _restVibrate);
+            if (mounted) setState(() {});
+          }
+
+          return SettingsSheet(
+            title: 'Rest timer',
+            eyebrow: 'TRAINING',
+            child: Column(
+              children: [
+                SettingsCard(
+                  children: [
+                    SettingsStepperRow(
+                      label: 'Default rest',
+                      valueLabel: '${_restSeconds}s',
+                      onDec: _restSeconds > 15
+                          ? () {
+                              setLocal(() => _restSeconds -= 15);
+                              save();
+                            }
+                          : null,
+                      onInc: _restSeconds < 300
+                          ? () {
+                              setLocal(() => _restSeconds += 15);
+                              save();
+                            }
+                          : null,
+                    ),
+                    SettingsSwitchRow(
+                      icon: AppIcons.bolt,
+                      tint: SettingsTint.amber,
+                      title: 'Auto-start',
+                      subtitle: 'Start the timer when a set is logged',
+                      value: _restAutostart,
+                      onChanged: (v) {
+                        setLocal(() => _restAutostart = v);
+                        save();
+                      },
+                    ),
+                    SettingsSwitchRow(
+                      icon: AppIcons.bell,
+                      tint: SettingsTint.red,
+                      title: 'Vibrate on finish',
+                      value: _restVibrate,
+                      onChanged: (v) {
+                        setLocal(() => _restVibrate = v);
+                        save();
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
-  Future<void> _launch(Uri uri) async {
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else if (mounted) {
-      settingsSnack(context, 'Could not open this link.', error: true);
-    }
+  // ── Subscription (RevenueCat not wired yet — honest "coming soon") ────────
+  Future<void> _proSheet() async {
+    await showSettingsSheet<void>(
+      context,
+      SettingsSheet(
+        title: 'Zvelt Pro',
+        eyebrow: 'COMING SOON',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Unlimited ranks, advanced explainability, the program builder and '
+              'extended analytics. Pro launches soon — you’ll be the first to know.',
+              style: ZType.bodyM.copyWith(color: ZveltTokens.text2, height: 1.5),
+            ),
+            const SizedBox(height: ZveltTokens.s5),
+            SettingsActionButton(
+              label: 'Got it',
+              onTap: () => Navigator.of(context).maybePop(),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  String get _cloudSubtitle {
-    final value = _cloudLastSync;
-    if (value == null) return 'On - ready to sync';
-    final minutes = DateTime.now().difference(value).inMinutes;
-    return minutes < 1 ? 'On - synced just now' : 'On - synced ${minutes}m ago';
+  void _restore() {
+    settingsSnack(context, 'No previous purchases found on this account.');
+  }
+
+  Future<void> _deleteAccount() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => DeleteAccountScreen(onAccountDeleted: widget.onLogout),
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout() async {
+    final ok = await settingsConfirm(
+      context,
+      title: 'Log out?',
+      body: 'You can sign back in any time with your email and password.',
+      confirmLabel: 'Log out',
+      destructive: true,
+    );
+    if (ok) await widget.onLogout();
   }
 
   @override
@@ -452,291 +295,383 @@ class _SettingsScreenState extends State<SettingsScreen>
     return SettingsModalShell(
       title: 'Settings',
       children: [
+        // ── ACCOUNT ──────────────────────────────────────────────────────
         const SettingsSectionTitle('Account', top: ZveltTokens.s2),
-        SettingsCard(
-          children: [
-            SettingsRow(
-              icon: AppIcons.user,
-              tint: SettingsTint.orange,
-              title: 'Account',
-              subtitle: 'Profile, name & sign-in',
-              onTap: () =>
-                  _open(AccountDetailScreen(onLogout: widget.onLogout)),
-            ),
-            SettingsRow(
-              icon: AppIcons.balance_scale_left,
-              tint: SettingsTint.green,
-              title: 'Physical data',
-              subtitle: _physical,
-              onTap: () => _open(const PhysicalDataSettingsScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.target,
-              tint: SettingsTint.orange,
-              title: 'Goals & training max',
-              subtitle: _goal,
-              onTap: () => _open(const GoalsTrainingScreen()),
-            ),
-          ],
-        ),
-        const SettingsSectionTitle('General'),
-        SettingsCard(
-          children: [
-            SettingsRow(
-              icon: AppIcons.sparkles,
-              tint: SettingsTint.violet,
-              title: 'Appearance',
-              subtitle: _themeLabel,
-              onTap: _appearance,
-            ),
-            SettingsRow(
-              icon: AppIcons.bell,
-              tint: SettingsTint.red,
-              title: 'Notifications',
-              subtitle: _notifications ? 'On' : 'Off',
-              onTap: () => _open(const NotificationSettingsScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.settings_sliders,
-              tint: SettingsTint.amber,
-              title: 'Customization',
-              subtitle: 'Accent \u00b7 start screen \u00b7 layout',
-              onTap: () => _open(const CustomizationScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.bolt,
-              tint: SettingsTint.violet,
-              title: 'Shortcuts',
-              subtitle: '$_shortcutCount quick-launch actions',
-              onTap: () => _open(const ShortcutsScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.globe,
-              tint: SettingsTint.green,
-              title: 'Language',
-              subtitle: _language,
-              onTap: () => _open(const LanguageScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.ruler_horizontal,
-              tint: SettingsTint.blue,
-              title: 'Units',
-              subtitle: _units,
-              onTap: () => _open(const UnitsScreen()),
-            ),
-          ],
-        ),
-        const SettingsSectionTitle('Privacy'),
-        SettingsCard(
-          children: [
-            SettingsRow(
-              icon: AppIcons.lock,
-              tint: SettingsTint.blue,
-              title: 'Profile visibility',
-              subtitle: _visibility,
-              onTap: () => _open(const ProfileVisibilityScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.ban,
-              tint: SettingsTint.red,
-              title: 'Blocked users',
-              subtitle: '$_blockedCount blocked',
-              onTap: () => _open(const BlockedUsersScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.bookmark,
-              tint: SettingsTint.amber,
-              title: 'My bookmarks',
-              subtitle: '$_bookmarkCount saved',
-              onTap: () => _open(const BookmarksScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.comment_alt,
-              tint: SettingsTint.violet,
-              title: 'Messages',
-              subtitle: '$_conversationCount conversations',
-              onTap: () => _open(const ConversationsScreen()),
-            ),
-          ],
-        ),
-        const SettingsSectionTitle('Data'),
-        SettingsCard(
-          children: [
-            SettingsRow(
-              icon: AppIcons.heart,
-              tint: SettingsTint.red,
-              title: 'Health & devices',
-              subtitle: '$_deviceCount connected',
-              onTap: () => _open(const IntegrationsScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.cloud,
-              tint: SettingsTint.blue,
-              title: 'Cloud sync',
-              subtitle: _cloudSubtitle,
-              onTap: () => _open(const CloudSyncScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.download,
-              tint: SettingsTint.green,
-              title: 'Export my data',
-              subtitle: 'Download a copy',
-              onTap: _exportData,
-            ),
-          ],
-        ),
-        const SettingsSectionTitle('Resources'),
-        SettingsCard(
-          children: [
-            SettingsRow(
-              icon: AppIcons.sparkles,
-              tint: SettingsTint.violet,
-              title: "What's new",
-              subtitle: 'v2.4 - 6 updates',
-              badge: '6',
-              onTap: () => _open(const WhatsNewScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.flag,
-              tint: SettingsTint.green,
-              title: 'Getting started',
-              subtitle: '$_gettingStartedCount of 5 complete',
-              onTap: () => _open(const GettingStartedScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.book,
-              tint: SettingsTint.amber,
-              title: 'Knowledge base',
-              subtitle: 'Guides & FAQ',
-              onTap: () => _open(const KnowledgeBaseScreen()),
-            ),
-            SettingsRow(
-              icon: AppIcons.megaphone,
-              tint: SettingsTint.green,
-              title: 'Request a feature',
-              onTap: () =>
-                  _open(const FeedbackScreen(kind: FeedbackKind.feature)),
-            ),
-            SettingsRow(
-              icon: AppIcons.bug,
-              tint: SettingsTint.red,
-              title: 'Report a bug',
-              onTap: () => _open(const FeedbackScreen(kind: FeedbackKind.bug)),
-            ),
-            SettingsRow(
-              icon: AppIcons.star,
-              tint: SettingsTint.amber,
-              title: 'Rate Zvelt',
-              subtitle: "Tell us how we're doing",
-              onTap: _rate,
-            ),
-          ],
-        ),
-        const SettingsSectionTitle('Legal'),
-        SettingsCard(
-          children: [
-            SettingsRow(
-              icon: AppIcons.document,
-              tint: SettingsTint.gray,
-              title: 'Terms of Service',
-              onTap: () => _open(const LegalDocumentScreen(privacy: false)),
-            ),
-            SettingsRow(
-              icon: AppIcons.shield_check,
-              tint: SettingsTint.gray,
-              title: 'Privacy Policy',
-              onTap: () => _open(const LegalDocumentScreen(privacy: true)),
-            ),
-          ],
-        ),
-        const SizedBox(height: ZveltTokens.s4),
-        SettingsActionButton(
-            label: 'Clear cache & reload all data', onTap: _clearCache),
-        const SizedBox(height: ZveltTokens.cardGap),
-        SettingsActionButton(label: 'Send logs to developer', onTap: _sendLogs),
-        const SizedBox(height: ZveltTokens.cardGap),
-        SettingsCard(
-          children: [
-            SettingsSwitchRow(
-              icon: AppIcons.chart_line_up,
-              tint: SettingsTint.gray,
-              title: 'Enable diagnostics',
-              value: _diagnostics,
-              onChanged: _setDiagnostics,
-            ),
-          ],
-        ),
-        const SizedBox(height: ZveltTokens.s6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _SocialLink(
-                label: 'Instagram',
-                onTap: () =>
-                    _launch(Uri.parse('https://instagram.com/zveltapp'))),
-            _SocialLink(
-                label: 'X',
-                onTap: () => _launch(Uri.parse('https://x.com/zveltapp'))),
-            _SocialLink(
-                label: 'YouTube',
-                onTap: () => _launch(Uri.parse('https://youtube.com/@zvelt'))),
-            _SocialLink(
-                label: 'Reddit',
-                onTap: () => _launch(Uri.parse('https://reddit.com/r/zvelt'))),
-          ],
-        ),
-        const SizedBox(height: ZveltTokens.s5),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(
-                width: 10,
-                height: 10,
-                decoration: const BoxDecoration(
-                    color: ZveltTokens.brand, shape: BoxShape.circle)),
-            const SizedBox(width: 10),
-            Text('Zvelt', style: ZType.h1.copyWith(fontSize: 26)),
-            const SizedBox(width: 3),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(_version,
-                  style: ZType.monoS.copyWith(color: ZveltTokens.text4)),
-            ),
-          ],
-        ),
-        const SizedBox(height: ZveltTokens.s2),
-        Center(
-            child: Text('Made for athletes who level up.',
-                style: ZType.bodyS.copyWith(color: ZveltTokens.text4))),
-        const SizedBox(height: ZveltTokens.s1),
-        Center(
-          child: GestureDetector(
-            onTap: () => _launch(Uri.parse('https://www.flaticon.com/uicons')),
-            child: Text('Icons by Flaticon',
-                style: ZType.monoXS.copyWith(color: ZveltTokens.text4)),
+        SettingsCard(children: [
+          SettingsRow(
+            icon: AppIcons.user,
+            tint: SettingsTint.orange,
+            title: 'Edit Profile',
+            subtitle: 'Name, username, avatar, bio',
+            onTap: () => _open(AccountDetailScreen(onLogout: widget.onLogout)),
           ),
+          SettingsRow(
+            icon: AppIcons.lock,
+            tint: SettingsTint.blue,
+            title: 'Email & Login',
+            subtitle: 'Password, sign-in method',
+            onTap: () => _open(AccountDetailScreen(onLogout: widget.onLogout)),
+          ),
+          SettingsRow(
+            icon: AppIcons.cross_circle,
+            tint: SettingsTint.red,
+            title: 'Delete Account',
+            subtitle: 'Permanently remove your data',
+            titleColor: ZveltTokens.error,
+            onTap: _deleteAccount,
+          ),
+        ]),
+
+        // ── PREFERENCES ──────────────────────────────────────────────────
+        const SettingsSectionTitle('Preferences'),
+        SettingsCard(children: [
+          _themeRow(),
+          SettingsRow(
+            icon: AppIcons.ruler_horizontal,
+            tint: SettingsTint.blue,
+            title: 'Units',
+            subtitle: _units == 'Imperial' ? 'lb · in · mi · kcal' : 'kg · cm · km · kcal',
+            onTap: () => _open(const UnitsScreen()),
+          ),
+          _accentRow(),
+        ]),
+
+        // ── TRAINING ─────────────────────────────────────────────────────
+        const SettingsSectionTitle('Training'),
+        SettingsCard(children: [
+          SettingsRow(
+            icon: AppIcons.target,
+            tint: SettingsTint.orange,
+            title: 'Training Goal',
+            subtitle: _goal,
+            onTap: () => _open(const GoalsTrainingScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.chart_line_up,
+            tint: SettingsTint.green,
+            title: 'Weekly Target',
+            subtitle: '$_daysPerWeek workouts / week',
+            onTap: () => _open(const GoalsTrainingScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.list,
+            tint: SettingsTint.violet,
+            title: 'Workout Logging',
+            subtitle: [
+              if (_autofill) 'Auto-fill last weight',
+              if (_showPrevious) 'show previous set',
+            ].join(', ').isEmpty ? 'Manual entry' : [
+              if (_autofill) 'Auto-fill last weight',
+              if (_showPrevious) 'show previous set',
+            ].join(', '),
+            onTap: _editWorkoutLogging,
+          ),
+          SettingsRow(
+            icon: AppIcons.bolt,
+            tint: SettingsTint.amber,
+            title: 'Rest Timer Defaults',
+            subtitle: '${_restSeconds}s'
+                '${_restAutostart ? ' · Auto-start' : ''}'
+                '${_restVibrate ? ' · Vibrate' : ''}',
+            onTap: _editRestTimer,
+          ),
+        ]),
+
+        // ── NOTIFICATIONS ────────────────────────────────────────────────
+        const SettingsSectionTitle('Notifications'),
+        SettingsCard(children: [
+          SettingsRow(
+            icon: AppIcons.bell,
+            tint: SettingsTint.red,
+            title: 'Workout Reminders',
+            subtitle: 'Streak, rest day, missed workout',
+            onTap: () => _open(const NotificationSettingsScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.bolt,
+            tint: SettingsTint.orange,
+            title: 'Challenge Alerts',
+            subtitle: 'Invites, rank changes, ending soon',
+            onTap: () => _open(const NotificationSettingsScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.heart,
+            tint: SettingsTint.violet,
+            title: 'Social Notifications',
+            subtitle: 'Likes, comments, new followers, PRs',
+            onTap: () => _open(const NotificationSettingsScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.restaurant,
+            tint: SettingsTint.green,
+            title: 'Nutrition Reminders',
+            subtitle: 'Meals, protein, water',
+            onTap: () => _open(const NotificationSettingsScreen()),
+          ),
+        ]),
+
+        // ── PRIVACY & SOCIAL ─────────────────────────────────────────────
+        const SettingsSectionTitle('Privacy & Social'),
+        SettingsCard(children: [
+          SettingsRow(
+            icon: AppIcons.globe,
+            tint: SettingsTint.blue,
+            title: 'Profile Visibility',
+            subtitle: _visibility,
+            onTap: () => _open(const ProfileVisibilityScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.gym,
+            tint: SettingsTint.green,
+            title: 'Workout Visibility',
+            subtitle: 'Who can see your sessions',
+            onTap: () => _open(const ProfileVisibilityScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.trophy,
+            tint: SettingsTint.amber,
+            title: 'PR Visibility',
+            subtitle: 'Who can see your records',
+            onTap: () => _open(const ProfileVisibilityScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.users,
+            tint: SettingsTint.violet,
+            title: 'Challenge Invites',
+            subtitle: 'Who can invite you',
+            onTap: () => _open(const ProfileVisibilityScreen()),
+          ),
+          SettingsRow(
+            icon: AppIcons.ban,
+            tint: SettingsTint.red,
+            title: 'Blocked Users',
+            subtitle: '$_blockedCount blocked',
+            onTap: () => _open(const BlockedUsersScreen()),
+          ),
+        ]),
+
+        // ── SUBSCRIPTION ─────────────────────────────────────────────────
+        const SettingsSectionTitle('Subscription'),
+        SettingsCard(children: [
+          SettingsRow(
+            icon: AppIcons.bolt,
+            tint: SettingsTint.orange,
+            title: 'Zvelt Pro',
+            subtitle: 'Coming soon',
+            onTap: _proSheet,
+          ),
+          SettingsRow(
+            icon: AppIcons.refresh,
+            tint: SettingsTint.gray,
+            title: 'Restore Purchases',
+            onTap: _restore,
+          ),
+        ]),
+
+        // ── CONNECTED DATA (locked v2) ───────────────────────────────────
+        const SettingsSectionTitle('Connected Data'),
+        const SettingsCard(children: [
+          _LockedRow(
+            icon: AppIcons.heart,
+            title: 'Apple Health / Health Connect',
+            subtitle: 'Coming in v2 · Steps, sleep, HR, weight sync',
+          ),
+        ]),
+
+        // ── SUPPORT ──────────────────────────────────────────────────────
+        const SettingsSectionTitle('Support'),
+        SettingsCard(children: [
+          SettingsRow(
+            icon: AppIcons.megaphone,
+            tint: SettingsTint.green,
+            title: 'Help & Feedback',
+            onTap: () => _open(const FeedbackScreen(kind: FeedbackKind.feature)),
+          ),
+          SettingsRow(
+            icon: AppIcons.document,
+            tint: SettingsTint.gray,
+            title: 'Terms of Service',
+            onTap: () => _open(const LegalDocumentScreen(privacy: false)),
+          ),
+          SettingsRow(
+            icon: AppIcons.shield_check,
+            tint: SettingsTint.gray,
+            title: 'Privacy Policy',
+            onTap: () => _open(const LegalDocumentScreen(privacy: true)),
+          ),
+          SettingsRow(
+            icon: AppIcons.info,
+            tint: SettingsTint.gray,
+            title: 'App Version',
+            trailingText: _version,
+            chevron: false,
+          ),
+        ]),
+
+        const SizedBox(height: ZveltTokens.s5),
+        SettingsActionButton(
+          label: 'Log out',
+          icon: AppIcons.sign_out_alt,
+          destructive: true,
+          onTap: _confirmLogout,
         ),
       ],
     );
   }
+
+  // ── Theme: inline System / Light / Dark segmented ──────────────────────
+  Widget _themeRow() {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ZveltThemeNotifier.mode,
+      builder: (context, mode, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s4, vertical: ZveltTokens.s3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const SettingsIconTile(icon: AppIcons.sparkles, tint: SettingsTint.violet),
+                const SizedBox(width: ZveltTokens.s4),
+                Text('Theme', style: ZType.bodyL.copyWith(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: ZveltTokens.s3),
+            SettingsSegmented<ThemeMode>(
+              value: mode,
+              options: const [
+                (value: ThemeMode.system, label: 'System'),
+                (value: ThemeMode.light, label: 'Light'),
+                (value: ThemeMode.dark, label: 'Dark'),
+              ],
+              onChanged: (m) => ZveltThemeNotifier.set(m),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Accent: collapsed row → 6 swatches ─────────────────────────────────
+  Widget _accentRow() {
+    return ValueListenableBuilder<int>(
+      valueListenable: AppPreferencesNotifier.accent,
+      builder: (context, accentInt, _) {
+        final current = Color(accentInt);
+        return Column(
+          children: [
+            InkWell(
+              onTap: () => setState(() => _accentOpen = !_accentOpen),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s4, vertical: ZveltTokens.s3 + 2),
+                child: Row(
+                  children: [
+                    const SettingsIconTile(icon: AppIcons.settings_sliders, tint: SettingsTint.amber),
+                    const SizedBox(width: ZveltTokens.s4),
+                    Expanded(
+                      child: Text('Accent Color',
+                          style: ZType.bodyL.copyWith(fontWeight: FontWeight.w600)),
+                    ),
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: current),
+                    ),
+                    const SizedBox(width: ZveltTokens.s2),
+                    Icon(_accentOpen ? AppIcons.angle_small_down : AppIcons.angle_small_right,
+                        color: ZveltTokens.text4, size: 22),
+                  ],
+                ),
+              ),
+            ),
+            if (_accentOpen)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(ZveltTokens.s4, 0, ZveltTokens.s4, ZveltTokens.s4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    for (final a in _accents)
+                      GestureDetector(
+                        onTap: () => AppPreferencesNotifier.setAccent(
+                            a.color.toARGB32()),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: a.color,
+                                border: (current.toARGB32() == a.color.toARGB32())
+                                    ? Border.all(color: a.color, width: 3)
+                                    : null,
+                                boxShadow: (current.toARGB32() == a.color.toARGB32())
+                                    ? [BoxShadow(color: a.color.withValues(alpha: 0.5), blurRadius: 8)]
+                                    : null,
+                              ),
+                              child: (current.toARGB32() == a.color.toARGB32())
+                                  ? const Icon(AppIcons.check, color: Colors.white, size: 18)
+                                  : null,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(a.name, style: ZType.bodyS.copyWith(color: ZveltTokens.text3, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
 }
 
-class _SocialLink extends StatelessWidget {
-  const _SocialLink({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
+// ─────────────────────────────────────────────────────────────────────────────
+// LOCKED (v2) ROW — inert, dimmed, "v2" tag.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LockedRow extends StatelessWidget {
+  const _LockedRow({required this.icon, required this.title, required this.subtitle});
+  final IconData icon;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onTap,
-      style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          minimumSize: const Size(0, 44)),
-      child: Text(label,
-          style: ZType.bodyS
-              .copyWith(color: ZveltTokens.text3, fontWeight: FontWeight.w600)),
+    return Opacity(
+      opacity: 0.55,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s4, vertical: ZveltTokens.s3 + 2),
+        child: Row(
+          children: [
+            SettingsIconTile(icon: icon, tint: SettingsTint.gray),
+            const SizedBox(width: ZveltTokens.s4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: ZType.bodyL.copyWith(fontWeight: FontWeight.w600)),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Text(subtitle, style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: ZveltTokens.surface2,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('v2',
+                  style: ZType.monoXS.copyWith(color: ZveltTokens.text3, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
