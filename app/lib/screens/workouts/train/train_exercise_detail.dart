@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/exercise_db_service.dart';
 import '../../../theme/app_icons.dart';
 import '../../../theme/zvelt_tokens.dart';
+import '../../../widgets/zvelt_network_image.dart';
 
 /// Exercise detail — full-screen page pushed via Navigator. 1:1 with the design
 /// handoff: back button + title, a 3-up stat grid, a 7-session volume trend
@@ -55,6 +57,9 @@ class TrainExerciseDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
+
+            // ── Exercise demo GIF (ExerciseDB via the backend proxy) ─────
+            _ExerciseGif(name: name),
 
             // ── Stat cards (3-col) ───────────────────────────────────────
             Row(
@@ -336,6 +341,60 @@ class _AddToWorkoutButton extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Resolves the exercise's demo GIF by name through the backend ExerciseDB
+/// proxy and renders it. Shows nothing while loading or when unavailable
+/// (e.g. the server has no EXERCISEDB_KEY) — degrades gracefully, no broken box.
+class _ExerciseGif extends StatefulWidget {
+  const _ExerciseGif({required this.name});
+
+  final String name;
+
+  @override
+  State<_ExerciseGif> createState() => _ExerciseGifState();
+}
+
+class _ExerciseGifState extends State<_ExerciseGif> {
+  String? _gifUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final results = await ExerciseDbService().searchByName(widget.name);
+      final withGif = results.where((e) => e.hasGif).toList();
+      if (!mounted) return;
+      setState(() => _gifUrl = withGif.isNotEmpty ? withGif.first.gifUrl : null);
+    } catch (_) {
+      // 503 (key not set) / offline / no match → just show no GIF.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = _gifUrl;
+    if (url == null || url.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Container(
+        decoration: BoxDecoration(
+          color: ZveltTokens.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: ZveltTokens.shadowCard,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: ZveltNetworkImage(url: url, fit: BoxFit.contain),
         ),
       ),
     );
