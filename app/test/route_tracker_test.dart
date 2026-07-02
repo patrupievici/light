@@ -30,12 +30,14 @@ void main() {
   final t0 = DateTime.utc(2026, 6, 11, 10);
 
   group('RouteTracker distance filtering', () {
-    test('standing-still GPS jitter does not accumulate distance', () {
+    test('sub-meter GPS jitter does not accumulate distance', () {
       final tracker = RouteTracker();
-      // Anchor fix, then 60s of ±3 m wiggles around it (classic jitter).
+      // Anchor fix, then 60s of ±0.5 m wiggles — below the 1 m step floor.
+      // (The floor is intentionally fine for meter-by-meter distance; the
+      // accuracy gate is the main defense against larger GPS jitter.)
       tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0));
       for (var i = 1; i <= 60; i++) {
-        final wiggle = (i.isEven ? 3 : -3) * _degPerMeter;
+        final wiggle = (i.isEven ? 0.5 : -0.5) * _degPerMeter;
         tracker.add(_fix(lat: 51.5 + wiggle, lng: -0.12, ts: t0.add(Duration(seconds: i))));
       }
       expect(tracker.meters, 0);
@@ -104,15 +106,45 @@ void main() {
       expect(bike.meters, closeTo(20, 1));
     });
 
-    test('sub-5m moves are ignored as jitter', () {
+    test('sub-1m moves are ignored as jitter', () {
       final tracker = RouteTracker();
       tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0));
       final accepted = tracker.add(_fix(
-        lat: 51.5 + 4 * _degPerMeter,
+        lat: 51.5 + 0.5 * _degPerMeter,
         lng: -0.12,
         ts: t0.add(const Duration(seconds: 1)),
       ));
       expect(accepted, isFalse);
+      expect(tracker.meters, 0);
+    });
+
+    test('a precise fix moving 1m+ is counted (meter-by-meter granularity)', () {
+      final tracker = RouteTracker();
+      // accuracy 2 m → floor clamps to 1 m, so a 1.5 m move counts.
+      tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0, accuracy: 2));
+      final accepted = tracker.add(_fix(
+        lat: 51.5 + 1.5 * _degPerMeter,
+        lng: -0.12,
+        ts: t0.add(const Duration(seconds: 1)),
+        accuracy: 2,
+      ));
+      expect(accepted, isTrue);
+      expect(tracker.meters, closeTo(1.5, 0.5));
+    });
+
+    test('stationary drift with mediocre accuracy does not accumulate', () {
+      final tracker = RouteTracker();
+      // accuracy 10 m → floor rises to 5 m, so ±3 m rest-drift is rejected.
+      tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0, accuracy: 10));
+      for (var i = 1; i <= 60; i++) {
+        final wiggle = (i.isEven ? 3 : -3) * _degPerMeter;
+        tracker.add(_fix(
+          lat: 51.5 + wiggle,
+          lng: -0.12,
+          ts: t0.add(Duration(seconds: i)),
+          accuracy: 10,
+        ));
+      }
       expect(tracker.meters, 0);
     });
   });

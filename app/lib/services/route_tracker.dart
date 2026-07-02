@@ -8,8 +8,10 @@ import 'package:latlong2/latlong.dart';
 /// ±3–10 m and each wiggle used to be summed into the total. Filters applied
 /// here, in order:
 ///  1. Accuracy gate — fixes with a reported error radius >25 m are dropped.
-///  2. Minimum displacement — moves shorter than 5 m from the last accepted
-///     point are ignored (jitter, not travel).
+///  2. Minimum displacement — an accuracy-aware floor: meter-by-meter when the
+///     fix is precise, but the threshold scales with the fix's error radius
+///     (≈ accuracy × 0.5, clamped 1–8 m) so stationary GPS drift isn't summed
+///     as travel on continuous-stream (distanceFilter:0) callers.
 ///  3. Teleport guard — a jump implying an impossible speed (>12 m/s run,
 ///     >30 m/s bike) rebases the anchor without counting the jump distance
 ///     (GPS relocation after a tunnel/signal loss, not real travel).
@@ -23,7 +25,7 @@ class RouteTracker {
   final bool isBike;
 
   static const double _kMaxAccuracyM = 25.0;
-  static const double _kMinStepM = 5.0;
+  static const double _kMinStepM = 1.0;
   static const double _kElevHysteresisM = 3.0;
 
   /// Accepted route points (what the polyline should draw).
@@ -77,8 +79,12 @@ class RouteTracker {
       ll.longitude,
     );
 
-    // 2. Minimum displacement — jitter, not travel.
-    if (delta < _kMinStepM) return false;
+    // 2. Minimum displacement — accuracy-aware floor. Meter-by-meter when the
+    // fix is precise; the floor rises with the fix's error radius so stationary
+    // GPS drift (continuous-stream callers get every ~1 Hz fix) isn't counted.
+    final minStep = (pos.accuracy > 0 ? pos.accuracy * 0.5 : _kMinStepM)
+        .clamp(_kMinStepM, 8.0);
+    if (delta < minStep) return false;
 
     // 3. Teleport guard — rebase the anchor without counting the jump and
     // without appending to the polyline, so the drawn line doesn't streak

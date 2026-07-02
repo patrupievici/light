@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { computeRanks } from '../services/ranking.service'
+import { recomputeUserChallenges } from '../services/challenge-recalc.service'
 import { evaluateWeightJump } from '../services/anti-cheat.service'
 import { checkAndAward } from '../services/achievement.service'
 import { recordWorkoutProgress } from '../services/session-reconcile.service'
@@ -803,6 +804,13 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       await computeRanks(userId, workoutId)
     } catch (err: any) {
       app.log.warn({ err, userId, workoutId }, 'Ranking skip la complete (ex: BW_REQUIRED)')
+    }
+
+    // Auto-update the user's active challenge standings from this workout.
+    try {
+      await recomputeUserChallenges(userId)
+    } catch (err: any) {
+      app.log.warn({ err, userId }, 'Challenge recompute skipped after workout complete')
     }
 
     let newAchievementKeys: string[] = []
