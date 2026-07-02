@@ -15,13 +15,11 @@ import '../../services/auth_service.dart';
 import '../../services/moderation_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/settings_store.dart';
-import '../../theme/locale_notifier.dart';
 import '../../theme/zvelt_theme_notifier.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../social/blocked_users_screen.dart';
 import 'account_settings_screens.dart';
 import 'delete_account_screen.dart';
-import 'language_screen.dart';
 import 'preference_settings_screens.dart';
 import 'resource_settings_screens.dart';
 import 'settings_kit.dart';
@@ -255,30 +253,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ── Subscription (RevenueCat not wired yet — honest "coming soon") ────────
-  Future<void> _proSheet() async {
-    await showSettingsSheet<void>(
-      context,
-      SettingsSheet(
-        title: 'Zvelt Pro',
-        eyebrow: 'COMING SOON',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Unlimited ranks, advanced explainability, the program builder and '
-              'extended analytics. Pro launches soon — you’ll be the first to know.',
-              style: ZType.bodyM.copyWith(color: ZveltTokens.text2, height: 1.5),
-            ),
-            const SizedBox(height: ZveltTokens.s5),
-            SettingsActionButton(
-              label: 'Got it',
-              onTap: () => Navigator.of(context).maybePop(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Future<void> _proSheet() => _comingSoon(
+        'Zvelt Pro',
+        'Unlimited ranks, advanced explainability, the program builder and '
+            'extended analytics. Pro launches soon — you’ll be the first to know.',
+      );
 
   void _restore() {
     settingsSnack(context, 'No previous purchases found on this account.');
@@ -303,11 +282,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok) await widget.onLogout();
   }
 
-  String get _languageLabel => switch (LocaleNotifier.preference.value) {
-        'ro' => 'Română',
-        'en' => 'English',
-        _ => 'System default',
-      };
+  /// Shared "coming soon" info sheet (Language, Zvelt Pro, …).
+  Future<void> _comingSoon(String title, String body) async {
+    await showSettingsSheet<void>(
+      context,
+      SettingsSheet(
+        title: title,
+        eyebrow: 'COMING SOON',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(body, style: ZType.bodyM.copyWith(color: ZveltTokens.text2, height: 1.5)),
+            const SizedBox(height: ZveltTokens.s5),
+            SettingsActionButton(
+              label: 'Got it',
+              onTap: () => Navigator.of(context).maybePop(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ── Rate ─────────────────────────────────────────────────────────────────
   Future<void> _rate() async {
@@ -457,8 +452,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: AppIcons.globe,
             tint: SettingsTint.green,
             title: 'Language',
-            subtitle: _languageLabel,
-            onTap: () => _open(const LanguageScreen()),
+            subtitle: 'Coming soon',
+            onTap: () => _comingSoon(
+              'Language',
+              'Full in-app translations (Română and more) are on the way. '
+                  'The app is English for now.',
+            ),
           ),
           _accentRow(),
         ]),
