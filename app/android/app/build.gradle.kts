@@ -65,10 +65,10 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
-            // P0.7 — R8 disabled until user explicitly enables it (per "Skip pentru acum, fac la final").
-            // The proguard-rules.pro file is staged. To enable, flip both flags to true.
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // P0.7 — R8 code shrinking + resource shrinking enabled (owner opted in).
+            // Keeps for reflection-heavy plugins live in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
