@@ -39,10 +39,14 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
     required this.onLogout,
+    this.onSessionChanged,
     this.preview = false,
   });
 
   final Future<void> Function() onLogout;
+
+  /// Forwarded to AccountDetailScreen's "Sign in to an existing account" flow.
+  final Future<void> Function()? onSessionChanged;
   final bool preview;
 
   @override
@@ -448,7 +452,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               title: 'Account',
               subtitle: 'Profile, name & sign-in',
               onTap: () =>
-                  _open(AccountDetailScreen(onLogout: widget.onLogout)),
+                  _open(AccountDetailScreen(
+                onLogout: widget.onLogout,
+                onSessionChanged: widget.onSessionChanged,
+              )),
             ),
             SettingsRow(
               icon: AppIcons.balance_scale_left,

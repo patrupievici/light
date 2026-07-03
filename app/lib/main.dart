@@ -26,7 +26,6 @@ import 'theme/zvelt_theme_notifier.dart';
 import 'theme/locale_notifier.dart';
 import 'services/app_data_cache.dart';
 import 'services/fcm_background.dart';
-import 'services/background_tracking_service.dart';
 import 'services/moderation_service.dart';
 import 'services/health_service.dart';
 import 'services/location_service.dart';
@@ -589,6 +588,20 @@ class _AuthGateState extends State<AuthGate> {
         if (mounted) _maybePromptResumeWorkout();
       });
       return MainScreen(
+        // Keyed by user so switching accounts (Settings → Sign in) fully
+        // remounts the shell instead of showing the previous user's tabs.
+        key: ValueKey('main_$_userId'),
+        onSessionChanged: () async {
+          // Same per-user cache hygiene as logout, then re-read the session so
+          // the new userId/onboarding flags drive a fresh (re-keyed) MainScreen.
+          try {
+            await AppDataCache.instance.clearSessionCaches();
+          } catch (_) {}
+          try {
+            await ModerationService.clearLocalCache();
+          } catch (_) {}
+          await _checkAuth();
+        },
         onLogout: () async {
           // Drop any lingering snackbar (e.g. the race "You're in: …" toast)
           // so it doesn't carry over onto the logged-out screen.
@@ -608,9 +621,6 @@ class _AuthGateState extends State<AuthGate> {
           }
           // Teardown of everything still running / holding user state —
           // each step guarded so one failure can't break the others.
-          try {
-            await BackgroundTrackingService.instance.stopTracking();
-          } catch (_) {}
           try {
             LocationService.instance.stopTracking();
           } catch (_) {}

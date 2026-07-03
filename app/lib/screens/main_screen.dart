@@ -22,9 +22,13 @@ import 'workouts/workouts_tab.dart';
 /// Profile is no longer a bottom-nav destination: it opens from the Home avatar
 /// (top-left); Settings opens from the Home gear (top-right).
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key, required this.onLogout});
+  const MainScreen({super.key, required this.onLogout, this.onSessionChanged});
 
   final Future<void> Function() onLogout;
+
+  /// Fired after signing into a different account from Settings, so AuthGate
+  /// can clear per-user caches and remount the shell for the new user.
+  final Future<void> Function()? onSessionChanged;
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -110,7 +114,10 @@ class _MainScreenState extends State<MainScreen> {
   void _openSettings() {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(onLogout: widget.onLogout),
+        builder: (_) => SettingsScreen(
+          onLogout: widget.onLogout,
+          onSessionChanged: widget.onSessionChanged,
+        ),
       ),
     );
   }

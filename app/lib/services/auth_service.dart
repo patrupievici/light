@@ -361,6 +361,12 @@ class AuthService {
       final refreshToken = data['refreshToken'] as String?;
       if (accessToken != null && refreshToken != null) {
         await _saveTokens(accessToken, refreshToken);
+        // A real email/Google sign-in replaces any guest session. continueAsGuest
+        // re-sets the flag to true right after its signup call, so order is safe.
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool(_keyIsGuest, false);
+        } catch (_) {/* flag is best-effort */}
       }
       return data;
     } on FormatException {

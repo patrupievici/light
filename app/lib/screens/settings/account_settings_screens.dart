@@ -12,13 +12,19 @@ import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/settings_store.dart';
 import '../../theme/zvelt_tokens.dart';
+import '../login_screen.dart';
 import 'delete_account_screen.dart';
 import 'settings_kit.dart';
 
 class AccountDetailScreen extends StatefulWidget {
-  const AccountDetailScreen({super.key, required this.onLogout});
+  const AccountDetailScreen(
+      {super.key, required this.onLogout, this.onSessionChanged});
 
   final Future<void> Function() onLogout;
+
+  /// Fired after signing into a different account so the app shell can clear
+  /// per-user caches and remount for the new session.
+  final Future<void> Function()? onSessionChanged;
 
   @override
   State<AccountDetailScreen> createState() => _AccountDetailScreenState();
@@ -220,6 +226,23 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     await widget.onLogout();
   }
 
+  /// Recover an account on a new device (or switch accounts). LoginScreen owns
+  /// email/Google sign-in + forgot-password; on success we pop to the shell and
+  /// let AuthGate clear per-user caches and remount for the new session.
+  Future<void> _signInToExistingAccount() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => LoginScreen(
+          onLoggedIn: () {
+            if (!mounted) return;
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            widget.onSessionChanged?.call();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _deleteAccount() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -311,6 +334,14 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               const SettingsSectionTitle('Sign-in & security'),
               SettingsCard(
                 children: [
+                  SettingsRow(
+                    icon: AppIcons.user,
+                    tint: SettingsTint.orange,
+                    title: 'Sign in to an existing account',
+                    subtitle:
+                        'Switches this device to that account (this one stays on the server)',
+                    onTap: _signInToExistingAccount,
+                  ),
                   SettingsRow(
                     icon: AppIcons.lock,
                     tint: SettingsTint.blue,
