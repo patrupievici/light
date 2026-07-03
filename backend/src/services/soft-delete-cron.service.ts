@@ -54,11 +54,6 @@ export function startSoftDeleteCron(log: FastifyBaseLogger): void {
   log.info({ minutes }, 'cron: soft-delete hard-erase sweep started')
 }
 
-export function stopSoftDeleteCron(): void {
-  cronTask?.stop()
-  cronTask = null
-}
-
 /**
  * Find accounts past their scheduled hard-erase time and erase each. Public for
  * manual invocation (admin/tests). Overlap-guarded: a still-running sweep makes

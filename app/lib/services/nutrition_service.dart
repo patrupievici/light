@@ -986,10 +986,6 @@ class NutritionService {
     }
   }
 
-  Future<List<FoodItem>> getByCategory(String category) async => [];
-
-  Future<List<String>> getCategories() async => [];
-
   /// `food == null && errorMessage == null` means a genuine 'not in the
   /// database'. errorMessage carries network/USDA failures so the UI stops
   /// telling users a real product 'doesn't exist' when the lookup just

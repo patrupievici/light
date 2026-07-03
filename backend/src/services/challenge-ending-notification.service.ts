@@ -54,11 +54,6 @@ export function startChallengeEndingNotificationCron(log: FastifyBaseLogger): vo
   log.info('cron: challenge ending/ended notifications @ 11:00 + 23:00 UTC')
 }
 
-export function stopChallengeEndingNotificationCron(): void {
-  cronTask?.stop()
-  cronTask = null
-}
-
 /** Public for tests / manual runs. Returns a summary. */
 export async function runChallengeEndingNotifications(
   log: FastifyBaseLogger,

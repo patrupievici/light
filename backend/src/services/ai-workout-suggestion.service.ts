@@ -32,53 +32,6 @@ type AiSessionJson = {
   exercises?: AiExercisePick[]
 }
 
-/**
- * One-line session titles for calendar rows (POST /me/planned-workouts/generate-weekly).
- */
-export async function generateAiWeeklyPlannedSessionTitles(
-  userId: string,
-  sessionDatesYmd: string[],
-): Promise<string[]> {
-  if (sessionDatesYmd.length === 0) return []
-  if (!process.env.DEEPSEEK_API_KEY) {
-    throw new Error('AI_DISABLED')
-  }
-
-  const tp = await prisma.userTrainingProfile.findUnique({ where: { userId } })
-
-  const prompt = `Return strict JSON only (no markdown): {"titles":["..."]}
-Rules:
-- Exactly ${sessionDatesYmd.length} strings in "titles", same order as SESSION_DATES.
-- Each title max 55 characters, English, catchy gym-session names.
-- Vary focus across sessions (e.g. upper strength, pull volume, legs, push hypertrophy) when it fits the user's frequency.
-
-SESSION_DATES=${JSON.stringify(sessionDatesYmd)}
-primaryGoal=${JSON.stringify(tp?.primaryGoal ?? 'hypertrophy')}
-trainingLevel=${JSON.stringify(tp?.trainingLevel ?? 'intermediate')}
-daysPerWeek=${tp?.daysPerWeek ?? 4}`
-
-  const out = await deepSeekChat(
-    [
-      {
-        role: 'system',
-        content: `${ZVELT_APP_CONTEXT_FOR_AI}
-
-You output strict JSON only. Field "titles" = English session names.`,
-      },
-      { role: 'user', content: prompt },
-    ],
-    { maxTokens: 400, temperature: 0.35 },
-  )
-
-  const json = parseJsonFromModel<{ titles?: string[] }>(out.text)
-  const raw = Array.isArray(json?.titles) ? json!.titles!.map((t) => String(t).trim().slice(0, 140)) : []
-  const titles: string[] = []
-  for (let i = 0; i < sessionDatesYmd.length; i++) {
-    titles.push(raw[i]?.length ? raw[i]! : `Training session ${i + 1}`)
-  }
-  return titles
-}
-
 function clampSets(n: unknown): number {
   const x = typeof n === 'number' ? n : Number(n)
   if (!Number.isFinite(x)) return 3

@@ -64,12 +64,6 @@ export function startGoalAwarePushCron(log: FastifyBaseLogger): void {
   log.info('cron: goal-aware push @ :05 each hour (UTC)')
 }
 
-export function stopGoalAwarePushCron(): void {
-  cronTask?.stop()
-  cronTask = null
-  SENT_TODAY.clear()
-}
-
 /** Public, on-demand single-user trigger used by the `/me/test-push` route.
  *  Bypasses the hour-of-day gate so QA can fire it any time. Still respects
  *  the per-day dedupe (call `force=true` to override). */

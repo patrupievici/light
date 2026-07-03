@@ -73,13 +73,6 @@ async function loadCatalog(): Promise<typeof cachedNormalized> {
   return cachedNormalized
 }
 
-/** Reset the in-memory cache. Call from seed/test scripts after re-seeding. */
-export function _clearExerciseResolverCache(): void {
-  cachedCatalog = null
-  cachedNormalized = []
-  cachedAt = 0
-}
-
 export async function resolveExerciseByName(raw: string): Promise<ExerciseRow | null> {
   if (!raw || raw.trim().length === 0) return null
   const catalog = await loadCatalog()
@@ -105,11 +98,4 @@ export async function resolveExerciseByName(raw: string): Promise<ExerciseRow | 
   }
   if (best) return { id: best.id, name: best.name }
   return null
-}
-
-/** Bulk resolve; preserves order, returns null entries for misses. */
-export async function resolveExerciseNames(
-  names: string[],
-): Promise<Array<ExerciseRow | null>> {
-  return Promise.all(names.map((n) => resolveExerciseByName(n)))
 }

@@ -122,9 +122,3 @@ export function startWebhookReconcileCron(log: FastifyBaseLogger): void {
   log.info({ intervalMs }, `cron: webhook reconcile every ${Math.round(intervalMs / 60000)} min`)
 }
 
-export function stopWebhookReconcileCron(): void {
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
-}

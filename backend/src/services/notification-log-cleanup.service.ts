@@ -34,11 +34,6 @@ export function startNotificationLogCleanupCron(log: FastifyBaseLogger): void {
   log.info('cron: notification-sent-log cleanup @ 03:15 UTC daily')
 }
 
-export function stopNotificationLogCleanupCron(): void {
-  cronTask?.stop()
-  cronTask = null
-}
-
 /** Public for tests / manual runs. Deletes claims older than retentionDays. */
 export async function runNotificationLogCleanup(
   log: FastifyBaseLogger,

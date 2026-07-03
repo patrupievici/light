@@ -47,11 +47,6 @@ export function startWeeklyPlanRegenCron(log: FastifyBaseLogger): void {
   log.info('cron: weekly-plan regen @ Monday 03:00 UTC')
 }
 
-export function stopWeeklyPlanRegenCron(): void {
-  cronTask?.stop()
-  cronTask = null
-}
-
 /**
  * Public entry point. Runs the regeneration for every eligible user.
  * Returns a summary so an admin endpoint or tests can call it on demand.

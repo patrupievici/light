@@ -43,11 +43,6 @@ export function startStreakRiskNotificationCron(log: FastifyBaseLogger): void {
   log.info('cron: streak-risk notifications @ 23:30 UTC daily')
 }
 
-export function stopStreakRiskNotificationCron(): void {
-  cronTask?.stop()
-  cronTask = null
-}
-
 /** Public for tests / manual runs. Returns a summary. */
 export async function runStreakRiskNotifications(
   log: FastifyBaseLogger,

@@ -60,38 +60,7 @@ class QuickStartHub extends StatefulWidget {
     this.onCardio, // ValueChanged<String> kind: run|walk|bike|custom
     this.onTemplate, // ValueChanged<String> id: push|pull|legs|fullbody (start)
     this.onBrowseLibrary,
-    this.templates = const <QsTemplate>[
-      QsTemplate('push', 'Push', 'Chest · Shoulders · Triceps', 6, [
-        ('Bench Press', '4×8 · 70kg'),
-        ('Incline DB Press', '3×10 · 22kg'),
-        ('Shoulder Press', '3×10 · 50kg'),
-        ('Lateral Raise', '3×15 · 8kg'),
-        ('Triceps Pushdown', '3×12 · 30kg'),
-        ('Overhead Ext.', '3×12 · 24kg'),
-      ]),
-      QsTemplate('pull', 'Pull', 'Back · Biceps', 6, [
-        ('Pull-up', '4×6 · BW'),
-        ('Barbell Row', '4×8 · 70kg'),
-        ('Cable Row', '3×10 · 55kg'),
-        ('Face Pull', '3×15 · 20kg'),
-        ('Barbell Curl', '3×10 · 32kg'),
-        ('Hammer Curl', '3×12 · 14kg'),
-      ]),
-      QsTemplate('legs', 'Legs', 'Quads · Hamstrings · Glutes', 5, [
-        ('Squat', '4×5 · 100kg'),
-        ('Romanian DL', '3×8 · 80kg'),
-        ('Leg Press', '3×12 · 120kg'),
-        ('Leg Curl', '3×12 · 45kg'),
-        ('Calf Raise', '4×15 · 60kg'),
-      ]),
-      QsTemplate('fullbody', 'Full Body', 'Chest · Back · Legs · Shoulders', 5, [
-        ('Squat', '3×8 · 80kg'),
-        ('Pull-up', '3×6 · BW'),
-        ('Bench Press', '3×8 · 65kg'),
-        ('Romanian DL', '3×8 · 70kg'),
-        ('Shoulder Press', '3×10 · 40kg'),
-      ]),
-    ],
+    this.templates = const <QsTemplate>[],
   });
 
   final QsHubData data;

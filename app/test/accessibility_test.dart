@@ -28,7 +28,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zvelt_app/theme/app_icons.dart';
 import 'package:zvelt_app/theme/app_theme.dart';
 import 'package:zvelt_app/widgets/z/z_card.dart';
-import 'package:zvelt_app/widgets/z/z_chip.dart';
 import 'package:zvelt_app/widgets/zvelt_main_nav_bar.dart';
 import 'package:zvelt_app/widgets/zvelt_primary_button.dart';
 import 'package:zvelt_app/widgets/zvelt_secondary_button.dart';
@@ -331,23 +330,6 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('ZChip does not overflow at 1.6x text', (tester) async {
-      await tester.pumpWidget(
-        _host(
-          const SizedBox(
-            width: 160,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: ZChip(label: 'Push day', variant: ZChipVariant.brand),
-            ),
-          ),
-          textScaler: big,
-        ),
-      );
-      await tester.pump();
-      expect(tester.takeException(), isNull);
-    });
-
     testWidgets('ZCard with stacked text reflows at 1.6x without overflow',
         (tester) async {
       await tester.pumpWidget(
@@ -373,29 +355,5 @@ void main() {
       expect(tester.takeException(), isNull,
           reason: 'card body text must wrap, not overflow, at 1.6x');
     });
-  });
-
-  group('Interactive chip — documented sub-target case', () {
-    testWidgets(
-      'tappable ZChip is below the 48dp target (documented)',
-      (tester) async {
-        // ZChip is a compact pill (font 11, 5px vertical padding). When given an
-        // onTap it becomes interactive but stays well under 48dp tall. This is
-        // acceptable for secondary filter chips but is recorded so a regression
-        // (e.g. promoting a chip to a primary action) is caught in review.
-        await tester.pumpWidget(
-          _host(ZChip(label: 'Filter', onTap: () {})),
-        );
-        final size = _sizeOf(tester, find.byType(ZChip));
-        expect(
-          size.height,
-          lessThan(kAndroidMinTarget),
-          reason:
-              'documenting that the chip is intentionally a sub-target control',
-        );
-        // TODO(a11y): if a tappable ZChip ever becomes a primary control, wrap
-        // it so its hit area reaches 48dp.
-      },
-    );
   });
 }

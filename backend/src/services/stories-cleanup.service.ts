@@ -32,11 +32,6 @@ export function startStoriesCleanupCron(log: FastifyBaseLogger): void {
   log.info('cron: stories cleanup @ :07 every hour UTC')
 }
 
-export function stopStoriesCleanupCron(): void {
-  cronTask?.stop()
-  cronTask = null
-}
-
 /**
  * Public for manual invocation (e.g. admin endpoint or tests). Returns a
  * summary so the caller can log/assert.
