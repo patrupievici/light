@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zvelt_app/theme/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -12,6 +14,7 @@ import '../../widgets/zvelt_main_nav_bar.dart';
 import '../calendar/activity_calendar_screen.dart';
 import 'quick_launch_sheet.dart';
 import 'exercise_library_screen.dart';
+import 'train/ai_workout_preview_sheet.dart';
 import 'train/train_exercises_tab.dart';
 import 'train/train_exercise_detail.dart';
 import 'train/train_history_tab.dart';
@@ -53,6 +56,13 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   List<WorkoutDto> _workouts = [];
   List<Routine> _routines = [];
   Routine? _startingRoutine;
+
+  // AI coach suggestion for the "no planned workout" hero. Loaded outside the
+  // main Future.wait so a slow AI generation never delays the tab spinner;
+  // null = nothing to show (hero stays generic — never placeholder content).
+  WorkoutSuggestionDto? _suggestion;
+  bool _suggestionLoading = false;
+  bool _regenerating = false;
   List<DailyTrainingPoint> _dailyTraining = [];
   List<ManualCardioDayPoint> _manualCardio = [];
   Map<String, List<ActivityKind>> _activities = {};
@@ -89,6 +99,11 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     // + the active-program banner instead of showing stale data.
     _programsFuture = null;
     _activeFuture = null;
+
+    // Deliberately not awaited: usually instant (cached/prewarmed at
+    // onboarding), but a cold AI generation can take tens of seconds and must
+    // not hold the whole tab hostage.
+    unawaited(_loadSuggestion());
 
     // Settle every fetch independently so one failing endpoint (e.g. a
     // getWorkouts 5xx) no longer collapses the whole screen into the error
@@ -215,6 +230,70 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
       return "Can't reach the server. Check your connection and try again.";
     }
     return "Couldn't start the workout: $raw";
+  }
+
+  // ── AI coach suggestion (hero fallback when nothing is planned) ────────────
+  Future<void> _loadSuggestion() async {
+    if (_suggestionLoading) return;
+    if (mounted) setState(() => _suggestionLoading = true);
+    try {
+      final s = await _workoutService.getWorkoutSuggestion();
+      if (!mounted) return;
+      setState(() {
+        _suggestion = s.exercises.isEmpty ? null : s;
+        _suggestionLoading = false;
+      });
+    } catch (_) {
+      // No cache + no network / AI disabled → hero silently stays generic.
+      if (mounted) setState(() => _suggestionLoading = false);
+    }
+  }
+
+  Future<void> _regenerateSuggestion() async {
+    if (_regenerating) return;
+    setState(() => _regenerating = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final s = await _workoutService.getWorkoutSuggestion(refresh: true);
+      if (!mounted) return;
+      setState(() {
+        if (s.exercises.isNotEmpty) _suggestion = s;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            "Couldn't build a new workout. Check your connection and try again."),
+        backgroundColor: ZveltTokens.error,
+      ));
+    } finally {
+      if (mounted) setState(() => _regenerating = false);
+    }
+  }
+
+  Future<void> _startAiWorkout(WorkoutSuggestionDto s) async {
+    if (_starting) return;
+    setState(() => _starting = true);
+    try {
+      await Navigator.of(context).push<void>(MaterialPageRoute<void>(
+        builder: (_) => ActiveWorkoutView(preset: aiSuggestionPreset(s)),
+      ));
+    } finally {
+      if (mounted) {
+        setState(() => _starting = false);
+        await _load();
+      }
+    }
+  }
+
+  Future<void> _openAiPreview(WorkoutSuggestionDto s) async {
+    final start = await showAiWorkoutPreviewSheet(
+      context,
+      suggestion: s,
+      regenerate: () => _workoutService.getWorkoutSuggestion(refresh: true),
+      onSuggestionChanged: (next) => setState(() => _suggestion = next),
+    );
+    if (start != null && mounted) await _startAiWorkout(start);
   }
 
   @override
@@ -467,9 +546,12 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     );
   }
 
-  // ── TODAY'S WORKOUT — planned session name (real) or honest fallback ───────
+  // ── TODAY'S WORKOUT — planned session (real), the AI coach's pick when
+  // nothing is planned, or the honest generic fallback. Never fabricated.
   Widget _todaysWorkoutHero() {
     final planned = _plannedToday();
+    final suggestion = planned == null ? _suggestion : null;
+    if (suggestion != null) return _aiSuggestionHero(suggestion);
     final title = planned?.title ?? 'Ready to train';
     final routine = _matchedRoutineForToday();
     return Material(
@@ -507,6 +589,15 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                     fontSize: 26,
                     letterSpacing: -0.02 * 26),
               ),
+              if (planned == null && _suggestionLoading) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Zvelt Coach is preparing a workout…',
+                  style: ZType.bodyS.copyWith(
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
+                ),
+              ],
               if (routine != null) ...[
                 const SizedBox(height: 12),
                 Row(
@@ -551,6 +642,143 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── COACH'S PICK hero — real AI suggestion; body opens preview, CTA starts.
+  Widget _aiSuggestionHero(WorkoutSuggestionDto s) {
+    final goal = (s.primaryGoal ?? '').trim();
+    final description = s.description.trim();
+    return Material(
+      color: Colors.transparent,
+      child: Semantics(
+        button: true,
+        label: 'Preview AI workout: ${s.title}',
+        child: InkWell(
+          onTap: _starting ? null : () => _openAiPreview(s),
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: ZveltTokens.gradBrand,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: ZveltTokens.glowBrand,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 14),
+                        child: Text(
+                          "COACH'S PICK FOR TODAY",
+                          style: ZType.bodyS.copyWith(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            letterSpacing: 0.1 * 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _regenerateHeroButton(),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  s.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: ZType.h2.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 26,
+                      letterSpacing: -0.02 * 26),
+                ),
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: ZType.bodyS.copyWith(
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _heroMetaChip(
+                        '${s.exercises.length} exercise${s.exercises.length == 1 ? '' : 's'}'),
+                    if (goal.isNotEmpty) _heroMetaChip(goal),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Semantics(
+                  button: true,
+                  label: 'Start workout',
+                  child: Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: _starting ? null : () => _startAiWorkout(s),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        alignment: Alignment.center,
+                        child: Text(
+                          _starting ? 'Starting…' : 'Start Workout →',
+                          style: ZType.bodyM.copyWith(
+                            color: ZveltTokens.brand,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _regenerateHeroButton() {
+    return Semantics(
+      button: true,
+      label: 'New suggestion',
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.22),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _regenerating ? null : _regenerateSuggestion,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(
+              child: _regenerating
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(AppIcons.refresh, size: 20, color: Colors.white),
+            ),
           ),
         ),
       ),

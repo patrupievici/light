@@ -44,6 +44,8 @@ class QuickStartHub extends StatefulWidget {
   const QuickStartHub({
     super.key,
     this.data = const QsHubData(),
+    this.aiTitle,
+    this.onAiWorkout,
     this.onClose,
     this.onResume,
     this.onStartNext,
@@ -94,6 +96,11 @@ class QuickStartHub extends StatefulWidget {
 
   final QsHubData data;
   final List<QsTemplate> templates;
+
+  /// Title of the AI coach's cached suggestion — subtitle of the AI tile when
+  /// available. Null keeps honest generic copy (never a fabricated title).
+  final String? aiTitle;
+  final VoidCallback? onAiWorkout;
   final VoidCallback? onClose,
       onResume,
       onStartNext,
@@ -206,6 +213,11 @@ class _QuickStartHubState extends State<QuickStartHub> {
         _primaryCard(),
         _sectionLabel('SHORTCUTS'),
         _shortcuts(),
+        if (widget.onAiWorkout != null) ...[
+          const SizedBox(height: 24),
+          _sectionLabel("COACH'S PICK"),
+          _aiWorkoutCard(),
+        ],
         const SizedBox(height: 24),
         _sectionLabel('TEMPLATES'),
         _templatesGrid(),
@@ -528,6 +540,68 @@ class _QuickStartHubState extends State<QuickStartHub> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // C½. AI Workout — the coach's suggested session (preview → start).
+  Widget _aiWorkoutCard() {
+    return Semantics(
+      button: true,
+      label: 'AI workout — preview the coach\'s suggested session',
+      child: Material(
+        color: ZveltTokens.surface,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: widget.onAiWorkout,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: ZveltTokens.shadowCard,
+            ),
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                _iconTile(AppIcons.sparkles, 44, 14, 22),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'AI Workout',
+                        style: TextStyle(
+                          fontFamily: ZveltTokens.fontPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: ZveltTokens.text,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.aiTitle ?? 'Built for you by Zvelt Coach',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: ZveltTokens.fontPrimary,
+                          fontWeight: FontWeight.w400,
+                          fontSize: 12,
+                          height: 1.3,
+                          color: ZveltTokens.text2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(AppIcons.angle_small_right,
+                    size: 20, color: ZveltTokens.text3),
+              ],
+            ),
           ),
         ),
       ),

@@ -38,6 +38,7 @@ import 'post_workout_screen.dart';
 import 'train/custom_cardio_sheet.dart';
 import '../../services/program_service.dart';
 import '../ai/ai_chat_screen.dart';
+import 'train/ai_workout_preview_sheet.dart';
 import '../analytics/photo_capture_screen.dart';
 import '../nutrition/nutrition_tab.dart';
 import '../outdoor/outdoor_track_screen.dart';
@@ -214,6 +215,34 @@ const _kAllPresets = <FabPreset>[
 FabPreset _presetById(String id) => _kAllPresets.firstWhere((p) => p.id == id,
     orElse: () => _kAllPresets.first);
 
+/// Maps the AI coach's suggestion onto the same preset structure the template
+/// engine runs, so an AI session gets catalog matching, history-weight
+/// prefill and draft/resume for free. Lives in this file because FabPreset's
+/// exercise list type is library-private.
+FabPreset aiSuggestionPreset(WorkoutSuggestionDto s) {
+  final subtitle = (s.primaryGoal ?? '').trim();
+  return FabPreset(
+    id: 'ai',
+    name: s.title,
+    type: _PresetType.gym,
+    subtitle: subtitle.isNotEmpty ? subtitle : 'Built by Zvelt Coach',
+    tagline: "Coach's pick",
+    icon: AppIcons.sparkles,
+    accent: const [ZveltTokens.brand2, ZveltTokens.brand],
+    exercises: [
+      for (final e in s.exercises)
+        _GymExercise(
+          e.name,
+          e.sets.clamp(1, 10),
+          e.repRange.trim().isEmpty ? '8-10' : e.repRange.trim(),
+          e.suggestedWeightKg <= 0
+              ? 'BW'
+              : '${e.suggestedWeightKg.toStringAsFixed(e.suggestedWeightKg % 1 == 0 ? 0 : 1)} kg',
+        ),
+    ],
+  );
+}
+
 FabPreset? fabPresetById(String id) {
   for (final p in _kAllPresets) {
     if (p.id == id) return p;
@@ -273,11 +302,60 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
   QsHubData _hubData = const QsHubData();
   WorkoutDraftSnapshot? _draft;
   String? _completedWorkoutId;
+  WorkoutSuggestionDto? _aiSuggestion;
 
   @override
   void initState() {
     super.initState();
     _loadHubData();
+    _loadAiSuggestion();
+  }
+
+  // Fire-and-forget: the tile shows the suggestion title once it lands; until
+  // then (or on failure) it keeps honest generic copy. Never blocks the hub.
+  Future<void> _loadAiSuggestion() async {
+    try {
+      final s = await WorkoutService().getWorkoutSuggestion();
+      if (!mounted || s.exercises.isEmpty) return;
+      setState(() => _aiSuggestion = s);
+    } catch (_) {
+      // No cache + no network / AI disabled — tile copy stays generic.
+    }
+  }
+
+  Future<void> _openAiWorkout() async {
+    final messenger = ScaffoldMessenger.of(context);
+    var s = _aiSuggestion;
+    if (s == null) {
+      try {
+        s = await WorkoutService().getWorkoutSuggestion();
+      } catch (_) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text(
+              "Coach's pick isn't ready yet. Check your connection and try again."),
+          backgroundColor: ZveltTokens.error,
+        ));
+        return;
+      }
+      if (!mounted) return;
+      if (s.exercises.isEmpty) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text(
+              "Coach's pick isn't ready yet. Log a workout or set a goal first."),
+          backgroundColor: ZveltTokens.error,
+        ));
+        return;
+      }
+      setState(() => _aiSuggestion = s);
+    }
+    final start = await showAiWorkoutPreviewSheet(
+      context,
+      suggestion: s,
+      regenerate: () => WorkoutService().getWorkoutSuggestion(refresh: true),
+      onSuggestionChanged: (next) => setState(() => _aiSuggestion = next),
+    );
+    if (start == null || !mounted) return;
+    await _startPreset(aiSuggestionPreset(start));
   }
 
   // Loads the real context for the primary card: an unfinished draft (resume),
@@ -475,6 +553,8 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
     return QuickStartHub(
       data: _hubData,
       templates: _quickStartTemplates(),
+      aiTitle: _aiSuggestion?.title,
+      onAiWorkout: _openAiWorkout,
       onClose: () => Navigator.of(context).maybePop(),
       onResume: _resumeDraft,
       onStartNext: _openActiveProgram,
