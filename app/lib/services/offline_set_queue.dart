@@ -2,10 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import '_crash_reporter.dart';
 import 'auth_service.dart';
 import 'workout_service.dart';
+
+/// Fixed namespace for deriving a stable UUIDv5 from a legacy entry's content
+/// (see [PendingSetEntry.fromJson]). Any constant UUID works as a namespace;
+/// this one is arbitrary and permanent.
+const String _kLegacySetNamespace = '6f3a9d20-8b1e-4c77-9a2e-0f5b7c1d2e3a';
 
 /// The kind of mutation a [PendingSetEntry] replays on reconnect.
 ///
@@ -218,10 +224,13 @@ class PendingSetEntry {
     // Legacy entries (queued before clientSetId existed) get a DETERMINISTIC id
     // derived from their content — re-deriving it on every load yields the same
     // token, so a failed flush can't create duplicates by minting a fresh UUID
-    // each app restart (the server dedupes on clientSetId).
+    // each app restart (the server dedupes on clientSetId). It MUST be a real
+    // UUID: the backend AddSetSchema rejects non-UUID clientSetIds with 400, so
+    // a `legacy-…` string would replay-fail and be dropped as un-retryable.
+    final legacySeed = 'legacy-$wId-$weId-$weightKg-$reps-${rpe ?? 'n'}-$tag-'
+        '${queuedAt?.millisecondsSinceEpoch ?? 0}';
     final clientSetId = (m['clientSetId'] as String?) ??
-        'legacy-$wId-$weId-$weightKg-$reps-${rpe ?? 'n'}-$tag-'
-            '${queuedAt?.millisecondsSinceEpoch ?? 0}';
+        const Uuid().v5(_kLegacySetNamespace, legacySeed);
     return PendingSetEntry(
       workoutId: wId,
       weId: weId,
@@ -296,10 +305,17 @@ class OfflineSetQueue {
     return completer.future;
   }
 
+  /// Storage key scoped to the current user. Uses [getStoredUserId] (a local
+  /// JWT decode, NO network) rather than getCurrentUserId (which triggers a
+  /// token refresh): offline with an expired access token the latter returns
+  /// null, so sets would queue under `…_anon` and then never be found by a
+  /// later online flush that resolves the real user key — silent data loss.
   Future<String> _key() async {
-    final id = await _auth.getCurrentUserId();
+    final id = await _auth.getStoredUserId();
     return '${_keyPrefix}_${id ?? 'anon'}';
   }
+
+  static const String _anonKey = '${_keyPrefix}_anon';
 
   Future<List<PendingSetEntry>> _loadAllForKey(String key) async {
     final p = await SharedPreferences.getInstance();
@@ -499,7 +515,19 @@ class OfflineSetQueue {
       // so a mid-flush user/token flip (e.g. refresh → 'anon') can't make the
       // remaining (unsynced) entries get written under the wrong user key.
       final key = await _key();
-      final pending = await _loadAllForKey(key);
+      var pending = await _loadAllForKey(key);
+      // Rescue entries stranded under the `…_anon` key by the old
+      // getCurrentUserId-based scheme (queued offline when userId was null).
+      // Merge them ahead of the current user's entries (enqueue order → parents
+      // before children) and clear the anon bucket so they aren't re-processed.
+      if (key != _anonKey) {
+        final orphaned = await _loadAllForKey(_anonKey);
+        if (orphaned.isNotEmpty) {
+          pending = [...orphaned, ...pending];
+          final p = await SharedPreferences.getInstance();
+          await p.remove(_anonKey);
+        }
+      }
       if (pending.isEmpty) return const FlushResult(synced: 0, dropped: 0, deferred: 0);
       final now = DateTime.now();
       var synced = 0;
@@ -555,9 +583,17 @@ class OfflineSetQueue {
             blockedClientSetIds.remove(e.clientSetId);
           }
         } on WorkoutApiException catch (err) {
-          // 4xx = client/data error; a retry will never succeed — drop, but
-          // record it so a silently-lost set is at least observable.
-          if (err.statusCode >= 400 && err.statusCode < 500) {
+          // Not every 4xx is a permanent data rejection. 401/403 = the access
+          // token expired mid-session (retry succeeds after re-auth); 408/429 =
+          // timeout / rate-limit (transient). Dropping those discarded a real
+          // logged set the moment a session lapsed. Keep them queued with
+          // backoff; only a genuine client/data 4xx (400/404/409/422…) can
+          // never succeed on retry and is dropped (recorded so it's observable).
+          const retryable4xx = {401, 403, 408, 429};
+          final permanent = err.statusCode >= 400 &&
+              err.statusCode < 500 &&
+              !retryable4xx.contains(err.statusCode);
+          if (permanent) {
             dropped++;
             // If a parent add is un-retryable, its children are orphaned too.
             if (e.op == PendingSetOp.add) {

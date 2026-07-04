@@ -69,8 +69,14 @@ export async function sendPasswordResetEmail(to: string, code: string): Promise<
       'you can safely ignore this email — your password will not change.',
   })
   if (!sent) {
-    // Keep the code discoverable server-side in dev when email is not
-    // configured (mirrors the console fallback above).
-    console.log(`[mail] password reset code for ${to}: ${code}`)
+    // Keep the code discoverable server-side ONLY in non-production (email not
+    // configured in dev/staging). In production a mail failure must NOT print a
+    // live reset code + address to the logs — that is an account-takeover vector
+    // for anyone who can read them.
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[mail] password reset code for ${to}: ${code}`)
+    } else {
+      console.error(`[mail] password reset email could not be delivered to ${to}`)
+    }
   }
 }

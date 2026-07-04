@@ -28,6 +28,10 @@ import 'package:zvelt_app/services/workout_service.dart';
 class _FakeAuth extends AuthService {
   @override
   Future<String?> getCurrentUserId() async => 'user-1';
+
+  // The queue keys off getStoredUserId (local, offline-safe); mirror it here.
+  @override
+  Future<String?> getStoredUserId() async => 'user-1';
 }
 
 /// Workout API stub. By default every add/update succeeds and is recorded; set
@@ -199,7 +203,15 @@ void main() {
       final b = PendingSetEntry.fromJson(legacy)!;
 
       expect(a.clientSetId, isNotEmpty);
-      expect(a.clientSetId, startsWith('legacy-'));
+      // Must be a real UUID — the backend AddSetSchema rejects non-UUID
+      // clientSetIds with 400, so a `legacy-…` string would replay-fail and be
+      // dropped. UUIDv5 keeps it deterministic (content-derived) AND valid.
+      expect(
+        a.clientSetId,
+        matches(RegExp(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')),
+        reason: 'legacy id must be a valid UUIDv5, not a legacy- string',
+      );
       expect(a.clientSetId, b.clientSetId,
           reason: 'legacy id must be content-derived, never a fresh UUID');
     });
@@ -301,6 +313,37 @@ void main() {
       expect(res.deferred, 0);
       expect(await q.pendingCount(), 0,
           reason: '4xx can never succeed on retry — must be dropped');
+    });
+
+    test('401 (auth expired mid-session) → entry KEPT with backoff, not dropped',
+        () async {
+      // Regression: an access token lapsing mid-workout used to drop every
+      // queued set as an un-retryable 4xx — silent loss of a logged session.
+      final fake = _FakeWorkouts(
+        error: WorkoutApiException(statusCode: 401, message: 'token expired'),
+      );
+      final q = OfflineSetQueue(auth: _FakeAuth(), workouts: fake);
+      await q.enqueue(_entry());
+
+      final res = await q.flush();
+
+      expect(res.dropped, 0, reason: '401 is recoverable after re-auth');
+      expect(res.synced, 0);
+      expect(await q.pendingCount(), 1, reason: 'must survive for a later flush');
+      expect((await q.loadAll()).single.retryCount, 1);
+    });
+
+    test('429 (rate limited) → entry KEPT with backoff, not dropped', () async {
+      final fake = _FakeWorkouts(
+        error: WorkoutApiException(statusCode: 429, message: 'slow down'),
+      );
+      final q = OfflineSetQueue(auth: _FakeAuth(), workouts: fake);
+      await q.enqueue(_entry());
+
+      final res = await q.flush();
+
+      expect(res.dropped, 0);
+      expect(await q.pendingCount(), 1);
     });
 
     test('5xx (503) → entry KEPT with backoff (retryCount++, nextRetryAt set)',
