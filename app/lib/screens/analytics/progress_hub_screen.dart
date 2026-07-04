@@ -522,10 +522,17 @@ class _TrainingTabState extends State<_TrainingTab>
     }
   }
 
+  /// The last [n] elements of [list], preserving order. Fewer than [n] → all.
+  static List<T> _lastN<T>(List<T> list, int n) =>
+      list.length <= n ? List<T>.from(list) : list.sublist(list.length - n);
+
   /// Derive every chart/stat aggregation once when [_daily] changes — these
   /// used to be getters recomputed on each build().
   void _recompute() {
-    final last7 = _daily.take(7).toList().reversed.toList();
+    // _daily arrives oldest-first (backend ORDER BY day ASC; the service does
+    // not reverse). "This week" is therefore the LAST 7 entries, not the first —
+    // taking the head showed ~30-day-old data as the current week.
+    final last7 = _lastN(_daily, 7); // already chronological (oldest→newest)
     _weekVolume = last7.map((d) => d.volumeKg).toList();
 
     const dayInitials = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -544,16 +551,17 @@ class _TrainingTabState extends State<_TrainingTab>
           d.sessions > 0;
     }).length;
 
-    _activeDaysThisWeek = _daily.take(7).where((d) => d.sessions > 0).length;
+    _activeDaysThisWeek = last7.where((d) => d.sessions > 0).length;
 
     // Volume change last 7 days vs prior 7 days, as signed percent. Null when
     // prior week has zero volume (would divide by zero / be meaningless).
     if (_daily.length < 14) {
       _volumeDeltaPct = null;
     } else {
-      final lastWeek = _daily.take(7).fold<double>(0, (a, d) => a + d.volumeKg);
-      final priorWeek =
-          _daily.skip(7).take(7).fold<double>(0, (a, d) => a + d.volumeKg);
+      final lastWeek = last7.fold<double>(0, (a, d) => a + d.volumeKg);
+      final priorWeek = _daily
+          .sublist(_daily.length - 14, _daily.length - 7)
+          .fold<double>(0, (a, d) => a + d.volumeKg);
       _volumeDeltaPct =
           priorWeek <= 0 ? null : ((lastWeek - priorWeek) / priorWeek) * 100;
     }
@@ -571,8 +579,9 @@ class _TrainingTabState extends State<_TrainingTab>
       if (dt == null) return '';
       return '${monthNames[dt.month - 1]} ${dt.day}';
     }
-    // _daily is ordered newest-first; trend chart reads oldest-first.
-    final week = _daily.take(7).toList().reversed.toList();
+    // _daily is oldest-first; the last 7 entries are the current week already
+    // in the oldest-first order the trend chart expects.
+    final week = _lastN(_daily, 7);
     if (week.length < 5) return [for (final d in week) fmt(d.day)];
     return [
       fmt(week[0].day),
@@ -1077,7 +1086,11 @@ class _NutritionTabState extends State<_NutritionTab>
         : logged.fold(0.0, (sum, d) => sum + d.calories) / logged.length;
 
     // Last 7 days oldest-first — the design's "Weekly calories" bar chart.
-    _week = _history.take(7).toList().reversed.toList();
+    // _history is built oldest-first, so the CURRENT week is the last 7 entries
+    // (taking the head + reversing showed the oldest week, newest-bar-first).
+    _week = _history.length <= 7
+        ? List<NutritionDaySnapshot>.from(_history)
+        : _history.sublist(_history.length - 7);
 
     const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     _weekDayLabels = [for (final d in _week) days[d.date.weekday - 1]];

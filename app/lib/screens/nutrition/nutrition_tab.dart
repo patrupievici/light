@@ -634,8 +634,14 @@ class _NutritionTabState extends State<NutritionTab> {
                         padding: EdgeInsets.fromLTRB(ZveltTokens.s4, 0, ZveltTokens.s4, ZveltMainNavBar.reservedBottomHeight(context) + ZveltTokens.s4),
                         children: [
                           const SizedBox(height: ZveltTokens.s3),
-                          _buildPlanBanner(),
-                          const SizedBox(height: ZveltTokens.s3),
+                          // Only show the "AI plan ready" banner when a plan
+                          // actually exists (signed in, not mid-generation) —
+                          // it used to render unconditionally, asserting a plan
+                          // that wasn't there.
+                          if (_signedIn && _weekPlan.isNotEmpty && !_planGenerating) ...[
+                            _buildPlanBanner(),
+                            const SizedBox(height: ZveltTokens.s3),
+                          ],
                           if (_planGenerating)
                             _buildPlanGeneratingCard()
                           else
@@ -860,11 +866,15 @@ class _NutritionTabState extends State<NutritionTab> {
     // 32px tinted icon tile, title + kcal subtitle, View action). 'View'
     // opens today's day-plan sheet. Honest: only renders when a plan exists
     // (gated by the caller); the kcal subtitle uses the REAL goal.
-    final today = _weekPlan.isEmpty
-        ? null
-        : _weekPlan[DateTime.now().weekday - 1 < _weekPlan.length
-            ? DateTime.now().weekday - 1
-            : 0];
+    // Match today's plan by DATE, not list position — a plan that isn't a
+    // Monday-aligned 7-day list used to fall back to index 0 (Monday), so
+    // "View" opened the wrong day.
+    final now = DateTime.now();
+    final todayYmd =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final matchesToday = _weekPlan.where((d) => d.day.startsWith(todayYmd));
+    // Final (not loop-assigned) so it promotes to non-null inside the closure.
+    final today = matchesToday.isEmpty ? null : matchesToday.first;
     return Container(
       padding: const EdgeInsets.all(ZveltTokens.s4),
       decoration: BoxDecoration(
