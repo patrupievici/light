@@ -182,6 +182,65 @@ export async function statsRoutes(app: FastifyInstance) {
     })
   })
 
+  // GET /v1/me/workouts/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
+  // Distinct workout days (completed/posted) in the range — feeds the Home
+  // "this week" strip and the activity calendar. Without this the client 404s
+  // and permanently shows "Not logged yet" / 0 sessions even after a workout.
+  app.get('/workouts/calendar', { preHandler: authenticate }, async (request, reply) => {
+    const { userId } = request.user
+    const q = request.query as { from?: string; to?: string }
+    const ymd = /^\d{4}-\d{2}-\d{2}$/
+    // Default to a 90-day trailing window when the client omits bounds.
+    const to = q.to && ymd.test(q.to) ? q.to : new Date().toISOString().slice(0, 10)
+    const from =
+      q.from && ymd.test(q.from)
+        ? q.from
+        : new Date(Date.now() - 89 * 86_400_000).toISOString().slice(0, 10)
+
+    const rows = await prisma.$queryRawUnsafe<{ date: string }[]>(
+      `SELECT DISTINCT (w.started_at AT TIME ZONE 'UTC')::date::text AS date
+       FROM workouts w
+       WHERE w.user_id = $1
+         AND w.status IN ('completed','posted')
+         AND (w.started_at AT TIME ZONE 'UTC')::date BETWEEN $2::date AND $3::date
+       ORDER BY date`,
+      userId,
+      from,
+      to,
+    )
+
+    return reply.send({ dates: rows.map((r) => ({ date: r.date })) })
+  })
+
+  // GET /v1/me/workouts/heatmap?year=YYYY
+  // Per-day completed-workout count for the given year — feeds the profile
+  // density heatmap. 404-less: an active user used to see "0 sessions in the
+  // last 365 days" because the endpoint didn't exist.
+  app.get('/workouts/heatmap', { preHandler: authenticate }, async (request, reply) => {
+    const { userId } = request.user
+    const q = request.query as { year?: string }
+    const now = new Date()
+    const year = Math.min(
+      now.getUTCFullYear(),
+      Math.max(2000, parseInt(q.year ?? `${now.getUTCFullYear()}`, 10) || now.getUTCFullYear()),
+    )
+
+    const rows = await prisma.$queryRawUnsafe<{ date: string; count: number }[]>(
+      `SELECT (w.started_at AT TIME ZONE 'UTC')::date::text AS date,
+              COUNT(*)::int AS count
+       FROM workouts w
+       WHERE w.user_id = $1
+         AND w.status IN ('completed','posted')
+         AND EXTRACT(YEAR FROM (w.started_at AT TIME ZONE 'UTC')) = $2
+       GROUP BY 1
+       ORDER BY 1`,
+      userId,
+      year,
+    )
+
+    return reply.send({ days: rows.map((r) => ({ date: r.date, count: r.count })) })
+  })
+
   // GET /v1/me/stats (prefix înregistrat: /v1/me)
   app.get('/stats', { preHandler: authenticate }, async (request, reply) => {
     const { userId } = request.user

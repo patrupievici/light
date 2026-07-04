@@ -135,18 +135,21 @@ class _HallOfFameScreenState extends State<HallOfFameScreen> {
     try {
       final res = await http
           .get(
-            Uri.parse('$v1Base/leaderboard/season')
+            Uri.parse('$v1Base/ranks/leaderboard')
                 .replace(queryParameters: {'limit': '8'}),
             headers: headers,
           )
           .withTimeout();
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final list = data['data'] as List<dynamic>? ?? [];
+        // Backend envelope: { season, leaderboard: [{ rank, username,
+        // displayName, lpSeason }] }. (The old client hit /leaderboard/season
+        // with a { data, lpTotal } shape that never existed → always 404.)
+        final list = data['leaderboard'] as List<dynamic>? ?? [];
         return list.asMap().entries.map((e) {
           final j = e.value as Map<String, dynamic>;
           final name = (j['username'] ?? j['displayName'] ?? 'User').toString();
-          final lp = (j['lpTotal'] as num?)?.toInt() ?? 0;
+          final lp = (j['lpSeason'] as num?)?.toInt() ?? 0;
           final delta = (j['deltaRank'] as num?)?.toInt() ?? 0;
           final tier = (j['tier'] as String?) ?? 'Iron';
           final isMe = j['isMe'] as bool? ?? false;
