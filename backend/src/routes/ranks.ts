@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
-import { srToLP, lpToTier, calcStrengthRatio, bestWorkSetForRank, resolveBwStrengthFraction } from '../services/ranking.service'
+import { srToLP, lpToTier, calcStrengthRatio, bestWorkSetForRank, resolveBwStrengthFraction, getSRThresholds } from '../services/ranking.service'
 
 export async function rankRoutes(app: FastifyInstance) {
   // GET /v1/ranks/me — toate rangurile userului curent
@@ -75,9 +75,16 @@ export async function rankRoutes(app: FastifyInstance) {
 
     const targetWeightAt5Reps = (() => {
       if (isBwReps) return null
-      const targetSR = nextTierLP / 100
+      // The SR needed to REACH the next tier is that tier's THRESHOLD, not
+      // nextTierLP/100 (which assumed a linear LP=SR×100 — it overstated the
+      // target, e.g. Bronze read 1.0 instead of the real 0.6). Use the same
+      // threshold table srToLP uses.
+      const thresholds = getSRThresholds(exercise?.name ?? '')
+      const nextTierIndex = Math.round(nextTierLP / 100)
+      const targetSR = thresholds[nextTierIndex] ?? thresholds[thresholds.length - 1]
       const targetE1RM = targetSR * bw
-      return Math.round((targetE1RM / (1 + 5 / 30)) * 2.5) / 2.5
+      // Round to the nearest 2.5 kg plate increment (was rounding to 0.4 kg).
+      return Math.round(targetE1RM / (1 + 5 / 30) / 2.5) * 2.5
     })()
 
     const bwFrac =
@@ -124,8 +131,15 @@ export async function rankRoutes(app: FastifyInstance) {
       return reply.send({ leaderboard: [], season: null })
     }
 
+    // Anti-cheat "trusted tier" (CLAUDE.md): only accounts older than 30 days
+    // appear on the seasonal leaderboard, so a throwaway account can't spike the
+    // board. Filter on the related user's createdAt.
+    const trustedBefore = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     const leaderboard = await prisma.userSeasonStat.findMany({
-      where: { seasonId: activeSeason.id },
+      where: {
+        seasonId: activeSeason.id,
+        user: { createdAt: { lte: trustedBefore }, status: 'active' },
+      },
       orderBy: { lpSeason: 'desc' },
       take: limit,
       include: {

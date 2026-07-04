@@ -329,11 +329,17 @@ export async function computeRanks(
     // Single source of truth for the >20% SR-jump heuristic (anti-cheat.service).
     const isAnomaly = isSrAnomaly(sr, prevSr)
 
+    // Keep the stored best consistent with lpTotal: only overwrite bestE1rmKg /
+    // strengthRatio when THIS session owns the (new) max LP. Previously a lighter
+    // session dropped the stored 'best' e1RM/SR while lpTotal kept the max, so
+    // /explain showed numbers that couldn't produce the tier.
+    const prevBestE1rm = prevRank ? Number(prevRank.bestE1rmKg) : 0
+    const isNewBest = newLp >= prevLp
     await prisma.userExerciseRank.upsert({
       where: { userId_exerciseId: { userId, exerciseId: we.exerciseId } },
       update: {
-        bestE1rmKg: bestE1rm,
-        strengthRatio: sr,
+        bestE1rmKg: isNewBest ? bestE1rm : prevBestE1rm,
+        strengthRatio: isNewBest ? sr : prevSr,
         lpTotal: Math.max(newLp, prevLp),
       },
       create: {

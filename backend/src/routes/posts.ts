@@ -589,9 +589,17 @@ export async function postRoutes(app: FastifyInstance) {
           id: { notIn: hiddenPostIds },
           userId: { notIn: blockedIds }, // hide blocked users' posts (both ways)
           OR: [
-            { userId: me },
-            { userId: { in: friendIds }, visibility: { in: ['friends', 'public'] } },
-            { visibility: 'public' },
+            { userId: me }, // my own posts always visible to me
+            // Others: only if the AUTHOR shares an activity feed (an owner who
+            // disabled showActivityFeed used to leak their public posts into the
+            // explore grid, then 404 on tap). null/true = shown, false = hidden.
+            {
+              user: { profile: { showActivityFeed: { not: false } } },
+              OR: [
+                { userId: { in: friendIds }, visibility: { in: ['friends', 'public'] } },
+                { visibility: 'public' },
+              ],
+            },
           ],
         }
 

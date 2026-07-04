@@ -254,7 +254,32 @@ export async function challengeRoutes(app: FastifyInstance) {
       },
     })
 
-    const data = rows.map((r) => serializeChallenge(r, me))
+    if (rows.length === 0) return reply.send({ data: [], requestId: request.id })
+
+    // Hydrate joined-state + participant counts (same batch queries as /discover)
+    // so the feed's Join/Leave button reflects reality — without this every row
+    // reported joined=false, hiding the Leave action for joined users.
+    const ids = rows.map((r) => r.id)
+    const [counts, mine] = await Promise.all([
+      prisma.challengeParticipant.groupBy({
+        by: ['challengeId'],
+        where: { challengeId: { in: ids } },
+        _count: { challengeId: true },
+      }),
+      prisma.challengeParticipant.findMany({
+        where: { challengeId: { in: ids }, userId: me },
+        select: { challengeId: true },
+      }),
+    ])
+    const countBy = new Map(counts.map((c) => [c.challengeId, c._count.challengeId]))
+    const joined = new Set(mine.map((m) => m.challengeId))
+
+    const data = rows.map((r) =>
+      serializeChallenge(r, me, {
+        participantsCount: countBy.get(r.id) ?? 0,
+        joined: joined.has(r.id),
+      }),
+    )
     return reply.send({ data, requestId: request.id })
   })
 
