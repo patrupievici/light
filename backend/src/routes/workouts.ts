@@ -34,10 +34,21 @@ import { sanitizePromptInput } from '../lib/ai-helpers'
 const INSIGHT_CACHE = new Map<string, { text: string; expiresAt: number }>()
 const INSIGHT_TTL_MS = 60 * 60 * 1000 // 1 hour
 
+const CreateWorkoutSchema = z.object({
+  /// Optional client-provided PK (UUID) for offline-first creation: the app
+  /// mints the id before it has a connection, uses it locally, and the create
+  /// replays on reconnect. Upsert on it makes the replay idempotent, and local
+  /// == server id so queued exercises/sets referencing it resolve correctly.
+  id: z.string().uuid().optional(),
+})
+
 const AddExerciseSchema = z.object({
   exerciseId: z.string().uuid(),
   position: z.number().int().min(0).optional(),
   restSecondsDefault: z.number().int().min(0).max(600).optional(),
+  /// Optional client-provided PK (UUID) for offline-first exercise creation
+  /// (see CreateWorkoutSchema.id).
+  id: z.string().uuid().optional(),
 })
 
 const AddSetSchema = z.object({
@@ -90,14 +101,41 @@ export async function workoutRoutes(app: FastifyInstance) {
   // POST /v1/workouts — creeaza draft
   app.post('/', { preHandler: authenticate }, async (request, reply) => {
     const { userId } = request.user
+    const parsed = CreateWorkoutSchema.safeParse(request.body ?? {})
+    const clientId = parsed.success ? parsed.data.id : undefined
 
-    const workout = await prisma.workout.create({
-      data: { userId, status: 'draft' },
-    })
-
-    await prisma.analyticsEvent.create({
-      data: { userId, eventName: 'workout_started' },
-    })
+    let workout
+    if (clientId) {
+      // Offline-first replay: the create may arrive more than once. Guard
+      // against a (astronomically unlikely) UUID collision with ANOTHER user's
+      // workout before upserting idempotently on the client-provided PK.
+      const existing = await prisma.workout.findUnique({ where: { id: clientId } })
+      if (existing && existing.userId !== userId) {
+        return reply.code(409).send({
+          error: 'ID_CONFLICT',
+          message: 'Workout id already in use',
+          requestId: request.id,
+        })
+      }
+      workout = await prisma.workout.upsert({
+        where: { id: clientId },
+        create: { id: clientId, userId, status: 'draft' },
+        update: {}, // idempotent — a replay must not mutate an in-progress workout
+      })
+      // Only emit the analytics event on first creation, not on replays.
+      if (!existing) {
+        await prisma.analyticsEvent.create({
+          data: { userId, eventName: 'workout_started' },
+        })
+      }
+    } else {
+      workout = await prisma.workout.create({
+        data: { userId, status: 'draft' },
+      })
+      await prisma.analyticsEvent.create({
+        data: { userId, eventName: 'workout_started' },
+      })
+    }
 
     return reply.code(201).send({ workout })
   })
@@ -255,6 +293,28 @@ export async function workoutRoutes(app: FastifyInstance) {
       })
     }
 
+    const clientExId = parsed.data.id
+    // Offline-first idempotent replay: if this exercise was already created
+    // (same client-provided PK), return it unchanged instead of duplicating.
+    if (clientExId) {
+      const existing = await prisma.workoutExercise.findUnique({
+        where: { id: clientExId },
+        include: { exercise: true },
+      })
+      if (existing) {
+        if (existing.workoutId !== workoutId) {
+          return reply.code(409).send({
+            error: 'ID_CONFLICT',
+            message: 'Exercise id already in use',
+            requestId: request.id,
+          })
+        }
+        return reply.code(201).send({
+          workoutExercise: await enrichWorkoutExerciseRow(existing as any),
+        })
+      }
+    }
+
     // Determina pozitia daca nu e specificata
     let position = parsed.data.position
     if (position === undefined) {
@@ -267,6 +327,7 @@ export async function workoutRoutes(app: FastifyInstance) {
 
     const workoutExercise = await prisma.workoutExercise.create({
       data: {
+        ...(clientExId ? { id: clientExId } : {}),
         workoutId,
         exerciseId: parsed.data.exerciseId,
         position,
