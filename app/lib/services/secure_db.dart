@@ -151,6 +151,39 @@ class SecureDb {
     }
   }
 
+  /// Wipe ALL local encrypted user data (progress photos, journal, health,
+  /// stories, rest intervals, tracking, report outbox) on logout / account
+  /// switch. These DBs are device-global with no per-user column, so without
+  /// this the NEXT account on the same device would see the previous user's
+  /// data — e.g. their progress photos. Closes open handles first so the files
+  /// aren't locked, then deletes each DB and its -journal/-wal/-shm sidecars.
+  Future<void> wipeUserData() async {
+    for (final db in _openDbs.values) {
+      try {
+        if (db.isOpen) await db.close();
+      } catch (e) {
+        debugPrint('[secure-db] close before wipe best-effort skip: $e');
+      }
+    }
+    _openDbs.clear();
+    try {
+      final base = await getDatabasesPath();
+      for (final name in kKnownDbNames) {
+        final path = p.join(base, name);
+        for (final suffix in const ['', '-journal', '-wal', '-shm']) {
+          try {
+            final f = File('$path$suffix');
+            if (await f.exists()) await f.delete();
+          } catch (e) {
+            debugPrint('[secure-db] wipe $name$suffix best-effort skip: $e');
+          }
+        }
+      }
+    } catch (e, st) {
+      _reportCrash(e, st, 'secure-db-wipe-user-data');
+    }
+  }
+
   /// Open `dbName` as an encrypted SQLCipher database. API-compatible with
   /// the plain `sqflite.openDatabase()` call — pass the same `version`,
   /// `onCreate`, and optional `onUpgrade` you had before.

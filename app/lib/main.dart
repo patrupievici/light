@@ -27,6 +27,7 @@ import 'theme/locale_notifier.dart';
 import 'services/app_data_cache.dart';
 import 'services/fcm_background.dart';
 import 'services/moderation_service.dart';
+import 'services/secure_db.dart';
 import 'services/health_service.dart';
 import 'services/location_service.dart';
 import 'services/offline_sync_coordinator.dart';
@@ -600,6 +601,18 @@ class _AuthGateState extends State<AuthGate> {
           try {
             await ModerationService.clearLocalCache();
           } catch (_) {}
+          // Wipe device-global encrypted stores (progress photos, journal,
+          // health, stories, tracking) so the new account can't see the
+          // previous user's data.
+          try {
+            await SecureDb.instance.wipeUserData();
+          } catch (_) {}
+          // Active-workout pointer + draft are global keys — clear them so the
+          // next account isn't prompted to resume the previous user's workout.
+          try {
+            await WorkoutService.clearActiveWorkoutPointer();
+            await WorkoutDraftStore().clear();
+          } catch (_) {}
           await _checkAuth();
         },
         onLogout: () async {
@@ -638,6 +651,18 @@ class _AuthGateState extends State<AuthGate> {
           } catch (_) {}
           try {
             await ModerationService.clearLocalCache();
+          } catch (_) {}
+          // Device-global encrypted stores (progress photos, journal, health,
+          // stories, tracking) — without this the next account on the device
+          // sees the previous user's private data.
+          try {
+            await SecureDb.instance.wipeUserData();
+          } catch (_) {}
+          // Active-workout pointer + draft are global keys — clear them so the
+          // next account isn't prompted to resume the previous user's workout.
+          try {
+            await WorkoutService.clearActiveWorkoutPointer();
+            await WorkoutDraftStore().clear();
           } catch (_) {}
         },
       );
