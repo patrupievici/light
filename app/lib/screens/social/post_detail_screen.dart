@@ -180,8 +180,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     try {
       final updated =
           await _service.editPost(widget.postId, caption: result.trim());
-      if (updated != null && mounted) {
+      if (mounted) {
         setState(() => _post = updated);
+      }
+    } on SocialFeedException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
       }
     } catch (e) {
       if (mounted) {

@@ -5,6 +5,7 @@ import '../../services/program_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/z/z_card.dart';
+import '../settings/settings_kit.dart';
 import 'workout_tracker_screen.dart';
 
 String _fmtKg(double v) {
@@ -115,6 +116,16 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
   Future<void> _skipSession() async {
     final program = _view?.program;
     if (program == null) return;
+    final ok = await settingsConfirm(
+      context,
+      title: 'Sari peste sesiune',
+      body:
+          'Sesiunea curentă va fi marcată ca sărită și programul avansează la '
+          'următoarea. Acțiunea nu poate fi anulată.',
+      confirmLabel: 'Sari peste',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
     try {
       await _service.advance(program.id);
       if (!mounted) return;
@@ -127,6 +138,16 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
   Future<void> _archive() async {
     final program = _view?.program;
     if (program == null) return;
+    final ok = await settingsConfirm(
+      context,
+      title: 'Arhivează programul',
+      body:
+          'Programul va fi arhivat și scos din antrenamentul activ. '
+          'Acțiunea nu poate fi anulată.',
+      confirmLabel: 'Arhivează',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
     try {
       await _service.archive(program.id);
       if (!mounted) return;

@@ -465,6 +465,10 @@ class _TrainingTabState extends State<_TrainingTab>
 
   // Photo Progress preview state — last two photos shown on the hub card.
   List<ProgressPhoto> _recentPhotos = const [];
+  // The very first ("Day 0") photo — the honest "Before" anchor, matching the
+  // compare screen. listPhotos(limit:2) only gives the 2nd-newest, which is not
+  // the first-ever photo once the user has 3+ shots.
+  ProgressPhoto? _firstPhoto;
 
   /// AI weekly coach read. Null while loading; stays null on failure so the
   /// card hides itself cleanly without breaking the layout.
@@ -595,7 +599,13 @@ class _TrainingTabState extends State<_TrainingTab>
   Future<void> _loadRecentPhotos() async {
     try {
       final list = await PhotoProgressService.instance.listPhotos(limit: 2);
-      if (mounted) setState(() => _recentPhotos = list);
+      final first = await PhotoProgressService.instance.firstPhoto();
+      if (mounted) {
+        setState(() {
+          _recentPhotos = list;
+          _firstPhoto = first;
+        });
+      }
     } catch (e, st) {
       reportError(e, st, reason: 'progress-hub:recent-photos');
       // Leave _recentPhotos as the previous list (empty on first load).
@@ -857,10 +867,14 @@ class _TrainingTabState extends State<_TrainingTab>
                       : Row(
                           children: [
                             Expanded(
-                              child: _recentPhotos.length >= 2
+                              // "Before" = the first-ever (Day 0) photo, honest
+                              // vs. the 2nd-newest. Only shown when it's distinct
+                              // from the latest (i.e. 2+ photos on file).
+                              child: (_recentPhotos.length >= 2 &&
+                                      _firstPhoto != null)
                                   ? _PhotoProgressCard.fromFile(
                                       label: 'Before',
-                                      file: _recentPhotos.last.file,
+                                      file: _firstPhoto!.file,
                                     )
                                   : const _PhotoProgressCard(label: 'Before'),
                             ),

@@ -624,6 +624,14 @@ class _AuthGateState extends State<AuthGate> {
           // can't make the first tap look like it did nothing (the "had to
           // tap Log out twice" bug). AuthService.logout() is fast now — the
           // server-side revoke is fire-and-forget inside it.
+          //
+          // Unregister the push token FIRST, while the JWT is still valid — once
+          // _auth.logout() wipes tokens, stopOnLogout() can't authenticate the
+          // DELETE /me/push-token and the device keeps getting the old account's
+          // DM pushes.
+          try {
+            await PushMessagingService.instance.stopOnLogout();
+          } catch (_) {}
           await _auth.logout();
           if (mounted) {
             setState(() {
@@ -636,9 +644,6 @@ class _AuthGateState extends State<AuthGate> {
           // each step guarded so one failure can't break the others.
           try {
             LocationService.instance.stopTracking();
-          } catch (_) {}
-          try {
-            await PushMessagingService.instance.stopOnLogout();
           } catch (_) {}
           try {
             await RetentionReminderService.instance.cancelAll();

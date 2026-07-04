@@ -272,14 +272,16 @@ int _parsePresetReps(String raw) {
   return int.tryParse(m?.group(1) ?? '') ?? 8;
 }
 
-int _estimateCardioKcal(String mode, int elapsedSec) {
+int _estimateCardioKcal(String mode, int elapsedSec, double? bodyweightKg) {
   if (elapsedSec < 10) return 0;
   final met = mode == 'bike'
       ? 6.0
       : mode == 'walk'
           ? 3.5
           : 9.0;
-  return (met * 70 * (elapsedSec / 3600)).round();
+  // Fall back to 70 kg only when the user's bodyweight is unknown.
+  final bw = (bodyweightKg != null && bodyweightKg > 0) ? bodyweightKg : 70.0;
+  return (met * bw * (elapsedSec / 3600)).round();
 }
 
 LocationSettings _cardioLocationSettings() => const LocationSettings(
@@ -847,6 +849,10 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
 
   List<_GymExercise> _displayExercises = [];
 
+  /// Cached bodyweight (kg) for cardio kcal estimates. Loaded from the `/me`
+  /// cache in [initState]; null until loaded / unknown → estimate falls back
+  /// to a 70 kg default.
+  double? _bodyweightKg;
 
   String get _cardioMode => widget.preset.id == 'bike'
       ? 'bike'
@@ -862,12 +868,29 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
       duration: const Duration(milliseconds: 600),
     );
     if (widget.preset.isCardio) {
+      _loadBodyweight();
       _initCardioLocation();
     } else {
       _displayExercises = List<_GymExercise>.from(widget.preset.exercises);
       _bootstrapGymWorkout();
     }
     _startCountdown();
+  }
+
+  /// Reads the user's canonical bodyweight from the cached `/me` payload so the
+  /// cardio kcal estimate uses their real mass instead of a fixed 70 kg.
+  Future<void> _loadBodyweight() async {
+    try {
+      final me = await AppDataCache.instance.loadMe();
+      final profile = me?['profile'] as Map<String, dynamic>?;
+      final bw = profile?['bodyweightKg'];
+      final v = bw is num ? bw.toDouble() : double.tryParse('${bw ?? ''}');
+      if (v != null && v > 0 && mounted) {
+        setState(() => _bodyweightKg = v);
+      }
+    } catch (_) {
+      // Best-effort — keep the 70 kg fallback on any cache/parse error.
+    }
   }
 
   void _syncSetValuesFromPreset() {
@@ -1615,7 +1638,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
 
   Widget _buildCardioLive() {
     final topPad = MediaQuery.paddingOf(context).top;
-    final kcal = _estimateCardioKcal(_cardioMode, _elapsedSeconds);
+    final kcal = _estimateCardioKcal(_cardioMode, _elapsedSeconds, _bodyweightKg);
     final avgKmh = _elapsedSeconds >= 5 && _routeTracker.meters >= 5
         ? (_routeTracker.meters / _elapsedSeconds) * 3.6
         : 0.0;
@@ -2007,7 +2030,11 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
           color: ZveltTokens.bg2,
           child: FractionallySizedBox(
             alignment: Alignment.centerLeft,
-            widthFactor: ((_currentExIdx * 10 + _currentSet + 1) /
+            widthFactor: ((exercises
+                            .take(_currentExIdx)
+                            .fold(0, (s, e) => s + e.sets) +
+                        _currentSet +
+                        1) /
                     (exercises.fold(0, (s, e) => s + e.sets)))
                 .clamp(0.0, 1.0),
             child: Container(

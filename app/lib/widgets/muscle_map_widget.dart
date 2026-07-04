@@ -37,11 +37,11 @@ class _MuscleMapWidgetState extends State<MuscleMapWidget> {
   int _pageIndex = 0;
   late final VoidCallback _onCacheRevision;
 
-  // Colors — V2 light: subtle surface for untrained, strain amber for recovering, brand orange for ready.
-  // Hex strings mirror ZveltTokens (SVG fills take string colors): surface3 / strain / brand.
-  static const _colorUntrained  = '#E6E8E4'; // ZveltTokens.surface3
-  static const _colorRecovering = '#FFB86B'; // ZveltTokens.strain
-  static const _colorReady      = '#FF7A2F'; // ZveltTokens.brand
+  // SVG fills take string colors, so we derive `#RRGGBB` from ZveltTokens at
+  // render time (NOT const) — surface3 is isDark-aware, so dark mode gets the
+  // correct untrained fill instead of a baked-in light-palette hex.
+  static String _hex(Color c) =>
+      '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
   @override
   void initState() {
@@ -78,12 +78,15 @@ class _MuscleMapWidgetState extends State<MuscleMapWidget> {
   }
 
   Map<String, String> _buildColors() {
+    final colorUntrained = _hex(ZveltTokens.surface3);
+    final colorRecovering = _hex(ZveltTokens.strain);
+    final colorReady = _hex(ZveltTokens.brand);
     final m = <String, String>{};
     for (final e in _muscles.entries) {
       switch (e.value.state) {
-        case MuscleState.untrained:   m[e.key] = _colorUntrained;  break;
-        case MuscleState.recovering:  m[e.key] = _colorRecovering; break;
-        case MuscleState.ready:       m[e.key] = _colorReady;      break;
+        case MuscleState.untrained:   m[e.key] = colorUntrained;  break;
+        case MuscleState.recovering:  m[e.key] = colorRecovering; break;
+        case MuscleState.ready:       m[e.key] = colorReady;      break;
       }
     }
     return m;
@@ -274,14 +277,14 @@ class _MuscleMapWidgetState extends State<MuscleMapWidget> {
 
             // Legend
             const SizedBox(height: 12),
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _LegendDot(color: _colorRecovering, label: 'Recovering'),
-                SizedBox(width: 16),
-                _LegendDot(color: _colorReady,      label: 'Ready'),
-                SizedBox(width: 16),
-                _LegendDot(color: _colorUntrained,  label: 'Not trained', border: true),
+                _LegendDot(color: _hex(ZveltTokens.strain), label: 'Recovering'),
+                const SizedBox(width: 16),
+                _LegendDot(color: _hex(ZveltTokens.brand),  label: 'Ready'),
+                const SizedBox(width: 16),
+                _LegendDot(color: _hex(ZveltTokens.surface3), label: 'Not trained', border: true),
               ],
             ),
           ],

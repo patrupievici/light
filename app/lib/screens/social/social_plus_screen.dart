@@ -737,16 +737,25 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   Future<void> _joinAndOpenRace(SocialChallenge c) async {
     if (_joiningRace || _openingRaceHub) return;
     _joiningRace = true;
+    // joinChallenge() treats 200 (already joined) and 201 (joined) as success,
+    // so a thrown error is a REAL failure (network / non-2xx). In that case we
+    // must NOT open the hub as if the user had joined — surface the error.
+    bool joined = false;
     try {
       await _challengeService.joinChallenge(c.id);
+      joined = true;
     } catch (e, st) {
-      // Already-joined / network failures are non-fatal — we still open the
-      // hub so the user lands somewhere actionable.
       reportError(e, st, reason: 'social-plus:join-from-hero');
     } finally {
       _joiningRace = false;
     }
     if (!mounted) return;
+    if (!joined) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't join the race. Check your connection and try again.")),
+      );
+      return;
+    }
     await _openRaceHub(initialChallengeId: c.id);
   }
 

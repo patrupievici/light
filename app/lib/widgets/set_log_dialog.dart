@@ -95,14 +95,14 @@ class _SetLogDialogState extends State<SetLogDialog> {
                   const Text('Weight (kg) '),
                   Expanded(
                     child: Slider(
-                      value: _weightKg.clamp(0, 300),
+                      value: _weightKg.clamp(0, kSetWeightMaxKg),
                       min: 0,
-                      max: 300,
-                      divisions: 300,
+                      max: kSetWeightMaxKg,
+                      divisions: kSetWeightMaxKg.round(),
                       onChanged: (v) => setState(() => _weightKg = v),
                     ),
                   ),
-                  Text(_weightKg.clamp(0, 300).toStringAsFixed(0)),
+                  Text(_weightKg.clamp(0, kSetWeightMaxKg).toStringAsFixed(0)),
                 ],
               ),
               Align(

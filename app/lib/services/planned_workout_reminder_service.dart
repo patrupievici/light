@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -41,15 +43,20 @@ class PlannedWorkoutReminderService {
     return _baseId + (hash % 900000);
   }
 
-  tz.TZDateTime _scheduleTime(String dayYmd) {
+  /// The 09:00 local reminder time for [dayYmd], or `null` when the date is
+  /// unparseable or already in the past. Returning null makes the caller SKIP
+  /// scheduling — clamping a past date to now+2min would fire a stale reminder
+  /// for a day that has already gone by.
+  tz.TZDateTime? _scheduleTime(String dayYmd) {
     final parts = dayYmd.split('-');
-    if (parts.length != 3) return tz.TZDateTime.now(tz.local).add(const Duration(minutes: 2));
-    final y = int.tryParse(parts[0]) ?? 2099;
-    final m = int.tryParse(parts[1]) ?? 1;
-    final d = int.tryParse(parts[2]) ?? 1;
-    var at = tz.TZDateTime(tz.local, y, m, d, 9, 0);
+    if (parts.length != 3) return null;
+    final y = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    final d = int.tryParse(parts[2]);
+    if (y == null || m == null || d == null) return null;
+    final at = tz.TZDateTime(tz.local, y, m, d, 9, 0);
     final now = tz.TZDateTime.now(tz.local);
-    if (!at.isAfter(now)) at = now.add(const Duration(minutes: 2));
+    if (!at.isAfter(now)) return null;
     return at;
   }
 
@@ -72,18 +79,23 @@ class PlannedWorkoutReminderService {
 
     for (final e in entries) {
       final id = _notificationIdFor(e.id);
-      if (e.completed) {
+      final when = _scheduleTime(e.dayYmd);
+      if (e.completed || when == null) {
+        // Completed, in the past, or an unparseable date — never schedule, and
+        // clear any previously-scheduled reminder for this plan.
         await _plugin.cancel(id: id);
         continue;
       }
       await _plugin.zonedSchedule(
         id: id,
-        scheduledDate: _scheduleTime(e.dayYmd),
+        scheduledDate: when,
         notificationDetails: details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         title: 'Zvelt plan',
         body: 'Today: ${e.title}. Get ready.',
-        payload: e.id,
+        // JSON payload so the tap handler (navigateFromPushData) can jsonDecode
+        // it instead of throwing on a bare planId string.
+        payload: jsonEncode({'type': 'planned_workout', 'planId': e.id}),
       );
     }
   }

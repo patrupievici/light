@@ -72,6 +72,13 @@ class _DiaryTotals {
 String _mealEntrySubtitle(MealEntry entry) {
   final sg = entry.food.servingGrams;
   final macros = 'P${entry.protein.round()} C${entry.carbs.round()} F${entry.fat.round()}';
+  // Quick-adds (`quick:…`) and applied recipes (`recipe:…`) are scaffolded as a
+  // synthetic 100g "food" — the real gram weight is unknown, so rendering
+  // '100g' would be a fabrication. Surface the calories instead.
+  final id = entry.food.id;
+  if (id.startsWith('quick:') || id.startsWith('recipe:')) {
+    return '${entry.calories.round()} kcal · $macros';
+  }
   if (sg != null && sg > 0) {
     final n = entry.grams / sg;
     if (n > 0) {
@@ -81,6 +88,17 @@ String _mealEntrySubtitle(MealEntry entry) {
     }
   }
   return '${entry.grams.round()}g · $macros';
+}
+
+/// Picks a sensible default meal for the main "Add food" CTA based on the
+/// current time of day, so a dinner logged in the evening doesn't land in
+/// Breakfast. Buckets: <11 breakfast, <16 lunch, <21 dinner, else snack.
+String _defaultMealForNow([DateTime? now]) {
+  final hour = (now ?? DateTime.now()).hour;
+  if (hour < 11) return 'breakfast';
+  if (hour < 16) return 'lunch';
+  if (hour < 21) return 'dinner';
+  return 'snack';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -936,7 +954,7 @@ class _NutritionTabState extends State<NutritionTab> {
       label: 'Add food',
       excludeSemantics: true,
       child: GestureDetector(
-        onTap: () => _showAddFood('breakfast'),
+        onTap: () => _showAddFood(_defaultMealForNow()),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: ZveltTokens.s4, horizontal: ZveltTokens.s6),

@@ -11,6 +11,7 @@ import '../../services/friends_service.dart';
 import '../../services/messages_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/zvelt_empty_state.dart';
+import '../../widgets/zvelt_error_state.dart';
 import '../social/direct_chat_screen.dart';
 import '../social/friends_screen.dart';
 
@@ -42,6 +43,11 @@ class _CircleScreenState extends State<CircleScreen> {
   // no data" so the row can show a dim "—" instead of spinning forever.
   final Set<String> _streakResolved = {};
   bool _loadingFriends = true;
+  // True when the friend-list load actually failed (vs. an empty friend list).
+  // Drives an error+retry surface instead of the misleading "Add friends"
+  // empty state, which would hide a real load failure from a user who has
+  // friends.
+  bool _error = false;
 
   @override
   void initState() {
@@ -50,6 +56,12 @@ class _CircleScreenState extends State<CircleScreen> {
   }
 
   Future<void> _loadFriends() async {
+    if (mounted) {
+      setState(() {
+        _loadingFriends = true;
+        _error = false;
+      });
+    }
     try {
       final friends = await _friendsService.listFriends();
       if (!mounted) return;
@@ -64,7 +76,10 @@ class _CircleScreenState extends State<CircleScreen> {
     } catch (e, st) {
       reportError(e, st, reason: 'circle:load-friends');
       if (!mounted) return;
-      setState(() => _loadingFriends = false);
+      setState(() {
+        _loadingFriends = false;
+        _error = true;
+      });
     }
   }
 
@@ -212,14 +227,21 @@ class _CircleScreenState extends State<CircleScreen> {
                       padding: EdgeInsets.symmetric(vertical: 24),
                       child: Center(child: CircularProgressIndicator(color: ZveltTokens.brand, strokeWidth: 2)),
                     )
-                  else ...[
+                  else if (_error) ...[
+                    const SizedBox(height: 22),
+                    ZveltErrorState(
+                      tier: ZveltErrorTier.network,
+                      title: "Couldn't load your circle",
+                      onRetry: _loadFriends,
+                    ),
+                  ] else ...[
                   const SizedBox(height: 22),
                   if (_topStreaks.isNotEmpty) _buildTopStreaks(),
                   const SizedBox(height: 22),
                   _buildRecentlyActive(),
-                  ],
                   const SizedBox(height: 22),
                   _buildFindMoreCta(),
+                  ],
                   const SizedBox(height: 8),
                 ],
               ),

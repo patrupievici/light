@@ -339,8 +339,12 @@ class _SocialFeedPostCardState extends State<SocialFeedPostCard> {
     try {
       final updated =
           await widget.service.editPost(postId, caption: result.trim());
-      if (updated != null && mounted) {
+      if (mounted) {
         widget.onEdit?.call(updated);
+      }
+    } on SocialFeedException catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (e) {
       if (mounted) {

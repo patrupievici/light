@@ -108,24 +108,35 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
         limit: _pageLimit,
       );
       if (!mounted) return;
-      final list = page.items;
-      // Cheap identity check: only rebuild if the count or last id changed.
-      final changed = list.length != _msgs.length ||
-          (list.isNotEmpty &&
-              _msgs.isNotEmpty &&
-              list.last.id != _msgs.last.id);
-      if (!changed) return;
+      // Append-only: keep every already-loaded page (and the user's scroll
+      // position) intact. We only add messages we don't already hold, deduped
+      // by id — replacing _msgs with the newest page would discard older
+      // history the user scrolled up to read and yank them to the bottom.
+      final existing = _msgs.map((m) => m.id).toSet();
+      final incoming =
+          page.items.where((m) => !existing.contains(m.id)).toList();
+      if (incoming.isEmpty) return;
+      // Only auto-scroll if the user is already reading the latest messages;
+      // otherwise leave them where they are while new messages append below.
+      final wasNearBottom = _isNearBottom();
       setState(() {
-        _msgs = list;
-        // Re-anchor pagination state — a silent reload always replaces the
-        // currently-visible window with the freshest page.
-        _oldestCursor = page.nextCursor ?? (list.isNotEmpty ? list.first.id : null);
-        _hasMoreEarlier = page.nextCursor != null || list.length >= _pageLimit;
+        _msgs = [..._msgs, ...incoming];
       });
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToEnd());
+      if (wasNearBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToEnd());
+      }
     } catch (e, st) {
       reportError(e, st, reason: 'dm-chat:silent-reload');
     }
+  }
+
+  /// True when the list is scrolled close enough to the newest message that a
+  /// fresh incoming message should auto-scroll into view. Also true before the
+  /// list has been laid out (initial paint scrolls to the end anyway).
+  bool _isNearBottom() {
+    if (!_scroll.hasClients) return true;
+    final pos = _scroll.position;
+    return (pos.maxScrollExtent - pos.pixels) < 120;
   }
 
   Future<void> _bootstrap() async {

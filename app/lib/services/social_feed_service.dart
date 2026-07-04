@@ -501,8 +501,12 @@ class SocialFeedService {
     }
   }
 
-  /// PATCH /v1/posts/:id — returnează post actualizat sau null la eroare.
-  Future<SocialFeedPost?> editPost(String postId, {String? caption, String? visibility}) async {
+  /// PATCH /v1/posts/:id — returnează postul actualizat.
+  ///
+  /// Aruncă [SocialFeedException] cu mesajul serverului la eroare (ex. 429
+  /// `EDIT_LIMIT` — max 3 editări/24h), pentru ca UI-ul să poată afișa un
+  /// SnackBar în loc să închidă dialogul fără feedback.
+  Future<SocialFeedPost> editPost(String postId, {String? caption, String? visibility}) async {
     final headers = await _headers();
     final body = <String, dynamic>{};
     if (caption != null) body['caption'] = caption;
@@ -514,15 +518,30 @@ class SocialFeedService {
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 22));
-    if (res.statusCode != 200) return null;
+    if (res.statusCode != 200) {
+      throw SocialFeedException(
+        _decodeErrMessage(
+          res.body,
+          tag: 'editPost',
+          fallback: 'Could not edit post (${res.statusCode})',
+        ),
+        statusCode: res.statusCode,
+      );
+    }
     try {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final raw = data['data'] as Map<String, dynamic>?;
-      if (raw == null) return null;
+      if (raw == null) {
+        throw SocialFeedException('Malformed edit response',
+            statusCode: res.statusCode);
+      }
       return SocialFeedPost.fromJson(raw);
+    } on SocialFeedException {
+      rethrow;
     } catch (e, st) {
       reportError(e, st, reason: 'feed:edit-post-decode');
-      return null;
+      throw SocialFeedException('Could not parse edited post: $e',
+          statusCode: res.statusCode);
     }
   }
 
