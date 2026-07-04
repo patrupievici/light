@@ -257,10 +257,9 @@ export async function messagesRoutes(app: FastifyInstance) {
       data: { updatedAt: new Date() },
     })
 
-    const peerId = peerIdFromConversation(conv, me)
     const preview = body.length > 120 ? `${body.slice(0, 117)}...` : body
     await createNotificationSafe({
-      recipientId: peerId,
+      recipientId: peer,
       actorId: me,
       type: 'dm_message',
       payload: { conversationId: id, bodyPreview: preview },

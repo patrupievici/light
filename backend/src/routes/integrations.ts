@@ -125,7 +125,6 @@ async function createTerraAuthUrl({
 function terraProviderToZvelt(provider: unknown) {
   const normalized = String(provider ?? '').toLowerCase()
   if (normalized === 'zepp') return 'amazfit'
-  if (normalized === 'huawei') return 'huawei'
   if (normalized in providerMetadata) return normalized
   return normalized || 'unknown'
 }

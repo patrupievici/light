@@ -258,31 +258,24 @@ export async function statsRoutes(app: FastifyInstance) {
       }),
     ])
 
-    const strengthRanks = ranks.filter((r) => r.exercise.category === 'strength')
-    const strengthScore =
-      strengthRanks.length > 0
+    // Strength and agility are the same aggregate (mean LP / 3, clamped to 100)
+    // over the ranks of a single exercise category; only the category differs.
+    const categoryScore = (cat: string) => {
+      const catRanks = ranks.filter((r) => r.exercise.category === cat)
+      return catRanks.length > 0
         ? Math.min(
             100,
             Math.round(
-              strengthRanks.reduce((sum, r) => sum + r.lpTotal, 0) /
-                strengthRanks.length /
+              catRanks.reduce((sum, r) => sum + r.lpTotal, 0) /
+                catRanks.length /
                 3
             )
           )
         : 0
+    }
 
-    const explosiveRanks = ranks.filter((r) => r.exercise.category === 'explosive')
-    const agilityScore =
-      explosiveRanks.length > 0
-        ? Math.min(
-            100,
-            Math.round(
-              explosiveRanks.reduce((sum, r) => sum + r.lpTotal, 0) /
-                explosiveRanks.length /
-                3
-            )
-          )
-        : 0
+    const strengthScore = categoryScore('strength')
+    const agilityScore = categoryScore('explosive')
 
     const last30Days = workouts.filter((w) => {
       const diff = Date.now() - new Date(w.startedAt).getTime()

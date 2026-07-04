@@ -1,7 +1,9 @@
-import { FastifyInstance } from 'fastify'
+import { FastifyInstance, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
+import { ymdFromUtcWithOffset } from '../lib/day-key'
+import { accessibleExerciseWhere } from './exercises'
 import { computeRanks } from '../services/ranking.service'
 import { recomputeCompletingUserChallenges } from '../services/challenge-recalc.service'
 import { evaluateWeightJump } from '../services/anti-cheat.service'
@@ -89,15 +91,28 @@ const CompleteSetSchema = z.object({
   setId: z.string().uuid(),
 })
 
-export async function workoutRoutes(app: FastifyInstance) {
-  const ymdLocal = (d: Date, tzOffsetMin?: number) => {
-    if (tzOffsetMin != null) {
-      const x = new Date(d.getTime() + tzOffsetMin * 60 * 1000)
-      return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}-${String(x.getUTCDate()).padStart(2, '0')}`
-    }
-    // Fallback: use UTC (no timezone info provided)
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+// Completed workouts are immutable — a post-completion mutation (add/edit/delete
+// exercise or set) would drift XP/ranks/standings already fixed at /complete.
+// Sends the shared 409 and returns true when `status` is present and not a
+// draft; the handler returns immediately. Centralizes the guard the add-exercise
+// / add-set / PATCH-set / DELETE-set handlers all shared.
+function completedGuardResponse(
+  status: string | null | undefined,
+  reply: FastifyReply,
+  requestId: string,
+): boolean {
+  if (status != null && status !== 'draft') {
+    reply.code(409).send({
+      error: 'WORKOUT_COMPLETED',
+      message: 'Workout already completed',
+      requestId,
+    })
+    return true
   }
+  return false
+}
+
+export async function workoutRoutes(app: FastifyInstance) {
   // POST /v1/workouts — creeaza draft
   app.post('/', { preHandler: authenticate }, async (request, reply) => {
     const { userId } = request.user
@@ -286,13 +301,7 @@ export async function workoutRoutes(app: FastifyInstance) {
     // Completed workouts are immutable — adding an exercise post-completion would
     // drift XP/ranks/standings already fixed at /complete. Same guard the
     // PATCH/DELETE-set handlers use. Reject anything but a draft.
-    if (workout.status !== 'draft') {
-      return reply.code(409).send({
-        error: 'WORKOUT_COMPLETED',
-        message: 'Workout already completed',
-        requestId: request.id,
-      })
-    }
+    if (completedGuardResponse(workout.status, reply, request.id)) return
 
     const parsed = AddExerciseSchema.safeParse(request.body)
     if (!parsed.success) {
@@ -333,7 +342,7 @@ export async function workoutRoutes(app: FastifyInstance) {
     const exercise = await prisma.exercise.findFirst({
       where: {
         id: parsed.data.exerciseId,
-        OR: [{ isCustom: false }, { createdByUserId: userId }],
+        ...accessibleExerciseWhere(userId),
       },
       select: { id: true },
     })
@@ -395,13 +404,7 @@ export async function workoutRoutes(app: FastifyInstance) {
       where: { id: workoutId, userId },
       select: { status: true },
     })
-    if (parentWorkout && parentWorkout.status !== 'draft') {
-      return reply.code(409).send({
-        error: 'WORKOUT_COMPLETED',
-        message: 'Workout already completed',
-        requestId: request.id,
-      })
-    }
+    if (completedGuardResponse(parentWorkout?.status, reply, request.id)) return
 
     const parsed = AddSetSchema.safeParse(request.body)
     if (!parsed.success) {
@@ -528,13 +531,7 @@ export async function workoutRoutes(app: FastifyInstance) {
       where: { id: workoutId, userId },
       select: { status: true },
     })
-    if (parentWorkout && parentWorkout.status !== 'draft') {
-      return reply.code(409).send({
-        error: 'WORKOUT_COMPLETED',
-        message: 'Workout already completed',
-        requestId: request.id,
-      })
-    }
+    if (completedGuardResponse(parentWorkout?.status, reply, request.id)) return
 
     const parsed = UpdateSetSchema.safeParse(request.body)
     if (!parsed.success) {
@@ -646,13 +643,7 @@ export async function workoutRoutes(app: FastifyInstance) {
       where: { id: workoutId, userId },
       select: { status: true },
     })
-    if (parentWorkout && parentWorkout.status !== 'draft') {
-      return reply.code(409).send({
-        error: 'WORKOUT_COMPLETED',
-        message: 'Workout already completed',
-        requestId: request.id,
-      })
-    }
+    if (completedGuardResponse(parentWorkout?.status, reply, request.id)) return
 
     await prisma.workoutSet.delete({ where: { id: setId } })
     return reply.code(204).send()
@@ -936,7 +927,7 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
     await prisma.plannedWorkout.updateMany({
       where: {
         userId,
-        day: ymdLocal(updated.startedAt, tzOffsetMin),
+        day: ymdFromUtcWithOffset(updated.startedAt, tzOffsetMin),
         kind: 'gym',
         status: 'pending',
       },

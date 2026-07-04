@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { generateAndPersistWeeklyPlan, WeeklyPlanError } from '../services/weekly-plan.service'
+import { ymdFromUtcWithOffset } from '../lib/day-key'
 
 const GenerateWeeklySchema = z.object({
   tzOffset: z.number().int().min(-840).max(840).optional().default(0),
@@ -12,14 +13,6 @@ const GenerateWeeklySchema = z.object({
 const UpdateStatusSchema = z.object({
   status: z.enum(['pending', 'completed']),
 })
-
-function ymdFromUtcWithOffset(d: Date, offsetMin: number): string {
-  const x = new Date(d.getTime() + offsetMin * 60 * 1000)
-  const y = x.getUTCFullYear()
-  const m = String(x.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(x.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 function dateFromYmdUtc(ymd: string): Date {
   const [y, m, d] = ymd.split('-').map(Number)

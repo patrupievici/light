@@ -37,6 +37,23 @@ function consecutiveDayRun(dayKeys: string[]): number {
   return streak
 }
 
+/** Shared streak core for a non-empty, desc-ordered post list. Streak resets to
+ *  1 once the last post is past the break window, otherwise it's the
+ *  consecutive-day run from the most recent post. */
+function computeStreak(posts: { createdAt: Date }[]): {
+  currentStreak: number
+  daysUntilBreak: number
+  gapSinceLast: number
+} {
+  const dayKeys = distinctPostDaysDesc(posts)
+  const nowKey = utcDayKey(new Date())
+  const gapSinceLast = dayKeyGap(nowKey, dayKeys[0])
+  const daysUntilBreak = Math.max(0, STREAK_BREAK_GAP_DAYS - gapSinceLast)
+  const currentStreak =
+    gapSinceLast < STREAK_BREAK_GAP_DAYS ? consecutiveDayRun(dayKeys) : 1
+  return { currentStreak, daysUntilBreak, gapSinceLast }
+}
+
 export async function updateStreak(userId: string): Promise<{
   currentStreak: number
   isAtRisk: boolean
@@ -51,21 +68,14 @@ export async function updateStreak(userId: string): Promise<{
     return { currentStreak: 1, isAtRisk: false }
   }
 
-  const dayKeys = distinctPostDaysDesc(posts)
-  const nowKey = utcDayKey(new Date())
-  const gapSinceLast = dayKeyGap(nowKey, dayKeys[0])
+  const { currentStreak, daysUntilBreak, gapSinceLast } = computeStreak(posts)
 
   if (gapSinceLast >= STREAK_BREAK_GAP_DAYS) {
     // Streak broken — this post starts a fresh one.
     return { currentStreak: 1, isAtRisk: false }
   }
 
-  const streak = consecutiveDayRun(dayKeys)
-
-  const daysUntilBreak = STREAK_BREAK_GAP_DAYS - gapSinceLast
-  const isAtRisk = daysUntilBreak <= 1
-
-  return { currentStreak: streak, isAtRisk }
+  return { currentStreak, isAtRisk: daysUntilBreak <= 1 }
 }
 
 export async function getStreakStatus(userId: string): Promise<{
@@ -83,16 +93,7 @@ export async function getStreakStatus(userId: string): Promise<{
     return { currentStreak: 0, daysUntilBreak: 0, isAtRisk: false }
   }
 
-  const dayKeys = distinctPostDaysDesc(posts)
-  const nowKey = utcDayKey(new Date())
-  const gapSinceLast = dayKeyGap(nowKey, dayKeys[0])
-  const daysUntilBreak = Math.max(0, STREAK_BREAK_GAP_DAYS - gapSinceLast)
-
-  // Mirror updateStreak: streak resets to 1 once the last post is past the break window.
-  let currentStreak = 1
-  if (gapSinceLast < STREAK_BREAK_GAP_DAYS) {
-    currentStreak = consecutiveDayRun(dayKeys)
-  }
+  const { currentStreak, daysUntilBreak } = computeStreak(posts)
 
   return {
     currentStreak,

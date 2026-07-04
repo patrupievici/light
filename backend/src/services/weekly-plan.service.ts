@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify'
-import { Prisma, type UserProfile, type UserTrainingProfile } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 import { prisma } from '../lib/prisma'
 import { normalizeEquipmentTagsForAi } from '../lib/equipment-for-ai'
@@ -229,9 +229,7 @@ For THIS endpoint, ALL human-readable strings in the JSON MUST be English only (
   // — not weekStart — so deleting by weekStart left stale rows that made the
   // create() below throw P2002. The per-day upsert further down overwrites the
   // 7 days idempotently. Only the pending planned workouts are cleared.
-  await prisma.$transaction([
-    prisma.plannedWorkout.deleteMany({ where: { userId, weekStart: weekStartStr, status: 'pending' } }),
-  ])
+  await prisma.plannedWorkout.deleteMany({ where: { userId, weekStart: weekStartStr, status: 'pending' } })
 
   const level: ProgressionLevel =
     (trainingProfile.trainingLevel as ProgressionLevel | null) === 'advanced'
@@ -682,6 +680,3 @@ Rules:
 - Return EXACTLY 7 days (some can be rest days)
 - **Language:** all exercise names, workout titles, focuses, suggestions, notes and every string inside "notes" MUST be **English only** (no Romanian).`
 }
-
-// Unused but kept so the type imports above stay live for editor goto-def.
-export type _types = UserProfile | UserTrainingProfile

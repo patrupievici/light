@@ -29,10 +29,7 @@ export async function pushRoutes(app: FastifyInstance) {
     // drop that stale row first so the upsert re-creates it owned by the caller
     // (this device now owns the token) without silently rerouting the other
     // user's notifications through an update.
-    const existing = await prisma.userPushToken.findUnique({ where: { token } })
-    if (existing && existing.userId !== userId) {
-      await prisma.userPushToken.delete({ where: { token } })
-    }
+    await prisma.userPushToken.deleteMany({ where: { token, NOT: { userId } } })
 
     await prisma.userPushToken.upsert({
       where: { token },

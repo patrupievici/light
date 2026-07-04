@@ -128,7 +128,6 @@ export async function runGoalAwarePushBatch(log: FastifyBaseLogger): Promise<{
       pushTokens: { some: {} },
       plannedWorkouts: {
         some: {
-          day: { contains: '' }, // narrowed below by joined query
           status: 'pending',
           kind: 'gym',
         },

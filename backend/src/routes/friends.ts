@@ -280,10 +280,7 @@ export async function friendRoutes(app: FastifyInstance) {
   // GET /v1/friends/streaks — streak curent al fiecărui prieten acceptat
   app.get('/streaks', { preHandler: authenticate }, async (request, reply) => {
     const { userId: me } = request.user
-    const rows = await prisma.friendship.findMany({
-      where: { status: 'accepted', OR: [{ userId: me }, { friendUserId: me }] },
-    })
-    const friendIds = rows.map((r) => (r.userId === me ? r.friendUserId : r.userId))
+    const friendIds = await acceptedFriendIds(me)
     if (friendIds.length === 0) return reply.send({ data: [] })
 
     const hints = await getUserDisplayHints(friendIds)
@@ -355,10 +352,7 @@ export async function friendRoutes(app: FastifyInstance) {
   // GET /v1/friends/activity — câți prieteni au antrenat azi (UTC)
   app.get('/activity', { preHandler: authenticate }, async (request, reply) => {
     const { userId: me } = request.user
-    const rows = await prisma.friendship.findMany({
-      where: { status: 'accepted', OR: [{ userId: me }, { friendUserId: me }] },
-    })
-    const friendIds = rows.map((r) => (r.userId === me ? r.friendUserId : r.userId))
+    const friendIds = await acceptedFriendIds(me)
     if (friendIds.length === 0) return reply.send({ data: { todayCount: 0 } })
 
     const todayStart = new Date()

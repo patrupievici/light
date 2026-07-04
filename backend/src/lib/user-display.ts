@@ -45,13 +45,6 @@ export async function getUserDisplayHints(userIds: string[]): Promise<Map<string
     return !hasName
   })
 
-  if (needEmail.length === 0) {
-    for (const id of unique) {
-      if (!out.has(id)) out.set(id, { username: null, displayName: null, emailHint: null })
-    }
-    return out
-  }
-
   const identities = await prisma.authIdentity.findMany({
     where: {
       userId: { in: needEmail },

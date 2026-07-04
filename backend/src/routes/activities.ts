@@ -14,15 +14,7 @@ import {
   MAX_IMPORT_POINTS,
 } from '../lib/activity-file-import'
 import { buildActivityFeed } from '../lib/activity-normalize'
-
-/** Data civilă (YYYY-MM-DD) în offset-ul clientului (minute față de UTC). */
-function ymdFromUtcWithOffset(d: Date, offsetMin: number): string {
-  const x = new Date(d.getTime() + offsetMin * 60 * 1000)
-  const y = x.getUTCFullYear()
-  const m = String(x.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(x.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+import { ymdFromUtcWithOffset } from '../lib/day-key'
 
 const CalendarQuery = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/),
@@ -1158,10 +1150,17 @@ export async function activitiesRoutes(app: FastifyInstance) {
         nutrition?: { calories: number; proteinG: number; carbsG: number; fatG: number; goal: string }
       }
     > = {}
+    // Lazily create a day's bucket in the canonical shape (nutrition is added
+    // later only when present; an absent `nutrition` serializes the same as
+    // `nutrition: undefined`).
+    const ensureDay = (key: string) => {
+      if (!days[key]) days[key] = { types: [], workoutIds: [], planned: [] }
+      return days[key]
+    }
     for (const w of workouts) {
       const key = ymdFromUtcWithOffset(w.startedAt, tzOffset)
       if (!key.startsWith(month)) continue
-      if (!days[key]) days[key] = { types: [], workoutIds: [], planned: [] }
+      ensureDay(key)
       if (!days[key].types.includes('gym')) days[key].types.push('gym')
       days[key].workoutIds.push(w.id)
     }
@@ -1174,7 +1173,7 @@ export async function activitiesRoutes(app: FastifyInstance) {
       orderBy: [{ day: 'asc' }, { createdAt: 'asc' }],
     })
     for (const p of planned) {
-      if (!days[p.day]) days[p.day] = { types: [], workoutIds: [], planned: [], nutrition: undefined }
+      ensureDay(p.day)
       if (!days[p.day].types.includes(p.kind)) days[p.day].types.push(p.kind)
       days[p.day].planned.push({
         id: p.id,
@@ -1193,7 +1192,7 @@ export async function activitiesRoutes(app: FastifyInstance) {
       orderBy: { day: 'asc' },
     })
     for (const nd of nutritionDays) {
-      if (!days[nd.day]) days[nd.day] = { types: [], workoutIds: [], planned: [], nutrition: undefined }
+      ensureDay(nd.day)
       days[nd.day].nutrition = {
         calories: nd.calories,
         proteinG: nd.proteinG,

@@ -6,37 +6,8 @@ import {
   likedPostIdsFor,
   bookmarkedPostIdsFor,
   redactHiddenSets,
+  canViewerSeePost,
 } from './posts'
-import { areFriends, isBlockedEitherWay } from '../lib/friendships'
-import { canViewerSeePostPure } from '../lib/post-visibility'
-
-/**
- * Read-time visibility gate, identical to `canViewerSeePost` in posts.ts (block
- * check → showActivityFeed overlay → the pure, unit-tested visibility rule).
- * A post saved while public/friends may since have been made private, or the
- * author may have unfriended/blocked the viewer — so a bookmark row alone must
- * not re-expose content. Defers the actual decision to the shared pure helper.
- */
-async function canViewerSeePost(
-  viewerId: string,
-  post: { userId: string; visibility: string },
-): Promise<boolean> {
-  if (post.userId === viewerId) return true
-  if (await isBlockedEitherWay(viewerId, post.userId)) return false
-  const sharing = await prisma.userProfile.findUnique({
-    where: { userId: post.userId },
-    select: { showActivityFeed: true },
-  })
-  if (sharing?.showActivityFeed === false) return false
-  const needsFriendCheck = post.visibility !== 'public' && post.visibility !== 'private'
-  const friends = needsFriendCheck ? await areFriends(viewerId, post.userId) : false
-  return canViewerSeePostPure({
-    viewerId,
-    ownerId: post.userId,
-    visibility: post.visibility,
-    areFriends: friends,
-  })
-}
 
 /**
  * Bookmarks list. Registered at prefix `/v1/me`, so this serves

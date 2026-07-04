@@ -74,6 +74,39 @@ async function prBaseline(userId: string, exerciseId: string, startAt: Date): Pr
   return best
 }
 
+/** Score one participant over the challenge window: load their workouts, keep
+ *  only the ones after they accepted, validate against the rules, and run the
+ *  scoring engine (with a PR baseline for pr_battle). Shared by the full-roster
+ *  recompute and the single-participant fast path. */
+async function scoreParticipant(params: {
+  userId: string
+  acceptedAt: Date
+  type: ChallengeScoringType
+  rules: ChallengeRules
+  startAt: Date
+  endAt: Date
+  exerciseId: string | null
+  targetDays: number | null
+}): Promise<ReturnType<typeof computeScore>> {
+  const { userId, acceptedAt, type, rules, startAt, endAt, exerciseId, targetDays } = params
+  const all = await loadScoringWorkouts(userId, startAt, endAt)
+  // Fairness (spec): only workouts done AFTER the user accepted count.
+  const afterAccept = all.filter((w) => w.startedAt >= acceptedAt)
+  const valid = validWorkoutsInWindow(afterAccept, rules, startAt, endAt)
+  let baseline: number | null = null
+  if (type === 'pr_battle' && exerciseId) {
+    baseline = await prBaseline(userId, exerciseId, startAt)
+  }
+  return computeScore({
+    type,
+    validWorkouts: valid,
+    rules,
+    exerciseId: exerciseId ?? undefined,
+    baselineE1rm: baseline,
+    targetDays: targetDays ?? undefined,
+  })
+}
+
 /** Recompute + persist scores/ranks for one auto-scored challenge. No-op for
  *  legacy/manual challenges (scoringType null). */
 export async function recomputeChallenge(challengeId: string): Promise<void> {
@@ -92,21 +125,15 @@ export async function recomputeChallenge(challengeId: string): Promise<void> {
   const scored: { userId: string; result: ReturnType<typeof computeScore> }[] = []
   for (const p of participants) {
     const acceptedAt = p.acceptedAt ?? p.joinedAt
-    const all = await loadScoringWorkouts(p.userId, startAt, endAt)
-    // Fairness (spec): only workouts done AFTER the user accepted count.
-    const afterAccept = all.filter((w) => w.startedAt >= acceptedAt)
-    const valid = validWorkoutsInWindow(afterAccept, rules, startAt, endAt)
-    let baseline: number | null = null
-    if (type === 'pr_battle' && c.ruleExerciseId) {
-      baseline = await prBaseline(p.userId, c.ruleExerciseId, startAt)
-    }
-    const result = computeScore({
+    const result = await scoreParticipant({
+      userId: p.userId,
+      acceptedAt,
       type,
-      validWorkouts: valid,
       rules,
-      exerciseId: c.ruleExerciseId ?? undefined,
-      baselineE1rm: baseline,
-      targetDays: c.ruleTargetDays ?? undefined,
+      startAt,
+      endAt,
+      exerciseId: c.ruleExerciseId,
+      targetDays: c.ruleTargetDays,
     })
     scored.push({ userId: p.userId, result })
   }
@@ -147,21 +174,15 @@ export async function recomputeParticipantScore(challengeId: string, userId: str
   const endAt = c.endsAt
   const acceptedAt = p.acceptedAt ?? p.joinedAt
 
-  const all = await loadScoringWorkouts(userId, startAt, endAt)
-  // Fairness (spec): only workouts done AFTER the user accepted count.
-  const afterAccept = all.filter((w) => w.startedAt >= acceptedAt)
-  const valid = validWorkoutsInWindow(afterAccept, rules, startAt, endAt)
-  let baseline: number | null = null
-  if (type === 'pr_battle' && c.ruleExerciseId) {
-    baseline = await prBaseline(userId, c.ruleExerciseId, startAt)
-  }
-  const result = computeScore({
+  const result = await scoreParticipant({
+    userId,
+    acceptedAt,
     type,
-    validWorkouts: valid,
     rules,
-    exerciseId: c.ruleExerciseId ?? undefined,
-    baselineE1rm: baseline,
-    targetDays: c.ruleTargetDays ?? undefined,
+    startAt,
+    endAt,
+    exerciseId: c.ruleExerciseId,
+    targetDays: c.ruleTargetDays,
   })
 
   await prisma.challengeParticipant.update({
@@ -170,10 +191,12 @@ export async function recomputeParticipantScore(challengeId: string, userId: str
   })
 }
 
-/** Recompute ONLY the completing user's score across their active, auto-scored
- *  joined challenges. Cheap enough (one participant per challenge, not the whole
- *  roster) to run synchronously on the POST /complete hot path. */
-export async function recomputeCompletingUserChallenges(userId: string): Promise<void> {
+/** Walk this user's active, auto-scored joined challenges and apply `perChallenge`
+ *  to each. The two exported entry points differ only in that callback. */
+async function forEachActiveScoredChallenge(
+  userId: string,
+  perChallenge: (challengeId: string, userId: string) => Promise<void>,
+): Promise<void> {
   const now = new Date()
   const parts = await prisma.challengeParticipant.findMany({
     where: {
@@ -184,24 +207,20 @@ export async function recomputeCompletingUserChallenges(userId: string): Promise
     select: { challengeId: true },
   })
   for (const p of parts) {
-    await recomputeParticipantScore(p.challengeId, userId)
+    await perChallenge(p.challengeId, userId)
   }
+}
+
+/** Recompute ONLY the completing user's score across their active, auto-scored
+ *  joined challenges. Cheap enough (one participant per challenge, not the whole
+ *  roster) to run synchronously on the POST /complete hot path. */
+export async function recomputeCompletingUserChallenges(userId: string): Promise<void> {
+  await forEachActiveScoredChallenge(userId, recomputeParticipantScore)
 }
 
 /** Recompute every active, auto-scored challenge this user participates in.
  *  Full-roster re-rank — use on the standings-read / background path, NOT
  *  synchronously in POST /complete (see recomputeCompletingUserChallenges). */
 export async function recomputeUserChallenges(userId: string): Promise<void> {
-  const now = new Date()
-  const parts = await prisma.challengeParticipant.findMany({
-    where: {
-      userId,
-      status: 'accepted',
-      challenge: { scoringType: { not: null }, endsAt: { gte: now } },
-    },
-    select: { challengeId: true },
-  })
-  for (const p of parts) {
-    await recomputeChallenge(p.challengeId)
-  }
+  await forEachActiveScoredChallenge(userId, (challengeId) => recomputeChallenge(challengeId))
 }

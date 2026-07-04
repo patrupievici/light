@@ -1,18 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
 import { ZVELT_APP_CONTEXT_FOR_AI } from '../ai/app-context'
 import { normalizeEquipmentTagsForAi } from '../lib/equipment-for-ai'
 import { inferSportIntentFromProfile } from '../programming/sport-intent'
-import { signalsEliteCompetitionLevel } from '../lib/elite-athlete'
 import { generateWorkoutSuggestionForUser, createDraftWorkoutFromSuggestion } from '../services/workout-generator.service'
 import { deepSeekChat } from '../services/deepseek.service'
-import { resolveExerciseByName } from '../lib/exercise-resolver'
-import { getRecentProgression, formatProgressionForPrompt } from '../lib/progression-context'
-import { computeProgressiveLoads, type ProgressionLevel } from '../lib/progressive-overload'
-import { sanitizePromptInput, parseJsonFromModel, generateGoalAdvice } from '../lib/ai-helpers'
+import { sanitizePromptInput, parseJsonFromModel } from '../lib/ai-helpers'
 import { buildGoalGuidance } from '../lib/goal-guidance'
 import { generateAndPersistWeeklyPlan, WeeklyPlanError } from '../services/weekly-plan.service'
 
@@ -81,12 +76,6 @@ const WeeklyPlanSchema = z.object({
  * Env: DEEPSEEK_API_KEY, optional DEEPSEEK_API_URL (default api.deepseek.com).
  */
 export async function aiRoutes(app: FastifyInstance) {
-  // Stricter rate limit for AI endpoints (5 req/min per user) to protect API credits.
-  app.addHook('preHandler', async (request, reply) => {
-    // Fastify rate-limit already tracks per-IP; this is a soft check via header.
-    // The global 100/min is the hard limit; AI routes need tighter control.
-  })
-
   app.post('/chat', { preHandler: [authenticate], config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     if (!process.env.DEEPSEEK_API_KEY) {
       return reply.code(503).send({

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
+import { accessibleExerciseWhere } from './exercises'
 
 /** One exercise slot in a routine — mirrors PlannedWorkout.exercisesJson so a
  * routine can be built from an AI plan and started via the same draft-workout
@@ -167,7 +168,7 @@ export async function routineRoutes(app: FastifyInstance) {
         await prisma.exercise.findMany({
           where: {
             id: { in: withId.map((e) => e.exerciseId!) },
-            OR: [{ isCustom: false }, { createdByUserId: userId }],
+            ...accessibleExerciseWhere(userId),
           },
           select: { id: true },
         })

@@ -622,15 +622,16 @@ export async function authRoutes(app: FastifyInstance) {
     })
 
     if (!identity) {
-      await prisma.$transaction(async (tx) => {
+      identity = await prisma.$transaction(async (tx) => {
         const newUser = await tx.user.create({ data: {} })
-        await tx.authIdentity.create({
+        const created = await tx.authIdentity.create({
           data: {
             userId: newUser.id,
             provider: 'google',
             providerSubject: googleSub,
             email,
           },
+          include: { user: true },
         })
         await tx.userProfile.create({
           data: {
@@ -640,23 +641,7 @@ export async function authRoutes(app: FastifyInstance) {
           },
         })
         await tx.wallet.create({ data: { userId: newUser.id } })
-      })
-      identity = await prisma.authIdentity.findUnique({
-        where: {
-          provider_providerSubject: {
-            provider: 'google',
-            providerSubject: googleSub,
-          },
-        },
-        include: { user: true },
-      })
-    }
-
-    if (!identity) {
-      return reply.code(500).send({
-        error: 'INTERNAL_ERROR',
-        message: 'Identitatea Google nu a putut fi încărcată',
-        requestId: request.id,
+        return created
       })
     }
 

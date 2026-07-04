@@ -274,16 +274,9 @@ export async function rankRoutes(app: FastifyInstance) {
       }
     }
 
-    // Update best E1RM din rank-urile curente
-    for (const rank of ranks) {
-      if (progressionMap.has(rank.exerciseId)) {
-        const progression = progressionMap.get(rank.exerciseId)!
-        progression.bestE1rmKg = Number(rank.bestE1rmKg)
-        progression.currentLP = rank.lpTotal
-        progression.currentTier = lpToTier(rank.lpTotal)
-      }
-    }
-
+    // currentLP/currentTier/bestE1rmKg were already seeded from the same `ranks`
+    // array by the map initializer above (unique rank per exerciseId), so no
+    // second pass is needed to re-derive them.
     const progressions = Array.from(progressionMap.values())
       .map(p => ({
         ...p,

@@ -214,19 +214,9 @@ export async function profileRoutes(app: FastifyInstance) {
       }
     }
 
-    const { dailyCalories, dailyProtein, dailyCarbs, dailyFat, dailyWaterMl, ...rest } =
-      parsed.data
-
     const profile = await prisma.userProfile.update({
       where: { userId },
-      data: {
-        ...rest,
-        ...(dailyCalories !== undefined && { dailyCalories }),
-        ...(dailyProtein !== undefined && { dailyProtein }),
-        ...(dailyCarbs !== undefined && { dailyCarbs }),
-        ...(dailyFat !== undefined && { dailyFat }),
-        ...(dailyWaterMl !== undefined && { dailyWaterMl }),
-      },
+      data: parsed.data,
     })
 
     // Daca s-a setat bodyweight, emite eveniment analytics

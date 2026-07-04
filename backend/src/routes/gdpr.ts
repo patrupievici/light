@@ -8,15 +8,6 @@ import { deleteUploadByUrl } from '../lib/post-photo'
 import { revokeAllProviderConnections } from './integrations'
 import type { FastifyBaseLogger } from 'fastify'
 
-/** Minimal logger shape eraseUser needs for best-effort side-effects. */
-type ErasureLogger = Pick<FastifyBaseLogger, 'warn' | 'error'>
-
-/** Fallback logger so eraseUser works when called without a Fastify log. */
-const noopLogger: ErasureLogger = {
-  warn: () => {},
-  error: () => {},
-}
-
 /**
  * GDPR / account-management routes mounted under /v1/me.
  *
@@ -61,28 +52,18 @@ const DELETED_USER_SENTINEL_ID = '00000000-0000-0000-0000-0000000dead00'
 /** Body shown in place of an erased user's DM text after anonymization. */
 const DELETED_USER_TOMBSTONE = '[deleted user]'
 
-/** Event-name allowlist for export: anything else is reported as a redacted count. */
-const EXPORTABLE_EVENT_NAMES = new Set([
-  'onboarding_started',
-  'workout_started',
-  'workout_completed',
-  'post_created',
-  'rank_calculated',
-  'bodyweight_set',
-])
-
 /**
  * Hard-delete a user and ALL dependent rows, children-before-parents. Most FK
  * relations are not `onDelete: Cascade`, so we delete explicitly inside one
  * transaction — if any step fails the whole erasure rolls back (no orphans).
  */
-async function eraseUser(userId: string, log: ErasureLogger = noopLogger): Promise<void> {
+async function eraseUser(userId: string, log: FastifyBaseLogger): Promise<void> {
   // Revoke external integrations + scrub remote tokens BEFORE the DB transaction,
   // while the wearable_connections rows (and their external ids) still exist.
   // Best-effort: a stuck/unreachable provider must NEVER block erasure, so this
   // never throws — failures are logged inside the helper and we proceed.
   try {
-    await revokeAllProviderConnections(userId, log as FastifyBaseLogger)
+    await revokeAllProviderConnections(userId, log)
   } catch (err) {
     log.warn({ err, userId }, 'eraseUser: provider revoke failed (continuing erasure)')
   }
@@ -371,4 +352,4 @@ export async function gdprRoutes(app: FastifyInstance) {
 
 }
 
-export { eraseUser, EXPORTABLE_EVENT_NAMES }
+export { eraseUser }

@@ -12,6 +12,11 @@ import { computeNutritionDayXp } from '../services/nutrition-xp.service'
 import { resolveUserXpContext } from '../services/cardio-xp.service'
 import { gameXpPayload } from '../services/gym-xp.service'
 import { searchOffByName, type UsdaShapedFood } from '../lib/open-food-facts'
+import {
+  ymdFromUtcWithOffset,
+  mondayOfWeek,
+  buildWeekDays,
+} from '../lib/day-key'
 
 const DateParam = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
@@ -45,38 +50,6 @@ const WeekQuerySchema = z.object({
   weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   tzOffset: z.coerce.number().int().min(-840).max(840).optional().default(0),
 })
-
-function ymdFromUtcWithOffset(d: Date, offsetMin: number): string {
-  const x = new Date(d.getTime() + offsetMin * 60 * 1000)
-  const y = x.getUTCFullYear()
-  const m = String(x.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(x.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function dateFromYmdUtc(ymd: string): Date {
-  const [y, m, d] = ymd.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0))
-}
-
-function mondayOfWeek(ymd: string): string {
-  const d = dateFromYmdUtc(ymd)
-  const wd = d.getUTCDay()
-  const shift = wd === 0 ? 6 : wd - 1
-  d.setUTCDate(d.getUTCDate() - shift)
-  return ymdFromUtcWithOffset(d, 0)
-}
-
-function buildWeekDays(weekStart: string): string[] {
-  const start = dateFromYmdUtc(weekStart)
-  const out: string[] = []
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(start.getTime())
-    d.setUTCDate(start.getUTCDate() + i)
-    out.push(ymdFromUtcWithOffset(d, 0))
-  }
-  return out
-}
 
 function payloadFromRow(payload: unknown) {
   const p = (payload ?? {}) as Record<string, unknown>
@@ -746,15 +719,20 @@ export async function nutritionRoutes(app: FastifyInstance) {
       ? dayParam
       : ymdFromUtcWithOffset(new Date(), tzOffset)
 
+    // The idempotency lookup for this (userId, day) claim — identical whether run
+    // on the base client (pre-check / catch re-read) or inside the tx (recheck).
+    const findClaim = (db: Prisma.TransactionClient | typeof prisma) =>
+      db.analyticsEvent.findFirst({
+        where: {
+          userId,
+          eventName: 'nutrition_xp_claimed',
+          props: { path: ['day'], equals: day } as unknown as Prisma.JsonFilter,
+        },
+        orderBy: { eventTime: 'desc' },
+      })
+
     // Idempotency: did we already claim XP for this day?
-    const existing = await prisma.analyticsEvent.findFirst({
-      where: {
-        userId,
-        eventName: 'nutrition_xp_claimed',
-        props: { path: ['day'], equals: day } as unknown as Prisma.JsonFilter,
-      },
-      orderBy: { eventTime: 'desc' },
-    })
+    const existing = await findClaim(prisma)
     if (existing) {
       const props = (existing.props as Record<string, unknown> | null) ?? {}
       return reply.send({
@@ -774,8 +752,7 @@ export async function nutritionRoutes(app: FastifyInstance) {
     }
 
     // Sum actuals from the day's entries.
-    const payload = (logDay?.payload as Record<string, unknown> | null) ?? {}
-    const entries = Array.isArray(payload.entries) ? payload.entries : []
+    const entries = payloadFromRow(logDay?.payload).entries
     const actual = entries.reduce(
       (acc, raw) => {
         const e = (raw && typeof raw === 'object') ? (raw as Record<string, unknown>) : {}
@@ -830,14 +807,7 @@ export async function nutritionRoutes(app: FastifyInstance) {
     try {
       const updatedProfile = await prisma.$transaction(
         async (tx) => {
-          const dup = await tx.analyticsEvent.findFirst({
-            where: {
-              userId,
-              eventName: 'nutrition_xp_claimed',
-              props: { path: ['day'], equals: day } as unknown as Prisma.JsonFilter,
-            },
-            orderBy: { eventTime: 'desc' },
-          })
+          const dup = await findClaim(tx)
           if (dup) {
             throw new Error('ALREADY_CLAIMED')
           }
@@ -875,14 +845,7 @@ export async function nutritionRoutes(app: FastifyInstance) {
       // Concurrent claim: either the in-tx recheck found a prior event or the
       // Serializable tx aborted (serialization failure). Re-read the winning
       // claim and return it as already-claimed instead of double-awarding.
-      const prior = await prisma.analyticsEvent.findFirst({
-        where: {
-          userId,
-          eventName: 'nutrition_xp_claimed',
-          props: { path: ['day'], equals: day } as unknown as Prisma.JsonFilter,
-        },
-        orderBy: { eventTime: 'desc' },
-      })
+      const prior = await findClaim(prisma)
       if (prior) {
         const props = (prior.props as Record<string, unknown> | null) ?? {}
         return reply.send({

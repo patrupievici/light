@@ -121,7 +121,7 @@ export async function bookmarkedPostIdsFor(
   return new Set(marks.map((m) => m.postId))
 }
 
-async function canViewerSeePost(
+export async function canViewerSeePost(
   viewerId: string,
   post: { userId: string; visibility: string },
 ): Promise<boolean> {
@@ -662,10 +662,10 @@ export async function postRoutes(app: FastifyInstance) {
     const body = parsedEdit.data
     const updates: Record<string, unknown> = { editCount: editVerdict.nextEditCount, lastEditAt: new Date() }
     if (body.caption !== undefined) {
-      const clean = stripControlChars(body.caption).trim()
+      const clean = stripControlChars(body.caption)
       updates.caption = clean || null
     }
-    if (body.visibility && ['private', 'friends', 'public'].includes(body.visibility)) {
+    if (body.visibility) {
       updates.visibility = body.visibility
     }
 

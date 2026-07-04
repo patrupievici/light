@@ -31,7 +31,6 @@ import {
   bumpForLevel,
   roundToPlate,
   type AutoregInput,
-  type AutoregResult,
   type ProgressionLevel,
 } from './progressive-overload'
 
@@ -160,9 +159,6 @@ export function applyProgressionScheme(inp: SchemeInput): SchemeResult {
       return { ...doubleScheme(inp), scheme }
     case 'reps_sum':
       return { ...repsSumScheme(inp), scheme }
-    /* c8 ignore next 2 — normalize() guarantees one of the above */
-    default:
-      return { ...{ ...autoregulateLoad(inp.autoreg) }, scheme: 'auto' }
   }
 }
 
@@ -280,6 +276,3 @@ function heldReason(
   }
   return 'Held: prescription not fully met last time — repeat before adding load.'
 }
-
-// Keep the AutoregResult import live for editor goto-def / future typing.
-export type _SchemeAutoreg = AutoregResult

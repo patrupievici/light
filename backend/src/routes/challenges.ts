@@ -44,13 +44,22 @@ const CreateChallengeSchema = z
     }
   })
 
-function creatorLabel(profile: { username: string | null; displayName: string | null } | null): string {
-  if (!profile) return 'Athlete'
-  const d = profile.displayName?.trim()
+/// Display label for a (possibly missing) profile: trimmed displayName, else
+/// trimmed username, else 'Athlete'. One helper for every roster/creator label.
+function profileLabel(profile: { username: string | null; displayName: string | null } | null): string {
+  const d = profile?.displayName?.trim()
   if (d) return d
-  const u = profile.username?.trim()
+  const u = profile?.username?.trim()
   if (u) return u
   return 'Athlete'
+}
+
+/// Human title for a challenge row: a custom challenge shows its trimmed
+/// customTitle; everything else (and a blank custom title) falls back to the
+/// kind's default title.
+function challengeTitle(row: { kind: string; customTitle: string | null }): string {
+  if (row.kind === 'custom' && row.customTitle?.trim()) return row.customTitle.trim()
+  return defaultTitle(row.kind)
 }
 
 function serializeChallenge(
@@ -72,15 +81,12 @@ function serializeChallenge(
   viewerId: string,
   extra?: { participantsCount?: number; joined?: boolean },
 ) {
-  const title =
-    row.kind === 'custom' && row.customTitle?.trim()
-      ? row.customTitle.trim()
-      : defaultTitle(row.kind)
+  const title = challengeTitle(row)
 
   return {
     id: row.id,
     creatorId: row.creatorId,
-    creatorDisplayName: creatorLabel(row.creator.profile),
+    creatorDisplayName: profileLabel(row.creator.profile),
     isMine: row.creatorId === viewerId,
     isOfficial: row.isOfficial ?? false,
     kind: row.kind,
@@ -96,21 +102,16 @@ function serializeChallenge(
   }
 }
 
+// custom + any unknown kind both fall through to 'Challenge'.
+const TITLES: Record<string, string> = {
+  pullUps: 'Pull-up challenge',
+  deadlift: 'Deadlift challenge',
+  squat: 'Squat challenge',
+  benchPress: 'Bench press challenge',
+}
+
 function defaultTitle(kind: string): string {
-  switch (kind) {
-    case 'pullUps':
-      return 'Pull-up challenge'
-    case 'deadlift':
-      return 'Deadlift challenge'
-    case 'squat':
-      return 'Squat challenge'
-    case 'benchPress':
-      return 'Bench press challenge'
-    case 'custom':
-      return 'Challenge'
-    default:
-      return 'Challenge'
-  }
+  return TITLES[kind] ?? 'Challenge'
 }
 
 /// Validates the `:id` route param as a UUID. Returns the id, or sends the
@@ -201,8 +202,7 @@ export async function challengeRoutes(app: FastifyInstance) {
           skipDuplicates: true,
         })
         // Notify each invited friend (fire-and-forget; never blocks create).
-        const inviteTitle =
-          row.kind === 'custom' && row.customTitle?.trim() ? row.customTitle.trim() : defaultTitle(row.kind)
+        const inviteTitle = challengeTitle(row)
         for (const uid of invitees) {
           void createNotificationSafe({
             recipientId: uid,
@@ -321,14 +321,12 @@ export async function challengeRoutes(app: FastifyInstance) {
     })
     const data = rows.map((p) => {
       const c = p.challenge
-      const title =
-        c.kind === 'custom' && c.customTitle?.trim() ? c.customTitle.trim() : defaultTitle(c.kind)
       return {
         id: c.id,
-        title,
+        title: challengeTitle(c),
         scoringType: c.scoringType ?? null,
         endsAt: c.endsAt.toISOString(),
-        creatorDisplayName: creatorLabel(c.creator.profile),
+        creatorDisplayName: profileLabel(c.creator.profile),
       }
     })
     return reply.send({ data, requestId: request.id })
@@ -422,10 +420,7 @@ export async function challengeRoutes(app: FastifyInstance) {
           select: { status: true, softDeletedAt: true },
         })
         if (creator && creator.status === 'active' && creator.softDeletedAt == null) {
-          const title =
-            challenge.kind === 'custom' && challenge.customTitle?.trim()
-              ? challenge.customTitle.trim()
-              : defaultTitle(challenge.kind)
+          const title = challengeTitle(challenge)
           void createNotificationSafe({
             recipientId: challenge.creatorId,
             actorId: me,
@@ -496,18 +491,16 @@ export async function challengeRoutes(app: FastifyInstance) {
     })
     const data = participants.map((p) => ({
       userId: p.userId,
-      displayName: p.user.profile?.displayName ?? p.user.profile?.username ?? 'Athlete',
+      displayName: profileLabel(p.user.profile),
       username: p.user.profile?.username ?? null,
       joinedAt: p.joinedAt.toISOString(),
     }))
     return reply.send({ data, total: data.length, requestId: request.id })
   })
 
-  /// Shared access gate for progress/standings/chat: challenge must exist
-  /// and be visible to the viewer (public, mine, or friend's). Returns the
-  /// challenge row or replies with the error and returns null.
-  async function loadVisibleChallenge(request: any, reply: any): Promise<{ id: string; creatorId: string; visibility: string; endsAt: Date; kind: string; customTitle: string | null; scoringType: string | null } | null> {
-    const { userId: me } = request.user
+  /// Shared preamble for the access gates below: validate the :id UUID, load
+  /// the challenge, and 404 if missing. Returns the row or replies + null.
+  async function loadChallengeOr404(request: any, reply: any) {
     const id = requireUuidParam(request, reply)
     if (!id) return null
     const challenge = await prisma.challenge.findUnique({ where: { id } })
@@ -515,6 +508,16 @@ export async function challengeRoutes(app: FastifyInstance) {
       reply.code(404).send({ error: 'NOT_FOUND', message: 'Provocarea nu există', requestId: request.id })
       return null
     }
+    return challenge
+  }
+
+  /// Shared access gate for progress/standings/chat: challenge must exist
+  /// and be visible to the viewer (public, mine, or friend's). Returns the
+  /// challenge row or replies with the error and returns null.
+  async function loadVisibleChallenge(request: any, reply: any): Promise<{ id: string; creatorId: string; visibility: string; endsAt: Date; kind: string; customTitle: string | null; scoringType: string | null } | null> {
+    const { userId: me } = request.user
+    const challenge = await loadChallengeOr404(request, reply)
+    if (!challenge) return null
     if (challenge.visibility === 'friends' && challenge.creatorId !== me) {
       const friendIds = await acceptedFriendIds(me)
       if (!friendIds.includes(challenge.creatorId)) {
@@ -530,13 +533,8 @@ export async function challengeRoutes(app: FastifyInstance) {
   /// returns null. Keeps its own ownership 403 distinct from visibility 403.
   async function loadOwnedChallenge(request: any, reply: any): Promise<{ id: string; creatorId: string } | null> {
     const { userId: me } = request.user
-    const id = requireUuidParam(request, reply)
-    if (!id) return null
-    const challenge = await prisma.challenge.findUnique({ where: { id } })
-    if (!challenge) {
-      reply.code(404).send({ error: 'NOT_FOUND', message: 'Provocarea nu există', requestId: request.id })
-      return null
-    }
+    const challenge = await loadChallengeOr404(request, reply)
+    if (!challenge) return null
     if (challenge.creatorId !== me) {
       reply.code(403).send({ error: 'FORBIDDEN', message: 'Nu poți șterge provocarea altcuiva', requestId: request.id })
       return null
@@ -565,7 +563,7 @@ export async function challengeRoutes(app: FastifyInstance) {
         .filter((p) => p.status === 'accepted')
         .map((p) => ({
           userId: p.userId,
-          displayName: p.user.profile?.displayName ?? p.user.profile?.username ?? 'Athlete',
+          displayName: profileLabel(p.user.profile),
           username: p.user.profile?.username ?? null,
           total: p.score,
           lastLoggedAt: p.lastScoreUpdate?.toISOString() ?? null,
@@ -585,7 +583,7 @@ export async function challengeRoutes(app: FastifyInstance) {
     const totals = new Map(sums.map((s) => [s.userId, { total: Number(s._sum.amount ?? 0), lastAt: s._max.createdAt }]))
     const rows = participants.map((p) => ({
       userId: p.userId,
-      displayName: p.user.profile?.displayName ?? p.user.profile?.username ?? 'Athlete',
+      displayName: profileLabel(p.user.profile),
       username: p.user.profile?.username ?? null,
       total: totals.get(p.userId)?.total ?? 0,
       lastLoggedAt: totals.get(p.userId)?.lastAt?.toISOString() ?? null,
@@ -669,7 +667,7 @@ export async function challengeRoutes(app: FastifyInstance) {
       data: messages.map((m) => ({
         id: m.id,
         userId: m.userId,
-        displayName: m.user.profile?.displayName ?? m.user.profile?.username ?? 'Athlete',
+        displayName: profileLabel(m.user.profile),
         username: m.user.profile?.username ?? null,
         body: m.body,
         createdAt: m.createdAt.toISOString(),
@@ -708,7 +706,7 @@ export async function challengeRoutes(app: FastifyInstance) {
       data: {
         id: saved.id,
         userId: saved.userId,
-        displayName: saved.user.profile?.displayName ?? saved.user.profile?.username ?? 'Athlete',
+        displayName: profileLabel(saved.user.profile),
         username: saved.user.profile?.username ?? null,
         body: saved.body,
         createdAt: saved.createdAt.toISOString(),

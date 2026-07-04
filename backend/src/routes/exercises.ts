@@ -9,6 +9,7 @@ import { rankSubstitutes } from '../lib/exercise-substitution'
 import { exerciseFitsUserEquipment } from '../programming/equipment-compatibility'
 import { normalizeEquipmentTagsForAi } from '../lib/equipment-for-ai'
 import { computeProgressiveLoads, type ProgressionLevel } from '../lib/progressive-overload'
+import { fetchLastWorkingWeights } from '../services/workout-generator.service'
 import {
   localizeExercise,
   inheritClassification,
@@ -115,6 +116,16 @@ async function loadTranslationsByExerciseId(
   return out
 }
 
+/**
+ * IDOR scoping predicate: an exercise is usable by `userId` when it's a public
+ * catalog row (isCustom=false) OR the user's own custom one. Shared across the
+ * exercise detail/substitutes/custom-parent lookups, the workout add-exercise
+ * validator, and the routine→workout converter so the scope can't drift.
+ */
+export function accessibleExerciseWhere(userId: string) {
+  return { OR: [{ isCustom: false }, { createdByUserId: userId }] }
+}
+
 export async function exerciseRoutes(app: FastifyInstance) {
   // GET /v1/exercises/last-weights?ids=a,b,c — most recent completed WORK-set
   // weight per exercise for the signed-in user. Lets the client pre-fill preset
@@ -125,26 +136,9 @@ export async function exerciseRoutes(app: FastifyInstance) {
     const ids = raw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 60)
     if (ids.length === 0) return reply.send({ data: {} })
 
-    const sets = await prisma.workoutSet.findMany({
-      where: {
-        tag: 'WORK',
-        isCompleted: true,
-        weightKg: { gt: 0 },
-        workoutExercise: {
-          exerciseId: { in: ids },
-          workout: { userId, status: { in: ['completed', 'posted'] } },
-        },
-      },
-      select: { weightKg: true, workoutExercise: { select: { exerciseId: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 400,
-    })
-    // First (most recent) weight wins per exercise.
-    const data: Record<string, number> = {}
-    for (const s of sets) {
-      const eid = s.workoutExercise.exerciseId
-      if (data[eid] === undefined) data[eid] = Number(s.weightKg)
-    }
+    // Most-recent completed WORK-set weight per exercise — same query the workout
+    // generator uses for warm starts. First (most recent) weight wins per exercise.
+    const data = Object.fromEntries(await fetchLastWorkingWeights(userId, ids))
     return reply.send({ data })
   })
 
@@ -278,7 +272,7 @@ export async function exerciseRoutes(app: FastifyInstance) {
       parent = await prisma.exercise.findFirst({
         where: {
           id: parentExerciseId,
-          OR: [{ isCustom: false }, { createdByUserId: userId }],
+          ...accessibleExerciseWhere(userId),
         },
         select: { movementPattern: true, rankModel: true, category: true },
       })
@@ -420,7 +414,7 @@ export async function exerciseRoutes(app: FastifyInstance) {
     const exercise = await prisma.exercise.findFirst({
       where: {
         id,
-        OR: [{ isCustom: false }, { createdByUserId: userId }],
+        ...accessibleExerciseWhere(userId),
       },
     })
 
@@ -523,7 +517,7 @@ export async function exerciseRoutes(app: FastifyInstance) {
     const source = await prisma.exercise.findFirst({
       where: {
         id,
-        OR: [{ isCustom: false }, { createdByUserId: userId }],
+        ...accessibleExerciseWhere(userId),
       },
     })
 
@@ -539,7 +533,7 @@ export async function exerciseRoutes(app: FastifyInstance) {
     // Cap matches the listing endpoint so a single page covers the catalog.
     const [candidates, trainingProfile] = await Promise.all([
       prisma.exercise.findMany({
-        where: { OR: [{ isCustom: false }, { createdByUserId: userId }] },
+        where: accessibleExerciseWhere(userId),
         take: 500,
       }),
       prisma.userTrainingProfile.findUnique({
