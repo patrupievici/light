@@ -369,6 +369,8 @@ describe('erasure completeness vs User relations (schema guard)', () => {
     'UserCustomFood', // Cascade: custom foods vanish with the account
     'UserFavoriteFood', // Cascade: favorite foods vanish with the account
     'UserRecipe', // Cascade: recipes vanish with the account
+    'UserBlock', // Cascade: blocks made/received vanish with the account
+    'UserReport', // Cascade: reports made/received vanish with the account
   ])
 
   function modelToAccessor(model: string): string {

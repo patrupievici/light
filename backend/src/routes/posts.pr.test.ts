@@ -9,6 +9,7 @@ const postHideFindMany = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
+    userBlock: { findMany: async () => [], findFirst: async () => null },
     post: { findMany: (...a: unknown[]) => postFindMany(...a) },
     userProfile: { findMany: (...a: unknown[]) => userProfileFindMany(...a) },
     friendship: { findMany: (...a: unknown[]) => friendshipFindMany(...a) },

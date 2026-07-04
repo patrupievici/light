@@ -20,6 +20,7 @@ const storyLike = {
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
+    userBlock: { findMany: async () => [], findFirst: async () => null },
     story: {
       create: (...a: unknown[]) => story.create(...a),
       update: (...a: unknown[]) => story.update(...a),
@@ -57,6 +58,7 @@ vi.mock('../lib/post-photo', () => ({
 
 vi.mock('../lib/friendships', () => ({
   acceptedFriendIds: vi.fn(async () => ['friendA']),
+  blockedUserIds: vi.fn(async () => []),
 }))
 vi.mock('../lib/user-display', () => ({
   getUserDisplayHints: vi.fn(async () => new Map([['u1', { displayName: 'Me', username: 'me' }]])),

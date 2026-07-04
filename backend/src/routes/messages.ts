@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { createNotificationSafe } from '../services/notification.service'
-import { areFriends } from '../lib/friendships'
+import { areFriends, isBlockedEitherWay } from '../lib/friendships'
 
 function orderedUserIds(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a]
@@ -76,6 +76,13 @@ export async function messagesRoutes(app: FastifyInstance) {
       return reply.code(400).send({
         error: 'VALIDATION_ERROR',
         message: 'Nu poți deschide conversație cu tine',
+        requestId: request.id,
+      })
+    }
+    if (await isBlockedEitherWay(me, peerUserId)) {
+      return reply.code(403).send({
+        error: 'BLOCKED',
+        message: 'Nu poți mesaja acest utilizator',
         requestId: request.id,
       })
     }
@@ -179,6 +186,24 @@ export async function messagesRoutes(app: FastifyInstance) {
       return reply.code(404).send({
         error: 'NOT_FOUND',
         message: 'Conversație inexistentă',
+        requestId: request.id,
+      })
+    }
+
+    // Re-check the relationship on every send (not just at open): unfriending or
+    // blocking must stop further messages on an existing thread.
+    const peer = peerIdFromConversation(conv, me)
+    if (await isBlockedEitherWay(me, peer)) {
+      return reply.code(403).send({
+        error: 'BLOCKED',
+        message: 'Nu poți mesaja acest utilizator',
+        requestId: request.id,
+      })
+    }
+    if (!(await areFriends(me, peer))) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        message: 'Poți mesaja doar prieteni acceptați',
         requestId: request.id,
       })
     }

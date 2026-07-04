@@ -30,6 +30,7 @@ const postReportUpsert = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
+    userBlock: { findMany: async () => [], findFirst: async () => null },
     post: {
       findUnique: (...a: unknown[]) => postFindUnique(...a),
       findMany: (...a: unknown[]) => postFindMany(...a),

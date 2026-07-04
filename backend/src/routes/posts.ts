@@ -7,7 +7,7 @@ import { computeRanks } from '../services/ranking.service'
 import { updateStreak } from '../services/streak.service'
 import { createNotificationSafe, NotificationType } from '../services/notification.service'
 import { decodePostPhotoBase64, savePostPhoto } from '../lib/post-photo'
-import { areFriends, getFriendIdsAndHidden } from '../lib/friendships'
+import { areFriends, getFriendIdsAndHidden, blockedUserIds, isBlockedEitherWay } from '../lib/friendships'
 import { stripControlChars } from '../lib/sanitize'
 import { evaluateEditLimit } from '../services/anti-cheat.service'
 import { canViewerSeePostPure } from '../lib/post-visibility'
@@ -126,6 +126,8 @@ async function canViewerSeePost(
   post: { userId: string; visibility: string },
 ): Promise<boolean> {
   if (post.userId === viewerId) return true
+  // A block in EITHER direction severs visibility (Apple §1.2 / Play UGC).
+  if (await isBlockedEitherWay(viewerId, post.userId)) return false
   // Extra privacy overlay on top of the core visibility rule: an owner who hid
   // their activity feed is invisible to others even for 'public' posts.
   const sharing = await prisma.userProfile.findUnique({
@@ -334,8 +336,8 @@ export async function postRoutes(app: FastifyInstance) {
     // param was ignored, so the pill reloaded the identical unfiltered feed.
     const followingOnly = query.scope === 'following'
 
-    // Gaseste prietenii acceptati + postarile ascunse
-    const { friendIds, hiddenIds } = await getFriendIdsAndHidden(userId)
+    // Gaseste prietenii acceptati + postarile ascunse + userii blocati
+    const { friendIds, hiddenIds, blockedIds } = await getFriendIdsAndHidden(userId)
     const activityHidden = await prisma.userProfile.findMany({
       where: { userId: { in: friendIds }, showActivityFeed: false },
       select: { userId: true },
@@ -343,10 +345,12 @@ export async function postRoutes(app: FastifyInstance) {
     const activityHiddenIds = new Set(activityHidden.map((row) => row.userId))
     const visibleFriendIds = friendIds.filter((id) => !activityHiddenIds.has(id))
 
-    // Feed = postari proprii + ale prietenilor (visibility != private), fara cele ascunse
+    // Feed = postari proprii + ale prietenilor (visibility != private), fara cele
+    // ascunse SAU de la useri blocati (bloc in orice directie).
     const posts = await prisma.post.findMany({
       where: {
         id: { notIn: hiddenIds },
+        userId: { notIn: blockedIds },
         ...(prOnly ? { isPr: true } : {}),
         OR: [
           // Own posts — omitted when the "Following" pill is active.
@@ -543,9 +547,13 @@ export async function postRoutes(app: FastifyInstance) {
     const limit = Math.min(50, parseInt(query.limit ?? '20'))
     const skip = (page - 1) * limit
 
+    // Hide comments from users blocked in either direction.
+    const blocked = await blockedUserIds(viewerId)
+    const commentWhere = { postId, userId: { notIn: blocked } }
+
     const [comments, total] = await Promise.all([
       prisma.postComment.findMany({
-        where: { postId },
+        where: commentWhere,
         orderBy: { createdAt: 'asc' },
         skip,
         take: limit,
@@ -553,7 +561,7 @@ export async function postRoutes(app: FastifyInstance) {
           user: { include: { profile: true } },
         },
       }),
-      prisma.postComment.count({ where: { postId } }),
+      prisma.postComment.count({ where: commentWhere }),
     ])
 
     return reply.send({
@@ -572,12 +580,14 @@ export async function postRoutes(app: FastifyInstance) {
     const limit = Math.min(30, parseInt(q.limit ?? '20'))
     const skip = (page - 1) * limit
 
-    const { friendIds, hiddenIds: hiddenPostIds } = await getFriendIdsAndHidden(me)
+    const { friendIds, hiddenIds: hiddenPostIds, blockedIds } =
+      await getFriendIdsAndHidden(me)
 
     const where = mine
       ? { userId: me, id: { notIn: hiddenPostIds } }
       : {
           id: { notIn: hiddenPostIds },
+          userId: { notIn: blockedIds }, // hide blocked users' posts (both ways)
           OR: [
             { userId: me },
             { userId: { in: friendIds }, visibility: { in: ['friends', 'public'] } },

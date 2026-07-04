@@ -62,6 +62,10 @@ model User {
   healthImports            UserHealthImport[]
   healthDailyMetrics       UserHealthDailyMetric[]
   healthConsents           HealthConsent[]
+  blocksMade               UserBlock[]     @relation("BlockBlocker")
+  blocksReceived           UserBlock[]     @relation("BlockBlocked")
+  reportsMade              UserReport[]    @relation("ReportReporter")
+  reportsReceived          UserReport[]    @relation("ReportReported")
 
   @@map("users")
 }
@@ -585,6 +589,40 @@ model Friendship {
 
   @@unique([userId, friendUserId])
   @@map("friendships")
+}
+
+/// Directional user-level block (Apple §1.2 / Play UGC). A row means [blockerId]
+/// blocked [blockedId]. Enforcement hides content in BOTH directions (a block by
+/// either party severs feed/comments/DMs/stories). Distinct from Friendship so a
+/// block survives unfriend and can't be self-removed by the blocked party.
+model UserBlock {
+  id        String   @id @default(uuid())
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("BlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("user_blocks")
+}
+
+/// User-level abuse report (Apple §1.2 / Play UGC). Stored for moderator review.
+model UserReport {
+  id         String   @id @default(uuid())
+  reporterId String   @map("reporter_id")
+  reportedId String   @map("reported_id")
+  category   String
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  reporter User @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("ReportReported", fields: [reportedId], references: [id], onDelete: Cascade)
+
+  @@index([reportedId, createdAt])
+  @@map("user_reports")
 }
 
 /// In-app notifications (friend requests, likes, comments). Push tokens = viitor.

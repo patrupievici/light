@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { getUserDisplayHints } from '../lib/user-display'
 import { decodePostPhotoBase64, saveStoryPhoto, deleteStoryPhoto } from '../lib/post-photo'
-import { acceptedFriendIds } from '../lib/friendships'
+import { acceptedFriendIds, blockedUserIds } from '../lib/friendships'
 
 const CreateStorySchema = z.object({
   caption: z.string().max(500).optional(),
@@ -55,12 +55,19 @@ export async function storyRoutes(app: FastifyInstance) {
     const { userId: me } = request.user
     const now = new Date()
 
-    const friendIds = await acceptedFriendIds(me)
+    const [friendIds, blockedIds] = await Promise.all([
+      acceptedFriendIds(me),
+      blockedUserIds(me),
+    ])
+    // Blocking severs friendship, so a blocked user is normally already out of
+    // friendIds — exclude explicitly too (defense-in-depth, both directions).
+    const blocked = new Set(blockedIds)
+    const visibleAuthorIds = [me, ...friendIds.filter((id) => !blocked.has(id))]
 
     const stories = await prisma.story.findMany({
       where: {
         expiresAt: { gt: now },
-        userId: { in: [me, ...friendIds] },
+        userId: { in: visibleAuthorIds },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,

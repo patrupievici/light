@@ -14,6 +14,7 @@ const notificationCreate = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
+    userBlock: { findMany: async () => [], findFirst: async () => null },
     friendship: { findFirst: (...a: unknown[]) => friendshipFindFirst(...a) },
     directConversation: {
       findFirst: (...a: unknown[]) => convFindFirst(...a),
@@ -132,6 +133,8 @@ describe('POST /v1/messages/conversations/:id/messages — send', () => {
 
   it('persists the message, bumps updatedAt, and notifies the peer', async () => {
     convFindFirst.mockResolvedValue({ id: 'c1', userLowId: 'me', userHighId: PEER })
+    // Send now re-checks the relationship (unfriend/block must stop messages).
+    friendshipFindFirst.mockResolvedValue({ id: 'f1', status: 'accepted' })
     msgCreate.mockResolvedValue({ id: 'm1', senderId: 'me', body: 'hello', createdAt: new Date('2026-01-01T00:00:00Z') })
 
     const app = await buildApp()

@@ -9,6 +9,7 @@ import fastifyStatic from '@fastify/static'
 import rawBody from 'fastify-raw-body'
 import { authRoutes } from './routes/auth'
 import { profileRoutes } from './routes/profile'
+import { moderationRoutes } from './routes/moderation'
 import { exerciseRoutes } from './routes/exercises'
 import { workoutRoutes } from './routes/workouts'
 import { routineRoutes } from './routes/routines'
@@ -127,6 +128,7 @@ async function main() {
 
   app.register(authRoutes, { prefix: '/v1/auth' })
   app.register(profileRoutes, { prefix: '/v1' })
+  app.register(moderationRoutes, { prefix: '/v1' })
   app.register(exerciseRoutes, { prefix: '/v1/exercises' })
   app.register(workoutRoutes, { prefix: '/v1/workouts' })
   app.register(routineRoutes, { prefix: '/v1/routines' })
