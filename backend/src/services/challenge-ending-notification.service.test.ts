@@ -3,10 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ── Mocks ───────────────────────────────────────────────────────────────────
 const challengeFindMany = vi.fn()
 const participantFindMany = vi.fn()
+const progressLogGroupBy = vi.fn()
 vi.mock('../lib/prisma', () => ({
   prisma: {
     challenge: { findMany: (...a: unknown[]) => challengeFindMany(...a) },
     challengeParticipant: { findMany: (...a: unknown[]) => participantFindMany(...a) },
+    challengeProgressLog: { groupBy: (...a: unknown[]) => progressLogGroupBy(...a) },
   },
 }))
 
@@ -38,8 +40,10 @@ beforeEach(() => {
   createNotificationSafe.mockReset()
   claimScheduledNotification.mockReset()
   recomputeChallenge.mockReset()
+  progressLogGroupBy.mockReset()
   claimScheduledNotification.mockResolvedValue(true)
   recomputeChallenge.mockResolvedValue(undefined)
+  progressLogGroupBy.mockResolvedValue([])
 })
 
 describe('runChallengeEndingNotifications', () => {
@@ -110,11 +114,55 @@ describe('runChallengeEndingNotifications', () => {
         { id: 'c3', kind: 'custom', customTitle: 'Legacy', endsAt: new Date(Date.now() - HOUR), scoringType: null },
       ])
     participantFindMany.mockResolvedValueOnce([
-      { userId: 'a', rank: 1, user: { profile: { displayName: 'A', username: 'a' } } },
+      { userId: 'a', rank: null, user: { profile: { displayName: 'A', username: 'a' } } },
     ])
 
     await runChallengeEndingNotifications(log)
 
     expect(recomputeChallenge).not.toHaveBeenCalled()
+  })
+
+  it('legacy challenge: winner is the top progress-log total, not the earliest joiner', async () => {
+    challengeFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'c4', kind: 'custom', customTitle: 'Legacy Race', endsAt: new Date(Date.now() - HOUR), scoringType: null },
+      ])
+    // `early` joined first (rank null for everyone in legacy), `late` logged more.
+    participantFindMany.mockResolvedValueOnce([
+      { userId: 'early', rank: null, user: { profile: { displayName: 'Early', username: 'early' } } },
+      { userId: 'late', rank: null, user: { profile: { displayName: 'Late', username: 'late' } } },
+    ])
+    progressLogGroupBy.mockResolvedValueOnce([
+      { userId: 'early', _sum: { amount: 10 } },
+      { userId: 'late', _sum: { amount: 42 } },
+    ])
+
+    const res = await runChallengeEndingNotifications(log)
+
+    expect(res.ended).toBe(2)
+    const lateCall = createNotificationSafe.mock.calls.find((c) => (c[0] as any).recipientId === 'late')![0] as any
+    expect(lateCall.payload).toMatchObject({ winnerName: 'Late', youWon: true })
+    const earlyCall = createNotificationSafe.mock.calls.find((c) => (c[0] as any).recipientId === 'early')![0] as any
+    expect(earlyCall.payload).toMatchObject({ winnerName: 'Late', youWon: false })
+  })
+
+  it('legacy challenge with no logged scores announces no winner', async () => {
+    challengeFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'c5', kind: 'custom', customTitle: 'Empty', endsAt: new Date(Date.now() - HOUR), scoringType: null },
+      ])
+    participantFindMany.mockResolvedValueOnce([
+      { userId: 'a', rank: null, user: { profile: { displayName: 'A', username: 'a' } } },
+      { userId: 'b', rank: null, user: { profile: { displayName: 'B', username: 'b' } } },
+    ])
+    progressLogGroupBy.mockResolvedValueOnce([])
+
+    await runChallengeEndingNotifications(log)
+
+    const call = createNotificationSafe.mock.calls.find((c) => (c[0] as any).recipientId === 'a')![0] as any
+    expect(call.payload.winnerName).toBeNull()
+    expect(call.payload.youWon).toBe(false)
   })
 })

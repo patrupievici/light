@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/auth'
 import { getUserDisplayHints } from '../lib/user-display'
 import { decodePostPhotoBase64, saveStoryPhoto, deleteStoryPhoto } from '../lib/post-photo'
 import { acceptedFriendIds, blockedUserIds, areFriends, isBlockedEitherWay } from '../lib/friendships'
+import { stripControlChars } from '../lib/sanitize'
 
 const CreateStorySchema = z.object({
   caption: z.string().max(500).optional(),
@@ -27,8 +28,9 @@ export async function storyRoutes(app: FastifyInstance) {
     }
 
     const { caption, imageBase64, location } = parsed.data
-    const captionDb = caption?.trim() || null
-    const locationDb = location?.trim() || null
+    // Strip control chars (like posts.ts does for captions) — not just trim.
+    const captionDb = caption ? stripControlChars(caption) || null : null
+    const locationDb = location ? stripControlChars(location) || null : null
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
 

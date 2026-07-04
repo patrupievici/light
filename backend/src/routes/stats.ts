@@ -401,12 +401,21 @@ export async function statsRoutes(app: FastifyInstance) {
     const days = Math.min(180, Math.max(1, parseInt(q.days ?? '30', 10) || 30))
     const windowSince = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
+    // Bound the scan: fetch only the last 180 days of WORK sets (the max display
+    // window) plus a hard take cap, so a long-time user's entire set history is
+    // never loaded into memory at once. The running-max baseline is therefore the
+    // best within this window rather than all-time — an acceptable trade for the
+    // "recent PRs" celebration list. Consistent with cumulative-volume's window.
+    const PR_HISTORY_WINDOW_MS = 180 * 24 * 60 * 60 * 1000
+    const prHistorySince = new Date(Date.now() - PR_HISTORY_WINDOW_MS)
+
     const sets = await prisma.workoutSet.findMany({
       where: {
         tag: 'WORK',
         isCompleted: true,
         weightKg: { gt: 0 },
         reps: { gte: 1, lte: 30 },
+        createdAt: { gte: prHistorySince },
         workoutExercise: {
           workout: { userId, status: { in: ['completed', 'posted'] } },
         },
@@ -423,6 +432,7 @@ export async function statsRoutes(app: FastifyInstance) {
         },
       },
       orderBy: { createdAt: 'asc' },
+      take: 5000,
     })
 
     // Track running max per (exerciseId, reps). A set is a PR iff its weight

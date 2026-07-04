@@ -3,10 +3,10 @@ import { deepSeekChat } from './deepseek.service'
 import { parseJsonFromModel } from '../lib/ai-helpers'
 
 const MacroEstimateSchema = z.object({
-  calories: z.coerce.number().nonnegative().optional(),
-  proteinG: z.coerce.number().nonnegative(),
-  carbsG: z.coerce.number().nonnegative(),
-  fatG: z.coerce.number().nonnegative(),
+  calories: z.coerce.number().nonnegative().max(20000).optional(),
+  proteinG: z.coerce.number().nonnegative().max(2000),
+  carbsG: z.coerce.number().nonnegative().max(2000),
+  fatG: z.coerce.number().nonnegative().max(2000),
 })
 
 const MealItemSchema = z.object({

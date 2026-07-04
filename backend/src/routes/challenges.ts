@@ -192,7 +192,9 @@ export async function challengeRoutes(app: FastifyInstance) {
       // would spam strangers and, for friends-visibility challenges, create
       // dead-end invites a non-friend could never accept.
       const friendSet = new Set(await acceptedFriendIds(userId))
-      const invitees = inviteUserIds.filter((uid) => uid !== userId && friendSet.has(uid))
+      // De-dupe: a repeated ID must not send multiple invite notifications
+      // (participant createMany is skipDuplicates-safe; the notify loop is not).
+      const invitees = [...new Set(inviteUserIds.filter((uid) => uid !== userId && friendSet.has(uid)))]
       if (invitees.length) {
         await prisma.challengeParticipant.createMany({
           data: invitees.map((uid) => ({ challengeId: row.id, userId: uid, status: 'invited' })),

@@ -23,6 +23,17 @@ export async function pushRoutes(app: FastifyInstance) {
     }
     const { token, platform } = parsed.data
 
+    // Guard against token-ownership hijack: the row is keyed on the unique
+    // `token`, so an upsert alone would let any caller reassign a token already
+    // registered to another user. If the token exists under a different userId,
+    // drop that stale row first so the upsert re-creates it owned by the caller
+    // (this device now owns the token) without silently rerouting the other
+    // user's notifications through an update.
+    const existing = await prisma.userPushToken.findUnique({ where: { token } })
+    if (existing && existing.userId !== userId) {
+      await prisma.userPushToken.delete({ where: { token } })
+    }
+
     await prisma.userPushToken.upsert({
       where: { token },
       create: { userId, token, platform },

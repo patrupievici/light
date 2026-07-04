@@ -130,6 +130,9 @@ function terraProviderToZvelt(provider: unknown) {
   return normalized || 'unknown'
 }
 
+/** Replay-window tolerance for a signed Terra webhook timestamp (±5 minutes). */
+const TERRA_SIGNATURE_TOLERANCE_MS = 5 * 60 * 1000
+
 function verifyTerraSignature({
   signatureHeader,
   rawBody,
@@ -151,6 +154,14 @@ function verifyTerraSignature({
   const timestamp = parts.t
   const signature = parts.v1
   if (!timestamp || !signature) return false
+
+  // Replay guard: reject a signed request whose timestamp is outside a ±5-minute
+  // window. Terra sends `t` as Unix seconds; tolerate a millisecond value too
+  // (>= 1e12) so either format is handled.
+  const tNum = Number(timestamp)
+  if (!Number.isFinite(tNum)) return false
+  const tMs = tNum >= 1e12 ? tNum : tNum * 1000
+  if (Math.abs(Date.now() - tMs) > TERRA_SIGNATURE_TOLERANCE_MS) return false
 
   const expected = crypto
     .createHmac('sha256', secret)
@@ -1014,6 +1025,14 @@ export async function integrationsRoutes(app: FastifyInstance) {
           message: 'Invalid wearable webhook secret.',
         })
       }
+    } else {
+      // Fail closed: with NO webhook secret configured we cannot authenticate
+      // the caller. Accepting the body would let anyone import health data or
+      // flip wearableConnection.status for arbitrary reference_id users.
+      return reply.code(401).send({
+        error: 'UNAUTHORIZED',
+        message: 'Webhook authentication is not configured.',
+      })
     }
 
     const body = (request.body ?? {}) as any

@@ -329,6 +329,26 @@ export async function computeRanks(
     // Single source of truth for the >20% SR-jump heuristic (anti-cheat.service).
     const isAnomaly = isSrAnomaly(sr, prevSr)
 
+    // Persist the anomaly signal so a >20% SR jump is auditable (CLAUDE.md
+    // anti-cheat): previously `isAnomaly` was only returned and the /complete
+    // caller discarded it, so nothing was ever recorded. Best-effort analytics
+    // row — a write failure must never break rank computation.
+    if (isAnomaly) {
+      void prisma.analyticsEvent
+        .create({
+          data: {
+            userId,
+            eventName: 'rank_anomaly',
+            props: {
+              exerciseId: we.exerciseId,
+              sr: Math.round(sr * 1000) / 1000,
+              prevSr: Math.round(prevSr * 1000) / 1000,
+            },
+          },
+        })
+        .catch(() => {})
+    }
+
     // Keep the stored best consistent with lpTotal: only overwrite bestE1rmKg /
     // strengthRatio when THIS session owns the (new) max LP. Previously a lighter
     // session dropped the stored 'best' e1RM/SR while lpTotal kept the max, so

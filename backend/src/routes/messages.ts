@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { createNotificationSafe } from '../services/notification.service'
-import { areFriends, isBlockedEitherWay } from '../lib/friendships'
+import { areFriends, isBlockedEitherWay, blockedUserIds } from '../lib/friendships'
 
 function orderedUserIds(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a]
@@ -36,7 +36,13 @@ export async function messagesRoutes(app: FastifyInstance) {
       },
     })
 
-    const data = rows.map((c) => {
+    // Exclude threads whose peer is blocked either-way: blocking severs the DM
+    // relationship, so those conversations must not surface in the list.
+    const blocked = new Set(await blockedUserIds(me))
+
+    const data = rows
+      .filter((c) => !blocked.has(peerIdFromConversation(c, me)))
+      .map((c) => {
       const peer = c.userLowId === me ? c.userHigh : c.userLow
       const last = c.messages[0]
       return {
@@ -135,6 +141,17 @@ export async function messagesRoutes(app: FastifyInstance) {
       return reply.code(404).send({
         error: 'NOT_FOUND',
         message: 'Conversație inexistentă',
+        requestId: request.id,
+      })
+    }
+
+    // Re-check the block relationship on read (like the send path): a block in
+    // either direction must stop the viewer from reading the thread too.
+    const peer = peerIdFromConversation(conv, me)
+    if (await isBlockedEitherWay(me, peer)) {
+      return reply.code(403).send({
+        error: 'BLOCKED',
+        message: 'Nu poți mesaja acest utilizator',
         requestId: request.id,
       })
     }

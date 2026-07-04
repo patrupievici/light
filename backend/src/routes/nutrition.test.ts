@@ -110,7 +110,24 @@ beforeEach(() => {
   for (const m of [nutritionPlanDay, nutritionLogDay, nutritionMealTemplate, userProfile, userTrainingProfile, analyticsEvent]) {
     Object.values(m).forEach((fn) => (fn as ReturnType<typeof vi.fn>).mockReset())
   }
-  transaction.mockReset()
+  // $transaction supports both forms the routes use: the callback form
+  // `$transaction(fn, opts)` (claim-xp Serializable award, generate-weekly
+  // upsert) invokes fn with a tx exposing the same spies; the legacy array form
+  // just resolves the array. Individual tests can override (e.g. mockRejected).
+  transaction.mockReset().mockImplementation(async (arg: unknown) => {
+    if (typeof arg === 'function') {
+      const tx = {
+        nutritionPlanDay,
+        nutritionLogDay,
+        nutritionMealTemplate,
+        userProfile,
+        userTrainingProfile,
+        analyticsEvent,
+      }
+      return (arg as (t: unknown) => unknown)(tx)
+    }
+    return Array.isArray(arg) ? arg : []
+  })
   generateWeeklyMealPlanWithDeepSeek.mockReset().mockResolvedValue(null)
   computeNutritionDayXp.mockReset()
   searchOffByName.mockReset().mockResolvedValue([])
@@ -416,7 +433,9 @@ describe('POST /v1/nutrition/claim-xp — idempotency', () => {
       payload: { entries: [{ calories: 600, proteinG: 50, carbsG: 60, fatG: 20 }] },
     })
     computeNutritionDayXp.mockReturnValue({ sessionXp: 30, breakdown: [{ macro: 'protein' }], ageMultiplier: 1, bonusApplied: true })
-    transaction.mockResolvedValue([])
+    // The award runs inside the callback-form $transaction; the profile update
+    // uses `increment` and returns the fresh total.
+    userProfile.update.mockResolvedValue({ gameXpTotal: 130 })
     const app = await buildApp()
     const res = await app.inject({
       method: 'POST',
@@ -425,8 +444,43 @@ describe('POST /v1/nutrition/claim-xp — idempotency', () => {
     })
     expect(res.statusCode).toBe(200)
     expect(res.json()).toMatchObject({ alreadyClaimed: false, day: '2026-06-13', xpAwarded: 30, bonusApplied: true })
-    // The update + claim-event create happen atomically.
+    // The update + claim-event create happen atomically, and the XP write is an
+    // atomic increment (never a stale read-modify-write).
     expect(transaction).toHaveBeenCalledOnce()
+    expect(userProfile.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { gameXpTotal: { increment: 30 } } }),
+    )
+    await app.close()
+  })
+
+  it('treats a concurrent/serialization-aborted claim as alreadyClaimed (no double award)', async () => {
+    // Outer idempotency check passes (null), then the Serializable award tx
+    // aborts on a write conflict; the catch re-reads the winner's claim event.
+    analyticsEvent.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        props: { day: '2026-06-13', xpAwarded: 30, breakdown: [{ macro: 'protein' }] },
+      })
+    userProfile.findUnique.mockResolvedValue({
+      dailyCalories: 2200, dailyProtein: 150, dailyCarbs: 250, dailyFat: 70,
+      bodyweightKg: 80, birthYear: 1984, sex: 'male', gameXpTotal: 100,
+    })
+    nutritionLogDay.findUnique.mockResolvedValue({
+      payload: { entries: [{ calories: 600, proteinG: 50, carbsG: 60, fatG: 20 }] },
+    })
+    computeNutritionDayXp.mockReturnValue({ sessionXp: 30, breakdown: [{ macro: 'protein' }], ageMultiplier: 1, bonusApplied: true })
+    const serErr = Object.assign(new Error('serialization failure'), { code: 'P2034' })
+    transaction.mockRejectedValueOnce(serErr)
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/nutrition/claim-xp',
+      payload: { date: '2026-06-13' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toMatchObject({ alreadyClaimed: true, day: '2026-06-13', xpAwarded: 30 })
+    // No XP was written by this loser request.
+    expect(userProfile.update).not.toHaveBeenCalled()
     await app.close()
   })
 })

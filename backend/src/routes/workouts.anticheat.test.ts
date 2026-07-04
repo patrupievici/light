@@ -10,7 +10,10 @@ const workoutSetUpdate = vi.fn()
 const workoutSetCreate = vi.fn()
 const workoutSetDelete = vi.fn()
 const workoutExerciseFindFirst = vi.fn()
+const workoutExerciseFindUnique = vi.fn()
+const workoutExerciseCreate = vi.fn()
 const workoutFindFirst = vi.fn()
+const exerciseFindFirst = vi.fn()
 const setEditAuditCreate = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
@@ -20,6 +23,11 @@ vi.mock('../lib/prisma', () => ({
     },
     workoutExercise: {
       findFirst: (...a: unknown[]) => workoutExerciseFindFirst(...a),
+      findUnique: (...a: unknown[]) => workoutExerciseFindUnique(...a),
+      create: (...a: unknown[]) => workoutExerciseCreate(...a),
+    },
+    exercise: {
+      findFirst: (...a: unknown[]) => exerciseFindFirst(...a),
     },
     workoutSet: {
       findFirst: (...a: unknown[]) => workoutSetFindFirst(...a),
@@ -55,6 +63,9 @@ beforeEach(() => {
   workoutSetCreate.mockReset()
   workoutSetDelete.mockReset()
   workoutExerciseFindFirst.mockReset()
+  workoutExerciseFindUnique.mockReset()
+  workoutExerciseCreate.mockReset()
+  exerciseFindFirst.mockReset()
   workoutFindFirst.mockReset()
   setEditAuditCreate.mockReset()
   // Default: audit create resolves so the chained .catch() doesn't reject.
@@ -332,6 +343,69 @@ describe('set mutation guard — completed workout is immutable', () => {
 
     expect(res.statusCode).toBe(204)
     expect(workoutSetDelete).toHaveBeenCalledOnce()
+    await app.close()
+  })
+})
+
+// Completed workouts are immutable on the ADD paths too — adding an exercise or
+// a set after /complete would drift XP/ranks/standings.
+const ADD_EX_URL = '/v1/workouts/w1/exercises'
+const EX_ID = '11111111-1111-1111-1111-111111111111'
+
+describe('add-path guard — completed workout is immutable', () => {
+  it('POST exercise → 409 WORKOUT_COMPLETED when the parent workout is not a draft', async () => {
+    workoutFindFirst.mockResolvedValue({ id: 'w1', userId: 'u1', status: 'completed' })
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST', url: ADD_EX_URL, payload: { exerciseId: EX_ID },
+    })
+
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: 'WORKOUT_COMPLETED' })
+    // Rejected before the exercise is validated or created.
+    expect(exerciseFindFirst).not.toHaveBeenCalled()
+    expect(workoutExerciseCreate).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('POST set → 409 WORKOUT_COMPLETED when the parent workout is not a draft', async () => {
+    workoutExerciseFindFirst.mockResolvedValue({ id: 'we1', workoutId: 'w1', exerciseId: 'ex1' })
+    workoutFindFirst.mockResolvedValue({ status: 'completed' })
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST', url: ADD_URL, payload: { weightKg: 100, reps: 5 },
+    })
+
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: 'WORKOUT_COMPLETED' })
+    expect(workoutSetCreate).not.toHaveBeenCalled()
+    await app.close()
+  })
+})
+
+// Exercise catalog validation on the add-exercise path: a bogus id (FK 500) or
+// another user's private custom exercise (IDOR) must be rejected, not attached.
+describe('add-exercise — exercise catalog validation', () => {
+  it('POST exercise → 404 EXERCISE_NOT_FOUND when the id is not a usable catalog/own exercise', async () => {
+    workoutFindFirst.mockResolvedValue({ id: 'w1', userId: 'u1', status: 'draft' })
+    exerciseFindFirst.mockResolvedValue(null) // not public and not owned by u1
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST', url: ADD_EX_URL, payload: { exerciseId: EX_ID },
+    })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toMatchObject({ error: 'EXERCISE_NOT_FOUND' })
+    // Scoping: public catalog exercises OR the caller's own custom ones only.
+    const whereArg = exerciseFindFirst.mock.calls[0][0] as {
+      where: { id: string; OR: Array<Record<string, unknown>> }
+    }
+    expect(whereArg.where.id).toBe(EX_ID)
+    expect(whereArg.where.OR).toEqual([{ isCustom: false }, { createdByUserId: 'u1' }])
+    expect(workoutExerciseCreate).not.toHaveBeenCalled()
     await app.close()
   })
 })

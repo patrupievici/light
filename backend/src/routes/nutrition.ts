@@ -357,9 +357,12 @@ export async function nutritionRoutes(app: FastifyInstance) {
     if (!upstream.ok) {
       const code =
         upstream.status === 429 ? 429 : upstream.status >= 500 ? 502 : upstream.status
+      // Don't echo the upstream body — the request URL carries the api_key and
+      // USDA may reflect it. Log server-side; return only a generic message.
+      app.log.warn({ status: upstream.status, body: text.slice(0, 500) }, 'USDA proxy POST upstream error')
       return reply.code(code).send({
         error: 'USDA_UPSTREAM',
-        message: text.slice(0, 500),
+        message: 'USDA request failed',
         requestId: request.id,
       })
     }
@@ -412,9 +415,12 @@ export async function nutritionRoutes(app: FastifyInstance) {
     const text = await upstream.text()
     if (!upstream.ok) {
       const code = upstream.status >= 500 ? 502 : upstream.status
+      // Don't echo the upstream body — the request URL carries the api_key and
+      // USDA may reflect it. Log server-side; return only a generic message.
+      app.log.warn({ status: upstream.status, body: text.slice(0, 500) }, 'USDA food detail upstream error')
       return reply.code(code).send({
         error: 'USDA_UPSTREAM',
-        message: text.slice(0, 500),
+        message: 'USDA request failed',
         requestId: request.id,
       })
     }
@@ -814,36 +820,80 @@ export async function nutritionRoutes(app: FastifyInstance) {
       })
     }
 
-    const newTotal = (profile.gameXpTotal ?? 0) + result.sessionXp
-    await prisma.$transaction([
-      prisma.userProfile.update({
-        where: { userId },
-        data: { gameXpTotal: newTotal },
-      }),
-      prisma.analyticsEvent.create({
-        data: {
+    // Award atomically. The outer findFirst above narrows the common case, but
+    // two concurrent requests can both pass it and double-award. We close the
+    // race by re-checking the claim event and awarding inside a single
+    // Serializable transaction: the XP write uses `increment` (never a stale
+    // read-modify-write), and either the in-tx recheck finds a prior claim or
+    // the Serializable isolation aborts the loser on a write conflict. Any of
+    // those outcomes is treated as "already claimed".
+    try {
+      const updatedProfile = await prisma.$transaction(
+        async (tx) => {
+          const dup = await tx.analyticsEvent.findFirst({
+            where: {
+              userId,
+              eventName: 'nutrition_xp_claimed',
+              props: { path: ['day'], equals: day } as unknown as Prisma.JsonFilter,
+            },
+            orderBy: { eventTime: 'desc' },
+          })
+          if (dup) {
+            throw new Error('ALREADY_CLAIMED')
+          }
+          await tx.analyticsEvent.create({
+            data: {
+              userId,
+              eventName: 'nutrition_xp_claimed',
+              props: {
+                day,
+                xpAwarded: result.sessionXp,
+                ageMultiplier: result.ageMultiplier,
+                bonusApplied: result.bonusApplied,
+                breakdown: result.breakdown as unknown as Prisma.InputJsonValue,
+              } as unknown as Prisma.InputJsonValue,
+            },
+          })
+          return tx.userProfile.update({
+            where: { userId },
+            data: { gameXpTotal: { increment: result.sessionXp } },
+          })
+        },
+        { isolationLevel: 'Serializable' },
+      )
+
+      return reply.send({
+        alreadyClaimed: false,
+        day,
+        xpAwarded: result.sessionXp,
+        breakdown: result.breakdown,
+        bonusApplied: result.bonusApplied,
+        ageMultiplier: result.ageMultiplier,
+        gameXp: gameXpPayload(updatedProfile.gameXpTotal ?? 0),
+      })
+    } catch {
+      // Concurrent claim: either the in-tx recheck found a prior event or the
+      // Serializable tx aborted (serialization failure). Re-read the winning
+      // claim and return it as already-claimed instead of double-awarding.
+      const prior = await prisma.analyticsEvent.findFirst({
+        where: {
           userId,
           eventName: 'nutrition_xp_claimed',
-          props: {
-            day,
-            xpAwarded: result.sessionXp,
-            ageMultiplier: result.ageMultiplier,
-            bonusApplied: result.bonusApplied,
-            breakdown: result.breakdown as unknown as Prisma.InputJsonValue,
-          } as unknown as Prisma.InputJsonValue,
+          props: { path: ['day'], equals: day } as unknown as Prisma.JsonFilter,
         },
-      }),
-    ])
-
-    return reply.send({
-      alreadyClaimed: false,
-      day,
-      xpAwarded: result.sessionXp,
-      breakdown: result.breakdown,
-      bonusApplied: result.bonusApplied,
-      ageMultiplier: result.ageMultiplier,
-      gameXp: gameXpPayload(newTotal),
-    })
+        orderBy: { eventTime: 'desc' },
+      })
+      if (prior) {
+        const props = (prior.props as Record<string, unknown> | null) ?? {}
+        return reply.send({
+          alreadyClaimed: true,
+          day,
+          xpAwarded: Number(props.xpAwarded ?? 0),
+          breakdown: props.breakdown ?? [],
+        })
+      }
+      throw new Error('CLAIM_XP_FAILED')
+    }
   })
 
   // ── Saved meal templates (per-user CRUD + apply) ───────────────────────────

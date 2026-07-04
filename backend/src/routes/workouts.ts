@@ -283,6 +283,17 @@ export async function workoutRoutes(app: FastifyInstance) {
       })
     }
 
+    // Completed workouts are immutable — adding an exercise post-completion would
+    // drift XP/ranks/standings already fixed at /complete. Same guard the
+    // PATCH/DELETE-set handlers use. Reject anything but a draft.
+    if (workout.status !== 'draft') {
+      return reply.code(409).send({
+        error: 'WORKOUT_COMPLETED',
+        message: 'Workout already completed',
+        requestId: request.id,
+      })
+    }
+
     const parsed = AddExerciseSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.code(400).send({
@@ -313,6 +324,25 @@ export async function workoutRoutes(app: FastifyInstance) {
           workoutExercise: await enrichWorkoutExerciseRow(existing as any),
         })
       }
+    }
+
+    // Validate the exercise is real and usable by THIS user before referencing
+    // it: an arbitrary/bogus id would 500 on the FK, and another user's private
+    // custom exercise must not be attachable (IDOR). Same scoping the
+    // routines/:id/start converter uses: catalog exercises OR the user's own.
+    const exercise = await prisma.exercise.findFirst({
+      where: {
+        id: parsed.data.exerciseId,
+        OR: [{ isCustom: false }, { createdByUserId: userId }],
+      },
+      select: { id: true },
+    })
+    if (!exercise) {
+      return reply.code(404).send({
+        error: 'EXERCISE_NOT_FOUND',
+        message: 'Exercise not found or not available to you',
+        requestId: request.id,
+      })
     }
 
     // Determina pozitia daca nu e specificata
@@ -354,6 +384,21 @@ export async function workoutRoutes(app: FastifyInstance) {
       return reply.code(404).send({
         error: 'NOT_FOUND',
         message: 'WorkoutExercise negasit',
+        requestId: request.id,
+      })
+    }
+
+    // Completed workouts are immutable — adding a set post-completion would drift
+    // XP/ranks/standings already fixed at /complete. Same guard the PATCH/DELETE
+    // set handlers use. Reject anything but a draft.
+    const parentWorkout = await prisma.workout.findFirst({
+      where: { id: workoutId, userId },
+      select: { status: true },
+    })
+    if (parentWorkout && parentWorkout.status !== 'draft') {
+      return reply.code(409).send({
+        error: 'WORKOUT_COMPLETED',
+        message: 'Workout already completed',
         requestId: request.id,
       })
     }

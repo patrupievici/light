@@ -104,6 +104,25 @@ describe('POST /v1/stories', () => {
     await app.close()
   })
 
+  it('strips control chars from caption and location before persisting', async () => {
+    story.create.mockResolvedValue({ id: 'st3', userId: 'u1', caption: null, location: null, imageUrl: null })
+    // NUL / BELL are C0 control chars stripped by stripControlChars; a plain
+    // space would survive, so their removal proves the sanitizer ran (not .trim).
+    const NUL = String.fromCharCode(0)
+    const BELL = String.fromCharCode(7)
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/stories',
+      payload: { caption: `hi${NUL}there`, location: `Gym${BELL}` },
+    })
+    expect(res.statusCode).toBe(201)
+    const arg = story.create.mock.calls[0][0] as { data: { caption: string; location: string } }
+    expect(arg.data.caption).toBe('hithere')
+    expect(arg.data.location).toBe('Gym')
+    await app.close()
+  })
+
   it('saves an attached photo via saveStoryPhoto (the /uploads/stories path, NOT posts)', async () => {
     story.create.mockResolvedValue({ id: 'st2', userId: 'u1', caption: null, location: null, imageUrl: null })
     story.update.mockResolvedValue({})

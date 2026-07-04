@@ -1,50 +1,68 @@
 import { prisma } from '../lib/prisma'
 
-const STREAK_GRACE_DAYS = 3
+// Day-based streak (spec): posting on 3 consecutive days keeps the streak; a
+// gap of 3+ calendar days without posting breaks it. Multiple posts on the same
+// UTC day count once — the streak is measured in distinct days, not raw posts.
+const STREAK_BREAK_GAP_DAYS = 3
+
+function utcDayKey(d: Date): string {
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Whole-day gap between two UTC day keys (YYYY-MM-DD), newer − older. */
+function dayKeyGap(newerKey: string, olderKey: string): number {
+  const [y1, m1, d1] = newerKey.split('-').map(Number)
+  const [y2, m2, d2] = olderKey.split('-').map(Number)
+  return Math.round((Date.UTC(y1, m1 - 1, d1) - Date.UTC(y2, m2 - 1, d2)) / 86_400_000)
+}
+
+/** Distinct UTC day keys with a post, most-recent first. */
+function distinctPostDaysDesc(posts: { createdAt: Date }[]): string[] {
+  // posts already ordered desc → Set preserves that order for the keys.
+  return [...new Set(posts.map((p) => utcDayKey(new Date(p.createdAt))))]
+}
+
+/** Consecutive-day run from the most recent day, breaking at a gap ≥ 3 days. */
+function consecutiveDayRun(dayKeys: string[]): number {
+  if (dayKeys.length === 0) return 0
+  let streak = 1
+  for (let i = 1; i < dayKeys.length; i++) {
+    const gap = dayKeyGap(dayKeys[i - 1], dayKeys[i])
+    if (gap < STREAK_BREAK_GAP_DAYS) streak++
+    else break
+  }
+  return streak
+}
 
 export async function updateStreak(userId: string): Promise<{
   currentStreak: number
   isAtRisk: boolean
 }> {
-  // Gaseste ultima postare anterioara
-  const lastPost = await prisma.post.findFirst({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  if (!lastPost) {
-    return { currentStreak: 1, isAtRisk: false }
-  }
-
-  const now = new Date()
-  const last = new Date(lastPost.createdAt)
-  const daysDiff = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
-
-  if (daysDiff > STREAK_GRACE_DAYS) {
-    // Streak broken
-    return { currentStreak: 1, isAtRisk: false }
-  }
-
-  // Numara streak-ul curent
   const posts = await prisma.post.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
     take: 100,
   })
 
-  let streak = 1
-  for (let i = 1; i < posts.length; i++) {
-    const curr = new Date(posts[i - 1].createdAt)
-    const prev = new Date(posts[i].createdAt)
-    const diff = Math.floor((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24))
-    if (diff <= STREAK_GRACE_DAYS) {
-      streak++
-    } else {
-      break
-    }
+  if (posts.length === 0) {
+    return { currentStreak: 1, isAtRisk: false }
   }
 
-  const daysUntilBreak = STREAK_GRACE_DAYS - daysDiff
+  const dayKeys = distinctPostDaysDesc(posts)
+  const nowKey = utcDayKey(new Date())
+  const gapSinceLast = dayKeyGap(nowKey, dayKeys[0])
+
+  if (gapSinceLast >= STREAK_BREAK_GAP_DAYS) {
+    // Streak broken — this post starts a fresh one.
+    return { currentStreak: 1, isAtRisk: false }
+  }
+
+  const streak = consecutiveDayRun(dayKeys)
+
+  const daysUntilBreak = STREAK_BREAK_GAP_DAYS - gapSinceLast
   const isAtRisk = daysUntilBreak <= 1
 
   return { currentStreak: streak, isAtRisk }
@@ -65,24 +83,15 @@ export async function getStreakStatus(userId: string): Promise<{
     return { currentStreak: 0, daysUntilBreak: 0, isAtRisk: false }
   }
 
-  const now = new Date()
-  const last = new Date(posts[0].createdAt)
-  const daysSinceLast = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
-  const daysUntilBreak = Math.max(0, STREAK_GRACE_DAYS - daysSinceLast)
+  const dayKeys = distinctPostDaysDesc(posts)
+  const nowKey = utcDayKey(new Date())
+  const gapSinceLast = dayKeyGap(nowKey, dayKeys[0])
+  const daysUntilBreak = Math.max(0, STREAK_BREAK_GAP_DAYS - gapSinceLast)
 
-  // Mirror updateStreak: streak resets to 1 once the last post is past the grace window
+  // Mirror updateStreak: streak resets to 1 once the last post is past the break window.
   let currentStreak = 1
-  if (daysSinceLast <= STREAK_GRACE_DAYS) {
-    for (let i = 1; i < posts.length; i++) {
-      const curr = new Date(posts[i - 1].createdAt)
-      const prev = new Date(posts[i].createdAt)
-      const diff = Math.floor((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24))
-      if (diff <= STREAK_GRACE_DAYS) {
-        currentStreak++
-      } else {
-        break
-      }
-    }
+  if (gapSinceLast < STREAK_BREAK_GAP_DAYS) {
+    currentStreak = consecutiveDayRun(dayKeys)
   }
 
   return {

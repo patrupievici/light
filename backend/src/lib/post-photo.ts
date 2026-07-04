@@ -62,7 +62,11 @@ export async function deleteStoryPhoto(imageUrl: string): Promise<void> {
   // get a path relative to `uploadsRoot/..`.
   if (!imageUrl.startsWith('/uploads/stories/')) return
   const filename = imageUrl.replace('/uploads/stories/', '')
-  const full = path.join(uploadsRoot(), 'stories', filename)
+  const root = uploadsRoot()
+  // Path-containment guard (mirror deleteUploadByUrl): refuse a filename that
+  // escapes the uploads root via `../` before touching the filesystem.
+  const full = path.resolve(root, 'stories', filename)
+  if (full !== root && !full.startsWith(root + path.sep)) return
   await fs.unlink(full).catch(() => {})
 }
 

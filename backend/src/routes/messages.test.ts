@@ -7,21 +7,34 @@ import Fastify from 'fastify'
 // + open flows.
 const friendshipFindFirst = vi.fn()
 const convFindFirst = vi.fn()
+const convFindMany = vi.fn()
 const convUpsert = vi.fn()
 const convUpdate = vi.fn()
+const msgFindMany = vi.fn()
+const msgFindFirst = vi.fn()
 const msgCreate = vi.fn()
 const notificationCreate = vi.fn()
+const blockFindMany = vi.fn(async (..._a: unknown[]) => [] as unknown[])
+const blockFindFirst = vi.fn(async (..._a: unknown[]) => null as unknown)
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
-    userBlock: { findMany: async () => [], findFirst: async () => null },
+    userBlock: {
+      findMany: (...a: unknown[]) => blockFindMany(...a),
+      findFirst: (...a: unknown[]) => blockFindFirst(...a),
+    },
     friendship: { findFirst: (...a: unknown[]) => friendshipFindFirst(...a) },
     directConversation: {
       findFirst: (...a: unknown[]) => convFindFirst(...a),
+      findMany: (...a: unknown[]) => convFindMany(...a),
       upsert: (...a: unknown[]) => convUpsert(...a),
       update: (...a: unknown[]) => convUpdate(...a),
     },
-    directMessage: { create: (...a: unknown[]) => msgCreate(...a) },
+    directMessage: {
+      findMany: (...a: unknown[]) => msgFindMany(...a),
+      findFirst: (...a: unknown[]) => msgFindFirst(...a),
+      create: (...a: unknown[]) => msgCreate(...a),
+    },
     notification: { create: (...a: unknown[]) => notificationCreate(...a) },
   },
 }))
@@ -52,10 +65,19 @@ beforeEach(() => {
   meId = 'me'
   friendshipFindFirst.mockReset()
   convFindFirst.mockReset()
+  convFindMany.mockReset()
   convUpsert.mockReset()
   convUpdate.mockReset()
+  msgFindMany.mockReset()
+  msgFindMany.mockResolvedValue([])
+  msgFindFirst.mockReset()
+  msgFindFirst.mockResolvedValue(null)
   msgCreate.mockReset()
   notificationCreate.mockReset()
+  blockFindMany.mockReset()
+  blockFindMany.mockResolvedValue([])
+  blockFindFirst.mockReset()
+  blockFindFirst.mockResolvedValue(null)
   notificationCreate.mockResolvedValue({ id: 'n1', userId: PEER, type: 'dm_message', actorId: 'me', payload: {} })
   convUpdate.mockResolvedValue({ id: 'c1' })
 })
@@ -169,6 +191,56 @@ describe('GET /v1/messages/conversations/:id/messages — read', () => {
     const res = await app.inject({ method: 'GET', url: '/v1/messages/conversations/c1/messages' })
 
     expect(res.statusCode).toBe(404)
+    await app.close()
+  })
+
+  it('403 BLOCKED when the peer is blocked either-way (read is gated like send)', async () => {
+    convFindFirst.mockResolvedValue({ id: 'c1', userLowId: 'me', userHighId: PEER })
+    blockFindFirst.mockResolvedValue({ id: 'b1' }) // a block exists
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/messages/conversations/c1/messages' })
+
+    expect(res.statusCode).toBe(403)
+    expect(res.json()).toMatchObject({ error: 'BLOCKED' })
+    // The messages are never loaded once the block gate trips.
+    expect(msgFindMany).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('returns the thread (chronological) when not blocked', async () => {
+    convFindFirst.mockResolvedValue({ id: 'c1', userLowId: 'me', userHighId: PEER })
+    msgFindMany.mockResolvedValue([
+      { id: 'm1', senderId: 'me', body: 'hi', createdAt: new Date('2026-01-01T00:00:00Z') },
+    ])
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/messages/conversations/c1/messages' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().data[0]).toMatchObject({ id: 'm1', body: 'hi' })
+    await app.close()
+  })
+})
+
+describe('GET /v1/messages/conversations — list', () => {
+  it('excludes conversations whose peer is blocked either-way', async () => {
+    convFindMany.mockResolvedValue([
+      {
+        id: 'c1', userLowId: 'me', userHighId: PEER, updatedAt: new Date('2026-01-02T00:00:00Z'),
+        messages: [], userLow: { id: 'me', profile: {} }, userHigh: { id: PEER, profile: { username: 'peer', displayName: 'Peer' } },
+      },
+      {
+        id: 'c2', userLowId: 'me', userHighId: 'blocked-user', updatedAt: new Date('2026-01-01T00:00:00Z'),
+        messages: [], userLow: { id: 'me', profile: {} }, userHigh: { id: 'blocked-user', profile: { username: 'b', displayName: 'B' } },
+      },
+    ])
+    blockFindMany.mockResolvedValue([{ blockerId: 'me', blockedId: 'blocked-user' }])
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/messages/conversations' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json().data as Array<{ conversationId: string }>
+    expect(data.map((c) => c.conversationId)).toEqual(['c1'])
     await app.close()
   })
 })

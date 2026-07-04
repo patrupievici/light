@@ -8,7 +8,7 @@ import { inferSportIntentFromProfile } from '../programming/sport-intent'
 import { ZVELT_APP_CONTEXT_FOR_AI } from '../ai/app-context'
 import { buildGoalGuidance, detectGoalIntents, goalTagsForIntent } from '../lib/goal-guidance'
 import { deepSeekChat } from './deepseek.service'
-import { parseJsonFromModel } from '../lib/ai-helpers'
+import { parseJsonFromModel, sanitizePromptInput } from '../lib/ai-helpers'
 import type { SuggestedExercise, WorkoutSuggestionResult } from './workout-generator.service'
 import { fetchLastWorkingWeights, heuristicWeightKg, roundToStep } from './workout-generator.service'
 import { getRecentProgression, formatProgressionForPrompt } from '../lib/progression-context'
@@ -244,7 +244,7 @@ USER_CONTEXT:
 - trainingLevel: ${JSON.stringify(trainingLevel ?? 'intermediate')}
 - daysPerWeek: ${tp?.daysPerWeek ?? 4}
 - sessionMinutes: ${tp?.sessionMinutes ?? 60}
-- injuriesLimitations: ${JSON.stringify((tp?.injuriesLimitations ?? '').slice(0, 400))}
+- injuriesLimitations: ${JSON.stringify(sanitizePromptInput((tp?.injuriesLimitations ?? '').slice(0, 400)))}
 ${onboardingGoalText ? `- userGoalNarrative: ${JSON.stringify(onboardingGoalText)}\n  (top priority — bias your picks toward this goal even when it tilts away from the enum bucket)` : ''}
 ${progressionBlock ? `\n${progressionBlock}` : ''}${buildGoalGuidance(onboardingGoalText)}
 

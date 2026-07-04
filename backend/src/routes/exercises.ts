@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
+import { isAdminTokenValid } from '../lib/admin-auth'
 import { MOVEMENT_PATTERNS, type MovementPattern } from '../constants/movement-patterns'
 import { buildMediaByExerciseId, enrichExerciseWithMedia } from '../lib/exercise-media'
 import { rankSubstitutes } from '../lib/exercise-substitution'
@@ -456,6 +457,17 @@ export async function exerciseRoutes(app: FastifyInstance) {
   // name/description. Auth-required; restricted to canonical (non-custom)
   // catalog exercises so users can't shadow others' custom rows.
   app.put('/:id/translations', { preHandler: authenticate }, async (request, reply) => {
+    // Shared catalog data — any authenticated user editing it would rewrite the
+    // localized name/description for EVERYONE. Gate on the admin token (there is
+    // no per-user admin role), same mechanism the /admin routes use.
+    if (!isAdminTokenValid(request.headers['x-admin-token'])) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        message: 'Admin token required to edit catalog translations.',
+        requestId: request.id,
+      })
+    }
+
     const { id } = request.params as { id: string }
 
     const parsed = UpsertTranslationSchema.safeParse(request.body)

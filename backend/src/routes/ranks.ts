@@ -117,7 +117,10 @@ export async function rankRoutes(app: FastifyInstance) {
 
   // GET /v1/ranks/leaderboard — leaderboard sezon curent
   app.get('/leaderboard', { preHandler: authenticate }, async (request, reply) => {
-    const query = request.query as { exerciseId?: string; limit?: string }
+    // Note: no per-exercise leaderboard — UserSeasonStat aggregates season LP
+    // across all exercises (no exerciseId column), so an `exerciseId` query param
+    // would silently return the overall board. Dropped to avoid misleading callers.
+    const query = request.query as { limit?: string }
     const limit = Math.min(100, parseInt(query.limit ?? '50'))
 
     const activeSeason = await prisma.season.findFirst({

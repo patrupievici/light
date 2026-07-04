@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import { isAdminTokenValid } from '../lib/admin-auth'
 import { runWeeklyPlanRegenForActiveUsers } from '../services/weekly-plan-cron.service'
 
 /**
@@ -15,12 +16,6 @@ import { runWeeklyPlanRegenForActiveUsers } from '../services/weekly-plan-cron.s
  * expose the endpoints with an empty-string token).
  */
 
-function isAuthorized(headerValue: unknown): boolean {
-  const configured = process.env.ADMIN_TOKEN
-  if (!configured || configured.length < 8) return false
-  return typeof headerValue === 'string' && headerValue === configured
-}
-
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', async (request, reply) => {
     if (!process.env.ADMIN_TOKEN || process.env.ADMIN_TOKEN.length < 8) {
@@ -30,7 +25,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         requestId: request.id,
       })
     }
-    if (!isAuthorized(request.headers['x-admin-token'])) {
+    if (!isAdminTokenValid(request.headers['x-admin-token'])) {
       return reply.code(401).send({
         error: 'UNAUTHORIZED',
         message: 'Missing or invalid X-Admin-Token header.',

@@ -385,8 +385,12 @@ Training profile: ${JSON.stringify({
           ? (trainingProfile.equipment as unknown[]).filter((x): x is string => typeof x === 'string')
           : [],
       ),
-      injuriesLimitations: trainingProfile?.injuriesLimitations ?? null,
-      gymExperience: trainingProfile?.gymExperience ?? null,
+      injuriesLimitations: trainingProfile?.injuriesLimitations
+        ? sanitizePromptInput(String(trainingProfile.injuriesLimitations))
+        : null,
+      gymExperience: trainingProfile?.gymExperience
+        ? sanitizePromptInput(String(trainingProfile.gymExperience))
+        : null,
     })}
 Current workout suggestion: ${JSON.stringify(suggestion)}`
 

@@ -47,8 +47,15 @@ async function isUserInSeasonTop10(userId: string): Promise<boolean> {
     where: { startsAt: { lte: now }, endsAt: { gte: now } },
   })
   if (!season) return false
+  // Anti-cheat "trusted tier" (CLAUDE.md): only accounts older than 30 days
+  // count toward the seasonal leaderboard, so a throwaway account can't claim a
+  // top-10 slot. Mirrors the filter in routes/ranks.ts.
+  const trustedBefore = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const top = await prisma.userSeasonStat.findMany({
-    where: { seasonId: season.id },
+    where: {
+      seasonId: season.id,
+      user: { createdAt: { lte: trustedBefore }, status: 'active' },
+    },
     orderBy: { lpSeason: 'desc' },
     take: 10,
     select: { userId: true },

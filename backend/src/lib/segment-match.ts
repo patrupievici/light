@@ -61,6 +61,29 @@ export type SegmentMatchOptions = {
   minCoverage?: number
 }
 
+/**
+ * Hard cap on points fed into the O(n·m) ordered scan. A recorded activity can
+ * carry tens of thousands of GPS samples; an un-capped nested Haversine loop
+ * over a hostile/huge track blocks the event loop. We evenly downsample any
+ * track (and, defensively, any polyline) longer than this before matching —
+ * even spacing preserves the shape so match quality stays reasonable.
+ */
+export const MAX_MATCH_POINTS = 3_000
+
+/**
+ * Return `points` unchanged when within `cap`, otherwise an evenly-spaced
+ * subsample of at most `cap` points that always keeps the first and last.
+ */
+export function downsampleEven<T>(points: T[], cap: number): T[] {
+  if (points.length <= cap || cap < 2) return points
+  const out: T[] = new Array(cap)
+  const step = (points.length - 1) / (cap - 1)
+  for (let i = 0; i < cap; i++) {
+    out[i] = points[Math.round(i * step)]
+  }
+  return out
+}
+
 // ─── Low-level geometry (pure) ───────────────────────────────────────────────
 
 /**
@@ -211,9 +234,14 @@ export function matchSegmentEffort(
     }
   }
 
-  const fwd = orderedProgress(polyline, track, corridorM)
-  const reversed = polyline.slice().reverse()
-  const rev = orderedProgress(reversed, track, corridorM)
+  // Cap the inputs before the O(n·m) scan so a huge activity can't stall the
+  // event loop. Even downsampling keeps the route shape intact.
+  const cappedPolyline = downsampleEven(polyline, MAX_MATCH_POINTS)
+  const cappedTrack = downsampleEven(track, MAX_MATCH_POINTS)
+
+  const fwd = orderedProgress(cappedPolyline, cappedTrack, corridorM)
+  const reversed = cappedPolyline.slice().reverse()
+  const rev = orderedProgress(reversed, cappedTrack, corridorM)
 
   const forwardOk = fwd.coverage >= minCoverage
   const reverseOk = rev.coverage >= minCoverage

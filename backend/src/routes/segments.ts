@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { normalizeRoutePoints } from './activities'
 import { matchSegmentEffort, type LatLng } from '../lib/segment-match'
+import { areFriends } from '../lib/friendships'
 
 // ─── Validation schemas ───────────────────────────────────────────────────────
 
@@ -15,7 +16,10 @@ const NearbyQuery = z.object({
 
 const CreateEffortBody = z.object({
   segmentId:    z.string().uuid(),
-  activityId:   z.string().uuid().optional(),
+  // Required: every leaderboard-eligible effort must reference an owned activity
+  // so it goes through the ownership + path/direction validation below. Without
+  // it a bare {segmentId, elapsedTimeS:1} would skip all checks and land rank 1.
+  activityId:   z.string().uuid(),
   elapsedTimeS: z.number().int().positive(),
   avgSpeedKmh:  z.number().positive().optional(),
 })
@@ -330,13 +334,28 @@ export async function segmentRoutes(app: FastifyInstance) {
 
   // ── GET /v1/users/:id/segment-efforts ─────────────────────────────────────
   // All efforts of a user, newest first, with segment metadata.
-  // Accessible by any authenticated user (segment efforts are public records).
+  // Privacy: a caller reading their OWN efforts sees everything. Reading another
+  // user's efforts only surfaces those whose SOURCE ACTIVITY is visible to the
+  // caller — public always, friends-only when an accepted friendship exists —
+  // mirroring canViewActivity in activities.ts. Efforts without a source
+  // activity (or from a `private` activity) are owner-only.
   app.get('/users/:id/segment-efforts', { preHandler: authenticate }, async (request, reply) => {
     const { id: targetUserId } = request.params as { id: string }
+    const { userId: viewerId } = request.user
     const q = request.query as { limit?: string; offset?: string }
 
     const limit  = Math.min(100, Math.max(1, parseInt(q.limit  ?? '20', 10) || 20))
     const offset = Math.max(0,               parseInt(q.offset ?? '0',  10) || 0)
+
+    const isOwn = viewerId === targetUserId
+    const isFriend = isOwn ? false : await areFriends(viewerId, targetUserId)
+    // SQL fragment restricting cross-user reads to visible source activities.
+    // Joined activity is aliased `a`; owner reads apply no restriction.
+    const visibilityClause = isOwn
+      ? ''
+      : isFriend
+        ? `AND a.visibility IN ('public', 'friends')`
+        : `AND a.visibility = 'public'`
 
     const [rows, countRows] = await Promise.all([
       prisma.$queryRawUnsafe<UserEffortRow[]>(
@@ -351,13 +370,17 @@ export async function segmentRoutes(app: FastifyInstance) {
            s.elev_gain_m
          FROM segment_efforts se
          JOIN segments s ON s.id = se.segment_id
-         WHERE se.user_id = $1
+         LEFT JOIN activities a ON a.id = se.activity_id
+         WHERE se.user_id = $1 ${visibilityClause}
          ORDER BY se.created_at DESC
          LIMIT $2 OFFSET $3`,
         targetUserId, limit, offset,
       ),
       prisma.$queryRawUnsafe<CountRow[]>(
-        `SELECT COUNT(*)::bigint AS count FROM segment_efforts WHERE user_id = $1`,
+        `SELECT COUNT(*)::bigint AS count
+         FROM segment_efforts se
+         LEFT JOIN activities a ON a.id = se.activity_id
+         WHERE se.user_id = $1 ${visibilityClause}`,
         targetUserId,
       ),
     ])

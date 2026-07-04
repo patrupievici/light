@@ -734,6 +734,16 @@ export async function authRoutes(app: FastifyInstance) {
     })
     if (rejectIfSoftDeleted(refreshUser, reply, request.id)) return
 
+    // Mirror the login path: a disabled (non-active) account must not be able to
+    // mint fresh sessions via a still-valid refresh token.
+    if (refreshUser && refreshUser.status !== 'active') {
+      return reply.code(403).send({
+        error: 'ACCOUNT_DISABLED',
+        message: 'Contul este dezactivat',
+        requestId: request.id,
+      })
+    }
+
     const identity = await prisma.authIdentity.findFirst({
       where: { userId: stored.userId },
     })
@@ -822,47 +832,6 @@ export async function authRoutes(app: FastifyInstance) {
     if (rawRefresh) {
       await prisma.refreshToken.deleteMany({ where: { tokenHash: hashRefreshToken(rawRefresh) } })
     }
-
-    return reply.code(204).send()
-  })
-
-  // DELETE /v1/auth/delete-account — anonimizare completă GDPR
-  app.delete('/delete-account', { preHandler: authenticate }, async (request, reply) => {
-    const { userId } = request.user
-
-    await prisma.$transaction(async (tx) => {
-      await tx.refreshToken.deleteMany({ where: { userId } })
-
-      await tx.postLike.deleteMany({ where: { userId } })
-      await tx.postComment.deleteMany({ where: { userId } })
-      await tx.post.deleteMany({ where: { userId } })
-
-      const workouts = await tx.workout.findMany({ where: { userId }, select: { id: true } })
-      const workoutIds = workouts.map((w) => w.id)
-      if (workoutIds.length > 0) {
-        await tx.workoutSet.deleteMany({ where: { workoutExercise: { workoutId: { in: workoutIds } } } })
-        await tx.workoutExercise.deleteMany({ where: { workoutId: { in: workoutIds } } })
-        await tx.workout.deleteMany({ where: { userId } })
-      }
-
-      await tx.nutritionLogDay.deleteMany({ where: { userId } }).catch(() => {})
-      await tx.nutritionPlanDay.deleteMany({ where: { userId } }).catch(() => {})
-
-      await tx.friendship.deleteMany({ where: { OR: [{ userId }, { friendUserId: userId }] } }).catch(() => {})
-      await tx.userExerciseRank.deleteMany({ where: { userId } }).catch(() => {})
-      // UserAchievement + UserSeasonStat have NO onDelete: Cascade, so leaving
-      // them blocks user.delete() with P2003 (FK violation). Every real user
-      // unlocks at least `first_workout`, so erasure was failing for everyone.
-      await tx.userAchievement.deleteMany({ where: { userId } }).catch(() => {})
-      await tx.userSeasonStat.deleteMany({ where: { userId } }).catch(() => {})
-      await tx.walletTransaction.deleteMany({ where: { wallet: { userId } } }).catch(() => {})
-      await tx.wallet.deleteMany({ where: { userId } }).catch(() => {})
-      await tx.analyticsEvent.deleteMany({ where: { userId } }).catch(() => {})
-
-      await tx.authIdentity.deleteMany({ where: { userId } })
-      await tx.userProfile.deleteMany({ where: { userId } })
-      await tx.user.delete({ where: { id: userId } })
-    })
 
     return reply.code(204).send()
   })

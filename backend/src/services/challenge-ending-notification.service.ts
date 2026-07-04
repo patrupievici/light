@@ -120,8 +120,32 @@ export async function runChallengeEndingNotifications(
       },
     })
     if (parts.length === 0) continue
-    const winner = parts.find((p) => p.rank === 1) ?? parts[0]
-    const winnerName = profileLabel(winner.user.profile)
+
+    // Pick the winner. Scored challenges have fresh ranks from the recompute
+    // above; legacy/manual ones (scoringType null) never rank participants, so
+    // derive standings from summed progress logs (buildStandings parity) rather
+    // than defaulting to the earliest joiner. No logged scores → no winner.
+    let winner: (typeof parts)[number] | null = null
+    if (c.scoringType) {
+      winner = parts.find((p) => p.rank === 1) ?? parts[0]
+    } else {
+      const sums = await prisma.challengeProgressLog.groupBy({
+        by: ['userId'],
+        where: { challengeId: c.id },
+        _sum: { amount: true },
+      })
+      const totals = new Map(sums.map((s) => [s.userId, Number(s._sum.amount ?? 0)]))
+      let best = 0
+      for (const p of parts) {
+        const total = totals.get(p.userId) ?? 0
+        if (total > best) {
+          best = total
+          winner = p
+        }
+      }
+      // best === 0 → nobody logged anything; announce no winner.
+    }
+    const winnerName = winner ? profileLabel(winner.user.profile) : null
     const title = challengeTitle(c)
     for (const p of parts) {
       const claimed = await claimScheduledNotification(
@@ -139,7 +163,7 @@ export async function runChallengeEndingNotifications(
           title,
           winnerName,
           myRank: p.rank ?? null,
-          youWon: p.userId === winner.userId,
+          youWon: winner ? p.userId === winner.userId : false,
           scoringType: c.scoringType ?? null,
         },
       })

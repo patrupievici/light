@@ -132,10 +132,19 @@ export function detectFormat(xml: string): ActivityFileFormat | null {
   return null
 }
 
-/** Rough well-formedness guard: balanced angle brackets and a closing tag. */
+/**
+ * Rough well-formedness guard: balanced angle brackets and a closing tag.
+ * Counts `<`/`>` with a bounded single-pass scan rather than `String.match`,
+ * which would allocate multi-million-element arrays on a 12–16 MB upload.
+ */
 function looksLikeXml(xml: string): boolean {
-  const opens = (xml.match(/</g) ?? []).length
-  const closes = (xml.match(/>/g) ?? []).length
+  let opens = 0
+  let closes = 0
+  for (let i = 0; i < xml.length; i++) {
+    const c = xml.charCodeAt(i)
+    if (c === 0x3c /* '<' */) opens++
+    else if (c === 0x3e /* '>' */) closes++
+  }
   return opens > 0 && opens === closes && /<\/[\w.-]+/.test(xml)
 }
 

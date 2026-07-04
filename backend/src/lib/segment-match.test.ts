@@ -5,6 +5,8 @@ import {
   pointToPolylineM,
   orderedProgress,
   matchSegmentEffort,
+  downsampleEven,
+  MAX_MATCH_POINTS,
   DEFAULT_CORRIDOR_M,
   type LatLng,
 } from './segment-match'
@@ -141,5 +143,38 @@ describe('matchSegmentEffort', () => {
     expect(matchSegmentEffort([], densify(SEGMENT)).direction).toBe('no-data')
     expect(matchSegmentEffort(SEGMENT, []).direction).toBe('no-data')
     expect(matchSegmentEffort(SEGMENT, [{ lat: 45, lng: 25 }]).direction).toBe('no-data')
+  })
+
+  it('caps a huge track so matching stays fast and still forward-matches', () => {
+    // A track with far more than MAX_MATCH_POINTS samples must be downsampled
+    // before the O(n·m) scan; a densely-sampled forward run still matches.
+    const huge: LatLng[] = []
+    const n = MAX_MATCH_POINTS * 5
+    for (let i = 0; i < n; i++) {
+      const f = i / (n - 1)
+      huge.push({ lat: 45.0 + 0.004 * f, lng: 25.0 })
+    }
+    const start = Date.now()
+    const res = matchSegmentEffort(SEGMENT, huge)
+    expect(Date.now() - start).toBeLessThan(1000)
+    expect(res.matched).toBe(true)
+    expect(res.direction).toBe('forward')
+  })
+})
+
+describe('downsampleEven', () => {
+  it('returns the input unchanged when within the cap', () => {
+    expect(downsampleEven(SEGMENT, 100)).toBe(SEGMENT)
+  })
+
+  it('caps to at most `cap` points, keeping first and last', () => {
+    const pts: LatLng[] = Array.from({ length: 10_000 }, (_, i) => ({
+      lat: 45 + i * 1e-5,
+      lng: 25,
+    }))
+    const out = downsampleEven(pts, MAX_MATCH_POINTS)
+    expect(out.length).toBe(MAX_MATCH_POINTS)
+    expect(out[0]).toBe(pts[0])
+    expect(out[out.length - 1]).toBe(pts[pts.length - 1])
   })
 })
