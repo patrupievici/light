@@ -358,6 +358,49 @@ function mondayOf(d: Date): string {
   return isoDay(x)
 }
 
+/**
+ * Idempotency guard for startProgramDay: the client re-fires POST /start-day
+ * every time the tracker is opened/exited uncompleted, which would otherwise
+ * mint a NEW planned calendar row + a NEW orphan draft workout each call. Before
+ * creating anything, look for today's still-open planned session (same user +
+ * day + title, not yet completed) and REUSE it — plus its live draft workout
+ * (the converter names the draft `From plan: <title>`). Returns null when there
+ * is nothing to reuse (→ caller creates fresh).
+ */
+export async function reuseExistingProgramDay(
+  userId: string,
+  day: string,
+  title: string,
+): Promise<{ workoutId: string | null; plannedWorkoutId: string; resolved: number } | null> {
+  const existingPlanned = await prisma.plannedWorkout.findFirst({
+    where: { userId, day, title, status: { in: ['pending', 'in_progress'] } },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!existingPlanned) return null
+
+  const existingWorkout = await prisma.workout.findFirst({
+    where: { userId, status: 'draft', notes: `From plan: ${title}` },
+    orderBy: { startedAt: 'desc' },
+    select: { id: true, _count: { select: { exercises: true } } },
+  })
+  if (existingWorkout) {
+    return {
+      workoutId: existingWorkout.id,
+      plannedWorkoutId: existingPlanned.id,
+      resolved: existingWorkout._count.exercises,
+    }
+  }
+
+  // Planned row exists but its draft is gone (e.g. discarded) — convert the SAME
+  // planned row rather than minting a duplicate calendar entry.
+  const result = await createWorkoutFromPlanned(userId, existingPlanned.id)
+  return {
+    workoutId: (result.workout as { id?: string } | null)?.id ?? null,
+    plannedWorkoutId: existingPlanned.id,
+    resolved: result.meta.resolved,
+  }
+}
+
 /** Materialize today's day → a PlannedWorkout + a live draft Workout for the tracker. */
 export async function startProgramDay(userId: string, program: ProgramRow & { title?: string }) {
   const tpl = getProgramTemplate(program.templateId)
@@ -365,12 +408,27 @@ export async function startProgramDay(userId: string, program: ProgramRow & { ti
   const built = await materializeCurrentDay(userId, program)
 
   const now = new Date()
+  const day = isoDay(now)
+  const title = `${tpl.title} — ${built.title}`
+
+  // Idempotent: re-firing start-day for the same session reuses today's still-open
+  // planned + draft instead of creating duplicate 'planned' rows / orphan drafts.
+  const reused = await reuseExistingProgramDay(userId, day, title)
+  if (reused) {
+    return {
+      workoutId: reused.workoutId,
+      plannedWorkoutId: reused.plannedWorkoutId,
+      day: built,
+      meta: { plannedWorkoutId: reused.plannedWorkoutId, resolved: reused.resolved, unresolved: [], reused: true },
+    }
+  }
+
   const planned = await prisma.plannedWorkout.create({
     data: {
       userId,
-      day: isoDay(now),
+      day,
       weekStart: mondayOf(now),
-      title: `${tpl.title} — ${built.title}`,
+      title,
       kind: 'gym',
       status: 'pending',
       exercisesJson: built.exercises as unknown as object,

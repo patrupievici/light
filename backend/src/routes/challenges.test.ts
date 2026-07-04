@@ -256,6 +256,41 @@ describe('DELETE /v1/challenges/:id/leave', () => {
   })
 })
 
+describe('POST /v1/challenges/:id/decline', () => {
+  it('declines a pending invite (204), scoped to status:invited only', async () => {
+    participantUpdateMany.mockResolvedValue({ count: 1 })
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: `/v1/challenges/${CID}/decline` })
+
+    expect(res.statusCode).toBe(204)
+    // The status filter is what prevents an accepted member from being unjoined.
+    expect((participantUpdateMany.mock.calls[0][0] as { where: object }).where).toEqual({
+      challengeId: CID,
+      userId: 'me',
+      status: 'invited',
+    })
+    await app.close()
+  })
+
+  it('409 NOT_INVITED when the caller is not in an invited state (never flips an accepted member)', async () => {
+    participantUpdateMany.mockResolvedValue({ count: 0 })
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: `/v1/challenges/${CID}/decline` })
+
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: 'NOT_INVITED' })
+    await app.close()
+  })
+
+  it('400 on a non-UUID id (no update attempted)', async () => {
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: '/v1/challenges/bad/decline' })
+    expect(res.statusCode).toBe(400)
+    expect(participantUpdateMany).not.toHaveBeenCalled()
+    await app.close()
+  })
+})
+
 describe('GET /v1/challenges/:id/participants', () => {
   it('returns the roster with a correct total, gated by visibility', async () => {
     challengeFindUnique.mockResolvedValue({ id: CID, creatorId: 'me', visibility: 'friends', endsAt: FUTURE })

@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import Fastify from 'fastify'
 import jwt from '@fastify/jwt'
+import * as crypto from 'crypto'
 
 // ── Mocks ───────────────────────────────────────────────────────────────────
 const authIdentityFindFirst = vi.fn()
 const authIdentityUpdate = vi.fn()
+const refreshTokenCreate = vi.fn().mockResolvedValue({})
+const refreshTokenFindUnique = vi.fn()
+const refreshTokenUpdate = vi.fn().mockResolvedValue({})
 const refreshTokenDeleteMany = vi.fn()
 const prismaTransaction = vi.fn()
 
@@ -16,13 +20,17 @@ vi.mock('../lib/prisma', () => ({
     },
     // issueSession persists a hashed refresh token on the login success path.
     refreshToken: {
-      create: vi.fn().mockResolvedValue({}),
+      create: (...a: unknown[]) => refreshTokenCreate(...a),
+      findUnique: (...a: unknown[]) => refreshTokenFindUnique(...a),
+      update: (...a: unknown[]) => refreshTokenUpdate(...a),
       deleteMany: (...a: unknown[]) => refreshTokenDeleteMany(...a),
     },
     user: { findUnique: vi.fn().mockResolvedValue({ status: 'active', softDeletedAt: null }) },
     $transaction: (...a: unknown[]) => prismaTransaction(...a),
   },
 }))
+
+const sha256 = (s: string) => crypto.createHash('sha256').update(s).digest('hex')
 
 // google-auth-library is imported at module top; stub it so the import is cheap
 // and never reaches the network.
@@ -39,7 +47,7 @@ vi.mock('../services/mail.service', () => ({
 // resetCodeForWindow() in tests derives the same codes as the route handlers.
 process.env.JWT_SECRET = 'test-secret-test-secret-test-secret-32'
 
-import { authRoutes, resetCodeForWindow, resetCodeWindow } from './auth'
+import { authRoutes, resetCodeForWindow, resetCodeWindow, deriveRotatedToken } from './auth'
 
 async function buildApp() {
   const app = Fastify()
@@ -54,6 +62,9 @@ async function buildApp() {
 beforeEach(() => {
   authIdentityFindFirst.mockReset()
   authIdentityUpdate.mockReset().mockResolvedValue({})
+  refreshTokenCreate.mockReset().mockResolvedValue({})
+  refreshTokenFindUnique.mockReset()
+  refreshTokenUpdate.mockReset().mockResolvedValue({})
   refreshTokenDeleteMany.mockReset().mockResolvedValue({ count: 0 })
   prismaTransaction.mockReset().mockResolvedValue([])
   sendPasswordResetEmail.mockClear()
@@ -429,6 +440,136 @@ describe('POST /v1/auth/password/reset — code verification', () => {
 
     expect(res.statusCode).toBe(400)
     expect(res.json()).toMatchObject({ error: 'INVALID_CODE' })
+    await app.close()
+  })
+})
+
+// ── Refresh rotation & the reuse grace window (#69) ─────────────────────────
+
+describe('POST /v1/auth/refresh — reuse grace window', () => {
+  const FUTURE = () => new Date(Date.now() + 30 * 86_400_000)
+
+  it('replays the SAME already-issued replacement token in-window (no new chain)', async () => {
+    const parentRaw = 'parent-raw-refresh-token'
+    const replacementRaw = deriveRotatedToken(parentRaw)
+    const parentHash = sha256(parentRaw)
+    const replacementHash = sha256(replacementRaw)
+
+    // Parent is already rotated (usedAt 1s ago → inside the 10s grace window);
+    // its deterministic replacement row already exists and is unused.
+    refreshTokenFindUnique.mockImplementation(async ({ where }: { where: { tokenHash: string } }) => {
+      if (where.tokenHash === parentHash) {
+        return { userId: 'u1', tokenHash: parentHash, usedAt: new Date(Date.now() - 1000), expiresAt: FUTURE() }
+      }
+      if (where.tokenHash === replacementHash) {
+        return { userId: 'u1', tokenHash: replacementHash, usedAt: null, expiresAt: FUTURE() }
+      }
+      return null
+    })
+    authIdentityFindFirst.mockResolvedValue({ userId: 'u1', email: 'u1@t.dev' })
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/refresh',
+      payload: { refreshToken: parentRaw },
+    })
+
+    expect(res.statusCode).toBe(200)
+    // Returns the EXISTING replacement — not a freshly minted independent chain.
+    expect(res.json().refreshToken).toBe(replacementRaw)
+    expect(res.json().accessToken).toBeTypeOf('string')
+    // No new refresh row created, and NOT treated as a compromise.
+    expect(refreshTokenCreate).not.toHaveBeenCalled()
+    expect(refreshTokenDeleteMany).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('treats an out-of-window reuse as a compromise (nukes sessions, 401)', async () => {
+    const parentRaw = 'stale-parent-token'
+    refreshTokenFindUnique.mockResolvedValue({
+      userId: 'u1',
+      tokenHash: sha256(parentRaw),
+      usedAt: new Date(Date.now() - 60_000), // 60s ago → beyond 10s grace
+      expiresAt: FUTURE(),
+    })
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/refresh',
+      payload: { refreshToken: parentRaw },
+    })
+
+    expect(res.statusCode).toBe(401)
+    expect(res.json()).toMatchObject({ error: 'TOKEN_REUSE_DETECTED' })
+    expect(refreshTokenDeleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
+    await app.close()
+  })
+
+  it('rotates a fresh (unused) token to its deterministic replacement', async () => {
+    const parentRaw = 'fresh-parent-token'
+    refreshTokenFindUnique.mockResolvedValue({
+      userId: 'u1',
+      tokenHash: sha256(parentRaw),
+      usedAt: null,
+      expiresAt: FUTURE(),
+    })
+    authIdentityFindFirst.mockResolvedValue({ userId: 'u1', email: 'u1@t.dev' })
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/refresh',
+      payload: { refreshToken: parentRaw },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().refreshToken).toBe(deriveRotatedToken(parentRaw))
+    // A brand-new session row IS created on the legitimate rotation path.
+    expect(refreshTokenCreate).toHaveBeenCalledOnce()
+    expect(refreshTokenUpdate).toHaveBeenCalledOnce() // parent marked used
+    await app.close()
+  })
+})
+
+// ── Logout revoke by refresh token (#88) ────────────────────────────────────
+
+describe('POST /v1/auth/logout', () => {
+  it('revokes by refresh-token hash even with NO access token', async () => {
+    refreshTokenDeleteMany.mockResolvedValue({ count: 1 })
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/logout',
+      payload: { refreshToken: 'client-refresh-token' },
+    })
+
+    expect(res.statusCode).toBe(204)
+    const wheres = refreshTokenDeleteMany.mock.calls.map((c) => (c[0] as { where: unknown }).where)
+    expect(wheres).toContainEqual({ tokenHash: sha256('client-refresh-token') })
+    await app.close()
+  })
+
+  it('still revokes all sessions for a valid access token (existing path)', async () => {
+    refreshTokenDeleteMany.mockResolvedValue({ count: 2 })
+    const app = await buildApp()
+    const accessToken = app.jwt.sign({ userId: 'u1', email: 'u1@t.dev' })
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/logout',
+      headers: { authorization: `Bearer ${accessToken}` },
+    })
+
+    expect(res.statusCode).toBe(204)
+    expect(refreshTokenDeleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
+    await app.close()
+  })
+
+  it('is an idempotent 204 with neither an access token nor a refresh token', async () => {
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: '/v1/auth/logout', payload: {} })
+    expect(res.statusCode).toBe(204)
     await app.close()
   })
 })

@@ -123,8 +123,74 @@ export async function recomputeChallenge(challengeId: string): Promise<void> {
   )
 }
 
+/** Recompute + persist ONLY `userId`'s own score slot for one challenge, without
+ *  reloading the whole roster. This is the SLO-safe path for POST /complete: a
+ *  completion only changes the completing user's data, so we recompute a single
+ *  participant instead of N heavy per-participant history loads.
+ *
+ *  NOTE: cross-participant re-ranking is intentionally DEFERRED here — we update
+ *  this user's `score` immediately but leave `rank` untouched. The full re-rank
+ *  (recomputeChallenge) still runs on the standings-read / background path so the
+ *  leaderboard order settles lazily without blocking the completion request. */
+export async function recomputeParticipantScore(challengeId: string, userId: string): Promise<void> {
+  const c = await prisma.challenge.findUnique({ where: { id: challengeId } })
+  if (!c || !c.scoringType) return
+
+  const p = await prisma.challengeParticipant.findUnique({
+    where: { challengeId_userId: { challengeId, userId } },
+  })
+  if (!p || p.status !== 'accepted') return
+
+  const type = c.scoringType as ChallengeScoringType
+  const rules = rulesFor(c)
+  const startAt = c.startsAt ?? c.createdAt
+  const endAt = c.endsAt
+  const acceptedAt = p.acceptedAt ?? p.joinedAt
+
+  const all = await loadScoringWorkouts(userId, startAt, endAt)
+  // Fairness (spec): only workouts done AFTER the user accepted count.
+  const afterAccept = all.filter((w) => w.startedAt >= acceptedAt)
+  const valid = validWorkoutsInWindow(afterAccept, rules, startAt, endAt)
+  let baseline: number | null = null
+  if (type === 'pr_battle' && c.ruleExerciseId) {
+    baseline = await prBaseline(userId, c.ruleExerciseId, startAt)
+  }
+  const result = computeScore({
+    type,
+    validWorkouts: valid,
+    rules,
+    exerciseId: c.ruleExerciseId ?? undefined,
+    baselineE1rm: baseline,
+    targetDays: c.ruleTargetDays ?? undefined,
+  })
+
+  await prisma.challengeParticipant.update({
+    where: { challengeId_userId: { challengeId, userId } },
+    data: { score: result.score, lastScoreUpdate: new Date() },
+  })
+}
+
+/** Recompute ONLY the completing user's score across their active, auto-scored
+ *  joined challenges. Cheap enough (one participant per challenge, not the whole
+ *  roster) to run synchronously on the POST /complete hot path. */
+export async function recomputeCompletingUserChallenges(userId: string): Promise<void> {
+  const now = new Date()
+  const parts = await prisma.challengeParticipant.findMany({
+    where: {
+      userId,
+      status: 'accepted',
+      challenge: { scoringType: { not: null }, endsAt: { gte: now } },
+    },
+    select: { challengeId: true },
+  })
+  for (const p of parts) {
+    await recomputeParticipantScore(p.challengeId, userId)
+  }
+}
+
 /** Recompute every active, auto-scored challenge this user participates in.
- *  Safe to call fire-and-forget after a workout completes/edits/deletes. */
+ *  Full-roster re-rank — use on the standings-read / background path, NOT
+ *  synchronously in POST /complete (see recomputeCompletingUserChallenges). */
 export async function recomputeUserChallenges(userId: string): Promise<void> {
   const now = new Date()
   const parts = await prisma.challengeParticipant.findMany({

@@ -453,10 +453,20 @@ export async function challengeRoutes(app: FastifyInstance) {
     const { userId: me } = request.user
     const id = requireUuidParam(request, reply)
     if (!id) return
-    await prisma.challengeParticipant.updateMany({
-      where: { challengeId: id, userId: me },
+    // Scope the flip to a still-pending invite: without the status filter,
+    // declining would knock an already-ACCEPTED member back to 'declined'
+    // (i.e. silently unjoin them). Only an 'invited' row is a valid decline.
+    const res = await prisma.challengeParticipant.updateMany({
+      where: { challengeId: id, userId: me, status: 'invited' },
       data: { status: 'declined' },
     })
+    if (res.count === 0) {
+      return reply.code(409).send({
+        error: 'NOT_INVITED',
+        message: 'No pending invite to decline',
+        requestId: request.id,
+      })
+    }
     return reply.code(204).send()
   })
 

@@ -140,6 +140,29 @@ function generateRefreshToken(): string {
   return crypto.randomBytes(64).toString('hex')
 }
 
+/** Canonical hash used to store/look up refresh tokens (never store raw). */
+function hashRefreshToken(raw: string): string {
+  return crypto.createHash('sha256').update(raw).digest('hex')
+}
+
+/**
+ * Deterministically derive the replacement token that a rotation of `parentRaw`
+ * mints. Keyed by the server secret (JWT_SECRET) so only the server can compute
+ * it — a client/attacker holding the parent token cannot pre-compute the chain.
+ *
+ * This makes the refresh-reuse grace window SAFE: a replay of an already-rotated
+ * token within the window re-derives the SAME replacement the legitimate rotation
+ * issued (rather than minting a brand-new independent chain), so both parties
+ * converge on one chain and TOKEN_REUSE_DETECTED still fires once a token is
+ * replayed beyond the grace window.
+ */
+export function deriveRotatedToken(parentRaw: string): string {
+  return crypto
+    .createHmac('sha256', process.env.JWT_SECRET ?? '')
+    .update(`refresh-rotate:${parentRaw}`)
+    .digest('hex')
+}
+
 // Per-route rate limiting for auth endpoints (CLAUDE.md: "rate limiting pe
 // auth endpoints (per IP + per email)"). The global limiter (100/min per IP)
 // is too loose for credential endpoints, so these get a tight 8/min bucket
@@ -164,14 +187,16 @@ async function issueSession(
   app: FastifyInstance,
   userId: string,
   email: string,
+  /** Pre-derived raw refresh token (rotation path passes the deterministic
+   *  replacement of the used token); defaults to a fresh random one. */
+  rawRefreshToken: string = generateRefreshToken(),
 ): Promise<{ accessToken: string; refreshToken: string }> {
   const accessToken = app.jwt.sign(
     { userId, email },
     { expiresIn: process.env.JWT_EXPIRES_IN ?? '15m' },
   )
 
-  const rawRefreshToken = generateRefreshToken()
-  const tokenHash = crypto.createHash('sha256').update(rawRefreshToken).digest('hex')
+  const tokenHash = hashRefreshToken(rawRefreshToken)
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS ?? 30))
 
@@ -686,10 +711,8 @@ export async function authRoutes(app: FastifyInstance) {
       })
     }
 
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(parsed.data.refreshToken)
-      .digest('hex')
+    const rawToken = parsed.data.refreshToken
+    const tokenHash = hashRefreshToken(rawToken)
 
     const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } })
 
@@ -701,46 +724,69 @@ export async function authRoutes(app: FastifyInstance) {
       })
     }
 
-    if (stored.usedAt) {
-      // Grace window: a benign client race or a lost-response retry can re-send
-      // a token whose rotation already succeeded server-side. Only treat reuse
-      // OLDER than the grace window as a genuine compromise (nuke all sessions);
-      // within the window, fall through and re-issue so we don't log out a
-      // legitimate user. The client also single-flights refreshes, so this is
-      // defense-in-depth.
-      const GRACE_MS = 10_000
-      if (Date.now() - stored.usedAt.getTime() > GRACE_MS) {
-        await prisma.refreshToken.deleteMany({ where: { userId: stored.userId } })
-        return reply.code(401).send({
-          error: 'TOKEN_REUSE_DETECTED',
-          message: 'Sesiune compromisa. Autentifica-te din nou.',
-          requestId: request.id,
-        })
-      }
-    }
-
-    // Block refresh for soft-deleted accounts (grace window). A soft-delete
-    // revokes refresh tokens, but a token issued elsewhere / a race could still
-    // arrive — this is the authoritative gate. No-op for active accounts.
+    // Block refresh for soft-deleted accounts. A soft-delete revokes refresh
+    // tokens, but a token issued elsewhere / a race could still arrive — this is
+    // the authoritative gate. No-op for active accounts. Checked before both the
+    // rotation and the grace-replay paths.
     const refreshUser = await prisma.user.findUnique({
       where: { id: stored.userId },
       select: { status: true, softDeletedAt: true },
     })
     if (rejectIfSoftDeleted(refreshUser, reply, request.id)) return
 
+    const identity = await prisma.authIdentity.findFirst({
+      where: { userId: stored.userId },
+    })
+
+    if (stored.usedAt) {
+      // Grace window: a benign client race or a lost-response retry can re-send
+      // a token whose rotation already succeeded server-side. Beyond the window,
+      // treat reuse as a genuine compromise (nuke all sessions). WITHIN the
+      // window, DO NOT mint a new independent chain (that would hand an attacker
+      // replaying a stolen token a valid parallel session and TOKEN_REUSE_DETECTED
+      // would never fire). Instead, replay the SAME replacement token the
+      // legitimate rotation already issued — re-derived deterministically from the
+      // used token — so both callers converge on one chain.
+      const GRACE_MS = 10_000
+      const withinGrace = Date.now() - stored.usedAt.getTime() <= GRACE_MS
+
+      if (withinGrace) {
+        const replacementRaw = deriveRotatedToken(rawToken)
+        const replacement = await prisma.refreshToken.findUnique({
+          where: { tokenHash: hashRefreshToken(replacementRaw) },
+        })
+        if (replacement && replacement.expiresAt >= new Date()) {
+          // Re-issue only a fresh (stateless) access token; return the ALREADY
+          // issued replacement refresh token. No new refresh row is created.
+          const accessToken = app.jwt.sign(
+            { userId: stored.userId, email: identity?.email ?? '' },
+            { expiresIn: process.env.JWT_EXPIRES_IN ?? '15m' },
+          )
+          return reply.send({ accessToken, refreshToken: replacementRaw })
+        }
+        // Replacement can't be resolved → fall through to the reuse path below.
+      }
+
+      await prisma.refreshToken.deleteMany({ where: { userId: stored.userId } })
+      return reply.code(401).send({
+        error: 'TOKEN_REUSE_DETECTED',
+        message: 'Sesiune compromisa. Autentifica-te din nou.',
+        requestId: request.id,
+      })
+    }
+
     await prisma.refreshToken.update({
       where: { tokenHash },
       data: { usedAt: new Date() },
     })
 
-    const identity = await prisma.authIdentity.findFirst({
-      where: { userId: stored.userId },
-    })
-
+    // Rotate to the DETERMINISTIC replacement of this token so a same-token
+    // replay within the grace window can reproduce it (see deriveRotatedToken).
     const { accessToken, refreshToken } = await issueSession(
       app,
       stored.userId,
       identity?.email ?? '',
+      deriveRotatedToken(rawToken),
     )
 
     return reply.send({ accessToken, refreshToken })
@@ -748,9 +794,35 @@ export async function authRoutes(app: FastifyInstance) {
   )
 
   // POST /v1/auth/logout
-  app.post('/logout', { preHandler: authenticate }, async (request, reply) => {
-    const user = request.user
-    await prisma.refreshToken.deleteMany({ where: { userId: user.userId } })
+  // Accepts an optional { refreshToken } body. The client's access token is
+  // usually already EXPIRED by logout time, so authenticating solely on it means
+  // the server-side revoke never runs. We therefore support BOTH:
+  //   1. a still-valid access token → revoke all of that user's sessions, and
+  //   2. a refresh token in the body → revoke by its hash regardless of the
+  //      access token's validity.
+  // No preHandler auth gate — either signal (or neither) yields an idempotent 204.
+  app.post('/logout', async (request, reply) => {
+    const body = (request.body ?? {}) as { refreshToken?: unknown }
+    const rawRefresh =
+      typeof body.refreshToken === 'string' && body.refreshToken.length > 0 ? body.refreshToken : null
+
+    // Path 1: valid access token → revoke every session for that user.
+    try {
+      await request.jwtVerify()
+      const userId = (request.user as { userId?: string } | undefined)?.userId
+      if (userId) {
+        await prisma.refreshToken.deleteMany({ where: { userId } })
+      }
+    } catch {
+      // Access token missing/expired — rely on the refresh-token path below.
+    }
+
+    // Path 2: revoke the specific refresh token by its hash (same hashing the
+    // refresh flow uses). Works even when the access token is expired/absent.
+    if (rawRefresh) {
+      await prisma.refreshToken.deleteMany({ where: { tokenHash: hashRefreshToken(rawRefresh) } })
+    }
+
     return reply.code(204).send()
   })
 

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { computeRanks } from '../services/ranking.service'
-import { recomputeUserChallenges } from '../services/challenge-recalc.service'
+import { recomputeCompletingUserChallenges } from '../services/challenge-recalc.service'
 import { evaluateWeightJump } from '../services/anti-cheat.service'
 import { checkAndAward } from '../services/achievement.service'
 import { recordWorkoutProgress } from '../services/session-reconcile.service'
@@ -922,8 +922,11 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
     }
 
     // Auto-update the user's active challenge standings from this workout.
+    // Only the completing user's own score is recomputed here (single participant)
+    // to stay within the completion SLO; the full cross-participant re-rank is
+    // deferred to the standings-read / background path.
     try {
-      await recomputeUserChallenges(userId)
+      await recomputeCompletingUserChallenges(userId)
     } catch (err: any) {
       app.log.warn({ err, userId }, 'Challenge recompute skipped after workout complete')
     }
