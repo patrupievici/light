@@ -89,6 +89,77 @@ describe('POST /v1/auth/signup — password policy', () => {
   })
 })
 
+describe('POST /v1/auth/attach-email — secure an instant account', () => {
+  function token(app: Awaited<ReturnType<typeof buildApp>>, userId = 'u1') {
+    return app.jwt.sign({ userId, email: `guest_${userId}@guest.zvelt.app` })
+  }
+
+  it('401 without a bearer token', async () => {
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/attach-email',
+      payload: { email: 'real@user.dev', password: 'longenoughpassword' },
+    })
+    expect(res.statusCode).toBe(401)
+    await app.close()
+  })
+
+  it('400 on a short password before any DB read', async () => {
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/attach-email',
+      headers: { authorization: `Bearer ${token(app)}` },
+      payload: { email: 'real@user.dev', password: 'short' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(authIdentityFindFirst).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('409 when the email belongs to a DIFFERENT user', async () => {
+    const app = await buildApp()
+    authIdentityFindFirst.mockResolvedValueOnce({ userId: 'someone-else', email: 'real@user.dev' })
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/attach-email',
+      headers: { authorization: `Bearer ${token(app)}` },
+      payload: { email: 'real@user.dev', password: 'longenoughpassword' },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: 'EMAIL_TAKEN' })
+    await app.close()
+  })
+
+  it('200 replaces the placeholder identity with real credentials', async () => {
+    const app = await buildApp()
+    // free email (findFirst for "taken"), then the account's existing identity.
+    authIdentityFindFirst
+      .mockResolvedValueOnce(null) // email not taken
+      .mockResolvedValueOnce({ id: 'id1', userId: 'u1', provider: 'email' }) // existing
+    const txUpdate = vi.fn().mockResolvedValue({})
+    prismaTransaction.mockImplementationOnce(async (fn: unknown) =>
+      typeof fn === 'function'
+        ? (fn as (tx: unknown) => unknown)({
+            authIdentity: { update: txUpdate, create: vi.fn() },
+            userProfile: { findUnique: vi.fn().mockResolvedValue(null), update: vi.fn() },
+          })
+        : [],
+    )
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/attach-email',
+      headers: { authorization: `Bearer ${token(app)}` },
+      payload: { email: 'real@user.dev', password: 'longenoughpassword' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toMatchObject({ ok: true, email: 'real@user.dev' })
+    expect(txUpdate).toHaveBeenCalledTimes(1)
+    await app.close()
+  })
+})
+
 describe('POST /v1/auth/login — credential check', () => {
   it('returns 401 INVALID_CREDENTIALS when the email has no identity', async () => {
     authIdentityFindFirst.mockResolvedValue(null)

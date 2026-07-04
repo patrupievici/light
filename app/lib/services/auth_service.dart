@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -477,8 +478,10 @@ class AuthService {
   Future<bool> continueAsGuest({String displayName = 'Athlete'}) async {
     final id = const Uuid().v4().replaceAll('-', '');
     final email = 'guest_$id@guest.zvelt.app';
-    // Backend only enforces length 8–128; this is ~34 chars with letters+digits.
-    final password = 'Gx${id}9';
+    // Password MUST be independent of the email — deriving it from the same
+    // uuid (the old `Gx${id}9`) meant anyone who learned the guest email could
+    // compute the password and take over the account. Use a CSPRNG.
+    final password = _randomSecret(32);
     final res = await signup(email: email, password: password, displayName: displayName);
     if (res == null) return false;
     try {
@@ -488,7 +491,19 @@ class AuthService {
     return true;
   }
 
-  /// Whether the active session is an anonymous guest account.
+  /// CSPRNG secret (url-safe base64) of at least [bytes] of entropy — used for
+  /// the auto-created account's password so it can never be derived from the
+  /// (guessable) guest email.
+  static String _randomSecret(int bytes) {
+    final rng = Random.secure();
+    final raw = List<int>.generate(bytes, (_) => rng.nextInt(256));
+    return base64Url.encode(raw).replaceAll('=', '');
+  }
+
+  /// Whether the active session is an auto-created account with NO real
+  /// (email/Google) credentials attached yet — i.e. it can't be recovered on
+  /// another device. Drives the "secure your account" prompt + logout warning.
+  /// (Stored under the legacy `is_guest` key; the account itself is a real one.)
   Future<bool> isGuest() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -496,6 +511,56 @@ class AuthService {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Alias with the accurate name — the account is real, it just isn't secured
+  /// with recoverable credentials yet.
+  Future<bool> needsAccountSecuring() => isGuest();
+
+  /// POST /v1/auth/attach-email — give the current auto-created account real,
+  /// recoverable credentials. On success the account is no longer "unsecured".
+  /// Throws [AttachEmailException] with `emailTaken` set when the email is used
+  /// by another account, or a plain message for validation/network errors.
+  Future<void> attachEmail(String email, String password,
+      {String? displayName}) async {
+    final token = await getAccessToken();
+    if (token == null) throw AttachEmailException('You are signed out.');
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            Uri.parse('$v1Base/auth/attach-email'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+              if (displayName != null && displayName.isNotEmpty)
+                'displayName': displayName,
+            }),
+          )
+          .timeout(httpTimeout);
+    } catch (e) {
+      throw AttachEmailException(_authNetworkHint());
+    }
+    if (res.statusCode == 200) {
+      // Account now has real credentials — clear the "unsecured" flag.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_keyIsGuest, false);
+      } catch (_) {/* best-effort */}
+      return;
+    }
+    final decoded = _tryDecodeJsonObject(res.body);
+    if (res.statusCode == 409 || decoded?['error'] == 'EMAIL_TAKEN') {
+      throw AttachEmailException('This email is already in use.', emailTaken: true);
+    }
+    throw AttachEmailException(
+      decoded?['message']?.toString() ??
+          'Could not secure the account (${res.statusCode}).',
+    );
   }
 
   Future<void> logout() async {
@@ -604,6 +669,16 @@ class PasswordResetException implements Exception {
   PasswordResetException(this.message, {this.invalidCode = false});
   final String message;
   final bool invalidCode;
+  @override
+  String toString() => message;
+}
+
+/// Thrown by [AuthService.attachEmail]. `emailTaken` lets the UI show an inline
+/// field error ("email already in use") vs. a generic failure.
+class AttachEmailException implements Exception {
+  AttachEmailException(this.message, {this.emailTaken = false});
+  final String message;
+  final bool emailTaken;
   @override
   String toString() => message;
 }

@@ -31,6 +31,12 @@ const ChangePasswordSchema = z.object({
   newPassword: z.string().min(8).max(128),
 })
 
+const AttachEmailSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+  displayName: z.string().max(80).optional(),
+})
+
 const ForgotPasswordSchema = z.object({
   email: z.string().email(),
 })
@@ -220,6 +226,70 @@ export async function authRoutes(app: FastifyInstance) {
         prisma.refreshToken.deleteMany({ where: { userId } }),
       ])
       return reply.send({ ok: true })
+    },
+  )
+
+  // POST /v1/auth/attach-email — give an instant (unsecured) account a real,
+  // recoverable email + password. New users enter the app on an auto-created
+  // account (guest_…@guest.zvelt.app); this replaces that placeholder identity
+  // with real credentials so the account can be recovered on another device.
+  // Without it, signing out an unsecured account orphaned all its data.
+  app.post(
+    '/attach-email',
+    {
+      preHandler: authenticate,
+      config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+    },
+    async (request, reply) => {
+      const parsed = AttachEmailSchema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_ERROR',
+          message: 'Enter a valid email and a password of 8-128 characters.',
+          requestId: request.id,
+        })
+      }
+      const { userId } = request.user
+      const { email, password, displayName } = parsed.data
+
+      // The email must be free (or already belong to THIS account — idempotent).
+      const taken = await prisma.authIdentity.findFirst({
+        where: { provider: 'email', email },
+      })
+      if (taken && taken.userId !== userId) {
+        return reply.code(409).send({
+          error: 'EMAIL_TAKEN',
+          message: 'This email is already in use.',
+          requestId: request.id,
+        })
+      }
+
+      const passwordHash = await hashPassword(password)
+      const existing = await prisma.authIdentity.findFirst({
+        where: { userId, provider: 'email' },
+      })
+
+      await prisma.$transaction(async (tx) => {
+        if (existing) {
+          // Replace the placeholder guest identity with real credentials.
+          await tx.authIdentity.update({
+            where: { id: existing.id },
+            data: { email, providerSubject: email, passwordHash },
+          })
+        } else {
+          await tx.authIdentity.create({
+            data: { userId, provider: 'email', providerSubject: email, email, passwordHash },
+          })
+        }
+        if (displayName) {
+          const profile = await tx.userProfile.findUnique({ where: { userId } })
+          if (profile && (profile.displayName == null || profile.displayName === '')) {
+            await tx.userProfile.update({ where: { userId }, data: { displayName } })
+          }
+        }
+      })
+
+      return reply.send({ ok: true, email })
     },
   )
 

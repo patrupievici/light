@@ -13,6 +13,7 @@ import '../../services/profile_service.dart';
 import '../../services/settings_store.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../login_screen.dart';
+import '../secure_account_screen.dart';
 import 'delete_account_screen.dart';
 import 'settings_kit.dart';
 
@@ -41,6 +42,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   bool _loading = true;
   bool _saving = false;
   String? _photoUrl;
+  /// Account has no real (email/Google) credentials yet — recoverable only
+  /// after "Secure your account".
+  bool _needsSecuring = false;
 
   @override
   void initState() {
@@ -59,6 +63,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   Future<void> _load() async {
     final me = await _profile.getMe(refresh: true);
+    final needsSecuring = await _auth.needsAccountSecuring();
     final p = me?['profile'] as Map<String, dynamic>?;
     if (!mounted) return;
     _name.text = p?['displayName']?.toString() ?? '';
@@ -67,8 +72,20 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     _emailController.text = me?['email']?.toString() ?? '';
     setState(() {
       _photoUrl = p?['photoUrl']?.toString();
+      _needsSecuring = needsSecuring;
       _loading = false;
     });
+  }
+
+  /// Opens the secure-account flow; refreshes state on success.
+  Future<void> _secureAccount() async {
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const SecureAccountScreen()),
+    );
+    if (ok == true && mounted) {
+      settingsSnack(context, 'Account secured — you can now sign in anywhere.');
+      await _load();
+    }
   }
 
   String get _initials {
@@ -214,6 +231,48 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   }
 
   Future<void> _logout() async {
+    // An unsecured account has no recoverable credentials — signing out loses
+    // access to it (and all its data) permanently. Warn hard and offer to
+    // secure it first instead of the normal confirm.
+    if (_needsSecuring) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (dCtx) => AlertDialog(
+          backgroundColor: ZveltTokens.surface,
+          title: const Text('Sign out without securing?'),
+          content: const Text(
+            "This account has no email or password yet, so you WON'T be able to "
+            'sign back in — your workouts, history and progress will be lost. '
+            'Secure it first to keep everything.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dCtx).pop('cancel'),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dCtx).pop('logout'),
+              child: const Text('Sign out anyway',
+                  style: TextStyle(color: ZveltTokens.error)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dCtx).pop('secure'),
+              child: const Text('Secure account'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || choice == null || choice == 'cancel') return;
+      if (choice == 'secure') {
+        await _secureAccount();
+        return;
+      }
+      // choice == 'logout' → fall through to the wipe.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      await widget.onLogout();
+      return;
+    }
+
     final ok = await settingsConfirm(
       context,
       title: 'Sign out?',
@@ -334,6 +393,15 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               const SettingsSectionTitle('Sign-in & security'),
               SettingsCard(
                 children: [
+                  if (_needsSecuring)
+                    SettingsRow(
+                      icon: AppIcons.shield_check,
+                      tint: SettingsTint.orange,
+                      title: 'Secure your account',
+                      subtitle:
+                          'Add an email + password so you can sign in on another device',
+                      onTap: _secureAccount,
+                    ),
                   SettingsRow(
                     icon: AppIcons.user,
                     tint: SettingsTint.orange,

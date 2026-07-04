@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../models/social_feed_post.dart';
 import '../../services/nutrition_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
+import '../secure_account_screen.dart';
 import '../../services/social_feed_service.dart';
 import '../../services/muscle_recovery_service.dart';
 import '../../services/workout_service.dart';
@@ -62,6 +64,9 @@ class _HomeTabState extends State<HomeTab> {
   int _weekCount = 0;
   int _weekGoal = 5;
   SocialFeedPost? _friendPost;
+  /// Auto-created account with no recoverable credentials yet → show the
+  /// persistent "secure your account" prompt until the user attaches an email.
+  bool _needsSecuring = false;
 
   @override
   void initState() {
@@ -101,6 +106,8 @@ class _HomeTabState extends State<HomeTab> {
     final calendar = (results[3] as List<DateTime>?) ?? const [];
     final posts = (results[4] as List<SocialFeedPost>?) ?? const [];
     final muscleLevels = (results[5] as Map<String, MuscleLevel>?) ?? const {};
+    final needsSecuring = await AuthService().needsAccountSecuring();
+    if (!mounted) return;
 
     final profile = me?['profile'] as Map<String, dynamic>?;
     final name = profile?['displayName'] as String?;
@@ -133,6 +140,7 @@ class _HomeTabState extends State<HomeTab> {
       _weekGoal = (daysPerWeek != null && daysPerWeek > 0) ? daysPerWeek : 5;
       _workoutToday = workedOutToday;
       _muscleLevels = muscleLevels;
+      _needsSecuring = needsSecuring;
       // "Friend activity" must be a FRIEND's post — the friends feed includes
       // the user's own posts, so drop those before taking the latest.
       final friendPosts =
@@ -193,6 +201,10 @@ class _HomeTabState extends State<HomeTab> {
           ),
           children: [
             _header(),
+            if (_needsSecuring) ...[
+              const SizedBox(height: ZveltTokens.s4),
+              _secureAccountBanner(),
+            ],
             const SizedBox(height: ZveltTokens.s5),
             _coachCard(),
             const SizedBox(height: ZveltTokens.s6),
@@ -216,6 +228,58 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: ZveltTokens.s3),
             _friendCard(),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ── Persistent "secure your account" prompt (unsecured auto-created account).
+  Widget _secureAccountBanner() {
+    return Semantics(
+      button: true,
+      label: 'Secure your account',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+          onTap: () async {
+            final ok = await Navigator.of(context).push<bool>(
+              MaterialPageRoute<bool>(
+                builder: (_) => const SecureAccountScreen(),
+              ),
+            );
+            if (ok == true && mounted) _load();
+          },
+          child: Container(
+            padding: const EdgeInsets.all(ZveltTokens.s4),
+            decoration: BoxDecoration(
+              color: ZveltTokens.brandTint,
+              borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+            ),
+            child: Row(
+              children: [
+                const Icon(AppIcons.shield_check, color: ZveltTokens.brand, size: 22),
+                const SizedBox(width: ZveltTokens.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Secure your account',
+                          style: ZType.bodyM.copyWith(
+                              color: ZveltTokens.text,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Add an email so you never lose your progress',
+                        style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(AppIcons.angle_small_right, color: ZveltTokens.brand),
+              ],
+            ),
+          ),
         ),
       ),
     );
