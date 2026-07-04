@@ -497,17 +497,34 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
 
   Future<void> _openShortcut(String key) async {
     final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    if (key == SettingsKeys.scEmpty) {
+      // Create the workout BEFORE dismissing the sheet. Previously the sheet
+      // popped first, then the un-awaited createWorkout threw into the void
+      // when offline — the button silently did nothing. Now a failure surfaces
+      // and the hub stays open so the user can retry.
+      WorkoutDto workout;
+      try {
+        workout = await WorkoutService().createWorkout(label: 'Empty workout');
+      } catch (_) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text(
+              "Couldn't start a workout. Check your connection and try again."),
+          backgroundColor: ZveltTokens.error,
+        ));
+        return;
+      }
+      if (!mounted) return;
+      nav.pop();
+      await nav.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => WorkoutTrackerScreen(workoutId: workout.id),
+        ),
+      );
+      return;
+    }
     nav.pop();
     switch (key) {
-      case SettingsKeys.scEmpty:
-        final workout =
-            await WorkoutService().createWorkout(label: 'Empty workout');
-        await nav.push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => WorkoutTrackerScreen(workoutId: workout.id),
-          ),
-        );
-        break;
       case SettingsKeys.scAi:
         await nav.push<void>(
             MaterialPageRoute<void>(builder: (_) => const AiChatScreen()));
@@ -1685,8 +1702,72 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
 
   // ── Gym live ───────────────────────────────────────────────────────────────
 
+  // Shown when the workout couldn't be created/loaded (offline / server error)
+  // — an honest retry state instead of a live-looking logger that drops sets.
+  Widget _bootstrapFailedView() {
+    return SafeArea(
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: Icon(AppIcons.cross_small, color: ZveltTokens.text2),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(AppIcons.gym, size: 48, color: ZveltTokens.text3),
+                  const SizedBox(height: 16),
+                  Text(
+                    _bootstrapError ??
+                        "Couldn't start this workout. Check your connection "
+                            'and try again.',
+                    textAlign: TextAlign.center,
+                    style: ZType.bodyM.copyWith(color: ZveltTokens.text2),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed:
+                        _bootstrapping ? null : () => _bootstrapGymWorkout(),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ZveltTokens.brand,
+                      foregroundColor: ZveltTokens.onBrand,
+                    ),
+                    child: Text(_bootstrapping ? 'Starting…' : 'Try again'),
+                  ),
+                  const SizedBox(height: ZveltTokens.s3),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: Text('Close',
+                        style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGymLive() {
     final exercises = _displayExercises;
+    // No server workout id yet. While bootstrapping → loader. If the bootstrap
+    // FAILED (e.g. offline createWorkout threw), show a retry state — NOT the
+    // live logger: _doneSet is guarded on `_workoutId != null`, so every set
+    // tap would silently no-op and Finish would discard the whole session.
+    if (_workoutId == null) {
+      if (_bootstrapping) {
+        return const Center(
+            child: CircularProgressIndicator(color: ZveltTokens.brand));
+      }
+      return _bootstrapFailedView();
+    }
     if (exercises.isEmpty) {
       // Still resolving the catalog → loader; otherwise a real dead-end (zero
       // matches, e.g. a Smart preset whose names aren't in the catalog) — show
