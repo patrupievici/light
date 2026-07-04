@@ -49,11 +49,16 @@ import '../social/race_hub_screen.dart';
 enum _PresetType { cardio, gym }
 
 class _GymExercise {
-  const _GymExercise(this.name, this.sets, this.repsRange, this.weight);
+  const _GymExercise(this.name, this.sets, this.repsRange, this.weight,
+      [this.fromHistory = false]);
   final String name;
   final int sets;
   final String repsRange;
   final String weight;
+  /// True when [weight] came from the user's real training history (safe to
+  /// prefill + log). False = a static preset number, which must NOT be
+  /// auto-logged as a real set — the user confirms it on the first set.
+  final bool fromHistory;
 }
 
 class FabPreset {
@@ -819,6 +824,11 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
   int _currentExIdx = 0;
   int _currentSet = 0; // 0-based
   double _currentWeightKg = 0;
+
+  /// Exercise indices whose (preset-sourced) weight the user has explicitly
+  /// confirmed at least once — so we prompt for confirmation only on the FIRST
+  /// set, never auto-logging a fabricated preset number.
+  final Set<int> _weightConfirmedExIdx = <int>{};
   int _currentReps = 8;
   double? _currentRpe;
   bool _resting = false;
@@ -869,9 +879,11 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
     _currentRpe = null;
   }
 
-  Future<void> _editSetValues() async {
+  /// Opens the set editor. Returns true when the user confirmed (values
+  /// applied), false on cancel or when the workout isn't ready.
+  Future<bool> _editSetValues() async {
     final exercises = _displayExercises;
-    if (_currentExIdx >= exercises.length) return;
+    if (_currentExIdx >= exercises.length) return false;
     final presetEx = exercises[_currentExIdx];
     if (_currentExIdx >= _workoutExercises.length) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -880,7 +892,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
           backgroundColor: ZveltTokens.warn,
         ),
       );
-      return;
+      return false;
     }
     final exercise = _workoutExercises[_currentExIdx].exercise;
     final result = await showDialog<(double, int, double?, String)?>(
@@ -893,12 +905,13 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
         title: presetEx.name,
       ),
     );
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) return false;
     setState(() {
       _currentWeightKg = result.$1;
       _currentReps = result.$2;
       _currentRpe = result.$3;
     });
+    return true;
   }
 
   Future<void> _bootstrapGymWorkout() async {
@@ -1042,7 +1055,10 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
         final weightLabel = histKg != null
             ? '${histKg.toStringAsFixed(histKg % 1 == 0 ? 0 : 1)} kg'
             : ex.weight;
-        display.add(_GymExercise(match.name, ex.sets, ex.repsRange, weightLabel));
+        // fromHistory = the weight is the user's real last working load (safe to
+        // log); otherwise it's a static preset number needing confirmation.
+        display.add(_GymExercise(
+            match.name, ex.sets, ex.repsRange, weightLabel, histKg != null));
       }
 
       // If the workout itself never reached the server (offline create), we can
@@ -1360,6 +1376,21 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
     final exercises = _displayExercises;
     if (exercises.isEmpty) return;
     final presetEx = exercises[_currentExIdx];
+
+    // A static preset weight (not the user's real history) must be confirmed on
+    // the FIRST set before it's logged — otherwise tapping "Done" records a
+    // fabricated number (e.g. a beginner's 140 kg deadlift) into e1RM/PRs/rank.
+    // On confirm we fall through and log the confirmed values; on cancel we
+    // stay put and log nothing.
+    if (!presetEx.fromHistory &&
+        !_weightConfirmedExIdx.contains(_currentExIdx) &&
+        !_loggingSet &&
+        _workoutId != null &&
+        _currentExIdx < _workoutExercises.length) {
+      final confirmed = await _editSetValues();
+      if (!mounted || !confirmed) return;
+      setState(() => _weightConfirmedExIdx.add(_currentExIdx));
+    }
 
     if (_workoutId != null &&
         _currentExIdx < _workoutExercises.length &&

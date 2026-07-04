@@ -141,8 +141,21 @@ export async function messagesRoutes(app: FastifyInstance) {
 
     const where: { conversationId: string; createdAt?: { lt: Date } } = { conversationId: id }
     if (q.before) {
-      const d = new Date(q.before)
-      if (!Number.isNaN(d.getTime())) where.createdAt = { lt: d }
+      // `before` is a message id (what the client holds) — resolve it to that
+      // message's createdAt. Fall back to parsing it as an ISO date for older
+      // clients. Previously a message-UUID `before` was fed to new Date() → NaN
+      // → the filter was dropped → the newest page returned every time →
+      // "Load earlier" duplicated the same messages forever.
+      const anchor = await prisma.directMessage.findFirst({
+        where: { id: q.before, conversationId: id },
+        select: { createdAt: true },
+      })
+      if (anchor) {
+        where.createdAt = { lt: anchor.createdAt }
+      } else {
+        const d = new Date(q.before)
+        if (!Number.isNaN(d.getTime())) where.createdAt = { lt: d }
+      }
     }
 
     const msgs = await prisma.directMessage.findMany({
@@ -152,6 +165,10 @@ export async function messagesRoutes(app: FastifyInstance) {
     })
 
     const chronological = [...msgs].reverse()
+    // nextCursor = the OLDEST message's id in this page, present only when the
+    // page was full (so there may be more). The client sends it as `before` to
+    // load the previous page; null signals the start of history.
+    const nextCursor = msgs.length === limit ? msgs[msgs.length - 1].id : null
     return reply.send({
       data: chronological.map((m) => ({
         id: m.id,
@@ -159,6 +176,7 @@ export async function messagesRoutes(app: FastifyInstance) {
         body: m.body,
         createdAt: m.createdAt.toISOString(),
       })),
+      next_cursor: nextCursor,
     })
   })
 

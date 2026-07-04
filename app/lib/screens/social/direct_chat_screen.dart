@@ -183,7 +183,10 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
         before: cursor,
       );
       if (!mounted) return;
-      final older = page.items;
+      // Dedupe on prepend: drop any ids already held so an overlapping page
+      // can't duplicate messages (defense-in-depth now the cursor is fixed).
+      final existing = _msgs.map((m) => m.id).toSet();
+      final older = page.items.where((m) => !existing.contains(m.id)).toList();
       setState(() {
         if (older.isNotEmpty) {
           _msgs.insertAll(0, older);

@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'offline_bootstrap_queue.dart';
 import 'offline_set_queue.dart';
+import 'settings_store.dart';
 
 /// App-wide bridge between connectivity changes and the offline set queue.
 /// UI subscribes to [pendingCount]; transitions to online auto-flush.
@@ -61,8 +63,20 @@ class OfflineSyncCoordinator with WidgetsBindingObserver {
     // Fire-and-forget + guarded so a teardown/error can never bubble into the
     // framework's lifecycle dispatch.
     if (state == AppLifecycleState.resumed && _started) {
-      unawaited(_safeFlush());
+      unawaited(_flushIfAutoAllowed());
     }
+  }
+
+  /// Resume-triggered auto-flush, gated by the Cloud Sync settings (reads the
+  /// current connectivity since a lifecycle event carries none).
+  Future<void> _flushIfAutoAllowed() async {
+    List<ConnectivityResult> results;
+    try {
+      results = await _connectivity.checkConnectivity();
+    } catch (_) {
+      results = const [ConnectivityResult.wifi]; // assume unrestricted on error
+    }
+    if (await _autoSyncAllowed(results)) await _safeFlush();
   }
 
   /// Enqueue + bump count. Use from screens that detect a failed set mutation
@@ -131,11 +145,33 @@ class OfflineSyncCoordinator with WidgetsBindingObserver {
     return results.any((r) => r != ConnectivityResult.none);
   }
 
+  bool _isCellular(List<ConnectivityResult> results) =>
+      results.contains(ConnectivityResult.mobile) &&
+      !results.contains(ConnectivityResult.wifi) &&
+      !results.contains(ConnectivityResult.ethernet);
+
+  /// Honors the user's Cloud Sync settings for AUTOMATIC flushes only (manual
+  /// "Sync now" always flushes). Auto-sync OFF → never auto-flush; "Sync on
+  /// cellular" OFF → skip auto-flush while on a cellular-only connection.
+  /// Defaults are ON, so the toggles only ever restrict behaviour.
+  Future<bool> _autoSyncAllowed(List<ConnectivityResult> results) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final auto = prefs.getBool(SettingsKeys.cloudAuto) ?? true;
+      if (!auto) return false;
+      final cellularOk = prefs.getBool(SettingsKeys.cloudCellular) ?? true;
+      if (!cellularOk && _isCellular(results)) return false;
+      return true;
+    } catch (_) {
+      return true; // best-effort: a prefs read failure must not strand the queue
+    }
+  }
+
   Future<void> _onChange(List<ConnectivityResult> results) async {
     final online = _isOnline(results);
     final transitionedOnline = online && !_wasOnline;
     _wasOnline = online;
-    if (transitionedOnline) {
+    if (transitionedOnline && await _autoSyncAllowed(results)) {
       await _safeFlush();
     } else {
       await _refreshCount();
