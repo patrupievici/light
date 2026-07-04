@@ -69,6 +69,7 @@ class SocialFeedPost {
     required this.likeCount,
     required this.commentCount,
     this.likedByMe = false,
+    this.bookmarkedByMe = false,
     required this.hideWeights,
     required this.hideReps,
     this.visibility = PostVisibility.friends,
@@ -89,6 +90,11 @@ class SocialFeedPost {
   /// `likedByMe` (camelCase) on /feed, /:id and the gallery list; older
   /// responses without the key default to false.
   final bool likedByMe;
+  /// Whether the CURRENT viewer already saved (bookmarked) this post. Backend
+  /// emits `bookmarkedByMe` on /feed, /:id, gallery and /me/bookmarks; older
+  /// responses without the key default to false. Without this the bookmark
+  /// icon showed empty on an already-saved post, so a "save" tap deleted it.
+  final bool bookmarkedByMe;
   final bool hideWeights;
   final bool hideReps;
   final PostVisibility visibility;
@@ -135,6 +141,7 @@ class SocialFeedPost {
       likeCount: count?['likes'] as int? ?? 0,
       commentCount: count?['comments'] as int? ?? 0,
       likedByMe: j['likedByMe'] as bool? ?? false,
+      bookmarkedByMe: j['bookmarkedByMe'] as bool? ?? false,
       hideWeights: privacy?['hideWeights'] as bool? ?? false,
       hideReps: privacy?['hideReps'] as bool? ?? false,
       visibility: _parseVisibility(visibilityRaw),
@@ -145,6 +152,7 @@ class SocialFeedPost {
     int? likeCount,
     int? commentCount,
     bool? likedByMe,
+    bool? bookmarkedByMe,
   }) {
     return SocialFeedPost(
       id: id,
@@ -158,6 +166,7 @@ class SocialFeedPost {
       likeCount: likeCount ?? this.likeCount,
       commentCount: commentCount ?? this.commentCount,
       likedByMe: likedByMe ?? this.likedByMe,
+      bookmarkedByMe: bookmarkedByMe ?? this.bookmarkedByMe,
       hideWeights: hideWeights,
       hideReps: hideReps,
       visibility: visibility,

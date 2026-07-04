@@ -33,6 +33,7 @@ import { nutritionRoutes } from './routes/nutrition'
 import { nutritionFoodsRoutes } from './routes/nutrition-foods'
 import { plannedWorkoutsRoutes } from './routes/planned-workouts'
 import { bodyMeasurementRoutes } from './routes/body-measurements'
+import { bookmarksRoutes } from './routes/bookmarks'
 import { gdprRoutes } from './routes/gdpr'
 import { healthConsentRoutes } from './routes/health-consent'
 import { buildCorsOrigin } from './lib/cors'
@@ -144,6 +145,7 @@ async function main() {
   app.register(weeklyCoachReadRoutes, { prefix: '/v1/me' })
   app.register(plannedWorkoutsRoutes, { prefix: '/v1/me' })
   app.register(bodyMeasurementRoutes, { prefix: '/v1/me' })
+  app.register(bookmarksRoutes, { prefix: '/v1/me' })
   app.register(pushRoutes, { prefix: '/v1/me' })
   app.register(activitiesRoutes, { prefix: '/v1/activities' })
   app.register(weatherRoutes, { prefix: '/v1/weather' })

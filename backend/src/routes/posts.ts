@@ -51,7 +51,7 @@ const AddCommentSchema = z.object({
   body: z.string().min(1).max(500),
 })
 
-const feedPostInclude = {
+export const feedPostInclude = {
   privacySettings: true,
   workout: {
     include: {
@@ -96,13 +96,29 @@ export function redactHiddenSets<
  * IDs (din `postIds`) pe care viewerul le-a apreciat deja. Un singur findMany
  * per pagină (fără N+1) — același pattern ca stories.ts `likedByMe`.
  */
-async function likedPostIdsFor(viewerId: string, postIds: string[]): Promise<Set<string>> {
+export async function likedPostIdsFor(viewerId: string, postIds: string[]): Promise<Set<string>> {
   if (postIds.length === 0) return new Set()
   const likes = await prisma.postLike.findMany({
     where: { postId: { in: postIds }, userId: viewerId },
     select: { postId: true },
   })
   return new Set(likes.map((l) => l.postId))
+}
+
+/**
+ * IDs (din `postIds`) pe care viewerul le-a salvat (bookmark). Un singur
+ * findMany per pagină (fără N+1), la fel ca [likedPostIdsFor].
+ */
+export async function bookmarkedPostIdsFor(
+  viewerId: string,
+  postIds: string[],
+): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set()
+  const marks = await prisma.postBookmark.findMany({
+    where: { postId: { in: postIds }, userId: viewerId },
+    select: { postId: true },
+  })
+  return new Set(marks.map((m) => m.postId))
 }
 
 async function canViewerSeePost(
@@ -360,10 +376,15 @@ export async function postRoutes(app: FastifyInstance) {
       },
     })
 
-    // Seed the client's heart state: one findMany for the whole page (no N+1).
-    const liked = await likedPostIdsFor(userId, posts.map((p) => p.id))
+    // Seed the client's heart + bookmark state: one findMany each per page.
+    const ids = posts.map((p) => p.id)
+    const liked = await likedPostIdsFor(userId, ids)
+    const marked = await bookmarkedPostIdsFor(userId, ids)
     const data = posts.map((p) =>
-      redactHiddenSets({ ...p, likedByMe: liked.has(p.id) }, userId),
+      redactHiddenSets(
+        { ...p, likedByMe: liked.has(p.id), bookmarkedByMe: marked.has(p.id) },
+        userId,
+      ),
     )
 
     return reply.send({ data, meta: { page, limit } })
@@ -400,8 +421,12 @@ export async function postRoutes(app: FastifyInstance) {
     }
 
     const liked = await likedPostIdsFor(viewerId, [post.id])
+    const marked = await bookmarkedPostIdsFor(viewerId, [post.id])
     return reply.send({
-      data: redactHiddenSets({ ...post, likedByMe: liked.has(post.id) }, viewerId),
+      data: redactHiddenSets(
+        { ...post, likedByMe: liked.has(post.id), bookmarkedByMe: marked.has(post.id) },
+        viewerId,
+      ),
     })
   })
 
@@ -572,9 +597,15 @@ export async function postRoutes(app: FastifyInstance) {
       },
     })
 
-    // Same single-query likedByMe seeding as /feed (no N+1).
-    const liked = await likedPostIdsFor(me, posts.map((p) => p.id))
-    const data = posts.map((p) => ({ ...p, likedByMe: liked.has(p.id) }))
+    // Same single-query seeding as /feed (no N+1).
+    const ids = posts.map((p) => p.id)
+    const liked = await likedPostIdsFor(me, ids)
+    const marked = await bookmarkedPostIdsFor(me, ids)
+    const data = posts.map((p) => ({
+      ...p,
+      likedByMe: liked.has(p.id),
+      bookmarkedByMe: marked.has(p.id),
+    }))
 
     return reply.send({ data, meta: { page, limit } })
   })

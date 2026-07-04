@@ -22,6 +22,7 @@ const postCommentFindMany = vi.fn()
 const postCommentCount = vi.fn()
 const analyticsEventCreate = vi.fn()
 const postBookmarkFindUnique = vi.fn()
+const postBookmarkFindMany = vi.fn()
 const postBookmarkCreate = vi.fn()
 const postBookmarkDelete = vi.fn()
 const postHideUpsert = vi.fn()
@@ -59,6 +60,7 @@ vi.mock('../lib/prisma', () => ({
     },
     postBookmark: {
       findUnique: (...a: unknown[]) => postBookmarkFindUnique(...a),
+      findMany: (...a: unknown[]) => postBookmarkFindMany(...a),
       create: (...a: unknown[]) => postBookmarkCreate(...a),
       delete: (...a: unknown[]) => postBookmarkDelete(...a),
     },
@@ -123,6 +125,7 @@ beforeEach(() => {
   postCommentCount.mockReset()
   analyticsEventCreate.mockReset()
   postBookmarkFindUnique.mockReset()
+  postBookmarkFindMany.mockReset().mockResolvedValue([]) // default: nothing saved
   postBookmarkCreate.mockReset()
   postBookmarkDelete.mockReset()
   postHideUpsert.mockReset()

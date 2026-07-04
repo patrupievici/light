@@ -891,6 +891,10 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                                   key: ValueKey(post.id),
                                   post: post,
                                   service: _feedService,
+                                  // Seed from the server so an already-saved
+                                  // post shows a filled bookmark — otherwise a
+                                  // "save" tap toggled it back off (deleted it).
+                                  initiallyBookmarked: post.bookmarkedByMe,
                                   onLike: () {},
                                   // Without these, Hide/Block/Delete left the
                                   // card on screen (a blocked user's post kept
