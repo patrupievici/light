@@ -214,8 +214,10 @@ class _HallOfFameScreenState extends State<HallOfFameScreen> {
         unlocked: streak >= 7,
       ),
       _BadgeData(
+        // Honest label: this unlocks at Gold tier, which says nothing about a
+        // population percentile the app never computes. Was mislabeled "Top 5%".
         icon: AppIcons.trophy,
-        label: 'Top 5%',
+        label: 'Gold Tier',
         tier: 'Gold',
         color: const Color(0xFFFFB14A),
         unlocked: maxTierIndex >= 3, // Gold or above

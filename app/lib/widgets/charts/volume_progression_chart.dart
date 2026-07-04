@@ -107,8 +107,17 @@ class _VolumeProgressionChartState extends State<VolumeProgressionChart> {
   Widget _buildChart(List<FlSpot> spots) {
     final maxVolume = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
     final minVolume = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
-    final growth = ((spots.last.y - spots.first.y) / spots.first.y * 100)
-        .toStringAsFixed(1);
+    // Guard against a zero-volume first session: (last-first)/first would be
+    // Infinity/NaN. null → show a neutral dash instead of "Infinity%".
+    final double? growthPct = spots.first.y > 0
+        ? (spots.last.y - spots.first.y) / spots.first.y * 100
+        : null;
+    final growthPositive = growthPct == null || growthPct >= 0;
+    final growthLabel = growthPct == null
+        ? '—'
+        : '${growthPct >= 0 ? '↑' : '↓'} ${growthPct.abs().toStringAsFixed(1)}%';
+    // fl_chart asserts on a zero interval when every plotted volume is 0.
+    final hInterval = maxVolume > 0 ? maxVolume / 3 : 1.0;
 
     return Container(
       padding: const EdgeInsets.all(ZveltTokens.s4),
@@ -134,17 +143,17 @@ class _VolumeProgressionChartState extends State<VolumeProgressionChart> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: double.parse(growth) >= 0
+                  color: growthPositive
                       ? ZveltTokens.success.withValues(alpha: 0.2)
                       : ZveltTokens.error.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${double.parse(growth) >= 0 ? '↑' : '↓'} ${double.parse(growth).abs().toStringAsFixed(1)}%',
+                  growthLabel,
                   style: ZType.num_.copyWith(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: double.parse(growth) >= 0
+                    color: growthPositive
                         ? ZveltTokens.success
                         : ZveltTokens.error,
                   ),
@@ -160,7 +169,7 @@ class _VolumeProgressionChartState extends State<VolumeProgressionChart> {
           const SizedBox(height: 16),
           Semantics(
             label:
-                'Volume progression, $growth% over the last ${_data.length} sessions',
+                'Volume progression, $growthLabel over the last ${_data.length} sessions',
             child: SizedBox(
               height: 200,
               child: LineChart(
@@ -168,7 +177,7 @@ class _VolumeProgressionChartState extends State<VolumeProgressionChart> {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval: maxVolume / 3,
+                    horizontalInterval: hInterval,
                     getDrawingHorizontalLine: (value) => FlLine(
                       color: ZveltTokens.hairline,
                       strokeWidth: 1,

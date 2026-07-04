@@ -48,23 +48,36 @@ class _MuscleBalanceChartState extends State<MuscleBalanceChart> {
         final name = exercise.name.toLowerCase();
         final volume = exercise.volumeKg;
 
-        if (name.contains('bench') || 
-            name.contains('press') || 
-            name.contains('fly') ||
-            name.contains('pushup')) {
-          categories['Push'] = categories['Push']! + volume;
-        } else if (name.contains('row') || 
-                   name.contains('pull') || 
-                   name.contains('curl') ||
-                   name.contains('deadlift')) {
-          categories['Pull'] = categories['Pull']! + volume;
-        } else if (name.contains('squat') || 
-                   name.contains('lunge') || 
-                   name.contains('leg press')) {
+        // Check LEG-specific patterns FIRST: 'leg press' contains 'press', so
+        // testing Push first mislabeled it as a push movement.
+        if (name.contains('squat') ||
+            name.contains('lunge') ||
+            name.contains('leg') || // leg press / leg curl / leg extension
+            name.contains('calf') ||
+            name.contains('hip thrust') ||
+            name.contains('glute') ||
+            name.contains('hamstring')) {
           categories['Legs'] = categories['Legs']! + volume;
-        } else if (name.contains('plank') || 
-                   name.contains('crunch') || 
-                   name.contains('ab')) {
+        } else if (name.contains('bench') ||
+            name.contains('press') || // overhead/db/incline press
+            name.contains('fly') ||
+            name.contains('pushup') ||
+            name.contains('dip') ||
+            name.contains('lateral') ||
+            name.contains('tricep')) {
+          categories['Push'] = categories['Push']! + volume;
+        } else if (name.contains('row') ||
+            name.contains('pull') ||
+            name.contains('chin') ||
+            name.contains('curl') ||
+            name.contains('rear') ||
+            name.contains('deadlift')) {
+          categories['Pull'] = categories['Pull']! + volume;
+        } else if (name.contains('plank') ||
+            name.contains('crunch') ||
+            name.contains('ab') ||
+            name.contains('core') ||
+            name.contains('sit')) {
           categories['Core'] = categories['Core']! + volume;
         }
       }

@@ -16,7 +16,11 @@ class AppDataCache {
   static const _prefix = 'zvelt_cache_v1';
 
   Future<String> _scopedKey(String suffix) async {
-    final id = await _auth.getCurrentUserId();
+    // Local JWT decode (no network refresh): offline with an expired access
+    // token, getCurrentUserId() returns null → the cache would read/write under
+    // 'anonymous' and the user's real cached profile/stats become invisible
+    // exactly when the offline-first cache matters most.
+    final id = await _auth.getStoredUserId();
     return '${_prefix}_${id ?? 'anonymous'}_$suffix';
   }
 

@@ -1172,6 +1172,12 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
       final m = margin % 1 == 0 ? margin.toInt().toString() : margin.toStringAsFixed(1);
       return 'Leading — $m ${spec.unit} ahead';
     }
+    // _myRank can come from a fresh server roster before _standings reloads (or
+    // when that reload fails), so the index may exceed the stale list — guard it
+    // to avoid a RangeError crash during build.
+    if (_myRank - 2 >= _standings.length) {
+      return 'You are #$_myRank in the standings.';
+    }
     final ahead = _standings[_myRank - 2];
     final gap = ((ahead['total'] as num?)?.toDouble() ?? 0) - _myTotal;
     final g = gap % 1 == 0 ? gap.toInt().toString() : gap.toStringAsFixed(1);

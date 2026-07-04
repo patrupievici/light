@@ -79,34 +79,42 @@ class SecureDb {
   bool _wipeRan = false;
 
   /// Read or create the master DB passphrase.
+  ///
+  /// CRITICAL: a transient SecureStorage READ failure must NOT fall through to
+  /// minting a NEW passphrase — that orphans (and openEncryptedOrRecreate then
+  /// DELETES) every existing encrypted DB. We retry the read a few times; a
+  /// fresh passphrase is minted ONLY when a read SUCCEEDS and confirms none
+  /// exists. If every read fails, we throw [SecureDbPassphraseUnavailable] so
+  /// the caller fails the open WITHOUT wiping data.
   Future<String> _getOrCreatePassphrase() async {
     if (_cachedPassphrase != null) return _cachedPassphrase!;
-    try {
-      final existing = await _secureStorage.read(key: _kPassphraseKey);
-      if (existing != null && existing.isNotEmpty) {
-        _cachedPassphrase = existing;
-        return existing;
+    Object? lastErr;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final existing = await _secureStorage.read(key: _kPassphraseKey);
+        if (existing != null && existing.isNotEmpty) {
+          _cachedPassphrase = existing;
+          return existing;
+        }
+        // Read succeeded and returned null → genuinely no passphrase yet → mint.
+        final rng = Random.secure();
+        final bytes = List<int>.generate(32, (_) => rng.nextInt(256));
+        final pass = base64Encode(bytes);
+        try {
+          await _secureStorage.write(key: _kPassphraseKey, value: pass);
+        } catch (e, st) {
+          _reportCrash(e, st, 'secure-db-passphrase-write');
+        }
+        _cachedPassphrase = pass;
+        return pass;
+      } catch (e, st) {
+        lastErr = e;
+        _reportCrash(e, st, 'secure-db-passphrase-read');
       }
-    } catch (e, st) {
-      // SecureStorage I/O can transiently fail on Android in low-memory
-      // situations — fall through and generate fresh. The recreate path
-      // will wipe DBs since the old passphrase is unrecoverable.
-      _reportCrash(e, st, 'secure-db-passphrase-read');
     }
-
-    final rng = Random.secure();
-    final bytes = List<int>.generate(32, (_) => rng.nextInt(256));
-    final pass = base64Encode(bytes);
-    try {
-      await _secureStorage.write(key: _kPassphraseKey, value: pass);
-    } catch (e, st) {
-      // Write failed — we'll still use this in-memory passphrase for the
-      // session, but next launch will generate a new one and the DBs
-      // will look corrupt → fall through to recreate-on-failure.
-      _reportCrash(e, st, 'secure-db-passphrase-write');
-    }
-    _cachedPassphrase = pass;
-    return pass;
+    // Every read attempt failed transiently — DO NOT overwrite. Surface a
+    // distinct error the recreate path recognizes and does NOT wipe on.
+    throw SecureDbPassphraseUnavailable(lastErr);
   }
 
   /// One-time wipe of pre-Wave-15 plain-SQLite files. Idempotent — guarded
@@ -234,6 +242,10 @@ class SecureDb {
         version: version,
         onUpgrade: onUpgrade,
       );
+    } on SecureDbPassphraseUnavailable {
+      // The DB is fine — we just couldn't read the key this moment. Never wipe
+      // on this; let the caller fail the open and retry later.
+      rethrow;
     } catch (e, st) {
       _reportCrash(e, st, 'secure-db-open');
       debugPrint('[secure-db] $dbName open failed ($e) — wiping & retrying');
@@ -289,4 +301,15 @@ class SecureDb {
       // Crashlytics not initialised (tests, early startup) — swallow.
     }
   }
+}
+
+/// Thrown when the master DB passphrase can't be read from secure storage
+/// (transient I/O failure), as distinct from a corrupt/mismatched DB. Callers
+/// must NOT wipe encrypted data on this — the data is intact, the key read
+/// just failed; retry later.
+class SecureDbPassphraseUnavailable implements Exception {
+  SecureDbPassphraseUnavailable([this.cause]);
+  final Object? cause;
+  @override
+  String toString() => 'SecureDbPassphraseUnavailable($cause)';
 }
