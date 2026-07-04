@@ -133,12 +133,17 @@ class WorkoutService {
 
   Future<Map<String, String>> _headers() => authedJsonHeaders(auth: _auth);
 
-  /// POST /v1/workouts — create draft workout
-  Future<WorkoutDto> createWorkout({String? label}) async {
+  /// POST /v1/workouts — create draft workout.
+  ///
+  /// [clientId] is an optional client-generated UUID used as the workout's PK
+  /// for offline-first creation: mint it locally, start logging against it, and
+  /// replay this create on reconnect — the server upserts on it, so the replay
+  /// is idempotent and the local id matches the server id.
+  Future<WorkoutDto> createWorkout({String? label, String? clientId}) async {
     final res = await http.post(
       Uri.parse('$v1Base/workouts'),
       headers: await _headers(),
-      body: '{}',
+      body: jsonEncode(clientId != null ? {'id': clientId} : {}),
     ).withTimeout();
     if (res.statusCode != 201) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -166,9 +171,14 @@ class WorkoutService {
   }
 
   /// POST /v1/workouts/:id/exercises
-  Future<WorkoutExerciseDto> addExercise(String workoutId, String exerciseId, {int? position}) async {
+  ///
+  /// [clientId] is an optional client-generated UUID used as the exercise's PK
+  /// for offline-first creation (see [createWorkout]). Replays upsert on it.
+  Future<WorkoutExerciseDto> addExercise(String workoutId, String exerciseId,
+      {int? position, String? clientId}) async {
     final body = <String, dynamic>{'exerciseId': exerciseId};
     if (position != null) body['position'] = position;
+    if (clientId != null) body['id'] = clientId;
     final res = await http.post(
       Uri.parse('$v1Base/workouts/$workoutId/exercises'),
       headers: await _headers(),
@@ -476,7 +486,156 @@ class WorkoutService {
     return WorkoutSuggestionDto.fromJson(suggestion);
   }
 
+  // ─── Local exercise-catalog cache (offline resolution / picking) ─────────────
+  //
+  // The catalog is GLOBAL (not user-specific), so it lives under a non-user-
+  // scoped key. Every SUCCESSFUL getExercises merges its rows in (dedup by id,
+  // newest-wins, capped); offline, getExercises filters the cached rows LOCALLY
+  // so an exercise can still be resolved / picked without a connection.
+
+  /// Non-user-scoped key for the accumulating global exercise catalog.
+  static const String _kCatalogKey = 'zvelt_exercise_catalog_v1';
+
+  /// Cap on cached catalog rows — newest-wins, oldest evicted first.
+  static const int _kCatalogCap = 2000;
+
+  /// Merge raw exercise JSON maps into the persisted global catalog: dedup by
+  /// id, newest-wins (a re-seen id moves to the tail), capped at [_kCatalogCap]
+  /// (oldest evicted). Best-effort — never throws, never blocks the caller's
+  /// result.
+  Future<void> _mergeCatalog(List<dynamic> rawExercises) async {
+    if (rawExercises.isEmpty) return;
+    try {
+      final p = await SharedPreferences.getInstance();
+      // LinkedHashMap preserves insertion order → tail == newest.
+      final byId = <String, Map<String, dynamic>>{};
+      final existing = p.getString(_kCatalogKey);
+      if (existing != null && existing.isNotEmpty) {
+        final decoded = jsonDecode(existing);
+        if (decoded is List) {
+          for (final e in decoded) {
+            if (e is Map && e['id'] is String) {
+              byId[e['id'] as String] = Map<String, dynamic>.from(e);
+            }
+          }
+        }
+      }
+      for (final e in rawExercises) {
+        if (e is Map && e['id'] is String) {
+          final id = e['id'] as String;
+          byId.remove(id); // re-insert at tail so newest-wins on cap eviction
+          byId[id] = Map<String, dynamic>.from(e);
+        }
+      }
+      var entries = byId.values.toList();
+      if (entries.length > _kCatalogCap) {
+        entries = entries.sublist(entries.length - _kCatalogCap);
+      }
+      await p.setString(_kCatalogKey, jsonEncode(entries));
+    } catch (_) {
+      // Cache is best-effort; a write failure must never break the online path.
+    }
+  }
+
+  /// Load the cached catalog rows. Returns null when the catalog is absent or
+  /// empty (a COLD cache the caller should treat as "can't resolve offline"),
+  /// distinct from a warm-but-non-matching filter (an empty result list).
+  Future<List<Map<String, dynamic>>?> _loadCatalog() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final raw = p.getString(_kCatalogKey);
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! List || decoded.isEmpty) return null;
+      return [
+        for (final e in decoded)
+          if (e is Map) Map<String, dynamic>.from(e),
+      ];
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Offline fallback: filter the cached catalog LOCALLY by the same
+  /// query/pattern/source getExercises accepts (case-insensitive name-contains).
+  /// Returns null on a cold cache so the caller can surface an honest failure;
+  /// returns a (possibly empty) response when the catalog exists but nothing
+  /// matched — an empty result offline is valid, not an error.
+  Future<ExercisesResponse?> _catalogFallback({
+    String? query,
+    String? pattern,
+    String? source,
+    int limit = 50,
+  }) async {
+    final rows = await _loadCatalog();
+    if (rows == null) return null;
+    final q = query?.trim().toLowerCase();
+    final pat = pattern?.trim().toLowerCase();
+    final src = source?.trim().toLowerCase();
+    final out = <ExerciseDto>[];
+    for (final m in rows) {
+      if (q != null && q.isNotEmpty) {
+        final name = (m['name'] as String?)?.toLowerCase() ?? '';
+        if (!name.contains(q)) continue;
+      }
+      if (pat != null && pat.isNotEmpty) {
+        final mp = (m['movementPattern'] ?? m['movement_pattern'])
+                ?.toString()
+                .toLowerCase() ??
+            '';
+        if (mp != pat) continue;
+      }
+      if (src != null && src.isNotEmpty) {
+        final sp = (m['sourceProvider'] ?? m['source_provider'])
+                ?.toString()
+                .toLowerCase() ??
+            '';
+        if (sp != src) continue;
+      }
+      try {
+        out.add(ExerciseDto.fromJson(m));
+      } catch (_) {
+        // Skip a malformed cached row rather than fail the whole fallback.
+      }
+      if (out.length >= limit) break;
+    }
+    return ExercisesResponse(data: out);
+  }
+
+  /// Resolve a single cached exercise by id (offline exercise-row rebuild).
+  /// Null when the id isn't in the local catalog.
+  Future<ExerciseDto?> resolveCachedExercise(String exerciseId) async {
+    final rows = await _loadCatalog();
+    if (rows == null) return null;
+    for (final m in rows) {
+      if (m['id'] == exerciseId) {
+        try {
+          return ExerciseDto.fromJson(m);
+        } catch (_) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Fetch a large page once and cache it, so offline resolution/picking has a
+  /// warm catalog. Best-effort: swallows every error. Call from an online path
+  /// (e.g. the QuickLaunch hub load).
+  Future<void> prefetchCatalog() async {
+    try {
+      await getExercises(limit: 500);
+    } catch (_) {
+      // Opportunistic — a failed prefetch just leaves the cache as-is.
+    }
+  }
+
   /// GET /v1/exercises — optional [pattern] filters `movementPattern` (e.g. `squat`).
+  ///
+  /// On success the returned rows are merged into the local catalog. On failure
+  /// (offline / timeout / 5xx) it falls back to filtering that cached catalog
+  /// locally and NEVER throws if the cache can serve; only a cold cache
+  /// rethrows the original error.
   Future<ExercisesResponse> getExercises({
     String? query,
     String? pattern,
@@ -487,12 +646,27 @@ class WorkoutService {
     if (query != null && query.isNotEmpty) q['query'] = query;
     if (pattern != null && pattern.isNotEmpty) q['pattern'] = pattern;
     if (source != null && source.isNotEmpty) q['source'] = source;
-    final res = await http.get(
-      Uri.parse('$v1Base/exercises').replace(queryParameters: q),
-      headers: await _headers(),
-    ).withTimeout();
-    if (res.statusCode != 200) _throw(res);
-    return ExercisesResponse.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    try {
+      final res = await http.get(
+        Uri.parse('$v1Base/exercises').replace(queryParameters: q),
+        headers: await _headers(),
+      ).withTimeout();
+      if (res.statusCode != 200) _throw(res);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final rawData = body['data'];
+      if (rawData is List) await _mergeCatalog(rawData);
+      return ExercisesResponse.fromJson(body);
+    } catch (e) {
+      // Offline / timeout / server error: serve the cached catalog if warm.
+      final fallback = await _catalogFallback(
+        query: query,
+        pattern: pattern,
+        source: source,
+        limit: limit,
+      );
+      if (fallback != null) return fallback;
+      rethrow; // cold cache — surface the honest failure
+    }
   }
 
   /// Most recent completed WORK-set weight (kg) per exercise id, for pre-filling

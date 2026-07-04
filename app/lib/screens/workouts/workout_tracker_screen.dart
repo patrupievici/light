@@ -7,6 +7,7 @@ import '../../l10n/app_strings.dart';
 import '../../models/exercise_load_policy.dart';
 import '../../services/health_service.dart';
 import '../../services/muscle_recovery_service.dart';
+import '../../services/offline_bootstrap_queue.dart';
 import '../../services/offline_set_queue.dart';
 import '../../services/offline_sync_coordinator.dart';
 import '../../services/rest_interval_store.dart';
@@ -273,11 +274,63 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
       _loadProgression(w);
     } catch (e) {
       if (!mounted) return;
+      // Offline-first: if this workout was started offline (its create is still
+      // queued), the server 404s. Synthesize a LOCAL draft from the bootstrap
+      // queue instead of an error screen so the user can keep logging. Any
+      // exercises added offline are rebuilt from their queued creates, resolved
+      // against the local catalog cache.
+      final local = await _loadLocalOfflineDraft();
+      if (!mounted) return;
+      if (local != null) {
+        _elapsed.value = DateTime.now().difference(local.startedAt);
+        setState(() {
+          _workout = local;
+          _loading = false;
+          _error = null;
+        });
+        WatchConnectivityService.instance.sendWorkoutState(local).ignore();
+        return;
+      }
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
         _loading = false;
       });
     }
+  }
+
+  /// Rebuild a locally-started workout from the offline bootstrap queue when the
+  /// server has no record of it yet. Returns null when this id was NOT started
+  /// offline (a genuine load failure the caller should surface).
+  Future<WorkoutDto?> _loadLocalOfflineDraft() async {
+    final boot = OfflineBootstrapQueue();
+    if (!await boot.hasPendingWorkout(widget.workoutId)) return null;
+    final pointer = await WorkoutService.readActiveWorkoutPointer();
+    final startedAt =
+        (pointer != null && pointer.workoutId == widget.workoutId)
+            ? pointer.startedAt
+            : DateTime.now();
+    final pendingEx = await boot.pendingExercisesFor(widget.workoutId);
+    final exercises = <WorkoutExerciseDto>[];
+    for (final e in pendingEx) {
+      final exId = e.exerciseId;
+      final weId = e.weId;
+      if (exId == null || weId == null) continue;
+      final ex = await _service.resolveCachedExercise(exId);
+      if (ex == null) continue; // can't resolve name offline — skip the row
+      exercises.add(WorkoutExerciseDto(
+        id: weId,
+        exerciseId: exId,
+        position: e.position ?? exercises.length,
+        exercise: ex,
+        sets: const [],
+      ));
+    }
+    return WorkoutDto(
+      id: widget.workoutId,
+      status: 'draft',
+      startedAt: startedAt,
+      exercises: exercises,
+    );
   }
 
   /// Rebuild [_workout] in place with [weId]'s set list transformed by
@@ -325,8 +378,53 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
         ),
       );
       if (chosen == null || !mounted || _workout == null) return;
-      await _service.addExercise(widget.workoutId, chosen.id);
-      await _load();
+      // Mint the client PK up front so the online create and any offline replay
+      // upsert on the SAME id (local id == server id — no remapping).
+      final weId = const Uuid().v4();
+      final position = _workout!.exercises.length;
+      try {
+        await _service.addExercise(widget.workoutId, chosen.id,
+            position: position, clientId: weId);
+        await _load();
+      } catch (_) {
+        if (!mounted) return;
+        // Offline-first: enqueue the exercise-create and optimistically add the
+        // row so the user can immediately log sets against it. Sets queue via
+        // clientSetId against widget.workoutId + this weId; on reconnect the
+        // coordinator replays the exercise-create BEFORE those sets.
+        await OfflineSyncCoordinator.instance.enqueueBootstrapExercise(
+          workoutId: widget.workoutId,
+          exerciseId: chosen.id,
+          weId: weId,
+          position: position,
+        );
+        if (!mounted) return;
+        final current = _workout!;
+        setState(() {
+          _workout = WorkoutDto(
+            id: current.id,
+            status: current.status,
+            startedAt: current.startedAt,
+            endedAt: current.endedAt,
+            exercises: [
+              ...current.exercises,
+              WorkoutExerciseDto(
+                id: weId,
+                exerciseId: chosen.id,
+                position: position,
+                exercise: chosen,
+                sets: const [],
+              ),
+            ],
+          );
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Added offline — will sync when back online.'),
+            backgroundColor: ZveltTokens.warn,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

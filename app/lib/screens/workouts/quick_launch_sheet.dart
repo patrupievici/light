@@ -371,6 +371,10 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
     }
     try { active = await ProgramService().getActive(); } catch (_) {}
     try { workouts = await WorkoutService().getWorkouts(); } catch (_) {}
+    // Opportunistically warm the local exercise catalog while we're online, so
+    // an offline "start workout" / preset can still resolve & pick exercises.
+    // Best-effort and fire-and-forget — never blocks the hub render.
+    unawaited(WorkoutService().prefetchCatalog());
     if (!mounted) return;
     setState(() {
       _draft = draft;
@@ -499,26 +503,41 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     if (key == SettingsKeys.scEmpty) {
-      // Create the workout BEFORE dismissing the sheet. Previously the sheet
-      // popped first, then the un-awaited createWorkout threw into the void
-      // when offline — the button silently did nothing. Now a failure surfaces
-      // and the hub stays open so the user can retry.
-      WorkoutDto workout;
+      // Mint the workout id locally so the online create and any offline replay
+      // upsert on the SAME id (local id == server id — no remapping anywhere).
+      final workoutId = const Uuid().v4();
+      const label = 'Empty workout';
       try {
-        workout = await WorkoutService().createWorkout(label: 'Empty workout');
+        await WorkoutService().createWorkout(label: label, clientId: workoutId);
       } catch (_) {
-        messenger.showSnackBar(const SnackBar(
-          content: Text(
-              "Couldn't start a workout. Check your connection and try again."),
-          backgroundColor: ZveltTokens.error,
-        ));
-        return;
+        // Offline-first: enqueue the workout-create and start logging against
+        // the local id immediately. The coordinator replays the create on
+        // reconnect (before its exercises/sets); the tracker synthesizes a
+        // local draft from the queue while the server has no record yet.
+        await OfflineSyncCoordinator.instance
+            .enqueueBootstrapWorkout(workoutId: workoutId, label: label);
+        // Persist the resume pointer so a kill/relaunch (and the tracker's
+        // offline draft rebuild) recovers the same session with its start time.
+        await WorkoutService.saveActiveWorkoutPointer(
+          WorkoutDto(
+            id: workoutId,
+            status: 'draft',
+            startedAt: DateTime.now(),
+          ),
+          label: label,
+        );
+        if (mounted) {
+          messenger.showSnackBar(const SnackBar(
+            content: Text('Started offline — will sync when back online.'),
+            backgroundColor: ZveltTokens.warn,
+          ));
+        }
       }
       if (!mounted) return;
       nav.pop();
       await nav.push<void>(
         MaterialPageRoute<void>(
-          builder: (_) => WorkoutTrackerScreen(workoutId: workout.id),
+          builder: (_) => WorkoutTrackerScreen(workoutId: workoutId),
         ),
       );
       return;
@@ -919,15 +938,27 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
         return;
       }
 
-      final workout = await _workoutService.createWorkout();
+      // Mint the workout id locally so an online create and an offline replay
+      // upsert on the SAME id (local id == server id). serverWorkout stays null
+      // when the create failed offline — we then queue the create instead.
+      final workoutId = const Uuid().v4();
+      WorkoutDto? serverWorkout;
+      try {
+        serverWorkout = await _workoutService.createWorkout(clientId: workoutId);
+      } catch (_) {
+        serverWorkout = null;
+      }
+      // Once online (server workout exists) and no add has failed yet.
+      var online = serverWorkout != null;
+
       final added = <WorkoutExerciseDto>[];
       final display = <_GymExercise>[];
       // Track preset exercises that couldn't be resolved so the user sees
       // a partial-match warning instead of silently getting fewer exercises.
       final skipped = <String>[];
-      // Run all catalog name lookups in parallel (one round-trip instead of
-      // up to N chained ones). Each lookup keeps its own try/catch so a single
-      // network blip degrades that exercise to a skip without killing the rest.
+      // Run all catalog name lookups in parallel. getExercises transparently
+      // falls back to the LOCAL catalog cache when offline, so a warm cache
+      // still resolves preset names without a connection.
       final matches = await Future.wait([
         for (final ex in _displayExercises)
           () async {
@@ -943,21 +974,19 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
               }
               return res.data.isNotEmpty ? res.data.first : null;
             } catch (_) {
-              // Network blip on a single exercise lookup shouldn't kill the
-              // whole bootstrap — log and continue with the rest of the preset.
+              // Cold cache offline (or a blip) — degrade this one exercise to a
+              // skip without killing the rest of the preset.
               return null;
             }
           }(),
       ]);
       // History-aware prefill: replace the generic preset weights with the
-      // user's most recent working weight per lift (best-effort; falls back to
-      // the preset label when there's no history). Kills the "edit 6 fake sets
-      // before you start" tax and stops showing a beginner 140kg deadlifts.
+      // user's most recent working weight per lift (best-effort; offline this
+      // returns {} and we fall back to the preset label).
       final matchedIds = [for (final m in matches) if (m != null) m.id];
       final lastWeights =
           await _workoutService.getLastWorkingWeights(matchedIds);
-      // Adds stay SEQUENTIAL in preset order: the backend auto-assigns
-      // position = lastPosition + 1, so concurrent adds would scramble order.
+      // Adds stay SEQUENTIAL in preset order so position is deterministic.
       for (var i = 0; i < _displayExercises.length; i++) {
         final ex = _displayExercises[i];
         final match = matches[i];
@@ -965,7 +994,49 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
           skipped.add(ex.name);
           continue;
         }
-        final we = await _workoutService.addExercise(workout.id, match.id);
+        // Mint the workout_exercise PK locally — the same id every set targets.
+        final weId = const Uuid().v4();
+        WorkoutExerciseDto we;
+        if (online) {
+          try {
+            we = await _workoutService.addExercise(
+              serverWorkout!.id,
+              match.id,
+              position: i,
+              clientId: weId,
+            );
+          } catch (_) {
+            // Fell offline mid-bootstrap — enqueue this and every remaining add.
+            online = false;
+            await OfflineSyncCoordinator.instance.enqueueBootstrapExercise(
+              workoutId: workoutId,
+              exerciseId: match.id,
+              weId: weId,
+              position: i,
+            );
+            we = WorkoutExerciseDto(
+              id: weId,
+              exerciseId: match.id,
+              position: i,
+              exercise: match,
+              sets: const [],
+            );
+          }
+        } else {
+          await OfflineSyncCoordinator.instance.enqueueBootstrapExercise(
+            workoutId: workoutId,
+            exerciseId: match.id,
+            weId: weId,
+            position: i,
+          );
+          we = WorkoutExerciseDto(
+            id: weId,
+            exerciseId: match.id,
+            position: i,
+            exercise: match,
+            sets: const [],
+          );
+        }
         added.add(we);
         final histKg = lastWeights[match.id];
         final weightLabel = histKg != null
@@ -973,9 +1044,37 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
             : ex.weight;
         display.add(_GymExercise(match.name, ex.sets, ex.repsRange, weightLabel));
       }
+
+      // If the workout itself never reached the server (offline create), we can
+      // only proceed local-first when the catalog resolved at least one
+      // exercise. A COLD cache resolves nothing → keep the honest "couldn't
+      // start — Try again" state (don't fabricate a workout with no exercises).
+      final createdOnServer = serverWorkout != null;
+      if (!createdOnServer) {
+        if (added.isEmpty) {
+          if (!mounted) return;
+          setState(() {
+            _bootstrapError =
+                "You're offline and this workout isn't cached yet. Reconnect and try again.";
+            _bootstrapping = false;
+          });
+          return; // _workoutId stays null → retry state (nothing fabricated)
+        }
+        // Warm cache: queue the workout-create (flush replays it before the
+        // exercise-creates) and persist a resume pointer.
+        await OfflineSyncCoordinator.instance
+            .enqueueBootstrapWorkout(workoutId: workoutId, label: null);
+        await WorkoutService.saveActiveWorkoutPointer(
+          WorkoutDto(id: workoutId, status: 'draft', startedAt: DateTime.now()),
+          label: 'Workout',
+        );
+      }
+
       if (!mounted) return;
       setState(() {
-        _workoutId = workout.id;
+        // serverWorkout.id == workoutId when created online (clientId upsert),
+        // so this local id is correct in both paths.
+        _workoutId = workoutId;
         _workoutExercises = added;
         _displayExercises = display;
         _bootstrapping = false;
