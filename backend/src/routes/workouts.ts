@@ -764,9 +764,24 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       userXpContext,
     )
 
-    const updated = await prisma.workout.update({
-      where: { id: workoutId },
+    // Atomically claim the draft→completed transition. The status check above is
+    // a fast fail, but two concurrent "Complete" taps can both pass it (both read
+    // 'draft') and each award XP. updateMany with a status:'draft' guard lets
+    // exactly ONE request win (count 1); the loser bails before any XP is added.
+    const claim = await prisma.workout.updateMany({
+      where: { id: workoutId, userId, status: 'draft' },
       data: { status: 'completed', endedAt: new Date() },
+    })
+    if (claim.count === 0) {
+      return reply.code(400).send({
+        error: 'ALREADY_COMPLETED',
+        message: 'Workout-ul a fost deja finalizat',
+        requestId: request.id,
+      })
+    }
+
+    const updated = await prisma.workout.findUniqueOrThrow({
+      where: { id: workoutId },
       include: {
         exercises: {
           include: { exercise: true, sets: { orderBy: { setIndex: 'asc' } } },
@@ -787,12 +802,14 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
 
     let gameXp = gameXpPayload(profile?.gameXpTotal ?? 0)
     if (profile) {
-      const newTotal = profile.gameXpTotal + sessionXp
-      await prisma.userProfile.update({
+      // Atomic increment (not read-add-write): the completion is already
+      // single-winner via the claim above, but increment keeps the total
+      // correct against any other concurrent XP-affecting write.
+      const updatedProfile = await prisma.userProfile.update({
         where: { userId },
-        data: { gameXpTotal: newTotal },
+        data: { gameXpTotal: { increment: sessionXp } },
       })
-      gameXp = gameXpPayload(newTotal)
+      gameXp = gameXpPayload(updatedProfile.gameXpTotal)
     }
 
     await prisma.analyticsEvent.create({

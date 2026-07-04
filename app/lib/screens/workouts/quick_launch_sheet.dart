@@ -1185,7 +1185,11 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
     }
   }
 
+  bool _finishing = false;
+
   Future<void> _finishWorkout() async {
+    if (_finishing) return; // guard: double-tap must not complete twice
+    _finishing = true;
     if (widget.preset.isCardio) {
       await _stopCardioTracking(save: false);
       if (!mounted) return;
@@ -1222,6 +1226,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
         );
         return;
       } catch (e) {
+        _finishing = false; // allow a retry after a failed completion
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

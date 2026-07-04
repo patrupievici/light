@@ -12,6 +12,11 @@ import { stripControlChars } from '../lib/sanitize'
 import { evaluateEditLimit } from '../services/anti-cheat.service'
 import { canViewerSeePostPure } from '../lib/post-visibility'
 
+const EditPostSchema = z.object({
+  caption: z.string().max(500).optional(),
+  visibility: z.enum(['private', 'friends', 'public']).optional(),
+})
+
 const CreatePostSchema = z
   .object({
     /** Dacă lipsește = postare doar social (caption și/sau poză). */
@@ -557,9 +562,22 @@ export async function postRoutes(app: FastifyInstance) {
       return reply.code(429).send({ error: 'EDIT_LIMIT', message: 'Maxim 3 editări per 24h', requestId: request.id })
     }
 
-    const body = request.body as { caption?: string; visibility?: string }
+    // Validate like create does — the old raw-cast path stored unbounded
+    // captions with control chars, bypassing the spec's caption<=500 rule.
+    const parsedEdit = EditPostSchema.safeParse(request.body)
+    if (!parsedEdit.success) {
+      return reply.code(400).send({
+        error: 'VALIDATION',
+        message: 'Caption invalid (max 500 caractere)',
+        requestId: request.id,
+      })
+    }
+    const body = parsedEdit.data
     const updates: Record<string, unknown> = { editCount: editVerdict.nextEditCount, lastEditAt: new Date() }
-    if (body.caption !== undefined) updates.caption = body.caption?.trim() || null
+    if (body.caption !== undefined) {
+      const clean = stripControlChars(body.caption).trim()
+      updates.caption = clean || null
+    }
     if (body.visibility && ['private', 'friends', 'public'].includes(body.visibility)) {
       updates.visibility = body.visibility
     }

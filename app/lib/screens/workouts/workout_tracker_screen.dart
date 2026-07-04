@@ -642,7 +642,11 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     }
   }
 
+  bool _completing = false;
+
   Future<void> _complete() async {
+    if (_completing) return; // guard: double-tap would try to complete twice
+    setState(() => _completing = true);
     try {
       final result = await _service.completeWorkout(widget.workoutId);
       await MuscleRecoveryService().invalidateCache();
@@ -660,6 +664,7 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      setState(() => _completing = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: ZveltTokens.error));
     }
   }
@@ -808,7 +813,7 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
             Padding(
               padding: const EdgeInsets.all(24),
               child: FilledButton(
-                onPressed: _complete,
+                onPressed: _completing ? null : _complete,
                 style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
                 child: const Text('Complete workout'),
               ),

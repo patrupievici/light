@@ -17,7 +17,7 @@ export async function statsRoutes(app: FastifyInstance) {
               COUNT(*)::int AS work_sets
        FROM workouts w
        INNER JOIN workout_exercises we ON we.workout_id = w.id
-       INNER JOIN workout_sets ws ON ws.workout_exercise_id = we.id AND ws.tag = 'WORK'
+       INNER JOIN workout_sets ws ON ws.workout_exercise_id = we.id AND ws.tag = 'WORK' AND ws.is_completed = true
        WHERE w.user_id = $1 AND w.status IN ('completed','posted')
        GROUP BY 1
        ORDER BY 1 DESC
@@ -66,7 +66,7 @@ export async function statsRoutes(app: FastifyInstance) {
                 COUNT(*)::int AS work_sets
          FROM workouts w
          INNER JOIN workout_exercises we ON we.workout_id = w.id
-         INNER JOIN workout_sets ws ON ws.workout_exercise_id = we.id AND ws.tag = 'WORK'
+         INNER JOIN workout_sets ws ON ws.workout_exercise_id = we.id AND ws.tag = 'WORK' AND ws.is_completed = true
          WHERE w.user_id = $1
            AND w.status IN ('completed','posted')
            AND (w.started_at AT TIME ZONE 'UTC')::date >= (CURRENT_DATE - ($2::int - 1))
@@ -136,7 +136,7 @@ export async function statsRoutes(app: FastifyInstance) {
               COUNT(*)::int AS work_sets
        FROM workouts w
        INNER JOIN workout_exercises we ON we.workout_id = w.id
-       INNER JOIN workout_sets ws ON ws.workout_exercise_id = we.id AND ws.tag = 'WORK'
+       INNER JOIN workout_sets ws ON ws.workout_exercise_id = we.id AND ws.tag = 'WORK' AND ws.is_completed = true
        INNER JOIN exercises e ON e.id = we.exercise_id
        WHERE w.user_id = $1
          AND w.status IN ('completed','posted')
