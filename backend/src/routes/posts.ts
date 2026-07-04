@@ -68,6 +68,31 @@ const feedPostInclude = {
 }
 
 /**
+ * Strip weightKg/reps from a post's sets when the owner hid them and the viewer
+ * is not the owner. Client-side redaction alone leaked the real numbers to
+ * anyone inspecting the API payload — the toggle was cosmetic. Mutates the
+ * (already-copied) post in place and returns it for chaining in a .map.
+ */
+export function redactHiddenSets<
+  T extends {
+    userId: string
+    privacySettings?: { hideWeights?: boolean; hideReps?: boolean } | null
+    workout?: { exercises?: Array<{ sets?: Array<Record<string, unknown>> }> } | null
+  },
+>(post: T, viewerId: string): T {
+  if (post.userId === viewerId) return post
+  const ps = post.privacySettings
+  if (!ps || (!ps.hideWeights && !ps.hideReps)) return post
+  for (const we of post.workout?.exercises ?? []) {
+    for (const s of we.sets ?? []) {
+      if (ps.hideWeights) s.weightKg = null
+      if (ps.hideReps) s.reps = null
+    }
+  }
+  return post
+}
+
+/**
  * IDs (din `postIds`) pe care viewerul le-a apreciat deja. Un singur findMany
  * per pagină (fără N+1) — același pattern ca stories.ts `likedByMe`.
  */
@@ -277,13 +302,21 @@ export async function postRoutes(app: FastifyInstance) {
   // GET /v1/posts/feed — feed prieteni
   app.get('/feed', { preHandler: authenticate }, async (request, reply) => {
     const { userId } = request.user
-    const query = request.query as { page?: string; limit?: string; kind?: string }
+    const query = request.query as {
+      page?: string
+      limit?: string
+      kind?: string
+      scope?: string
+    }
 
     const page = Math.max(1, parseInt(query.page ?? '1'))
     const limit = Math.min(30, parseInt(query.limit ?? '10'))
     const skip = (page - 1) * limit
     // Feed "PRs" filter (mockup 9): only posts whose workout set a personal record.
     const prOnly = query.kind === 'pr'
+    // "Following" pill: only friends' posts (exclude my own). Previously the
+    // param was ignored, so the pill reloaded the identical unfiltered feed.
+    const followingOnly = query.scope === 'following'
 
     // Gaseste prietenii acceptati + postarile ascunse
     const { friendIds, hiddenIds } = await getFriendIdsAndHidden(userId)
@@ -300,7 +333,8 @@ export async function postRoutes(app: FastifyInstance) {
         id: { notIn: hiddenIds },
         ...(prOnly ? { isPr: true } : {}),
         OR: [
-          { userId }, // propriile postari
+          // Own posts — omitted when the "Following" pill is active.
+          ...(followingOnly ? [] : [{ userId }]),
           {
             userId: { in: visibleFriendIds },
             visibility: { in: ['friends', 'public'] },
@@ -328,7 +362,9 @@ export async function postRoutes(app: FastifyInstance) {
 
     // Seed the client's heart state: one findMany for the whole page (no N+1).
     const liked = await likedPostIdsFor(userId, posts.map((p) => p.id))
-    const data = posts.map((p) => ({ ...p, likedByMe: liked.has(p.id) }))
+    const data = posts.map((p) =>
+      redactHiddenSets({ ...p, likedByMe: liked.has(p.id) }, userId),
+    )
 
     return reply.send({ data, meta: { page, limit } })
   })
@@ -364,7 +400,9 @@ export async function postRoutes(app: FastifyInstance) {
     }
 
     const liked = await likedPostIdsFor(viewerId, [post.id])
-    return reply.send({ data: { ...post, likedByMe: liked.has(post.id) } })
+    return reply.send({
+      data: redactHiddenSets({ ...post, likedByMe: liked.has(post.id) }, viewerId),
+    })
   })
 
   // POST /v1/posts/:id/likes — toggle like
