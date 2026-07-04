@@ -188,26 +188,32 @@ export async function challengeRoutes(app: FastifyInstance) {
       data: { challengeId: row.id, userId, status: 'accepted', acceptedAt: createdAt },
     })
     if (inviteUserIds?.length) {
-      const invitees = inviteUserIds.filter((uid) => uid !== userId)
-      await prisma.challengeParticipant.createMany({
-        data: invitees.map((uid) => ({ challengeId: row.id, userId: uid, status: 'invited' })),
-        skipDuplicates: true,
-      })
-      // Notify each invited friend (fire-and-forget; never blocks create).
-      const inviteTitle =
-        row.kind === 'custom' && row.customTitle?.trim() ? row.customTitle.trim() : defaultTitle(row.kind)
-      for (const uid of invitees) {
-        void createNotificationSafe({
-          recipientId: uid,
-          actorId: userId,
-          type: NotificationType.CHALLENGE_INVITE,
-          payload: {
-            challengeId: row.id,
-            title: inviteTitle,
-            scoringType: scoringType ?? null,
-            endsAt: row.endsAt.toISOString(),
-          },
+      // Only the creator's accepted friends can be invited. Arbitrary user IDs
+      // would spam strangers and, for friends-visibility challenges, create
+      // dead-end invites a non-friend could never accept.
+      const friendSet = new Set(await acceptedFriendIds(userId))
+      const invitees = inviteUserIds.filter((uid) => uid !== userId && friendSet.has(uid))
+      if (invitees.length) {
+        await prisma.challengeParticipant.createMany({
+          data: invitees.map((uid) => ({ challengeId: row.id, userId: uid, status: 'invited' })),
+          skipDuplicates: true,
         })
+        // Notify each invited friend (fire-and-forget; never blocks create).
+        const inviteTitle =
+          row.kind === 'custom' && row.customTitle?.trim() ? row.customTitle.trim() : defaultTitle(row.kind)
+        for (const uid of invitees) {
+          void createNotificationSafe({
+            recipientId: uid,
+            actorId: userId,
+            type: NotificationType.CHALLENGE_INVITE,
+            payload: {
+              challengeId: row.id,
+              title: inviteTitle,
+              scoringType: scoringType ?? null,
+              endsAt: row.endsAt.toISOString(),
+            },
+          })
+        }
       }
     }
 

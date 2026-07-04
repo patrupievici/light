@@ -15,11 +15,25 @@ import { searchOffByName, type UsdaShapedFood } from '../lib/open-food-facts'
 
 const DateParam = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
+// A diary entry carries an optional set of top-level macro totals (read by the
+// lenient claim-xp summer) plus app-specific fields (nested `food`, `grams`,
+// `meal`, `loggedAt`, …). Macros are capped to sane per-entry bounds so a client
+// can't persist absurd/garbage values; unknown keys pass through so the richer
+// app shape survives the round-trip. Array length is capped to bound the blob.
+const NutritionEntrySchema = z
+  .object({
+    calories: z.coerce.number().min(0).max(20_000).optional(),
+    proteinG: z.coerce.number().min(0).max(2_000).optional(),
+    carbsG: z.coerce.number().min(0).max(2_000).optional(),
+    fatG: z.coerce.number().min(0).max(2_000).optional(),
+  })
+  .passthrough()
+
 const PutDaySchema = z.object({
   date: DateParam,
-  entries: z.array(z.unknown()).default([]),
+  entries: z.array(NutritionEntrySchema).max(200).default([]),
   waterMl: z.coerce.number().int().min(0).max(100_000).default(0),
-  weightKg: z.coerce.number().min(20).max(400).optional().nullable(),
+  weightKg: z.coerce.number().min(30).max(250).optional().nullable(),
 })
 
 const GeneratePlanSchema = z.object({

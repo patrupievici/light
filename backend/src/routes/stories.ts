@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { getUserDisplayHints } from '../lib/user-display'
 import { decodePostPhotoBase64, saveStoryPhoto, deleteStoryPhoto } from '../lib/post-photo'
-import { acceptedFriendIds, blockedUserIds } from '../lib/friendships'
+import { acceptedFriendIds, blockedUserIds, areFriends, isBlockedEitherWay } from '../lib/friendships'
 
 const CreateStorySchema = z.object({
   caption: z.string().max(500).optional(),
@@ -118,6 +118,18 @@ export async function storyRoutes(app: FastifyInstance) {
     const story = await prisma.story.findUnique({ where: { id } })
     if (!story || story.expiresAt <= new Date()) {
       return reply.code(404).send({ error: 'NOT_FOUND', message: 'Story negăsit sau expirat', requestId: request.id })
+    }
+    // Visibility gate (stories are friends-only, like the feed): only the owner
+    // or an accepted, non-blocked friend may like. Anyone else gets the SAME 404
+    // as a missing story so a stranger can't even confirm the story exists.
+    if (story.userId !== me) {
+      const [friends, blocked] = await Promise.all([
+        areFriends(me, story.userId),
+        isBlockedEitherWay(me, story.userId),
+      ])
+      if (!friends || blocked) {
+        return reply.code(404).send({ error: 'NOT_FOUND', message: 'Story negăsit sau expirat', requestId: request.id })
+      }
     }
     const existing = await prisma.storyLike.findUnique({
       where: { storyId_userId: { storyId: id, userId: me } },

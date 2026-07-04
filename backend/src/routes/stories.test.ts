@@ -56,9 +56,15 @@ vi.mock('../lib/post-photo', () => ({
   deleteStoryPhoto: (...a: unknown[]) => photo.deleteStoryPhoto(...a),
 }))
 
+const friendships = {
+  areFriends: vi.fn(async () => true),
+  isBlockedEitherWay: vi.fn(async () => false),
+}
 vi.mock('../lib/friendships', () => ({
   acceptedFriendIds: vi.fn(async () => ['friendA']),
   blockedUserIds: vi.fn(async () => []),
+  areFriends: (...a: unknown[]) => friendships.areFriends(...(a as [])),
+  isBlockedEitherWay: (...a: unknown[]) => friendships.isBlockedEitherWay(...(a as [])),
 }))
 vi.mock('../lib/user-display', () => ({
   getUserDisplayHints: vi.fn(async () => new Map([['u1', { displayName: 'Me', username: 'me' }]])),
@@ -79,6 +85,12 @@ beforeEach(() => {
   for (const m of [...Object.values(story), ...Object.values(storyLike), ...Object.values(photo)]) {
     ;(m as ReturnType<typeof vi.fn>).mockReset()
   }
+  // Default: viewer is an accepted, non-blocked friend so the visibility gate
+  // passes; the enumeration test overrides areFriends to false.
+  friendships.areFriends.mockReset()
+  friendships.areFriends.mockResolvedValue(true)
+  friendships.isBlockedEitherWay.mockReset()
+  friendships.isBlockedEitherWay.mockResolvedValue(false)
 })
 
 describe('POST /v1/stories', () => {
@@ -158,6 +170,38 @@ describe('POST /v1/stories/:id/like', () => {
     const app = await buildApp()
     const res = await app.inject({ method: 'POST', url: `/v1/stories/${UUID}/like` })
     expect(res.statusCode).toBe(404)
+    await app.close()
+  })
+
+  it('#83 — a non-friend gets the SAME 404 as a missing story (no enumeration, no like)', async () => {
+    story.findUnique.mockResolvedValue({
+      id: UUID, userId: 'stranger', expiresAt: new Date(Date.now() + 3600_000),
+    })
+    friendships.areFriends.mockResolvedValue(false)
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: `/v1/stories/${UUID}/like` })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toMatchObject({ error: 'NOT_FOUND' })
+    // The like is never created and no existence signal leaks beyond the 404.
+    expect(storyLike.create).not.toHaveBeenCalled()
+    expect(storyLike.findUnique).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('owner can like their own story (gate skipped)', async () => {
+    story.findUnique.mockResolvedValue({
+      id: UUID, userId: 'u1', expiresAt: new Date(Date.now() + 3600_000),
+    })
+    storyLike.findUnique.mockResolvedValue(null)
+    storyLike.create.mockResolvedValue({})
+    storyLike.count.mockResolvedValue(1)
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'POST', url: `/v1/stories/${UUID}/like` })
+    expect(res.statusCode).toBe(200)
+    expect(friendships.areFriends).not.toHaveBeenCalled()
     await app.close()
   })
 })

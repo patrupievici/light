@@ -476,6 +476,21 @@ export async function workoutRoutes(app: FastifyInstance) {
       })
     }
 
+    // Completed workouts are immutable: XP/ranks/standings were fixed at
+    // /complete, so a post-completion set edit would silently drift stats out of
+    // sync with those already-awarded numbers. Reject anything but a draft.
+    const parentWorkout = await prisma.workout.findFirst({
+      where: { id: workoutId, userId },
+      select: { status: true },
+    })
+    if (parentWorkout && parentWorkout.status !== 'draft') {
+      return reply.code(409).send({
+        error: 'WORKOUT_COMPLETED',
+        message: 'Workout already completed',
+        requestId: request.id,
+      })
+    }
+
     const parsed = UpdateSetSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.code(400).send({
@@ -576,6 +591,20 @@ export async function workoutRoutes(app: FastifyInstance) {
       return reply.code(404).send({
         error: 'NOT_FOUND',
         message: 'Set negasit',
+        requestId: request.id,
+      })
+    }
+
+    // Completed workouts are immutable — deleting a set post-completion would
+    // drift XP/ranks/standings already fixed at /complete. Reject non-drafts.
+    const parentWorkout = await prisma.workout.findFirst({
+      where: { id: workoutId, userId },
+      select: { status: true },
+    })
+    if (parentWorkout && parentWorkout.status !== 'draft') {
+      return reply.code(409).send({
+        error: 'WORKOUT_COMPLETED',
+        message: 'Workout already completed',
         requestId: request.id,
       })
     }
@@ -771,6 +800,14 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
     const { userId } = request.user
     const { id: workoutId } = request.params as { id: string }
 
+    // Optional tz offset (minutes east of UTC) so the planned-workout flip below
+    // matches the user's LOCAL day. Without it a UTC+3 user training at 01:00
+    // local completes a workout dated yesterday-UTC and their local plannedWorkout
+    // never flips to 'completed'. Same convention the nutrition routes use.
+    const completeBody = (request.body as Record<string, unknown> | null) ?? {}
+    const tzRaw = Number(completeBody.tzOffsetMin ?? completeBody.tzOffset ?? 0)
+    const tzOffsetMin = Number.isFinite(tzRaw) ? Math.max(-840, Math.min(840, tzRaw)) : 0
+
     const workoutFull = await prisma.workout.findFirst({
       where: { id: workoutId, userId },
       include: {
@@ -854,7 +891,7 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
     await prisma.plannedWorkout.updateMany({
       where: {
         userId,
-        day: ymdLocal(updated.startedAt),
+        day: ymdLocal(updated.startedAt, tzOffsetMin),
         kind: 'gym',
         status: 'pending',
       },

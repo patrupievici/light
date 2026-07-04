@@ -8,11 +8,16 @@ import Fastify from 'fastify'
 const workoutSetFindFirst = vi.fn()
 const workoutSetUpdate = vi.fn()
 const workoutSetCreate = vi.fn()
+const workoutSetDelete = vi.fn()
 const workoutExerciseFindFirst = vi.fn()
+const workoutFindFirst = vi.fn()
 const setEditAuditCreate = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
+    workout: {
+      findFirst: (...a: unknown[]) => workoutFindFirst(...a),
+    },
     workoutExercise: {
       findFirst: (...a: unknown[]) => workoutExerciseFindFirst(...a),
     },
@@ -20,6 +25,7 @@ vi.mock('../lib/prisma', () => ({
       findFirst: (...a: unknown[]) => workoutSetFindFirst(...a),
       update: (...a: unknown[]) => workoutSetUpdate(...a),
       create: (...a: unknown[]) => workoutSetCreate(...a),
+      delete: (...a: unknown[]) => workoutSetDelete(...a),
     },
     setEditAudit: { create: (...a: unknown[]) => setEditAuditCreate(...a) },
   },
@@ -47,10 +53,16 @@ beforeEach(() => {
   workoutSetFindFirst.mockReset()
   workoutSetUpdate.mockReset()
   workoutSetCreate.mockReset()
+  workoutSetDelete.mockReset()
   workoutExerciseFindFirst.mockReset()
+  workoutFindFirst.mockReset()
   setEditAuditCreate.mockReset()
   // Default: audit create resolves so the chained .catch() doesn't reject.
   setEditAuditCreate.mockResolvedValue({ id: 'audit1' })
+  // Default parent workout is a draft so edits/deletes are permitted; the
+  // immutability tests override this with a 'completed' status.
+  workoutFindFirst.mockResolvedValue({ status: 'draft' })
+  workoutSetDelete.mockResolvedValue({})
 })
 
 describe('PATCH set — anti-cheat audit + >2x weight-jump flag', () => {
@@ -271,6 +283,55 @@ describe('POST set — anti-cheat >2x personal-max weight jump', () => {
 
     expect(res.statusCode).toBe(201)
     expect(workoutSetCreate).toHaveBeenCalledOnce()
+    await app.close()
+  })
+})
+
+// #78 — completed workouts are immutable: set edits/deletes must be rejected so
+// XP/ranks/standings fixed at /complete can't drift.
+describe('set mutation guard — completed workout is immutable', () => {
+  it('PATCH set → 409 WORKOUT_COMPLETED when the parent workout is not a draft', async () => {
+    workoutSetFindFirst.mockResolvedValue({
+      id: 's1', weightKg: 100, reps: 5, rpe: 8, tag: 'WORK', isCompleted: true,
+    })
+    workoutFindFirst.mockResolvedValue({ status: 'completed' })
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'PATCH', url: URL, payload: { weightKg: 110 } })
+
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: 'WORKOUT_COMPLETED' })
+    expect(workoutSetUpdate).not.toHaveBeenCalled()
+    expect(setEditAuditCreate).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('DELETE set → 409 WORKOUT_COMPLETED when the parent workout is not a draft', async () => {
+    workoutSetFindFirst.mockResolvedValue({
+      id: 's1', weightKg: 100, reps: 5, tag: 'WORK', isCompleted: true,
+    })
+    workoutFindFirst.mockResolvedValue({ status: 'completed' })
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'DELETE', url: URL })
+
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: 'WORKOUT_COMPLETED' })
+    expect(workoutSetDelete).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('DELETE set → 204 when the parent workout is still a draft', async () => {
+    workoutSetFindFirst.mockResolvedValue({
+      id: 's1', weightKg: 100, reps: 5, tag: 'WORK', isCompleted: true,
+    })
+    workoutFindFirst.mockResolvedValue({ status: 'draft' })
+
+    const app = await buildApp()
+    const res = await app.inject({ method: 'DELETE', url: URL })
+
+    expect(res.statusCode).toBe(204)
+    expect(workoutSetDelete).toHaveBeenCalledOnce()
     await app.close()
   })
 })

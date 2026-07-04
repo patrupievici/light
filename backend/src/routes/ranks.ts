@@ -176,11 +176,29 @@ export async function rankRoutes(app: FastifyInstance) {
       orderBy: [{ exerciseId: 'asc' }, { updatedAt: 'desc' }],
     })
 
-    // Obtine toate workout-urile userului cu seturile pentru a calcula istoricul
+    // Bodyweight is mandatory for any rank/LP computation (CLAUDE.md: missing BW →
+    // BW_REQUIRED, never a guessed rank). Refuse up-front instead of fabricating
+    // history off a 70kg default.
+    const profileRow = await prisma.userProfile.findUnique({ where: { userId } })
+    if (!profileRow?.bodyweightKg) {
+      return reply.code(422).send({
+        error: 'BW_REQUIRED',
+        message: 'Set your bodyweight to compute rank history.',
+        requestId: request.id,
+      })
+    }
+    const bwHist = Number(profileRow.bodyweightKg)
+
+    // Obtine workout-urile userului cu seturile pentru a calcula istoricul.
+    // Bounded to the last 180 days + a hard take cap so a long-time user's full
+    // history is never loaded into memory at once.
+    const HISTORY_WINDOW_MS = 180 * 24 * 60 * 60 * 1000
+    const historySince = new Date(Date.now() - HISTORY_WINDOW_MS)
     const workouts = await prisma.workout.findMany({
       where: {
         userId,
         status: { in: ['completed', 'posted'] },
+        startedAt: { gte: historySince },
       },
       include: {
         exercises: {
@@ -193,6 +211,7 @@ export async function rankRoutes(app: FastifyInstance) {
         },
       },
       orderBy: { startedAt: 'asc' },
+      take: 500,
     })
 
     // Calculeaza e1RM history per exercise
@@ -213,9 +232,6 @@ export async function rankRoutes(app: FastifyInstance) {
     }
 
     const progressionMap = new Map<string, ExerciseProgression>()
-
-    const profileRow = await prisma.userProfile.findUnique({ where: { userId } })
-    const bwHist = profileRow?.bodyweightKg ? Number(profileRow.bodyweightKg) : 70
 
     for (const workout of workouts) {
       for (const we of workout.exercises) {
