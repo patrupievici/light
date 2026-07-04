@@ -27,6 +27,7 @@ import 'theme/locale_notifier.dart';
 import 'services/app_data_cache.dart';
 import 'services/fcm_background.dart';
 import 'services/moderation_service.dart';
+import 'services/onboarding_service.dart';
 import 'services/secure_db.dart';
 import 'services/health_service.dart';
 import 'services/location_service.dart';
@@ -262,6 +263,9 @@ class _AppBootstrapState extends State<_AppBootstrap>
       } catch (e, st) {
         debugPrint('[bootstrap] RetentionReminder init: $e\n$st');
       }
+      // Re-apply the local reminder schedule on app start (notifications are
+      // dropped across reboots). Previously dead code — now reachable. #72
+      unawaited(RetentionReminderService.instance.rescheduleIfEnabled());
       // Wave 8 — register the WorkManager periodic task for Health Connect
       // incremental sync. Fire-and-forget; failures are logged but do not
       // block bootstrap.
@@ -613,6 +617,12 @@ class _AuthGateState extends State<AuthGate> {
             await WorkoutService.clearActiveWorkoutPointer();
             await WorkoutDraftStore().clear();
           } catch (_) {}
+          // Body-data + 1RM prefs are device-global (not per-user) — wipe them
+          // so the next account can't inherit the previous user's weight/age/
+          // sex/height/lift maxes (#67).
+          try {
+            await OnboardingService.clearBodyDataPrefs();
+          } catch (_) {}
           await _checkAuth();
         },
         onLogout: () async {
@@ -668,6 +678,12 @@ class _AuthGateState extends State<AuthGate> {
           try {
             await WorkoutService.clearActiveWorkoutPointer();
             await WorkoutDraftStore().clear();
+          } catch (_) {}
+          // Body-data + 1RM prefs are device-global (not per-user) — wipe them
+          // so the next account can't inherit the previous user's weight/age/
+          // sex/height/lift maxes (#67).
+          try {
+            await OnboardingService.clearBodyDataPrefs();
           } catch (_) {}
         },
       );

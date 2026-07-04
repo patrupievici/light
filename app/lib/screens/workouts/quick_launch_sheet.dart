@@ -1264,6 +1264,22 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
     });
   }
 
+  /// Cancel during the 3s countdown. Bootstrap has usually already created the
+  /// server workout + saved a draft snapshot, so a bare pop leaves a phantom
+  /// "Resume" card + an orphan workout. Clear the draft AND abandon the
+  /// just-created workout (also clears the active pointer) before popping.
+  Future<void> _cancelCountdown() async {
+    _countdownTimer?.cancel();
+    if (!widget.preset.isCardio) {
+      await WorkoutDraftStore().clear();
+      final id = _workoutId;
+      if (id != null) {
+        await _workoutService.discardWorkout(id);
+      }
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
   void _startElapsed() {
     _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted || _paused) return;
@@ -1334,6 +1350,12 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
       if (mounted) Navigator.of(context).pop();
     } else if (choice == 'discard') {
       await WorkoutDraftStore().clear();
+      // Also drop the server draft + active pointer, otherwise the next cold
+      // start still prompts "Resume your workout?" for the discarded session.
+      final id = _workoutId;
+      if (id != null) {
+        await _workoutService.discardWorkout(id);
+      }
       if (mounted) Navigator.of(context).pop();
     } else if (choice == 'end') {
       await _finishWorkout();
@@ -1622,7 +1644,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
             ),
             const SizedBox(height: 80),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: _cancelCountdown,
               child: Text(
                 'Cancel',
                 style: TextStyle(color: ZveltTokens.text2, fontSize: 15),

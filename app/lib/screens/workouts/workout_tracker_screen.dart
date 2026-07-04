@@ -662,6 +662,117 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     }
   }
 
+  /// EDIT an already-logged set (#49). A typo (e.g. 500 kg) otherwise
+  /// permanently inflates e1RM/PRs. Reopens the set dialog prefilled with the
+  /// set's current values and PATCHes it, using the SAME offline-enqueue
+  /// fallback (PendingSetEntry.update) as the add path so it works offline.
+  Future<void> _editLoggedSet(WorkoutExerciseDto we, WorkoutSetDto set) async {
+    final vals = await _showSetDialog(
+      exercise: we.exercise,
+      initialWeight: set.weightKg > 0 ? set.weightKg : 20.0,
+      initialReps: set.reps.clamp(1, 50),
+      title: 'Edit set',
+    );
+    if (vals == null || !mounted) return;
+    String? note;
+    while (true) {
+      try {
+        final updated = await _service.updateSet(
+          widget.workoutId,
+          we.id,
+          set.id,
+          weightKg: vals.$1,
+          reps: vals.$2,
+          rpe: vals.$3,
+          note: note,
+        );
+        if (!mounted) return;
+        _patchWorkoutSets(we.id, (sets) {
+          final idx = sets.indexWhere((s) => s.id == updated.id);
+          if (idx >= 0) sets[idx] = updated;
+          return sets;
+        });
+        _maybeFlagPr(
+          exerciseId: we.exerciseId,
+          weightKg: vals.$1,
+          reps: vals.$2,
+          tag: set.tag,
+          setId: updated.id,
+        );
+        return;
+      } on WeightJumpNoteRequiredException catch (ex) {
+        if (!mounted) return;
+        final entered = await showWeightJumpNoteSheet(context, message: ex.message);
+        if (entered == null) return; // user cancelled → set is NOT changed
+        note = entered;
+      } catch (e) {
+        if (!mounted) return;
+        await _enqueueOfflineSet(
+          PendingSetEntry.update(
+            workoutId: widget.workoutId,
+            weId: we.id,
+            setId: set.id,
+            clientSetId: const Uuid().v4(),
+            weightKg: vals.$1,
+            reps: vals.$2,
+            rpe: vals.$3,
+            note: note,
+          ),
+        );
+        return;
+      }
+    }
+  }
+
+  /// DELETE an already-logged set (#49). Confirms first, then removes it via the
+  /// SAME offline-enqueue fallback (PendingSetEntry.delete) as the add path so
+  /// it works offline; delete is idempotent so the optimistic local removal is
+  /// safe even before the server confirms.
+  Future<void> _deleteLoggedSet(WorkoutExerciseDto we, WorkoutSetDto set) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ZveltTokens.surface,
+        title: const Text('Delete set?'),
+        content: const Text('This set will be removed from your workout.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: ZveltTokens.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _service.deleteSet(widget.workoutId, we.id, set.id);
+      if (!mounted) return;
+      _patchWorkoutSets(we.id, (sets) {
+        sets.removeWhere((s) => s.id == set.id);
+        return sets;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      await _enqueueOfflineSet(
+        PendingSetEntry.delete(
+          workoutId: widget.workoutId,
+          weId: we.id,
+          setId: set.id,
+          clientSetId: const Uuid().v4(),
+        ),
+      );
+      // Delete replays idempotently, so drop the row locally now.
+      _patchWorkoutSets(we.id, (sets) {
+        sets.removeWhere((s) => s.id == set.id);
+        return sets;
+      });
+    }
+  }
+
   Future<(double, int, double?, String)?> _showSetDialog({
     required ExerciseDto exercise,
     double initialWeight = 20,
@@ -878,6 +989,8 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
             progression: _progression[we.exerciseId],
             onLogPendingSet: (s) => _logPendingSet(we, s),
             onAddSet: () => _addSet(we),
+            onEditSet: (set) => _editLoggedSet(we, set),
+            onDeleteSet: (set) => _deleteLoggedSet(we, set),
             onSaveSet: (set, weightKg, reps) => _saveSetInline(
               we,
               set,
@@ -961,6 +1074,8 @@ class _ExerciseCard extends StatefulWidget {
     required this.we,
     required this.onLogPendingSet,
     required this.onAddSet,
+    required this.onEditSet,
+    required this.onDeleteSet,
     required this.onSaveSet,
     required this.prSetIds,
     this.progression,
@@ -969,6 +1084,9 @@ class _ExerciseCard extends StatefulWidget {
   final WorkoutExerciseDto we;
   final void Function(WorkoutSetDto s) onLogPendingSet;
   final VoidCallback onAddSet;
+  /// Edit / delete affordances for an already-logged set (#49).
+  final void Function(WorkoutSetDto s) onEditSet;
+  final void Function(WorkoutSetDto s) onDeleteSet;
   final Future<void> Function(WorkoutSetDto set, double weightKg, int reps) onSaveSet;
 
   /// Ids of sets flagged as a personal record this session (parent-computed).
@@ -1133,6 +1251,41 @@ class _ExerciseCardState extends State<_ExerciseCard> {
         }
       });
     }
+  }
+
+  /// Long-press menu for an already-logged set (#49): edit or delete.
+  void _showSetActions(WorkoutSetDto s) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: ZveltTokens.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(ZveltTokens.rLg)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(AppIcons.edit, color: ZveltTokens.text),
+              title: const Text('Edit set'),
+              onTap: () {
+                Navigator.pop(ctx);
+                widget.onEditSet(s);
+              },
+            ),
+            ListTile(
+              leading: const Icon(AppIcons.trash, color: ZveltTokens.error),
+              title: const Text('Delete set',
+                  style: TextStyle(color: ZveltTokens.error)),
+              onTap: () {
+                Navigator.pop(ctx);
+                widget.onDeleteSet(s);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -1373,7 +1526,12 @@ class _ExerciseCardState extends State<_ExerciseCard> {
               }
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Container(
+                // Long-press a logged set to edit or delete it (#49) — fixes a
+                // typo'd weight permanently inflating e1RM/PRs.
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onLongPress: () => _showSetActions(s),
+                  child: Container(
                   decoration: BoxDecoration(
                     color: ZveltTokens.bg2.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(ZveltTokens.rSm),
@@ -1443,6 +1601,7 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                       ),
                     ],
                   ),
+                ),
                 ),
               );
             }),

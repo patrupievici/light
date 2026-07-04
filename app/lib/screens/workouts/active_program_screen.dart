@@ -102,7 +102,11 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
       if (completedWorkout) {
         try {
           await _service.advance(program.id);
-        } catch (_) {/* best-effort; _load reflects server truth below */}
+        } catch (_) {
+          // Don't fabricate progress: a post-workout connection drop must not
+          // silently leave the same session showing. Surface a retryable nudge.
+          _showAdvanceRetry(program.id);
+        }
       }
       if (!mounted) return;
       await _load();
@@ -111,6 +115,34 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
     } finally {
       if (mounted) setState(() => _starting = false);
     }
+  }
+
+  /// The session saved but advancing the program failed (e.g. connection drop
+  /// right after the workout). Show a retryable banner so the user isn't left
+  /// repeating the same session — retry re-calls advance and reloads on success.
+  void _showAdvanceRetry(String programId) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text(
+          "Session saved but couldn't advance the program — retry"),
+      backgroundColor: ZveltTokens.warn,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 8),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ZveltTokens.rSm)),
+      action: SnackBarAction(
+        label: 'Retry',
+        onPressed: () async {
+          try {
+            await _service.advance(programId);
+            if (!mounted) return;
+            await _load();
+          } catch (_) {
+            _showAdvanceRetry(programId);
+          }
+        },
+      ),
+    ));
   }
 
   Future<void> _skipSession() async {

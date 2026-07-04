@@ -199,11 +199,10 @@ class UsdaFdcClient {
       }
     }
     if (match == null) {
-      if (foods.length == 1 && foods.first is Map) {
-        match = Map<String, dynamic>.from(foods.first as Map);
-      } else {
-        return null;
-      }
+      // No food's gtinUpc actually matches the scanned code. Do NOT accept a
+      // lone fuzzy text-search hit as "the scanned product" — that logs the
+      // wrong macros. Honest not-found.
+      return null;
     }
 
     var hit = _hitFromSearchMap(match);

@@ -254,13 +254,25 @@ class _RaceHubScreenState extends State<RaceHubScreen> {
             c.durationDays == draft.durationDays,
         orElse: () => draft,
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Race launched · 0 athletes joined'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      _openRaceChat(fresh);
+      // publish() falls back to LOCAL storage (epoch-ms id) on network error.
+      // A local-only race has no server row, so pushing RaceChatScreen would
+      // fail with "ID invalid". Detect the non-UUID id and stay on the hub.
+      if (!_looksLikeServerId(fresh.id)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Saved offline — will publish when back online'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Race launched · 0 athletes joined'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        _openRaceChat(fresh);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -272,6 +284,12 @@ class _RaceHubScreenState extends State<RaceHubScreen> {
       if (mounted) setState(() => _launching = false);
     }
   }
+
+  /// A server-backed challenge has a UUID id; the offline fallback uses an
+  /// epoch-ms numeric string. Only server-backed races can open RaceChatScreen.
+  static final _uuidRe = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+  bool _looksLikeServerId(String id) => _uuidRe.hasMatch(id);
 
   Future<void> _loadParticipantCounts() async {
     // Parallel — the old serial loop awaited each request (22s timeout

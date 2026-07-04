@@ -12,6 +12,7 @@ import 'auth_service.dart';
 import 'http_client.dart';
 import 'nutrition_service.dart';
 import 'profile_service.dart';
+import 'settings_store.dart';
 import 'training_profile_service.dart';
 import 'workout_service.dart';
 
@@ -126,6 +127,31 @@ class OnboardingService {
   static const String _kWeightKg = 'ob_weight_kg';
   static const String _kWeightLbs = 'ob_weight_lbs';
   static const String _kAge = 'ob_age';
+
+  /// Wipe the device-global body-data + 1RM prefs on logout / account switch.
+  ///
+  /// These keys are NOT namespaced per user and were never cleared on teardown,
+  /// so the next account would inherit the previous user's weight/age/sex/height
+  /// and lift maxes. Called from both teardown paths in main.dart (#67).
+  static Future<void> clearBodyDataPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    const keys = <String>[
+      _kGender,
+      _kHeightCm,
+      _kHeightIn,
+      _kWeightKg,
+      _kWeightLbs,
+      _kAge,
+      'profile_height_cm',
+      SettingsKeys.rmSquat,
+      SettingsKeys.rmBench,
+      SettingsKeys.rmDeadlift,
+      SettingsKeys.rmPress,
+    ];
+    for (final k in keys) {
+      await prefs.remove(k);
+    }
+  }
 
   /// Save all questionnaire answers — local first, then backend.
   Future<void> save(QuestionnaireState state) async {

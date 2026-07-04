@@ -1213,7 +1213,9 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
         name: ex.name,
         lastSet: vm.lastLabel,
         best: vm.bestLabel,
-        volumeDeltaLabel: '${vm.trendLabel} mo.',
+        // The delta is first-vs-last of ≤7 recent sessions, NOT a monthly
+        // figure — label it to match the actual window (#81).
+        volumeDeltaLabel: '${vm.trendLabel} · last 7',
         bars: index < _exDetailBars.length && _exDetailBars[index].isNotEmpty
             ? _exDetailBars[index]
             : const [0.4, 0.55, 0.48, 0.7, 0.6, 0.88, 1.0],

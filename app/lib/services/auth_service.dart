@@ -566,6 +566,11 @@ class AuthService {
   Future<void> logout() async {
     // Nu apela getAccessToken() — poate declanșa refresh blocant fără server.
     final token = await _getAccessToken();
+    // The access token is usually expired by logout time, so the server revoke
+    // 401s when it authenticates by it. Read the refresh token BEFORE wiping and
+    // send it in the body — the server revokes by its hash (still send the
+    // Authorization header too).
+    final refresh = await _getRefreshToken();
     // Local-first: the user is signed out the moment the tokens are wiped.
     // Previously this awaited the server POST first, so on a slow network
     // the first "Log out" tap looked like it did nothing (up to httpTimeout).
@@ -579,6 +584,9 @@ class AuthService {
             'Content-Type': 'application/json',
             if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
           },
+          body: jsonEncode({
+            if (refresh != null && refresh.isNotEmpty) 'refreshToken': refresh,
+          }),
         )
         .timeout(httpTimeout)
         .then<void>((_) {})

@@ -54,6 +54,10 @@ class _HomeTabState extends State<HomeTab> {
   final _recovery = MuscleRecoveryService();
 
   bool _loading = true;
+  /// Set when any _safe() call swallowed an error during the last load. Without
+  /// this the UI renders 0 kcal / empty week, indistinguishable from a real
+  /// empty day — so we surface a "couldn't refresh" note instead (#65).
+  bool _loadFailed = false;
   Map<String, MuscleLevel> _muscleLevels = const {};
 
   String _displayName = 'Athlete';
@@ -78,12 +82,14 @@ class _HomeTabState extends State<HomeTab> {
     try {
       return await f;
     } catch (_) {
+      _loadFailed = true;
       return null;
     }
   }
 
   Future<void> _load() async {
     if (!mounted) return;
+    _loadFailed = false;
     setState(() => _loading = true);
 
     final now = DateTime.now();
@@ -201,6 +207,10 @@ class _HomeTabState extends State<HomeTab> {
           ),
           children: [
             _header(),
+            if (_loadFailed) ...[
+              const SizedBox(height: ZveltTokens.s4),
+              _loadFailedNote(),
+            ],
             if (_needsSecuring) ...[
               const SizedBox(height: ZveltTokens.s4),
               _secureAccountBanner(),
@@ -229,6 +239,31 @@ class _HomeTabState extends State<HomeTab> {
             _friendCard(),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── Inline note when the last refresh failed (so zeros aren't shown as real).
+  Widget _loadFailedNote() {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: ZveltTokens.s4, vertical: ZveltTokens.s3),
+      decoration: BoxDecoration(
+        color: ZveltTokens.warn.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+        border: Border.all(color: ZveltTokens.warn.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(AppIcons.exclamation, color: ZveltTokens.warn, size: 18),
+          const SizedBox(width: ZveltTokens.s3),
+          Expanded(
+            child: Text(
+              "Couldn't refresh — pull to retry",
+              style: ZType.bodyM.copyWith(color: ZveltTokens.text),
+            ),
+          ),
+        ],
       ),
     );
   }

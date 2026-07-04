@@ -154,7 +154,9 @@ class RetentionReminderService {
       id: _streakAtRiskId,
       scheduledDate: target,
       notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      // INEXACT: exactAllowWhileIdle throws on Android 13+ without the
+      // SCHEDULE_EXACT_ALARM permission. A streak nudge doesn't need exactness.
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       title: '🔥 Streak at risk!',
       body: streak > 1
           ? 'Your $streak-day streak breaks tonight. Log a workout to keep it alive!'

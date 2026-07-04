@@ -40,6 +40,10 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
   num _myTotal = 0;
   bool _acting = false;
   bool _sharing = false;
+  /// Set once the invite is accepted or declined so the accept/decline row is
+  /// hidden — otherwise the still-visible Decline could flip an accepted member
+  /// to declined (#57).
+  bool _inviteResolved = false;
 
   @override
   void initState() {
@@ -81,6 +85,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await _service.joinChallenge(widget.challengeId);
+      if (mounted) setState(() => _inviteResolved = true);
       await _load();
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
@@ -124,11 +129,17 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
     if (_acting) return;
     setState(() => _acting = true);
     final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await _service.declineChallenge(widget.challengeId);
+      if (mounted) setState(() => _inviteResolved = true);
       nav.pop();
-    } catch (_) {
+    } catch (e) {
+      // The backend now rejects declining a non-invited member — surface it
+      // instead of silently swallowing (#57).
       if (mounted) setState(() => _acting = false);
+      messenger.showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', ''))));
     }
   }
 
@@ -206,7 +217,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
             Text('RULES', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
             const SizedBox(height: ZveltTokens.s3),
             _rulesCard(rulesText),
-            if (widget.showAcceptDecline) ...[
+            if (widget.showAcceptDecline && !_inviteResolved) ...[
               const SizedBox(height: ZveltTokens.s5),
               _acceptDecline(),
             ],

@@ -19,7 +19,7 @@ class TrainExerciseDetailScreen extends StatelessWidget {
     this.name = 'Bench Press',
     this.lastSet = '70 kg × 8',
     this.best = '80 kg × 5',
-    this.volumeDeltaLabel = '+8% mo.',
+    this.volumeDeltaLabel = '+8% · last 7',
     this.bars = const [0.40, 0.55, 0.48, 0.70, 0.60, 0.88, 1.00],
     this.muscles = const ['Chest', 'Shoulders', 'Triceps'],
     this.instructions =
