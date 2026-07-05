@@ -49,11 +49,12 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- v1 GPS records in the foreground only (screen kept awake) — no
+	     background-location mode, so the claim to review stays honest. -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
 		<string>remote-notification</string>
-		<string>location</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
@@ -63,20 +64,12 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
-	<key>NSHealthShareUsageDescription</key>
-	<string>Zvelt reads Apple Health metrics you permit (optional) to align training and wellness data with your workouts.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>Zvelt can write approved workout or health summaries to Apple Health only when you explicitly allow it.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Zvelt uses your photos when you choose an image to share with a workout.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Zvelt uses the camera to scan product barcodes for nutrition logging and when you take a workout photo.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Zvelt shows your run or ride on the map and measures distance while you use the app.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Zvelt continues tracking your route in the background so your workout is recorded completely even when the screen turns off.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Zvelt continues tracking your route in the background so your workout is recorded completely even when the screen turns off.</string>
+	<string>Zvelt shows your run or ride on the map and measures your route and distance while you record a workout in the app.</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

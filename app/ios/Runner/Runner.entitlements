@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>com.apple.developer.healthkit</key><true/>
-  <key>com.apple.developer.healthkit.access</key><array/>
+  <!-- HealthKit entitlement removed for v1 — Health integrations are not
+       shipping (v2). An entitlement without shipped functionality is an App
+       Review rejection. Restore both healthkit keys when Health returns. -->
 </dict></plist>

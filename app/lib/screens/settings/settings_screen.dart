@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:zvelt_app/theme/app_icons.dart';
 import 'dart:io';
 
@@ -15,7 +14,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/api_config.dart';
 import '../../services/app_data_cache.dart';
 import '../../services/auth_service.dart';
-import '../../services/health_service.dart';
 import '../../services/messages_service.dart';
 import '../../services/moderation_service.dart';
 import '../../services/profile_service.dart';
@@ -24,7 +22,6 @@ import '../../services/social_feed_service.dart';
 import '../../services/social_notification_hub.dart';
 import '../../theme/zvelt_theme_notifier.dart';
 import '../../theme/zvelt_tokens.dart';
-import '../profile/integrations_screen.dart';
 import '../social/blocked_users_screen.dart';
 import '../social/bookmarks_screen.dart';
 import '../social/conversations_screen.dart';
@@ -64,7 +61,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   int _blockedCount = 0;
   int _bookmarkCount = 0;
   int _conversationCount = 0;
-  int _deviceCount = 0;
   int _gettingStartedCount = 0;
   DateTime? _cloudLastSync;
   String _version = 'v1.0.0 - build 3';
@@ -170,7 +166,6 @@ class _SettingsScreenState extends State<SettingsScreen>
       _safeResult(ModerationService().listBlocked(), const <Object>[]),
       _safeResult(SocialFeedService().getBookmarks(limit: 20), null),
       _safeResult(MessagesService().listConversations(), const <Object>[]),
-      _integrationCount(),
     ]);
     if (!mounted) return;
     final bookmarks = results[1];
@@ -178,7 +173,6 @@ class _SettingsScreenState extends State<SettingsScreen>
       _blockedCount = (results[0] as List).length;
       _bookmarkCount = bookmarks is SocialFeedPage ? bookmarks.posts.length : 0;
       _conversationCount = (results[2] as List).length;
-      _deviceCount = results[3] as int;
     });
   }
 
@@ -188,25 +182,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     } catch (_) {
       return fallback;
     }
-  }
-
-  Future<int> _integrationCount() async {
-    var count = 0;
-    try {
-      if (!kIsWeb && await HealthService.instance.hasPermissions()) count++;
-    } catch (_) {}
-    final token = await _auth.getAccessToken();
-    if (token == null) return count;
-    try {
-      final res = await http.get(Uri.parse('$v1Base/integrations'), headers: {
-        'Authorization': 'Bearer $token'
-      }).timeout(const Duration(seconds: 12));
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        count += (body['integrations'] as List<dynamic>? ?? const []).length;
-      }
-    } catch (_) {}
-    return count;
   }
 
   String _goalLabel(String? value) => switch (value) {
@@ -550,13 +525,9 @@ class _SettingsScreenState extends State<SettingsScreen>
         const SettingsSectionTitle('Data'),
         SettingsCard(
           children: [
-            SettingsRow(
-              icon: AppIcons.heart,
-              tint: SettingsTint.red,
-              title: 'Health & devices',
-              subtitle: '$_deviceCount connected',
-              onTap: () => _open(const IntegrationsScreen()),
-            ),
+            // 'Health & devices' row removed for v1 — Health/wearable/Strava
+            // integrations are v2. IntegrationsScreen stays in the codebase
+            // (dormant); re-add this row when integrations ship.
             SettingsRow(
               icon: AppIcons.cloud,
               tint: SettingsTint.blue,

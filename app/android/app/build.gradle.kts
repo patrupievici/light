@@ -60,11 +60,17 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            // Release builds REQUIRE real signing — a silent debug-signed
+            // "release" is unusable on Play and a store-upload footgun.
+            // Setup: android/README-signing.md (key.properties + upload key).
+            if (!keystorePropertiesFile.exists()) {
+                throw GradleException(
+                    "Release signing missing: create android/key.properties " +
+                    "(storeFile, storePassword, keyAlias, keyPassword). " +
+                    "See android/README-signing.md for the one-time setup."
+                )
             }
+            signingConfig = signingConfigs.getByName("release")
             // P0.7 — R8 code shrinking + resource shrinking enabled (owner opted in).
             // Keeps for reflection-heavy plugins live in proguard-rules.pro.
             isMinifyEnabled = true
