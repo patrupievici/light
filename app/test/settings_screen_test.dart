@@ -52,9 +52,9 @@ void main() {
       (tester) async {
     await pumpSettings(tester);
     expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Account'), findsNWidgets(2));
-    expect(find.text('General'), findsOneWidget);
-    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('Preferences'), findsOneWidget);
+    expect(find.text('Theme'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await expectLater(
       find.byType(SettingsScreen),
@@ -66,11 +66,12 @@ void main() {
     await pumpSettings(tester);
     final list = find.byType(Scrollable).first;
     for (final label in <String>[
-      'Privacy',
-      'Data',
-      'Resources',
-      'Legal',
-      'Enable diagnostics'
+      'Training',
+      'Notifications',
+      'Privacy & Social',
+      'Subscription',
+      'Support',
+      'Log out'
     ]) {
       for (var attempt = 0;
           attempt < 12 && find.text(label).evaluate().isEmpty;
@@ -88,12 +89,12 @@ void main() {
     await pumpSettings(tester);
     final list = find.byType(Scrollable).first;
     for (var attempt = 0;
-        attempt < 16 && find.text('Enable diagnostics').evaluate().isEmpty;
+        attempt < 16 && find.text('Log out').evaluate().isEmpty;
         attempt++) {
       await tester.drag(list, const Offset(0, -440));
       await tester.pumpAndSettle();
     }
-    expect(find.text('Enable diagnostics'), findsOneWidget);
+    expect(find.text('Log out'), findsOneWidget);
     await tester.fling(list, const Offset(0, -900), 1200);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

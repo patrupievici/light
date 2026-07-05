@@ -23,7 +23,10 @@ class SettingsTint {
   static const Color amber = ZveltTokens.warn;
   static const Color green = ZveltTokens.strength;
   static const Color red = ZveltTokens.cardio;
-  static Color gray = ZveltTokens.text2;
+  // Getter (not a field): text2 is a runtime getter keyed on isDark, so gray
+  // must re-evaluate each access to track light/dark switches. A `static Color
+  // gray = ...` field freezes to the theme at first access.
+  static Color get gray => ZveltTokens.text2;
 }
 
 /// Soft background behind a colored icon (12–14% of the icon colour).

@@ -68,6 +68,15 @@ class SettingsKeys {
 
   // Diagnostics
   static const diagnostics = 'zvelt_diagnostics_enabled';
+
+  // Workout logging defaults (applied by the tracker on new sets)
+  static const logAutofillWeight = 'zvelt_log_autofill_weight';
+  static const logShowPrevious = 'zvelt_log_show_previous';
+
+  // Rest timer defaults
+  static const restSeconds = 'zvelt_rest_seconds'; // int, default 90
+  static const restAutostart = 'zvelt_rest_autostart';
+  static const restVibrate = 'zvelt_rest_vibrate';
 }
 
 /// Global, app-wide unit system. Mirrors ProfileService profile.unitSystem and
