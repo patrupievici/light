@@ -1,0 +1,11 @@
+# SAFE TEMPLATE — committed so a fresh clone builds (pubspec declares this
+# file as an asset; a missing declared asset fails `flutter build`).
+# NEVER put real keys here. For a local key, either:
+#   * pass it at build time:  flutter build ... --dart-define=USDA_API_KEY=xxx
+#   * or fill it here locally and DO NOT commit the change.
+# Production uses the backend USDA proxy, so an empty value is fine.
+#
+# USDA FoodData Central (food search in app):
+# https://fdc.nal.usda.gov/api-key-signup.html
+
+USDA_API_KEY=

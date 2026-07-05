@@ -1,6 +1,8 @@
-# Local env file (USDA API key, secrets) — copy template; never commit real keys
-assets/dotenv
-app/assets/dotenv
+# assets/dotenv is a COMMITTED safe template (empty values only) — pubspec
+# declares it as an asset, so a fresh clone must have it to build. Put real
+# local keys in assets/dotenv.local (ignored) or pass them via --dart-define.
+assets/dotenv.local
+app/assets/dotenv.local
 
 *.log
 *.pyc
