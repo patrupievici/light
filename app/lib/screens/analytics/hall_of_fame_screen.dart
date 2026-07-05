@@ -130,36 +130,36 @@ class _HallOfFameScreenState extends State<HallOfFameScreen> {
     return null;
   }
 
+  /// One LP tier per 100 season LP (Iron → Olympian) — the leaderboard
+  /// endpoint doesn't return a tier, so derive it the same way ranks do.
+  static const _tiers = [
+    'Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Olympian',
+  ];
+  static String _tierForLp(int lp) =>
+      _tiers[(lp ~/ 100).clamp(0, _tiers.length - 1)];
+
   Future<List<_LeaderEntry>> _fetchLeaderboard(
       Map<String, String> headers) async {
+    // Uses the REAL backend route (GET /v1/ranks/leaderboard) via the shared
+    // service — the previous inline fetch hit the nonexistent
+    // /v1/leaderboard/season, so the global board silently never loaded.
     try {
-      final res = await http
-          .get(
-            Uri.parse('$v1Base/leaderboard/season')
-                .replace(queryParameters: {'limit': '8'}),
-            headers: headers,
-          )
-          .withTimeout();
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final list = data['data'] as List<dynamic>? ?? [];
-        return list.asMap().entries.map((e) {
-          final j = e.value as Map<String, dynamic>;
-          final name = (j['username'] ?? j['displayName'] ?? 'User').toString();
-          final lp = (j['lpTotal'] as num?)?.toInt() ?? 0;
-          final delta = (j['deltaRank'] as num?)?.toInt() ?? 0;
-          final tier = (j['tier'] as String?) ?? 'Iron';
-          final isMe = j['isMe'] as bool? ?? false;
-          return _LeaderEntry(
-            rank: e.key + 1,
-            name: name,
-            lpTotal: lp,
-            delta: delta >= 0 ? '+$delta' : '$delta',
-            tier: tier,
-            isMe: isMe,
-          );
-        }).toList();
-      }
+      final response =
+          await WorkoutService().getSeasonLeaderboard(limit: 8);
+      final myId = await _auth.getCurrentUserId();
+      return [
+        for (final e in response.entries)
+          _LeaderEntry(
+            rank: e.rank,
+            name: e.label,
+            lpTotal: e.lpSeason,
+            // Rank movement isn't tracked server-side yet — show a neutral
+            // dash instead of a fake "+0" for everyone.
+            delta: '–',
+            tier: _tierForLp(e.lpSeason),
+            isMe: myId != null && e.userId == myId,
+          ),
+      ];
     } catch (e, st) {
       reportError(e, st, reason: 'hall-of-fame:fetch-leaders');
     }
