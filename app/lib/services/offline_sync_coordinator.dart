@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 
 import 'offline_set_queue.dart';
+import 'pending_activity_queue.dart';
 
 /// App-wide bridge between connectivity changes and the offline set queue.
 /// UI subscribes to [pendingCount]; transitions to online auto-flush.
@@ -23,6 +24,7 @@ class OfflineSyncCoordinator with WidgetsBindingObserver {
   final ValueNotifier<int> pendingCount = ValueNotifier<int>(0);
 
   final OfflineSetQueue _queue = OfflineSetQueue();
+  final PendingActivityQueue _activityQueue = PendingActivityQueue();
   final Connectivity _connectivity = Connectivity();
 
   StreamSubscription<List<ConnectivityResult>>? _sub;
@@ -76,6 +78,13 @@ class OfflineSyncCoordinator with WidgetsBindingObserver {
     await _refreshCount();
   }
 
+  /// Durable-store a completed GPS session whose backend save failed
+  /// (offline / 5xx). Replays through the same flush triggers as sets.
+  Future<void> enqueueActivity(PendingActivityEntry entry) async {
+    await _activityQueue.enqueue(entry);
+    await _refreshCount();
+  }
+
   /// Force a flush attempt (used by foreground screens that need fresh state).
   Future<void> refreshPending({bool flush = false}) async {
     if (flush) {
@@ -120,14 +129,20 @@ class OfflineSyncCoordinator with WidgetsBindingObserver {
       await _queue.flush();
     } catch (_) {
       // network/server errors are kept in the queue by flush() itself.
-    } finally {
-      _flushing = false;
-      await _refreshCount();
     }
+    try {
+      await _activityQueue.flush();
+    } catch (_) {
+      // same contract: transient failures stay queued with backoff.
+    }
+    _flushing = false;
+    await _refreshCount();
   }
 
   Future<void> _refreshCount() async {
-    final n = await _queue.pendingCount();
+    final sets = await _queue.pendingCount();
+    final activities = await _activityQueue.pendingCount();
+    final n = sets + activities;
     if (pendingCount.value != n) pendingCount.value = n;
   }
 }

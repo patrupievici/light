@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart' show v1Base;
 import '../models/game_xp_models.dart';
-import '_crash_reporter.dart';
 import 'activity_service.dart';
 import 'app_data_cache.dart';
 import 'auth_service.dart';
@@ -642,58 +641,10 @@ class WorkoutService {
   }
 
 
-  /// POST /v1/workouts/cardio — persist an outdoor GPS session (run/ride).
-  ///
-  /// **Backend dependency:** this endpoint does not yet exist server-side.
-  /// Payload shape proposed below; the call is best-effort (404/501/timeout
-  /// swallowed and surfaced as `false`) so the local Activity calendar entry
-  /// written by the caller remains the source of truth until the backend
-  /// lands. Returns `true` only on 2xx.
-  ///
-  /// JSON shape:
-  /// ```
-  /// {
-  ///   "type": "cardio_outdoor",
-  ///   "mode": "run" | "bike",
-  ///   "startedAt": ISO-8601,
-  ///   "endedAt":   ISO-8601,
-  ///   "distanceM": number,
-  ///   "durationS": int,
-  ///   "kcal":      int?,
-  ///   "route":     [ { "lat": double, "lng": double, "ts": ISO-8601 }, ... ]
-  /// }
-  /// ```
-  Future<bool> saveOutdoorSession({
-    required String mode,
-    required DateTime startedAt,
-    required DateTime endedAt,
-    required double distanceM,
-    required int durationS,
-    required List<Map<String, dynamic>> route,
-    int? kcal,
-  }) async {
-    final body = jsonEncode({
-      'type': 'cardio_outdoor',
-      'mode': mode,
-      'startedAt': startedAt.toUtc().toIso8601String(),
-      'endedAt': endedAt.toUtc().toIso8601String(),
-      'distanceM': distanceM,
-      'durationS': durationS,
-      if (kcal != null) 'kcal': kcal,
-      'route': route,
-    });
-    try {
-      final res = await http.post(
-        Uri.parse('$v1Base/workouts/cardio'),
-        headers: await _headers(),
-        body: body,
-      ).withTimeout();
-      return res.statusCode >= 200 && res.statusCode < 300;
-    } catch (e, st) {
-      reportError(e, st, reason: 'workout:save-cardio');
-      return false;
-    }
-  }
+  // NOTE: the old saveOutdoorSession (POST /v1/workouts/cardio) was removed —
+  // that endpoint never existed server-side (silent 404). Outdoor sessions now
+  // persist via ActivityService.saveActivity → POST /v1/activities, with
+  // offline replay through PendingActivityQueue.
 
   /// GET /v1/ranks/me — all user ranks
   Future<List<ExerciseRankDto>> getMyRanks() async {

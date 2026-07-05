@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '_crash_reporter.dart';
 import 'activity_calendar_store.dart';
 import 'activity_service.dart';
 import 'app_data_cache.dart';
+import 'offline_sync_coordinator.dart';
+import 'pending_activity_queue.dart';
 import '../models/activity_kind.dart';
 import '../screens/workouts/cardio_recap_screen.dart';
 import '../screens/workouts/xp_complete_screen.dart';
@@ -16,6 +19,12 @@ class CardioFlowHelper {
     required double meters,
     required int elapsedSeconds,
     String source = 'app',
+    // Canonical recorded route ({lat,lng,t}) + session window. When present,
+    // the session is persisted to POST /v1/activities BEFORE the XP award —
+    // and durably queued for replay if the save fails (route is never lost).
+    List<Map<String, dynamic>>? routePoints,
+    DateTime? startedAt,
+    DateTime? endedAt,
   }) async {
     if (elapsedSeconds < 30 && meters < 50) return null;
     final store = ActivityCalendarStore();
@@ -33,14 +42,64 @@ class CardioFlowHelper {
         durationMin: (elapsedSeconds / 60).ceil().clamp(1, 999),
       ),
     );
-    return ActivityService().completeCardio(
-      // The XP endpoint may only recognize run/bike; score a walk as a run so
-      // XP isn't lost (the local calendar above still records it as a walk).
-      mode: mode == 'walk' ? 'run' : mode,
-      distanceM: meters,
-      durationSec: elapsedSeconds,
-      source: source,
-    );
+
+    // ── Persist the GPS route (canonical /v1/activities) ────────────────────
+    var xpDistance = meters;
+    var xpDuration = elapsedSeconds;
+    var queuedOffline = false;
+    if (routePoints != null && routePoints.length >= 2 && startedAt != null) {
+      final end = endedAt ?? startedAt.add(Duration(seconds: elapsedSeconds));
+      try {
+        final saved = await ActivityService().saveActivity(
+          routePoints: routePoints,
+          distanceM: meters,
+          durationS: elapsedSeconds,
+          startedAt: startedAt,
+          endedAt: end,
+        );
+        // Server recomputes from the polyline (anti-cheat) — award XP on the
+        // server-trusted metrics, not the local estimate.
+        if ((saved.distanceM ?? 0) > 0) xpDistance = saved.distanceM!;
+        if ((saved.durationS ?? 0) > 0) xpDuration = saved.durationS!;
+      } on ActivitySaveException catch (e, st) {
+        // 4xx: replaying the identical payload can never succeed — keep the
+        // XP flow on local metrics and leave a breadcrumb.
+        reportError(e, st, reason: 'cardio-flow:activity-4xx');
+      } catch (_) {
+        // Offline / 5xx — durable-store the full session for later replay.
+        await OfflineSyncCoordinator.instance.enqueueActivity(
+          PendingActivityEntry(
+            clientActivityId:
+                'act_${DateTime.now().microsecondsSinceEpoch}',
+            mode: mode,
+            routePoints: routePoints,
+            distanceM: meters,
+            durationS: elapsedSeconds,
+            startedAtIso: startedAt.toUtc().toIso8601String(),
+            endedAtIso: end.toUtc().toIso8601String(),
+          ),
+        );
+        queuedOffline = true;
+      }
+    }
+
+    try {
+      return await ActivityService().completeCardio(
+        // The XP endpoint may only recognize run/bike; score a walk as a run so
+        // XP isn't lost (the local calendar above still records it as a walk).
+        mode: mode == 'walk' ? 'run' : mode,
+        distanceM: xpDistance,
+        durationSec: xpDuration.clamp(1, 86400),
+        source: source,
+      );
+    } catch (_) {
+      if (queuedOffline) {
+        // Offline end-to-end: the route is stored and the queue awards XP on
+        // replay — finish the flow quietly instead of surfacing an error.
+        return null;
+      }
+      rethrow;
+    }
   }
 
   static String recapCaption(String mode, double meters, int elapsedSeconds) {
@@ -59,6 +118,9 @@ class CardioFlowHelper {
     required double meters,
     required int elapsedSeconds,
     required String source,
+    List<Map<String, dynamic>>? routePoints,
+    DateTime? startedAt,
+    DateTime? endedAt,
     VoidCallback? afterDone,
   }) async {
     if (elapsedSeconds < 30 && meters < 50) {
@@ -83,6 +145,9 @@ class CardioFlowHelper {
               meters: meters,
               elapsedSeconds: elapsedSeconds,
               source: source,
+              routePoints: routePoints,
+              startedAt: startedAt,
+              endedAt: endedAt,
             ),
             onDiscard: () => Navigator.of(ctx).pop(),
           ),

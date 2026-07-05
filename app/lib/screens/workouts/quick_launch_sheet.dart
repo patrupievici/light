@@ -23,6 +23,7 @@ import '../../services/workout_draft_store.dart';
 import '../../services/offline_set_queue.dart';
 import '../../services/offline_sync_coordinator.dart';
 import '../../services/settings_store.dart';
+import '../../services/activity_service.dart';
 import '../../services/cardio_flow_helper.dart';
 import '../../services/route_tracker.dart';
 import '../../widgets/map_metrics_overlay.dart';
@@ -1109,12 +1110,19 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
     if (widget.preset.isCardio) {
       await _stopCardioTracking(save: false);
       if (!mounted) return;
+      // Persist the recorded route too (canonical /v1/activities) — the
+      // tracker's points were previously discarded here, losing the run.
+      final cardioEnd = DateTime.now();
       await CardioFlowHelper.showRecapAndXp(
         context: context,
         mode: _cardioMode,
         meters: _routeTracker.meters,
         elapsedSeconds: _elapsedSeconds,
         source: 'quick_launch',
+        routePoints: ActivityService.routePointsFrom(
+            _routeTracker.points, _routeTracker.pointTs),
+        startedAt: cardioEnd.subtract(Duration(seconds: _elapsedSeconds)),
+        endedAt: cardioEnd,
         afterDone: () {
           if (mounted) Navigator.of(context).pop();
         },

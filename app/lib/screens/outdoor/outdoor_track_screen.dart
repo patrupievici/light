@@ -21,10 +21,12 @@ import '../../theme/zvelt_tokens.dart';
 import '../../models/activity_kind.dart';
 import '../../services/_crash_reporter.dart';
 import '../../services/activity_calendar_store.dart';
+import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/offline_sync_coordinator.dart';
+import '../../services/pending_activity_queue.dart';
 import '../../services/route_tracker.dart';
 import '../../services/weather_service.dart';
-import '../../services/workout_service.dart';
 
 /// Run or ride: live route on OSM + distance (foreground GPS only).
 class OutdoorTrackScreen extends StatefulWidget {
@@ -227,43 +229,69 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
 
     setState(() => _saving = true);
 
-    final route = <Map<String, dynamic>>[
-      for (var i = 0; i < _tracker.points.length; i++)
-        {
-          'lat': _tracker.points[i].latitude,
-          'lng': _tracker.points[i].longitude,
-          if (i < _tracker.pointTs.length)
-            'ts': _tracker.pointTs[i].toUtc().toIso8601String(),
-        },
-    ];
+    // Canonical wire shape: {lat, lng, t: epoch ms}. The server recomputes
+    // distance/duration/elevation from these points (anti-cheat) — an ISO
+    // timestamp here would be silently dropped by the backend normalizer.
+    final route = ActivityService.routePointsFrom(_tracker.points, _tracker.pointTs);
 
-    bool serverOk = false;
-    Object? err;
+    var storedOffline = false;
+    var xpGain = 0;
+    Object? err; // 4xx only — a payload the server will never accept
     try {
-      serverOk = await WorkoutService().saveOutdoorSession(
-        mode: _mode,
-        startedAt: start,
-        endedAt: end,
+      final saved = await ActivityService().saveActivity(
+        routePoints: route,
         distanceM: _tracker.meters,
         durationS: _elapsedSec,
-        route: route,
-        kcal: _kcalEstimate > 0 ? _kcalEstimate : null,
+        calories: _kcalEstimate > 0 ? _kcalEstimate : null,
+        startedAt: start,
+        endedAt: end,
       );
-      // Always mirror locally so the Activity calendar reflects the session
-      // even while the backend endpoint is still being built.
-      final dayYmd =
-          '${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}';
-      await ActivityCalendarStore().addManualSession(
-        dayYmd,
-        ManualCardioSession(
-          kind: _mode == 'bike' ? ActivityKind.cycle : ActivityKind.run,
-          distanceKm: _tracker.meters / 1000.0,
-          durationMin: (_elapsedSec / 60).round(),
+      // Award XP on the server-trusted metrics (best-effort — the activity is
+      // already persisted; a failed XP call must not fail the save).
+      try {
+        final xp = await ActivityService().completeCardio(
+          mode: _mode == 'bike' ? 'bike' : 'run',
+          distanceM: (saved.distanceM ?? _tracker.meters),
+          durationSec: (saved.durationS ?? _elapsedSec).clamp(1, 86400),
+          source: 'outdoor_track',
+        );
+        xpGain = xp.xpGain;
+      } catch (e, st) {
+        reportError(e, st, reason: 'outdoor:xp-award');
+      }
+    } on ActivitySaveException catch (e) {
+      err = e;
+    } catch (e, st) {
+      // Offline / 5xx — durable-store the full session; the sync coordinator
+      // replays it (and awards the XP) when connectivity returns.
+      reportError(e, st, reason: 'outdoor:save-enqueue');
+      await OfflineSyncCoordinator.instance.enqueueActivity(
+        PendingActivityEntry(
+          clientActivityId: 'act_${DateTime.now().microsecondsSinceEpoch}',
+          mode: _mode,
+          routePoints: route,
+          distanceM: _tracker.meters,
+          durationS: _elapsedSec,
+          calories: _kcalEstimate > 0 ? _kcalEstimate : null,
+          startedAtIso: start.toUtc().toIso8601String(),
+          endedAtIso: end.toUtc().toIso8601String(),
         ),
       );
-    } catch (e) {
-      err = e;
+      storedOffline = true;
     }
+
+    // Always mirror locally so the Activity calendar shows the session
+    // immediately, regardless of how the backend save went.
+    final dayYmd =
+        '${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}';
+    await ActivityCalendarStore().addManualSession(
+      dayYmd,
+      ManualCardioSession(
+        kind: _mode == 'bike' ? ActivityKind.cycle : ActivityKind.run,
+        distanceKm: _tracker.meters / 1000.0,
+        durationMin: (_elapsedSec / 60).round(),
+      ),
+    );
 
     if (!mounted) return;
     setState(() {
@@ -294,9 +322,12 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(serverOk
-          ? 'Workout saved · view it in Activity'
-          : 'Saved locally · view it in Activity')),
+      SnackBar(
+          content: Text(storedOffline
+              ? 'Offline — run stored on device, will sync automatically'
+              : xpGain > 0
+                  ? 'Run saved · +$xpGain XP · view it in Activity'
+                  : 'Run saved · view it in Activity')),
     );
     Navigator.of(context).pop();
   }
