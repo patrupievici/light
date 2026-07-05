@@ -1,6 +1,6 @@
 // Central registry of device-local Settings keys + a small global notifier so
 // screens react to live changes (units in particular). Device-local prefs
-// (units, energy, distance, notification categories, customization, shortcuts,
+// (units, notification categories, customization, shortcuts,
 // language, getting-started, diagnostics, cloud prefs, starting 1RMs) live in
 // SharedPreferences — NOT the /me/settings endpoint, per ProfileService's doc.
 //
@@ -16,8 +16,6 @@ class SettingsKeys {
 
   // Units
   static const unitSystem = 'zvelt_unit_system'; // 'metric' | 'imperial'
-  static const energyUnit = 'zvelt_energy_unit'; // 'kcal' | 'kj'
-  static const distanceUnit = 'zvelt_distance_unit'; // 'km' | 'mi'
 
   // Notifications (per-category, local)
   static const notifMaster = 'zvelt_notif_master';
@@ -32,7 +30,6 @@ class SettingsKeys {
   static const accent = 'zvelt_accent'; // stored ARGB int
   static const startScreen =
       'zvelt_start_screen'; // 'home'|'train'|'food'|'feed'
-  static const compact = 'zvelt_compact_cards';
   static const reduceMotion = 'zvelt_reduce_motion';
 
   // Shortcuts (quick-launch)
@@ -125,7 +122,6 @@ class AppPreferencesNotifier {
   AppPreferencesNotifier._();
 
   static final ValueNotifier<int> accent = ValueNotifier<int>(0xFFFF7A2F);
-  static final ValueNotifier<bool> compact = ValueNotifier<bool>(false);
   static final ValueNotifier<bool> reduceMotion = ValueNotifier<bool>(false);
 
   static Color get accentColor => Color(accent.value);
@@ -134,7 +130,6 @@ class AppPreferencesNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       accent.value = prefs.getInt(SettingsKeys.accent) ?? accent.value;
-      compact.value = prefs.getBool(SettingsKeys.compact) ?? false;
       reduceMotion.value = prefs.getBool(SettingsKeys.reduceMotion) ?? false;
     } catch (e) {
       debugPrint('[AppPreferencesNotifier.init] best-effort skip: $e');
@@ -145,12 +140,6 @@ class AppPreferencesNotifier {
     accent.value = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(SettingsKeys.accent, value);
-  }
-
-  static Future<void> setCompact(bool value) async {
-    compact.value = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(SettingsKeys.compact, value);
   }
 
   static Future<void> setReduceMotion(bool value) async {

@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' hide Path;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../models/activity_kind.dart';
@@ -31,6 +30,13 @@ import '../../widgets/weight_jump_note_sheet.dart';
 import 'package:uuid/uuid.dart';
 import 'xp_complete_screen.dart';
 import 'workout_tracker_screen.dart';
+import 'train/quick_start_hub.dart';
+import 'active_program_screen.dart';
+import 'programs_library_screen.dart';
+import 'exercise_library_screen.dart';
+import 'post_workout_screen.dart';
+import 'train/custom_cardio_sheet.dart';
+import '../../services/program_service.dart';
 import '../ai/ai_chat_screen.dart';
 import '../analytics/photo_capture_screen.dart';
 import '../nutrition/nutrition_tab.dart';
@@ -93,6 +99,15 @@ const _kAllPresets = <FabPreset>[
     tagline: 'Ride out',
     icon: AppIcons.bike,
     accent: [Color(0xFF4DA3FF), Color(0xFF1E5BCC)],
+  ),
+  FabPreset(
+    id: 'walk',
+    name: 'Walk',
+    type: _PresetType.cardio,
+    subtitle: 'Distance · Pace · Time',
+    tagline: 'Step out',
+    icon: AppIcons.running,
+    accent: [ZveltTokens.info, Color(0xFF1E5BCC)],
   ),
   FabPreset(
     id: 'push',
@@ -196,8 +211,6 @@ const _kAllPresets = <FabPreset>[
   ),
 ];
 
-const _kDefaultPresetKey = 'fab_default_preset_id';
-
 FabPreset _presetById(String id) => _kAllPresets.firstWhere((p) => p.id == id,
     orElse: () => _kAllPresets.first);
 
@@ -227,7 +240,11 @@ int _parsePresetReps(String raw) {
 
 int _estimateCardioKcal(String mode, int elapsedSec) {
   if (elapsedSec < 10) return 0;
-  final met = mode == 'bike' ? 6.0 : 9.0;
+  final met = mode == 'bike'
+      ? 6.0
+      : mode == 'walk'
+          ? 3.5
+          : 9.0;
   return (met * 70 * (elapsedSec / 3600)).round();
 }
 
@@ -252,30 +269,152 @@ class QuickLaunchSheet extends StatefulWidget {
 }
 
 class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
-  bool _library = false;
-  final Map<String, bool> _shortcutValues = {
-    SettingsKeys.scEmpty: true,
-    SettingsKeys.scAi: true,
-    SettingsKeys.scRun: true,
-    SettingsKeys.scMeal: false,
-    SettingsKeys.scRace: false,
-    SettingsKeys.scPhoto: false,
-  };
+  bool _loadingHub = true;
+  QsHubData _hubData = const QsHubData();
+  WorkoutDraftSnapshot? _draft;
+  String? _completedWorkoutId;
 
   @override
   void initState() {
     super.initState();
-    _loadShortcuts();
+    _loadHubData();
   }
 
-  Future<void> _loadShortcuts() async {
-    final prefs = await SharedPreferences.getInstance();
+  // Loads the real context for the primary card: an unfinished draft (resume),
+  // the active program + today's session (next), or today's completed workout.
+  Future<void> _loadHubData() async {
+    WorkoutDraftSnapshot? draft;
+    WorkoutDto? draftWorkout;
+    ActiveProgramView? active;
+    WorkoutsResponse? workouts;
+    try { draft = await WorkoutDraftStore().load(); } catch (_) {}
+    if (draft != null) {
+      try { draftWorkout = await WorkoutService().getWorkout(draft.workoutId); } catch (_) {}
+    }
+    try { active = await ProgramService().getActive(); } catch (_) {}
+    try { workouts = await WorkoutService().getWorkouts(); } catch (_) {}
     if (!mounted) return;
     setState(() {
-      for (final key in _shortcutValues.keys.toList()) {
-        _shortcutValues[key] = prefs.getBool(key) ?? _shortcutValues[key]!;
-      }
+      _draft = draft;
+      _hubData = _buildHubData(draft, draftWorkout, active, workouts?.data ?? const []);
+      _loadingHub = false;
     });
+  }
+
+  QsHubData _buildHubData(WorkoutDraftSnapshot? draft, WorkoutDto? draftWorkout,
+      ActiveProgramView? active, List<WorkoutDto> workouts) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    WorkoutDto? doneToday;
+    for (final w in workouts) {
+      if (w.status != 'completed') continue;
+      // Server timestamps are UTC; compare on the LOCAL calendar day so an
+      // early-morning (UTC+2/+3) session isn't pushed to the previous day.
+      final d = DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal());
+      if (d == today) {
+        doneToday = w;
+        break;
+      }
+    }
+    if (draft != null) {
+      // Real progress: exercises with at least one logged set / total exercises.
+      final total = draftWorkout?.exercises.length ?? draft.exerciseCount;
+      final started = draftWorkout == null
+          ? 0
+          : draftWorkout.exercises
+              .where((we) => we.sets.any((s) => s.isCompleted))
+              .length;
+      final progress = total > 0 ? (started / total).clamp(0.0, 1.0) : 0.0;
+      final parts = <String>[
+        if (total > 0) '$started/$total exercises',
+        '${draft.setsLogged} sets logged',
+      ];
+      return QsHubData(
+        primary: QsPrimaryKind.resume,
+        resumeTitle: draft.title,
+        resumeMeta: parts.join(' · '),
+        resumeProgress: progress,
+      );
+    }
+    final prog = active?.program;
+    if (prog != null && doneToday == null && active?.completed != true) {
+      final dayTitle = active?.today?.title;
+      final exCount = active?.today?.exercises.length ?? 0;
+      final meta = <String>[
+        if (exCount > 0) '$exCount exercises',
+        'Week ${prog.currentWeek} of ${prog.totalWeeks}',
+      ];
+      return QsHubData(
+        primary: QsPrimaryKind.next,
+        nextTitle: (dayTitle != null && dayTitle.isNotEmpty) ? dayTitle : prog.title,
+        nextMuscles: prog.title,
+        nextMeta: meta.join(' · '),
+      );
+    }
+    if (doneToday != null) {
+      _completedWorkoutId = doneToday.id;
+      var vol = 0.0;
+      var sets = 0;
+      for (final we in doneToday.exercises) {
+        for (final s in we.sets) {
+          if (s.tag == 'WARMUP') continue;
+          vol += s.weightKg * s.reps;
+          sets++;
+        }
+      }
+      final dur = doneToday.endedAt != null
+          ? _fmtDur(doneToday.endedAt!.difference(doneToday.startedAt))
+          : '—';
+      return QsHubData(
+        primary: QsPrimaryKind.completed,
+        completedTitle: _sessionLabel(doneToday),
+        completedSummary: '$sets sets · ${_fmtInt(vol)} kg · $dur',
+      );
+    }
+    return const QsHubData(primary: QsPrimaryKind.choose);
+  }
+
+  String _fmtInt(num n) {
+    final s = n.round().toString();
+    final b = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+      b.write(s[i]);
+    }
+    return b.toString();
+  }
+
+  String _fmtDur(Duration d) {
+    final h = d.inHours, m = d.inMinutes % 60;
+    return h > 0 ? '${h}h ${m}m' : '${m}m';
+  }
+
+  // Kept in sync with workouts_tab.dart's _muscleGroup so a session gets the
+  // same "{group} Day" label on the Quick Start card and the History/Today tabs.
+  String _muscleGroup(String? raw) {
+    final v = (raw ?? '').toLowerCase();
+    if (v.contains('chest') || v.contains('pec')) return 'Chest';
+    if (v.contains('back') || v.contains('lat') || v.contains('trap') || v.contains('rhom')) return 'Back';
+    if (v.contains('quad') || v.contains('glute') || v.contains('ham') || v.contains('calf') || v.contains('leg')) return 'Legs';
+    if (v.contains('delt') || v.contains('shoulder')) return 'Shoulders';
+    if (v.contains('bicep') || v.contains('tricep') || v.contains('forearm') || v.contains('arm')) return 'Arms';
+    if (v.contains('ab') || v.contains('core') || v.contains('oblique')) return 'Core';
+    return 'Other';
+  }
+
+  String _sessionLabel(WorkoutDto w) {
+    final vol = <String, double>{};
+    for (final we in w.exercises) {
+      final g = _muscleGroup(we.exercise.primaryMuscle);
+      if (g == 'Other') continue;
+      var sv = 0.0;
+      for (final s in we.sets) {
+        if (s.tag == 'WARMUP') continue;
+        sv += s.weightKg * s.reps + s.reps;
+      }
+      vol[g] = (vol[g] ?? 0) + sv;
+    }
+    if (vol.isEmpty) return 'Workout';
+    return '${vol.entries.reduce((a, b) => a.value >= b.value ? a : b).key} Day';
   }
 
   Future<void> _openShortcut(String key) async {
@@ -314,13 +453,6 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
     }
   }
 
-  /// Long-press on any tile/row pins it as the FAB long-press default —
-  /// silent app extra; the design's sheet has no default-preset concept.
-  Future<void> _saveDefault(String id) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kDefaultPresetKey, id);
-  }
-
   Future<void> _startPreset(FabPreset preset) async {
     final nav = Navigator.of(context);
     nav.pop();
@@ -332,477 +464,189 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
     );
   }
 
-  /// Design eyebrow with the bolt icon prefix.
-  Widget _eyebrow(String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(AppIcons.bolt, size: 12, color: ZveltTokens.brand),
-        const SizedBox(width: 4),
-        Text(
-          text.toUpperCase(),
-          style: ZType.eyebrow.copyWith(color: ZveltTokens.text2, fontSize: 11),
-        ),
+  @override
+  Widget build(BuildContext context) {
+    if (_loadingHub) {
+      return Scaffold(
+        backgroundColor: ZveltTokens.bg,
+        body: const Center(child: CircularProgressIndicator(color: ZveltTokens.brand)),
+      );
+    }
+    return QuickStartHub(
+      data: _hubData,
+      templates: _quickStartTemplates(),
+      onClose: () => Navigator.of(context).maybePop(),
+      onResume: _resumeDraft,
+      onStartNext: _openActiveProgram,
+      onPreviewNext: _openActiveProgram,
+      onEditNext: _openActiveProgram,
+      onSkipNext: _openActiveProgram,
+      onShareCompleted: _shareCompleted,
+      onLogAnother: () => _openShortcut(SettingsKeys.scEmpty),
+      onChooseProgram: _openPrograms,
+      onStartEmpty: () => _openShortcut(SettingsKeys.scEmpty),
+      onGenerateSmart: _startSmart,
+      onCardio: _startCardio,
+      onTemplate: _startTemplate,
+      onBrowseLibrary: _openExerciseLibrary,
+    );
+  }
+
+  Future<void> _resumeDraft() async {
+    final draft = _draft;
+    if (draft == null) return;
+    final nav = Navigator.of(context);
+    nav.pop();
+    await nav.push<void>(MaterialPageRoute<void>(
+      builder: (_) => ActiveWorkoutView.forExistingWorkout(workoutId: draft.workoutId),
+    ));
+  }
+
+  // Single source of truth: the Quick Start preview cards are built from the
+  // same _kAllPresets the workout engine actually starts, so what you preview
+  // is exactly what you train.
+  List<QsTemplate> _quickStartTemplates() {
+    const ids = {'push': 'push', 'pull': 'pull', 'legs': 'legs', 'full': 'fullbody'};
+    final out = <QsTemplate>[];
+    ids.forEach((presetId, hubId) {
+      final p = _presetById(presetId);
+      out.add(QsTemplate(
+        hubId,
+        p.name,
+        p.subtitle,
+        p.exercises.length,
+        [for (final e in p.exercises) (e.name, '${e.sets}×${e.repsRange} · ${e.weight}')],
+      ));
+    });
+    return out;
+  }
+
+  void _startTemplate(String id) {
+    // Hub uses 'fullbody'; the matching preset id is 'full'.
+    _startPreset(_presetById(id == 'fullbody' ? 'full' : id));
+  }
+
+  void _startCardio(String kind) {
+    if (kind == 'custom') {
+      _openCustomCardio();
+      return;
+    }
+    // run / walk / bike each have a tracked GPS engine (walk logs as walk).
+    final id = kind == 'bike'
+        ? 'bike'
+        : kind == 'walk'
+            ? 'walk'
+            : 'run';
+    _startPreset(_presetById(id));
+  }
+
+  // Custom cardio = no GPS: a manual log (activity + duration) → calendar store.
+  Future<void> _openCustomCardio() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await showCustomCardioSheet(context);
+    if (result == null || !mounted) return;
+    try {
+      await ActivityCalendarStore().addManualSession(
+        AppDataCache.localDayYmd(),
+        ManualCardioSession(kind: result.kind, durationMin: result.durationMin),
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Logged ${result.durationMin} min ${result.kind.label}.'),
+        backgroundColor: ZveltTokens.success,
+      ),
+    );
+  }
+
+  // Share the just-completed workout via the real feed composer (pre-fills the
+  // workout summary server-side from the workoutId).
+  void _shareCompleted() {
+    final id = _completedWorkoutId;
+    final nav = Navigator.of(context);
+    nav.pop();
+    nav.push<void>(MaterialPageRoute<void>(
+      builder: (_) => PostWorkoutScreen(workoutId: id),
+    ));
+  }
+
+  // Smart workout: the goal/duration/equipment pills genuinely drive a session,
+  // which then runs through the same engine as the templates (catalog match +
+  // history-weight prefill + countdown). Equipment filters the pool, goal sets
+  // the rep range / set count, duration sets how many exercises.
+  void _startSmart(String goal, int duration, String equip) {
+    const pools = <String, List<String>>{
+      'gym': [
+        'Back Squat', 'Bench Press', 'Deadlift', 'Overhead Press', 'Barbell Row',
+        'Lat Pulldown', 'Leg Press', 'Romanian Deadlift', 'Lateral Raise',
+        'Tricep Pushdown', 'Barbell Curl', 'Leg Curl',
       ],
+      'dumbbells': [
+        'Dumbbell Bench Press', 'Goblet Squat', 'Dumbbell Row',
+        'Dumbbell Shoulder Press', 'Dumbbell Romanian Deadlift', 'Dumbbell Lunge',
+        'Dumbbell Lateral Raise', 'Hammer Curl', 'Overhead Tricep Extension',
+        'Dumbbell Curl',
+      ],
+      'bodyweight': [
+        'Pull-up', 'Push-up', 'Bodyweight Squat', 'Walking Lunge', 'Dip',
+        'Pike Push-up', 'Glute Bridge', 'Plank', 'Mountain Climber', 'Burpee',
+      ],
+    };
+    final pool = pools[equip] ?? pools['gym']!;
+    final rawCount = duration <= 30 ? 4 : (duration <= 45 ? 6 : 8);
+    final n = rawCount.clamp(1, pool.length);
+    final (sets, reps) = switch (goal) {
+      'strength' => (5, '5'),
+      'muscle' => (4, '8-12'),
+      'fat' => (3, '12-15'),
+      _ => (3, '8-10'),
+    };
+    final isBw = equip == 'bodyweight';
+    final exercises = <_GymExercise>[
+      for (var i = 0; i < n; i++)
+        _GymExercise(pool[i], sets, reps, isBw ? 'BW' : '20 kg'),
+    ];
+    final preset = FabPreset(
+      id: 'smart',
+      name: 'Smart Workout (${duration}min)',
+      type: _PresetType.gym,
+      subtitle: _smartSubtitle(goal),
+      tagline: 'Generated for you',
+      icon: AppIcons.sparkles,
+      accent: const [ZveltTokens.brand2, ZveltTokens.brand],
+      exercises: exercises,
     );
+    _startPreset(preset);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // ── Design (quick-launch.jsx): home = "Quick start / What are we
-    // doing?" + 2×2 tile grid (Push / Pull / Legs / Cardio) + "Browse
-    // library →"; library = back + "Choose an activity" + activity list.
-    // App-specific: tiles map to the real preset starters (countdown →
-    // GPS tracker or gym bootstrap); Cardio opens the library, where the
-    // GPS activities live. Long-press still sets the FAB default (silent
-    // extra). Only activities we can actually track are listed — design's
-    // Swim/Yoga/Hike rows have no tracking flow yet, so they're absent.
-    return Container(
-      decoration: BoxDecoration(
-        color: ZveltTokens.bg,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
-        boxShadow: ZveltTokens.shadowHero,
-      ),
-      padding: const EdgeInsets.fromLTRB(ZveltTokens.screenPaddingH,
-          ZveltTokens.s3, ZveltTokens.screenPaddingH, 0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag handle
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: ZveltTokens.s3),
-            decoration: BoxDecoration(
-              color: ZveltTokens.border,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          if (!_library) ...[
-            // ── Home: header ──────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _eyebrow('Quick start'),
-                    const SizedBox(height: 4),
-                    Text(
-                      'What are we doing?',
-                      style: ZType.display
-                          .copyWith(fontSize: 24, color: ZveltTokens.text),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // ── 2×2 tile grid ─────────────────────────────────────────
-            if (_shortcutValues.values.any((enabled) => enabled)) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
-                  child: Text(
-                    'YOUR SHORTCUTS',
-                    style: ZType.eyebrow.copyWith(color: ZveltTokens.text3),
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: 72,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    if (_shortcutValues[SettingsKeys.scEmpty]!)
-                      _ShortcutAction(
-                          label: 'Empty',
-                          icon: AppIcons.plus,
-                          onTap: () => _openShortcut(SettingsKeys.scEmpty)),
-                    if (_shortcutValues[SettingsKeys.scAi]!)
-                      _ShortcutAction(
-                          label: 'AI workout',
-                          icon: AppIcons.sparkles,
-                          onTap: () => _openShortcut(SettingsKeys.scAi)),
-                    if (_shortcutValues[SettingsKeys.scRun]!)
-                      _ShortcutAction(
-                          label: 'Run',
-                          icon: AppIcons.running,
-                          onTap: () => _openShortcut(SettingsKeys.scRun)),
-                    if (_shortcutValues[SettingsKeys.scMeal]!)
-                      _ShortcutAction(
-                          label: 'Meal',
-                          icon: AppIcons.restaurant,
-                          onTap: () => _openShortcut(SettingsKeys.scMeal)),
-                    if (_shortcutValues[SettingsKeys.scRace]!)
-                      _ShortcutAction(
-                          label: 'Race',
-                          icon: AppIcons.trophy,
-                          onTap: () => _openShortcut(SettingsKeys.scRace)),
-                    if (_shortcutValues[SettingsKeys.scPhoto]!)
-                      _ShortcutAction(
-                          label: 'Photo',
-                          icon: AppIcons.camera,
-                          onTap: () => _openShortcut(SettingsKeys.scPhoto)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            Row(
-              children: [
-                Expanded(
-                  child: _QuickTile(
-                    label: 'Push',
-                    sub: 'Chest · Shoulders',
-                    icon: AppIcons.bolt,
-                    color: ZveltTokens.brand,
-                    onTap: () => _startPreset(_presetById('push')),
-                    onLongPress: () => _saveDefault('push'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickTile(
-                    label: 'Pull',
-                    sub: 'Back · Biceps',
-                    icon: AppIcons.gym,
-                    color: ZveltTokens.brand,
-                    onTap: () => _startPreset(_presetById('pull')),
-                    onLongPress: () => _saveDefault('pull'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _QuickTile(
-                    label: 'Legs',
-                    sub: 'Quads · Glutes',
-                    icon: AppIcons.target,
-                    color: ZveltTokens.warn,
-                    onTap: () => _startPreset(_presetById('legs')),
-                    onLongPress: () => _saveDefault('legs'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickTile(
-                    label: 'Cardio',
-                    sub: 'Run · Bike',
-                    icon: AppIcons.running,
-                    color: ZveltTokens.info,
-                    onTap: () => setState(() => _library = true),
-                  ),
-                ),
-              ],
-            ),
-            // ── Browse library ────────────────────────────────────────
-            TextButton(
-              onPressed: () => setState(() => _library = true),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.all(ZveltTokens.s4),
-                minimumSize: const Size(0, 44),
-              ),
-              child: Text(
-                'Browse library →',
-                style: TextStyle(
-                  fontFamily: ZveltTokens.fontPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: ZveltTokens.text2,
-                ),
-              ),
-            ),
-          ] else ...[
-            // ── Library: header with back ─────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, ZveltTokens.s4),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => setState(() => _library = false),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: ZveltTokens.surface,
-                        border: Border.all(color: ZveltTokens.border),
-                      ),
-                      child: Icon(AppIcons.arrow_small_left,
-                          size: 18, color: ZveltTokens.text),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _eyebrow('Library'),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Choose an activity',
-                        style: ZType.display
-                            .copyWith(fontSize: 24, color: ZveltTokens.text),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // ── Activity list ─────────────────────────────────────────
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 420),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: _kAllPresets.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (_, i) {
-                  final p = _kAllPresets[i];
-                  return _LibraryRow(
-                    preset: p,
-                    onTap: () => _startPreset(p),
-                    onLongPress: () => _saveDefault(p.id),
-                  );
-                },
-              ),
-            ),
-          ],
-          SizedBox(height: MediaQuery.paddingOf(context).bottom + 24),
-        ],
-      ),
-    );
+  String _smartSubtitle(String goal) => switch (goal) {
+        'strength' => 'Strength · heavy & low reps',
+        'muscle' => 'Muscle gain · hypertrophy',
+        'fat' => 'Fat loss · high volume',
+        _ => 'General fitness',
+      };
+
+  void _openActiveProgram() {
+    final nav = Navigator.of(context);
+    nav.pop();
+    nav.push<void>(MaterialPageRoute<void>(builder: (_) => const ActiveProgramScreen()));
+  }
+
+  void _openPrograms() {
+    final nav = Navigator.of(context);
+    nav.pop();
+    nav.push<void>(MaterialPageRoute<void>(builder: (_) => const ProgramsLibraryScreen()));
+  }
+
+  void _openExerciseLibrary() {
+    final nav = Navigator.of(context);
+    nav.pop();
+    nav.push<void>(MaterialPageRoute<void>(builder: (_) => const ExerciseLibraryScreen()));
   }
 }
 
-// ─── Quick tile (design 2×2 grid cell) ───────────────────────────────────────
-
-class _ShortcutAction extends StatelessWidget {
-  const _ShortcutAction(
-      {required this.label, required this.icon, required this.onTap});
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 72),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: ZveltTokens.surface,
-            borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-            border: Border.all(color: ZveltTokens.border),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 20, color: ZveltTokens.brand),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: ZType.bodyS
-                    .copyWith(fontSize: 11, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickTile extends StatelessWidget {
-  const _QuickTile({
-    required this.label,
-    required this.sub,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  final String label;
-  final String sub;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  @override
-  Widget build(BuildContext context) {
-    // Design: surface card r20 minHeight 130, radial glow blob top-right,
-    // 44px icon halo at 8% tint, bottom-aligned sub eyebrow + 26px label.
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        child: Ink(
-          height: 130,
-          decoration: BoxDecoration(
-            color: ZveltTokens.surface,
-            borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: -20,
-                  right: -20,
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          color.withValues(alpha: 0.18),
-                          color.withValues(alpha: 0),
-                        ],
-                        stops: const [0.0, 0.7],
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(ZveltTokens.s5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(ZveltTokens.rSm),
-                        ),
-                        child: Icon(icon, size: 22, color: color),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sub.toUpperCase(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: ZType.eyebrow,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            label,
-                            style: ZType.display.copyWith(
-                              fontSize: 24,
-                              color: ZveltTokens.text,
-                              height: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Library row (design activity list item) ─────────────────────────────────
-
-class _LibraryRow extends StatelessWidget {
-  const _LibraryRow({
-    required this.preset,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  final FabPreset preset;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  Color get _color => preset.isCardio ? ZveltTokens.info : ZveltTokens.brand;
-
-  @override
-  Widget build(BuildContext context) {
-    // Design: surface row r16 padding 14, 44px halo at 8% tint, 15/600
-    // label + 11.5 sub, plus icon on the right.
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-        child: Ink(
-          padding: const EdgeInsets.all(ZveltTokens.s4),
-          decoration: BoxDecoration(
-            color: ZveltTokens.surface,
-            borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _color.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(ZveltTokens.rSm),
-                ),
-                child: Icon(preset.icon, size: 22, color: _color),
-              ),
-              const SizedBox(width: ZveltTokens.s4),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      preset.name,
-                      style: TextStyle(
-                        fontFamily: ZveltTokens.fontPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: ZveltTokens.text,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      preset.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: ZveltTokens.fontPrimary,
-                        fontSize: 11,
-                        color: ZveltTokens.text2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(AppIcons.plus, size: 18, color: ZveltTokens.text3),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 // ─── ActiveWorkoutView ────────────────────────────────────────────────────────
 
 enum _WorkoutPhase { countdown, live }
@@ -877,9 +721,12 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
 
   List<_GymExercise> _displayExercises = [];
 
-  late final AnimationController _pulseAnim;
 
-  String get _cardioMode => widget.preset.id == 'bike' ? 'bike' : 'run';
+  String get _cardioMode => widget.preset.id == 'bike'
+      ? 'bike'
+      : widget.preset.id == 'walk'
+          ? 'walk'
+          : 'run';
 
   @override
   void initState() {
@@ -888,10 +735,6 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _pulseAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
     if (widget.preset.isCardio) {
       _initCardioLocation();
     } else {
@@ -1071,6 +914,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
       }
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) {
+        if (!mounted) return;
         setState(() {
           _cardioError = 'Enable location to track your route.';
           _cardioLocBusy = false;
@@ -1105,6 +949,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
+    if (!mounted) return;
     if (perm == LocationPermission.denied ||
         perm == LocationPermission.deniedForever) {
       setState(() => _cardioError = 'Enable location to track your route.');
@@ -1117,6 +962,8 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
       _livePosition = null;
     });
     await WakelockPlus.enable();
+    // Bailed out during the wakelock await → don't open an orphan GPS stream.
+    if (!mounted) return;
     _gpsSub = Geolocator.getPositionStream(
             locationSettings: _cardioLocationSettings())
         .listen(_handleCardioPosition);
@@ -1147,8 +994,11 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
     if (save && (_elapsedSeconds >= 30 || _routeTracker.meters >= 50)) {
       final store = ActivityCalendarStore();
       final day = AppDataCache.localDayYmd();
-      final kind =
-          _cardioMode == 'bike' ? ActivityKind.cycle : ActivityKind.run;
+      final kind = _cardioMode == 'bike'
+          ? ActivityKind.cycle
+          : _cardioMode == 'walk'
+              ? ActivityKind.walk
+              : ActivityKind.run;
       await store.addManualSession(
         day,
         ManualCardioSession(
@@ -1376,6 +1226,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
       if (cancelled) return; // user declined the note → stay on this set
     }
 
+    if (!mounted) return;
     final ex = presetEx;
     setState(() {
       if (_currentSet + 1 < ex.sets) {
@@ -1429,7 +1280,6 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
     _gpsSub?.cancel();
     WakelockPlus.disable();
     _countdownScale.dispose();
-    _pulseAnim.dispose();
     _map.dispose();
     super.dispose();
   }
@@ -1752,7 +1602,55 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
 
   Widget _buildGymLive() {
     final exercises = _displayExercises;
-    if (exercises.isEmpty) return const SizedBox.shrink();
+    if (exercises.isEmpty) {
+      // Still resolving the catalog → loader; otherwise a real dead-end (zero
+      // matches, e.g. a Smart preset whose names aren't in the catalog) — show
+      // an error with a way out instead of a trapped blank screen.
+      if (_bootstrapping) {
+        return const Center(
+            child: CircularProgressIndicator(color: ZveltTokens.brand));
+      }
+      return SafeArea(
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: Icon(AppIcons.cross_small, color: ZveltTokens.text2),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(AppIcons.gym, size: 48, color: ZveltTokens.text3),
+                    const SizedBox(height: 16),
+                    Text(
+                      _bootstrapError ??
+                          "Couldn't load this workout's exercises.",
+                      textAlign: TextAlign.center,
+                      style: ZType.bodyM.copyWith(color: ZveltTokens.text2),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ZveltTokens.brand,
+                        foregroundColor: ZveltTokens.onBrand,
+                      ),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     final ex = exercises[_currentExIdx];
 
     return Column(

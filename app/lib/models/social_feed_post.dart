@@ -68,6 +68,7 @@ class SocialFeedPost {
     required this.exercises,
     required this.likeCount,
     required this.commentCount,
+    this.likedByMe = false,
     required this.hideWeights,
     required this.hideReps,
     this.visibility = PostVisibility.friends,
@@ -84,6 +85,10 @@ class SocialFeedPost {
   final List<SocialFeedExerciseLine> exercises;
   final int likeCount;
   final int commentCount;
+  /// Whether the CURRENT viewer already liked this post. Backend emits
+  /// `likedByMe` (camelCase) on /feed, /:id and the gallery list; older
+  /// responses without the key default to false.
+  final bool likedByMe;
   final bool hideWeights;
   final bool hideReps;
   final PostVisibility visibility;
@@ -129,6 +134,7 @@ class SocialFeedPost {
       exercises: exercises,
       likeCount: count?['likes'] as int? ?? 0,
       commentCount: count?['comments'] as int? ?? 0,
+      likedByMe: j['likedByMe'] as bool? ?? false,
       hideWeights: privacy?['hideWeights'] as bool? ?? false,
       hideReps: privacy?['hideReps'] as bool? ?? false,
       visibility: _parseVisibility(visibilityRaw),
@@ -138,6 +144,7 @@ class SocialFeedPost {
   SocialFeedPost copyWith({
     int? likeCount,
     int? commentCount,
+    bool? likedByMe,
   }) {
     return SocialFeedPost(
       id: id,
@@ -150,6 +157,7 @@ class SocialFeedPost {
       exercises: exercises,
       likeCount: likeCount ?? this.likeCount,
       commentCount: commentCount ?? this.commentCount,
+      likedByMe: likedByMe ?? this.likedByMe,
       hideWeights: hideWeights,
       hideReps: hideReps,
       visibility: visibility,

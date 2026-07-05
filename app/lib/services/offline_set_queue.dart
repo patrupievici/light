@@ -477,19 +477,12 @@ class OfflineSetQueue {
           note: e.note,
         );
       case PendingSetOp.delete:
-        // Offline DELETE replay needs WorkoutService.deleteSet
-        // (DELETE /v1/workouts/:id/exercises/:weId/sets/:setId), which does not
-        // exist yet — and workout_service.dart is outside this change's scope.
-        // The entry model + replay ordering already support delete; wiring this
-        // branch (and a tracker delete affordance that enqueues it on failure)
-        // is the follow-up. Until then, no delete entries are ever enqueued, so
-        // this branch is unreachable in practice; throw an un-retryable error
-        // (treated as a 4xx drop) rather than silently looping if one appears.
-        throw WorkoutApiException(
-          statusCode: 400,
-          message: 'Offline set-delete replay not implemented '
-              '(needs WorkoutService.deleteSet)',
-        );
+        // setId is guaranteed non-null for delete (enforced in fromJson and
+        // the PendingSetEntry.delete factory). deleteSet treats a 404 as
+        // success — the set being already gone IS the desired end state, so a
+        // replay against an already-removed row syncs clean instead of being
+        // dropped as a 4xx.
+        await _workouts.deleteSet(e.workoutId, e.weId, e.setId!);
     }
   }
 

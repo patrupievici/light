@@ -263,6 +263,21 @@ class WorkoutService {
     return WorkoutSetDto.fromJson(data['set'] as Map<String, dynamic>);
   }
 
+  /// DELETE /v1/workouts/:id/exercises/:weId/sets/:setId — remove a set.
+  ///
+  /// 404 is treated as success: for a delete, "the set is already gone" IS the
+  /// desired end state (e.g. an offline delete replayed after the row was
+  /// removed from another device, or a retry after a response was lost).
+  /// Server returns 204 on success.
+  Future<void> deleteSet(String workoutId, String weId, String setId) async {
+    final res = await http.delete(
+      Uri.parse('$v1Base/workouts/$workoutId/exercises/$weId/sets/$setId'),
+      headers: await _headers(),
+    ).withTimeout();
+    if (res.statusCode == 404) return;
+    if (res.statusCode < 200 || res.statusCode >= 300) _throw(res);
+  }
+
   /// GET /v1/workouts/:id/insight — post-workout AI coach commentary.
   ///
   /// Returns null on any error (offline, AI disabled, model failure) so the
@@ -533,6 +548,29 @@ class WorkoutService {
     if (res.statusCode != 200) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     return ExerciseDto.fromJson(data['exercise'] as Map<String, dynamic>);
+  }
+
+  /// POST /v1/exercises/custom — create a user's custom exercise. The endpoint
+  /// contract follows CLAUDE.md's API conventions; adjust field names if the
+  /// backend differs.
+  Future<ExerciseDto> createCustomExercise({
+    required String name,
+    String? primaryMuscle,
+    String? equipment,
+  }) async {
+    final res = await http.post(
+      Uri.parse('$v1Base/exercises/custom'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'name': name,
+        if (primaryMuscle != null && primaryMuscle.isNotEmpty) 'primaryMuscle': primaryMuscle,
+        if (equipment != null && equipment.isNotEmpty) 'equipment': equipment,
+      }),
+    ).withTimeout();
+    if (res.statusCode != 201 && res.statusCode != 200) _throw(res);
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final ex = data['exercise'] ?? data;
+    return ExerciseDto.fromJson(ex as Map<String, dynamic>);
   }
 
   /// POST /v1/me/planned-workouts/generate-weekly

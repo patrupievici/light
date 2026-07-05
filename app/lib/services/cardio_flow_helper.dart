@@ -20,7 +20,11 @@ class CardioFlowHelper {
     if (elapsedSeconds < 30 && meters < 50) return null;
     final store = ActivityCalendarStore();
     final day = AppDataCache.localDayYmd();
-    final kind = mode == 'bike' ? ActivityKind.cycle : ActivityKind.run;
+    final kind = mode == 'bike'
+        ? ActivityKind.cycle
+        : mode == 'walk'
+            ? ActivityKind.walk
+            : ActivityKind.run;
     await store.addManualSession(
       day,
       ManualCardioSession(
@@ -30,7 +34,9 @@ class CardioFlowHelper {
       ),
     );
     return ActivityService().completeCardio(
-      mode: mode,
+      // The XP endpoint may only recognize run/bike; score a walk as a run so
+      // XP isn't lost (the local calendar above still records it as a walk).
+      mode: mode == 'walk' ? 'run' : mode,
       distanceM: meters,
       durationSec: elapsedSeconds,
       source: source,
@@ -40,7 +46,7 @@ class CardioFlowHelper {
   static String recapCaption(String mode, double meters, int elapsedSeconds) {
     final km = meters / 1000;
     final min = elapsedSeconds ~/ 60;
-    final label = mode == 'bike' ? 'Ride' : 'Run';
+    final label = mode == 'bike' ? 'Ride' : mode == 'walk' ? 'Walk' : 'Run';
     if (km >= 0.05) {
       return '$label · ${km.toStringAsFixed(2)} km · $min min';
     }

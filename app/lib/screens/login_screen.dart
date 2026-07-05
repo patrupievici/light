@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../theme/app_theme.dart';
+import '../theme/zvelt_tokens.dart';
 import '../services/auth_service.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/auth_error_messages.dart';
 import '../widgets/zvelt_secondary_button.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.onLoggedIn});
@@ -59,6 +61,22 @@ class _LoginScreenState extends State<LoginScreen> {
         _error = authErrorToEnglish(msg);
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _openForgotPassword() async {
+    final reset = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(
+          initialEmail: _emailController.text.trim(),
+        ),
+      ),
+    );
+    if (reset == true && mounted) {
+      _passwordController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password updated — sign in')),
+      );
     }
   }
 
@@ -146,6 +164,27 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
+                  if (_isLogin) ...[
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _loading ? null : _openForgotPassword,
+                        style: TextButton.styleFrom(
+                          // 44pt min touch target (iOS HIG) despite small label.
+                          minimumSize: const Size(44, 44),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: ZveltTokens.s3,
+                            vertical: ZveltTokens.s2,
+                          ),
+                        ),
+                        child: const Text(
+                          'Forgot password?',
+                          style: TextStyle(color: ZveltTokens.brand),
+                        ),
+                      ),
+                    ),
+                  ],
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     Container(

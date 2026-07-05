@@ -62,6 +62,19 @@ const feedPostInclude = {
   _count: { select: { likes: true, comments: true } },
 }
 
+/**
+ * IDs (din `postIds`) pe care viewerul le-a apreciat deja. Un singur findMany
+ * per pagină (fără N+1) — același pattern ca stories.ts `likedByMe`.
+ */
+async function likedPostIdsFor(viewerId: string, postIds: string[]): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set()
+  const likes = await prisma.postLike.findMany({
+    where: { postId: { in: postIds }, userId: viewerId },
+    select: { postId: true },
+  })
+  return new Set(likes.map((l) => l.postId))
+}
+
 async function canViewerSeePost(
   viewerId: string,
   post: { userId: string; visibility: string },
@@ -308,7 +321,11 @@ export async function postRoutes(app: FastifyInstance) {
       },
     })
 
-    return reply.send({ data: posts, meta: { page, limit } })
+    // Seed the client's heart state: one findMany for the whole page (no N+1).
+    const liked = await likedPostIdsFor(userId, posts.map((p) => p.id))
+    const data = posts.map((p) => ({ ...p, likedByMe: liked.has(p.id) }))
+
+    return reply.send({ data, meta: { page, limit } })
   })
 
   // GET /v1/posts/:id — o postare (pentru deep link / notificări)
@@ -341,7 +358,8 @@ export async function postRoutes(app: FastifyInstance) {
       })
     }
 
-    return reply.send({ data: post })
+    const liked = await likedPostIdsFor(viewerId, [post.id])
+    return reply.send({ data: { ...post, likedByMe: liked.has(post.id) } })
   })
 
   // POST /v1/posts/:id/likes — toggle like
@@ -365,7 +383,8 @@ export async function postRoutes(app: FastifyInstance) {
 
     if (existing) {
       await prisma.postLike.delete({ where: { postId_userId: { postId, userId } } })
-      return reply.send({ liked: false })
+      const likeCount = await prisma.postLike.count({ where: { postId } })
+      return reply.send({ liked: false, likeCount })
     } else {
       await prisma.postLike.create({ data: { postId, userId } })
       await prisma.analyticsEvent.create({
@@ -379,7 +398,8 @@ export async function postRoutes(app: FastifyInstance) {
           payload: { postId },
         })
       }
-      return reply.send({ liked: true })
+      const likeCount = await prisma.postLike.count({ where: { postId } })
+      return reply.send({ liked: true, likeCount })
     }
   })
 
@@ -509,7 +529,11 @@ export async function postRoutes(app: FastifyInstance) {
       },
     })
 
-    return reply.send({ data: posts, meta: { page, limit } })
+    // Same single-query likedByMe seeding as /feed (no N+1).
+    const liked = await likedPostIdsFor(me, posts.map((p) => p.id))
+    const data = posts.map((p) => ({ ...p, likedByMe: liked.has(p.id) }))
+
+    return reply.send({ data, meta: { page, limit } })
   })
 
   // PATCH /v1/posts/:id — edit caption/visibility (max 3 edits / 24h)
