@@ -807,10 +807,20 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   Future<ActiveProgramView>? _activeFuture;
 
   Future<void> _openTemplate(ProgramSummary t) async {
-    await Navigator.of(context).push<bool>(
+    // ProgramDetailScreen pops `true` once the program is actually started.
+    // Route straight into the active program (where "Începe sesiunea" launches
+    // the tracked session) — without this the tap looked like it did nothing.
+    final started = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(builder: (_) => ProgramDetailScreen(templateId: t.id)),
     );
-    if (mounted) _load();
+    if (!mounted) return;
+    if (started == true) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(builder: (_) => const ActiveProgramScreen()),
+      );
+      if (!mounted) return;
+    }
+    _load();
   }
 
   // Continue-program banner (spec A) — only when there's a real active program.

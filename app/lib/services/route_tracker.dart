@@ -8,11 +8,18 @@ import 'package:latlong2/latlong.dart';
 /// ±3–10 m and each wiggle used to be summed into the total. Filters applied
 /// here, in order:
 ///  1. Accuracy gate — fixes with a reported error radius >25 m are dropped.
-///  2. Minimum displacement — an accuracy-aware floor: meter-by-meter when the
-///     fix is precise, but the threshold scales with the fix's error radius
-///     (≈ accuracy × 0.5, clamped 1–8 m) so stationary GPS drift isn't summed
-///     as travel on continuous-stream (distanceFilter:0) callers.
-///  3. Teleport guard — a jump implying an impossible speed (>12 m/s run,
+///  2. Stationary speed gate — when the device reports a trustworthy speed
+///     below a slow walk (~0.5 m/s), the fix is dropped. This is the primary
+///     defence against "counting while sitting still": position jitter can
+///     exceed any distance threshold, but the device's own speed estimate is
+///     ~0 when you aren't moving. Only applied when the platform provides a
+///     positive, confident speed (speed==0 is treated as "unknown" so devices
+///     without a speed sensor never have every fix rejected).
+///  3. Minimum displacement — a floor of ≥8 m (rising with the fix's error
+///     radius) so sub-accuracy drift isn't summed as travel. Real movement
+///     still accumulates exactly: the anchor only advances once a fix clears
+///     the floor, so walking/running distance batches without loss.
+///  4. Teleport guard — a jump implying an impossible speed (>12 m/s run,
 ///     >30 m/s bike) rebases the anchor without counting the jump distance
 ///     (GPS relocation after a tunnel/signal loss, not real travel).
 ///
@@ -25,7 +32,13 @@ class RouteTracker {
   final bool isBike;
 
   static const double _kMaxAccuracyM = 25.0;
-  static const double _kMinStepM = 1.0;
+  /// Below a slow walk → treated as stationary (2.5 km/h ≈ 0.5 m/s wouldn't be
+  /// counted; a real walk is ~1.1–1.4 m/s so it's never wrongly dropped).
+  static const double _kMinMovingSpeedMs = 0.5;
+  /// Minimum displacement (m) before distance is counted — GPS drift while
+  /// stationary commonly wanders 5–10 m even with a "good" fix.
+  static const double _kMinStepFloorM = 8.0;
+  static const double _kMaxStepFloorM = 20.0;
   static const double _kElevHysteresisM = 3.0;
 
   /// Accepted route points (what the polyline should draw).
@@ -64,6 +77,13 @@ class RouteTracker {
     // 1. Accuracy gate (0 = unknown on some platforms; let those through).
     if (pos.accuracy > _kMaxAccuracyM) return false;
 
+    // 2. Stationary speed gate. When the platform reports a positive, confident
+    // speed below a slow walk, you're standing still — drop the fix so GPS
+    // jitter isn't accumulated (the couch-drift bug). speed==0 is treated as
+    // "unknown" (some devices report 0 with no speed sensor), so this can never
+    // reject every fix; those devices fall through to the displacement floor.
+    if (_isStationary(pos)) return false;
+
     final ll = LatLng(pos.latitude, pos.longitude);
     final ts = pos.timestamp;
 
@@ -79,11 +99,13 @@ class RouteTracker {
       ll.longitude,
     );
 
-    // 2. Minimum displacement — accuracy-aware floor. Meter-by-meter when the
-    // fix is precise; the floor rises with the fix's error radius so stationary
-    // GPS drift (continuous-stream callers get every ~1 Hz fix) isn't counted.
-    final minStep = (pos.accuracy > 0 ? pos.accuracy * 0.5 : _kMinStepM)
-        .clamp(_kMinStepM, 8.0);
+    // 3. Minimum displacement — a floor of ≥8 m (rising with the fix's error
+    // radius). The anchor only advances once a fix clears the floor, so real
+    // walking/running distance still accumulates exactly (it batches), while
+    // sub-accuracy stationary drift never crosses it.
+    final minStep =
+        (pos.accuracy > 0 ? pos.accuracy : _kMinStepFloorM)
+            .clamp(_kMinStepFloorM, _kMaxStepFloorM);
     if (delta < minStep) return false;
 
     // 3. Teleport guard — rebase the anchor without counting the jump and
@@ -99,6 +121,21 @@ class RouteTracker {
     meters += delta;
     _accept(ll, ts, pos);
     return true;
+  }
+
+  /// True when the platform is confident you're moving slower than a slow walk.
+  /// Requires a positive speed AND a positive, tight speedAccuracy so a device
+  /// that reports 0/unknown speed never has every fix dropped (it falls back to
+  /// the displacement floor instead).
+  bool _isStationary(Position pos) {
+    final s = pos.speed;
+    final sa = pos.speedAccuracy;
+    final trusted = s.isFinite &&
+        s > 0 &&
+        sa.isFinite &&
+        sa > 0 &&
+        sa < 2.0; // uncertainty tighter than ~7 km/h
+    return trusted && s < _kMinMovingSpeedMs;
   }
 
   void _accept(LatLng ll, DateTime ts, Position pos) {

@@ -11,6 +11,8 @@ Position _fix({
   required DateTime ts,
   double accuracy = 5,
   double altitude = 100,
+  double speed = 0,
+  double speedAccuracy = 0,
 }) {
   return Position(
     latitude: lat,
@@ -21,8 +23,8 @@ Position _fix({
     altitudeAccuracy: 3,
     heading: 0,
     headingAccuracy: 0,
-    speed: 0,
-    speedAccuracy: 0,
+    speed: speed,
+    speedAccuracy: speedAccuracy,
   );
 }
 
@@ -118,23 +120,32 @@ void main() {
       expect(tracker.meters, 0);
     });
 
-    test('a precise fix moving 1m+ is counted (meter-by-meter granularity)', () {
+    test('a move past the 8m floor is counted; below it is not', () {
       final tracker = RouteTracker();
-      // accuracy 2 m → floor clamps to 1 m, so a 1.5 m move counts.
       tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0, accuracy: 2));
-      final accepted = tracker.add(_fix(
-        lat: 51.5 + 1.5 * _degPerMeter,
+      // 6 m move — below the 8 m displacement floor → not yet counted.
+      final short = tracker.add(_fix(
+        lat: 51.5 + 6 * _degPerMeter,
         lng: -0.12,
-        ts: t0.add(const Duration(seconds: 1)),
+        ts: t0.add(const Duration(seconds: 2)),
         accuracy: 2,
       ));
-      expect(accepted, isTrue);
-      expect(tracker.meters, closeTo(1.5, 0.5));
+      expect(short, isFalse);
+      expect(tracker.meters, 0);
+      // 10 m from the anchor clears the floor → counted.
+      final long = tracker.add(_fix(
+        lat: 51.5 + 10 * _degPerMeter,
+        lng: -0.12,
+        ts: t0.add(const Duration(seconds: 4)),
+        accuracy: 2,
+      ));
+      expect(long, isTrue);
+      expect(tracker.meters, closeTo(10, 1));
     });
 
     test('stationary drift with mediocre accuracy does not accumulate', () {
       final tracker = RouteTracker();
-      // accuracy 10 m → floor rises to 5 m, so ±3 m rest-drift is rejected.
+      // accuracy 10 m → floor rises to 10 m, so ±3 m rest-drift is rejected.
       tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0, accuracy: 10));
       for (var i = 1; i <= 60; i++) {
         final wiggle = (i.isEven ? 3 : -3) * _degPerMeter;
@@ -146,6 +157,55 @@ void main() {
         ));
       }
       expect(tracker.meters, 0);
+    });
+
+    test('speed gate: a trustworthy near-zero speed drops the fix (couch drift)',
+        () {
+      final tracker = RouteTracker();
+      tracker.add(_fix(
+          lat: 51.5, lng: -0.12, ts: t0, speed: 0.1, speedAccuracy: 0.5));
+      // Sitting still: the device reports ~0 m/s (confident), but the position
+      // jitters 12 m — far past the distance floor. The speed gate must drop it
+      // so distance stays 0 (this is the real-device "counts on the couch" bug).
+      final accepted = tracker.add(_fix(
+        lat: 51.5 + 12 * _degPerMeter,
+        lng: -0.12,
+        ts: t0.add(const Duration(seconds: 5)),
+        speed: 0.15,
+        speedAccuracy: 0.5,
+      ));
+      expect(accepted, isFalse);
+      expect(tracker.meters, 0);
+    });
+
+    test('speed gate ignores speed==0 (unknown) so tracking never fully stalls',
+        () {
+      final tracker = RouteTracker();
+      // Device with no speed sensor reports speed=0/speedAccuracy=0 → the gate
+      // must NOT reject; a real 10 m move still counts via the distance floor.
+      tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0));
+      final accepted = tracker.add(_fix(
+        lat: 51.5 + 10 * _degPerMeter,
+        lng: -0.12,
+        ts: t0.add(const Duration(seconds: 4)),
+      ));
+      expect(accepted, isTrue);
+      expect(tracker.meters, closeTo(10, 1));
+    });
+
+    test('real movement with a healthy reported speed is counted', () {
+      final tracker = RouteTracker();
+      tracker.add(_fix(
+          lat: 51.5, lng: -0.12, ts: t0, speed: 3, speedAccuracy: 0.5));
+      final accepted = tracker.add(_fix(
+        lat: 51.5 + 10 * _degPerMeter,
+        lng: -0.12,
+        ts: t0.add(const Duration(seconds: 3)),
+        speed: 3,
+        speedAccuracy: 0.5,
+      ));
+      expect(accepted, isTrue);
+      expect(tracker.meters, closeTo(10, 1));
     });
   });
 

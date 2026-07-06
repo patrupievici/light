@@ -10,6 +10,7 @@ import '_crash_reporter.dart';
 import 'auth_service.dart';
 import 'http_client.dart';
 import 'nutrition_food_labels.dart';
+import 'open_food_facts_client.dart';
 import 'usda_fdc_client.dart';
 
 String _nutritionApiErrorDetail(http.Response res) {
@@ -972,17 +973,30 @@ class NutritionService {
   Future<FoodNameSearchResult> searchByName(String query) async {
     final q = query.trim();
     if (q.isEmpty) return (items: <FoodItem>[], errorMessage: null);
+    // Primary: USDA (via the backend proxy in release). Fallback: Open Food
+    // Facts (keyless, direct) so search still works when the server has no
+    // USDA key — otherwise it 503s and the list is empty.
     try {
       final hits = await UsdaFdcClient.searchFoods(q);
-      return (items: _foodItemsFromUsdaHits(hits), errorMessage: null);
+      final items = _foodItemsFromUsdaHits(hits);
+      if (items.isNotEmpty) return (items: items, errorMessage: null);
+      final off = await OpenFoodFactsClient.searchByName(q);
+      return (items: off, errorMessage: null);
     } on UsdaFdcException catch (e) {
-      return (items: <FoodItem>[], errorMessage: e.userMessage);
+      final off = await OpenFoodFactsClient.searchByName(q);
+      // Only surface the USDA error if OFF found nothing either.
+      return (items: off, errorMessage: off.isEmpty ? e.userMessage : null);
     } on TimeoutException catch (e) {
       debugPrint('[NutritionService] food search timeout: $e');
-      return (items: <FoodItem>[], errorMessage: 'Search timed out — check your connection.');
+      final off = await OpenFoodFactsClient.searchByName(q);
+      return (
+        items: off,
+        errorMessage: off.isEmpty ? 'Search timed out — check your connection.' : null,
+      );
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:search-foods');
-      return (items: <FoodItem>[], errorMessage: 'Food search failed — try again.');
+      final off = await OpenFoodFactsClient.searchByName(q);
+      return (items: off, errorMessage: off.isEmpty ? 'Food search failed — try again.' : null);
     }
   }
 
@@ -998,20 +1012,27 @@ class NutritionService {
       String barcode) async {
     final code = barcode.trim().replaceAll(RegExp(r'[^\d]'), '');
     if (code.length < 8) return (food: null, errorMessage: null);
+    // USDA Branded first; OFF (keyless, direct) as a fallback so barcode scan
+    // still resolves when the server has no USDA key.
     try {
       final hit = await UsdaFdcClient.lookupBrandedByGtin(code);
-      if (hit == null) return (food: null, errorMessage: null);
-      return (food: _foodItemFromUsdaHit(hit, barcode: code), errorMessage: null);
+      if (hit != null) {
+        return (food: _foodItemFromUsdaHit(hit, barcode: code), errorMessage: null);
+      }
+      return (food: await OpenFoodFactsClient.lookupByBarcode(code), errorMessage: null);
     } on UsdaFdcException catch (e) {
-      return (food: null, errorMessage: e.userMessage);
+      final off = await OpenFoodFactsClient.lookupByBarcode(code);
+      return (food: off, errorMessage: off == null ? e.userMessage : null);
     } on TimeoutException {
+      final off = await OpenFoodFactsClient.lookupByBarcode(code);
       return (
-        food: null,
-        errorMessage: 'Barcode lookup timed out — check your connection.'
+        food: off,
+        errorMessage: off == null ? 'Barcode lookup timed out — check your connection.' : null,
       );
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:lookup-gtin');
-      return (food: null, errorMessage: 'Barcode lookup failed — try again.');
+      final off = await OpenFoodFactsClient.lookupByBarcode(code);
+      return (food: off, errorMessage: off == null ? 'Barcode lookup failed — try again.' : null);
     }
   }
 
