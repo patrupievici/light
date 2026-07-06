@@ -78,6 +78,50 @@ const CompleteSetSchema = z.object({
   setId: z.string().uuid(),
 })
 
+const IsoDateSchema = z
+  .string()
+  .trim()
+  .refine((v) => !Number.isNaN(Date.parse(v)), { message: 'Invalid datetime' })
+  .transform((v) => new Date(v))
+
+const CreateWorkoutSchema = z
+  .object({
+    label: z.string().trim().min(1).max(80).optional(),
+    startedAt: IsoDateSchema.optional(),
+    timezone: z.string().trim().min(1).max(64).optional(),
+  })
+  .strict()
+
+const CompleteWorkoutSchema = z
+  .object({
+    startedAt: IsoDateSchema.optional(),
+    endedAt: IsoDateSchema.optional(),
+    timezone: z.string().trim().min(1).max(64).optional(),
+  })
+  .strict()
+
+const MAX_BACKFILL_MS = 366 * 24 * 60 * 60 * 1000
+const MAX_WORKOUT_DURATION_MS = 24 * 60 * 60 * 1000
+const FUTURE_SKEW_MS = 5 * 60 * 1000
+
+function workoutTimingError(input: { startedAt?: Date; endedAt?: Date; enforceDuration?: boolean }) {
+  const now = Date.now()
+  const dates = [input.startedAt, input.endedAt].filter((d): d is Date => d != null)
+  for (const date of dates) {
+    const t = date.getTime()
+    if (t > now + FUTURE_SKEW_MS) return 'Workout timestamps cannot be in the future'
+    if (t < now - MAX_BACKFILL_MS) return 'Workout timestamps cannot be older than 366 days'
+  }
+  if (input.startedAt && input.endedAt) {
+    const durationMs = input.endedAt.getTime() - input.startedAt.getTime()
+    if (durationMs < 0) return 'Workout end time cannot be before start time'
+    if (input.enforceDuration && durationMs > MAX_WORKOUT_DURATION_MS) {
+      return 'Workout duration cannot be longer than 24 hours'
+    }
+  }
+  return null
+}
+
 export async function workoutRoutes(app: FastifyInstance) {
   const ymdLocal = (d: Date, tzOffsetMin?: number) => {
     if (tzOffsetMin != null) {
@@ -91,8 +135,33 @@ export async function workoutRoutes(app: FastifyInstance) {
   app.post('/', { preHandler: authenticate }, async (request, reply) => {
     const { userId } = request.user
 
+    const parsed = CreateWorkoutSchema.safeParse(request.body ?? {})
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: 'VALIDATION_ERROR',
+        message: 'Date invalide',
+        requestId: request.id,
+        details: parsed.error.flatten(),
+      })
+    }
+
+    const timingError = workoutTimingError({ startedAt: parsed.data.startedAt })
+    if (timingError) {
+      return reply.code(400).send({
+        error: 'VALIDATION_ERROR',
+        message: timingError,
+        requestId: request.id,
+      })
+    }
+
     const workout = await prisma.workout.create({
-      data: { userId, status: 'draft' },
+      data: {
+        userId,
+        status: 'draft',
+        ...(parsed.data.startedAt ? { startedAt: parsed.data.startedAt } : {}),
+        ...(parsed.data.timezone ? { timezone: parsed.data.timezone } : {}),
+        ...(parsed.data.label ? { notes: `Session: ${parsed.data.label}` } : {}),
+      },
     })
 
     await prisma.analyticsEvent.create({
@@ -710,6 +779,16 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
     const { userId } = request.user
     const { id: workoutId } = request.params as { id: string }
 
+    const parsed = CompleteWorkoutSchema.safeParse(request.body ?? {})
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: 'VALIDATION_ERROR',
+        message: 'Date invalide',
+        requestId: request.id,
+        details: parsed.error.flatten(),
+      })
+    }
+
     const workoutFull = await prisma.workout.findFirst({
       where: { id: workoutId, userId },
       include: {
@@ -731,6 +810,22 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       return reply.code(400).send({
         error: 'ALREADY_COMPLETED',
         message: 'Workout-ul a fost deja finalizat',
+        requestId: request.id,
+      })
+    }
+
+    const hasRequestedTiming = parsed.data.startedAt != null || parsed.data.endedAt != null
+    const startedAt = parsed.data.startedAt ?? workoutFull.startedAt
+    const endedAt = parsed.data.endedAt ?? new Date()
+    const timingError = workoutTimingError({
+      startedAt,
+      endedAt,
+      enforceDuration: hasRequestedTiming,
+    })
+    if (timingError) {
+      return reply.code(400).send({
+        error: 'VALIDATION_ERROR',
+        message: timingError,
         requestId: request.id,
       })
     }
@@ -766,7 +861,12 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
 
     const updated = await prisma.workout.update({
       where: { id: workoutId },
-      data: { status: 'completed', endedAt: new Date() },
+      data: {
+        status: 'completed',
+        startedAt,
+        endedAt,
+        ...(parsed.data.timezone ? { timezone: parsed.data.timezone } : {}),
+      },
       include: {
         exercises: {
           include: { exercise: true, sets: { orderBy: { setIndex: 'asc' } } },

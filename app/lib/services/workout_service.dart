@@ -80,7 +80,8 @@ class CalendarAuthException implements Exception {
 /// silently, empty grid) from "real failure" (inline note). 404 is mapped to
 /// an empty map instead and never throws.
 class HeatmapRequestException implements Exception {
-  const HeatmapRequestException(this.statusCode, [this.message = 'Heatmap request failed']);
+  const HeatmapRequestException(this.statusCode,
+      [this.message = 'Heatmap request failed']);
   final int statusCode;
   final String message;
   @override
@@ -111,7 +112,9 @@ const double kSetRpeMax = 10.0;
 
 void _validateSetInputs({double? weightKg, int? reps, double? rpe}) {
   if (weightKg != null &&
-      (weightKg.isNaN || weightKg < kSetWeightMinKg || weightKg > kSetWeightMaxKg)) {
+      (weightKg.isNaN ||
+          weightKg < kSetWeightMinKg ||
+          weightKg > kSetWeightMaxKg)) {
     throw const SetValidationException(
       'weightKg',
       'Weight must be 0–500 kg',
@@ -134,48 +137,66 @@ class WorkoutService {
 
   /// POST /v1/workouts — create draft workout
   Future<WorkoutDto> createWorkout({String? label}) async {
-    final res = await http.post(
-      Uri.parse('$v1Base/workouts'),
-      headers: await _headers(),
-      body: '{}',
-    ).withTimeout();
+    final rawLabel = label?.trim();
+    final cleanLabel =
+        rawLabel != null && rawLabel.isNotEmpty ? rawLabel : null;
+    final body = <String, dynamic>{
+      if (cleanLabel != null) 'label': cleanLabel,
+    };
+    final res = await http
+        .post(
+          Uri.parse('$v1Base/workouts'),
+          headers: await _headers(),
+          body: jsonEncode(body),
+        )
+        .withTimeout();
     if (res.statusCode != 201) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final w = WorkoutDto.fromJson(data['workout'] as Map<String, dynamic>);
-    await saveActiveWorkoutPointer(w, label: label ?? 'Workout');
+    await saveActiveWorkoutPointer(w, label: cleanLabel ?? 'Workout');
     return w;
   }
 
   /// GET /v1/workouts — list past workouts (non-draft)
   Future<WorkoutsResponse> getWorkouts({int page = 1, int limit = 20}) async {
-    final res = await http.get(
-      Uri.parse('$v1Base/workouts').replace(queryParameters: {'page': '$page', 'limit': '$limit'}),
-      headers: await _headers(),
-    ).withTimeout();
+    final res = await http
+        .get(
+          Uri.parse('$v1Base/workouts')
+              .replace(queryParameters: {'page': '$page', 'limit': '$limit'}),
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode != 200) _throw(res);
-    return WorkoutsResponse.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    return WorkoutsResponse.fromJson(
+        jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   /// GET /v1/workouts/:id
   Future<WorkoutDto> getWorkout(String id) async {
-    final res = await http.get(Uri.parse('$v1Base/workouts/$id'), headers: await _headers()).withTimeout();
+    final res = await http
+        .get(Uri.parse('$v1Base/workouts/$id'), headers: await _headers())
+        .withTimeout();
     if (res.statusCode != 200) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     return WorkoutDto.fromJson(data['workout'] as Map<String, dynamic>);
   }
 
   /// POST /v1/workouts/:id/exercises
-  Future<WorkoutExerciseDto> addExercise(String workoutId, String exerciseId, {int? position}) async {
+  Future<WorkoutExerciseDto> addExercise(String workoutId, String exerciseId,
+      {int? position}) async {
     final body = <String, dynamic>{'exerciseId': exerciseId};
     if (position != null) body['position'] = position;
-    final res = await http.post(
-      Uri.parse('$v1Base/workouts/$workoutId/exercises'),
-      headers: await _headers(),
-      body: jsonEncode(body),
-    ).withTimeout();
+    final res = await http
+        .post(
+          Uri.parse('$v1Base/workouts/$workoutId/exercises'),
+          headers: await _headers(),
+          body: jsonEncode(body),
+        )
+        .withTimeout();
     if (res.statusCode != 201) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
-    return WorkoutExerciseDto.fromJson(data['workoutExercise'] as Map<String, dynamic>);
+    return WorkoutExerciseDto.fromJson(
+        data['workoutExercise'] as Map<String, dynamic>);
   }
 
   /// POST /v1/workouts/:id/exercises/:weId/sets
@@ -204,11 +225,13 @@ class WorkoutService {
       if (clientSetId != null) 'clientSetId': clientSetId,
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
     };
-    final res = await http.post(
-      Uri.parse('$v1Base/workouts/$workoutId/exercises/$weId/sets'),
-      headers: await _headers(),
-      body: jsonEncode(body),
-    ).withTimeout();
+    final res = await http
+        .post(
+          Uri.parse('$v1Base/workouts/$workoutId/exercises/$weId/sets'),
+          headers: await _headers(),
+          body: jsonEncode(body),
+        )
+        .withTimeout();
     // Anti-cheat: a >2× jump vs the recent personal max is rejected until the
     // user attaches a justification note.
     if (res.statusCode == 422 && _isWeightJump(res)) {
@@ -245,11 +268,13 @@ class WorkoutService {
     if (body.isEmpty) {
       throw Exception('Nothing to update');
     }
-    final res = await http.patch(
-      Uri.parse('$v1Base/workouts/$workoutId/exercises/$weId/sets/$setId'),
-      headers: await _headers(),
-      body: jsonEncode(body),
-    ).withTimeout();
+    final res = await http
+        .patch(
+          Uri.parse('$v1Base/workouts/$workoutId/exercises/$weId/sets/$setId'),
+          headers: await _headers(),
+          body: jsonEncode(body),
+        )
+        .withTimeout();
     // Anti-cheat: a >2× jump vs the prior weight needs a justification note.
     if (res.statusCode == 422 && _isWeightJump(res)) {
       final msg = _messageOf(res);
@@ -269,10 +294,12 @@ class WorkoutService {
   /// removed from another device, or a retry after a response was lost).
   /// Server returns 204 on success.
   Future<void> deleteSet(String workoutId, String weId, String setId) async {
-    final res = await http.delete(
-      Uri.parse('$v1Base/workouts/$workoutId/exercises/$weId/sets/$setId'),
-      headers: await _headers(),
-    ).withTimeout();
+    final res = await http
+        .delete(
+          Uri.parse('$v1Base/workouts/$workoutId/exercises/$weId/sets/$setId'),
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode == 404) return;
     if (res.statusCode < 200 || res.statusCode >= 300) _throw(res);
   }
@@ -284,10 +311,12 @@ class WorkoutService {
   /// Backend caches per (user, workout) for 1h, so revisits are free.
   Future<String?> fetchPostWorkoutInsight(String workoutId) async {
     try {
-      final res = await http.get(
-        Uri.parse('$v1Base/workouts/$workoutId/insight'),
-        headers: await _headers(),
-      ).withAiTimeout();
+      final res = await http
+          .get(
+            Uri.parse('$v1Base/workouts/$workoutId/insight'),
+            headers: await _headers(),
+          )
+          .withAiTimeout();
       if (res.statusCode != 200) return null;
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final text = (data['insight'] as String?)?.trim();
@@ -313,10 +342,12 @@ class WorkoutService {
       }
     }
     try {
-      final res = await http.get(
-        Uri.parse('$v1Base/me/weekly-coach-read'),
-        headers: await _headers(),
-      ).withAiTimeout();
+      final res = await http
+          .get(
+            Uri.parse('$v1Base/me/weekly-coach-read'),
+            headers: await _headers(),
+          )
+          .withAiTimeout();
       if (res.statusCode != 200) return null;
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final text = (data['read'] as String?)?.trim();
@@ -332,12 +363,26 @@ class WorkoutService {
   }
 
   /// POST /v1/workouts/:id/complete — awards game XP (gym_rpg formula) and returns snapshot.
-  Future<CompleteWorkoutResult> completeWorkout(String workoutId) async {
-    final res = await http.post(
-      Uri.parse('$v1Base/workouts/$workoutId/complete'),
-      headers: await _headers(),
-      body: '{}',
-    ).withTimeout();
+  Future<CompleteWorkoutResult> completeWorkout(
+    String workoutId, {
+    DateTime? startedAt,
+    DateTime? endedAt,
+    String? timezone,
+  }) async {
+    final cleanTimezone = timezone?.trim();
+    final body = <String, dynamic>{
+      if (startedAt != null) 'startedAt': startedAt.toUtc().toIso8601String(),
+      if (endedAt != null) 'endedAt': endedAt.toUtc().toIso8601String(),
+      if (cleanTimezone != null && cleanTimezone.isNotEmpty)
+        'timezone': cleanTimezone,
+    };
+    final res = await http
+        .post(
+          Uri.parse('$v1Base/workouts/$workoutId/complete'),
+          headers: await _headers(),
+          body: jsonEncode(body),
+        )
+        .withTimeout();
     if (res.statusCode != 200) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final gx = data['gameXp'] as Map<String, dynamic>?;
@@ -365,17 +410,21 @@ class WorkoutService {
   /// caller can show a snackbar. P1.11.
   Future<void> discardWorkout(String workoutId) async {
     try {
-      final res = await http.delete(
-        Uri.parse('$v1Base/workouts/$workoutId'),
-        headers: await _headers(),
-      ).withTimeout();
+      final res = await http
+          .delete(
+            Uri.parse('$v1Base/workouts/$workoutId'),
+            headers: await _headers(),
+          )
+          .withTimeout();
       final ok = (res.statusCode >= 200 && res.statusCode < 300) ||
           res.statusCode == 404;
       if (!ok) {
-        debugPrint('[discardWorkout] non-ok status ${res.statusCode}: ${res.body}');
+        debugPrint(
+            '[discardWorkout] non-ok status ${res.statusCode}: ${res.body}');
       }
     } catch (e) {
-      debugPrint('[discardWorkout] network error (clearing pointer anyway): $e');
+      debugPrint(
+          '[discardWorkout] network error (clearing pointer anyway): $e');
     } finally {
       await clearActiveWorkoutPointer(matchingId: workoutId);
     }
@@ -383,14 +432,17 @@ class WorkoutService {
 
   /// POST /v1/workouts/from-suggestion — creates draft with exercises from AI suggestion (DeepSeek).
   Future<WorkoutDto> createWorkoutFromSuggestion() async {
-    final res = await http.post(
-      Uri.parse('$v1Base/workouts/from-suggestion'),
-      headers: await _headers(),
-      body: '{}',
-    ).withTimeout();
+    final res = await http
+        .post(
+          Uri.parse('$v1Base/workouts/from-suggestion'),
+          headers: await _headers(),
+          body: '{}',
+        )
+        .withTimeout();
     if (res.statusCode == 422) {
       final body = jsonDecode(res.body) as Map<String, dynamic>?;
-      throw Exception(body?['message'] ?? 'Could not build workout from your profile');
+      throw Exception(
+          body?['message'] ?? 'Could not build workout from your profile');
     }
     if (res.statusCode != 201) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -425,7 +477,8 @@ class WorkoutService {
   static Future<ActiveWorkoutPointer?> readActiveWorkoutPointer() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return ActiveWorkoutPointer.tryParse(prefs.getString(kActiveWorkoutPrefsKey));
+      return ActiveWorkoutPointer.tryParse(
+          prefs.getString(kActiveWorkoutPrefsKey));
     } catch (e) {
       debugPrint('[active-workout] read failed: $e');
       return null;
@@ -439,7 +492,8 @@ class WorkoutService {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (matchingId != null) {
-        final cur = ActiveWorkoutPointer.tryParse(prefs.getString(kActiveWorkoutPrefsKey));
+        final cur = ActiveWorkoutPointer.tryParse(
+            prefs.getString(kActiveWorkoutPrefsKey));
         if (cur != null && cur.workoutId != matchingId) return;
       }
       await prefs.remove(kActiveWorkoutPrefsKey);
@@ -449,7 +503,8 @@ class WorkoutService {
   }
 
   /// GET /v1/me/workout-suggestion — AI-built suggestion from profile + exercise catalog.
-  Future<WorkoutSuggestionDto> getWorkoutSuggestion({bool refresh = false}) async {
+  Future<WorkoutSuggestionDto> getWorkoutSuggestion(
+      {bool refresh = false}) async {
     if (!refresh) {
       final cached = await AppDataCache.instance.loadWorkoutSuggestion();
       if (cached != null) {
@@ -460,10 +515,12 @@ class WorkoutService {
     final uri = Uri.parse('$v1Base/me/workout-suggestion').replace(
       queryParameters: refresh ? const {'refresh': 'true'} : null,
     );
-    final res = await http.get(
-      uri,
-      headers: await _headers(),
-    ).withTimeout();
+    final res = await http
+        .get(
+          uri,
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode != 200) {
       final cached = await AppDataCache.instance.loadWorkoutSuggestion();
       if (cached != null) return WorkoutSuggestionDto.fromJson(cached);
@@ -486,25 +543,31 @@ class WorkoutService {
     if (query != null && query.isNotEmpty) q['query'] = query;
     if (pattern != null && pattern.isNotEmpty) q['pattern'] = pattern;
     if (source != null && source.isNotEmpty) q['source'] = source;
-    final res = await http.get(
-      Uri.parse('$v1Base/exercises').replace(queryParameters: q),
-      headers: await _headers(),
-    ).withTimeout();
+    final res = await http
+        .get(
+          Uri.parse('$v1Base/exercises').replace(queryParameters: q),
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode != 200) _throw(res);
-    return ExercisesResponse.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    return ExercisesResponse.fromJson(
+        jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   /// Most recent completed WORK-set weight (kg) per exercise id, for pre-filling
   /// preset sets from the user's real history. Best-effort: returns {} on any
   /// failure so callers fall back to their static defaults.
-  Future<Map<String, double>> getLastWorkingWeights(List<String> exerciseIds) async {
+  Future<Map<String, double>> getLastWorkingWeights(
+      List<String> exerciseIds) async {
     if (exerciseIds.isEmpty) return {};
     try {
-      final res = await http.get(
-        Uri.parse('$v1Base/exercises/last-weights')
-            .replace(queryParameters: {'ids': exerciseIds.join(',')}),
-        headers: await _headers(),
-      ).withTimeout();
+      final res = await http
+          .get(
+            Uri.parse('$v1Base/exercises/last-weights')
+                .replace(queryParameters: {'ids': exerciseIds.join(',')}),
+            headers: await _headers(),
+          )
+          .withTimeout();
       if (res.statusCode != 200) return {};
       final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'];
       if (data is! Map) return {};
@@ -523,13 +586,16 @@ class WorkoutService {
   /// suggested next working load for [exerciseId] from the user's WORK-set
   /// history (+ a "why" reason for explainability). Best-effort: null on any
   /// failure so the tracker just shows no hint.
-  Future<ProgressionSuggestion?> getProgression(String exerciseId, {int reps = 8}) async {
+  Future<ProgressionSuggestion?> getProgression(String exerciseId,
+      {int reps = 8}) async {
     try {
-      final res = await http.get(
-        Uri.parse('$v1Base/exercises/$exerciseId/progression')
-            .replace(queryParameters: {'reps': '$reps'}),
-        headers: await _headers(),
-      ).withTimeout();
+      final res = await http
+          .get(
+            Uri.parse('$v1Base/exercises/$exerciseId/progression')
+                .replace(queryParameters: {'reps': '$reps'}),
+            headers: await _headers(),
+          )
+          .withTimeout();
       if (res.statusCode != 200) return null;
       final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'];
       if (data is! Map) return null;
@@ -540,10 +606,12 @@ class WorkoutService {
   }
 
   Future<ExerciseDto> getExercise(String id) async {
-    final res = await http.get(
-      Uri.parse('$v1Base/exercises/$id'),
-      headers: await _headers(),
-    ).withTimeout();
+    final res = await http
+        .get(
+          Uri.parse('$v1Base/exercises/$id'),
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode != 200) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     return ExerciseDto.fromJson(data['exercise'] as Map<String, dynamic>);
@@ -557,15 +625,19 @@ class WorkoutService {
     String? primaryMuscle,
     String? equipment,
   }) async {
-    final res = await http.post(
-      Uri.parse('$v1Base/exercises/custom'),
-      headers: await _headers(),
-      body: jsonEncode({
-        'name': name,
-        if (primaryMuscle != null && primaryMuscle.isNotEmpty) 'primaryMuscle': primaryMuscle,
-        if (equipment != null && equipment.isNotEmpty) 'equipment': equipment,
-      }),
-    ).withTimeout();
+    final res = await http
+        .post(
+          Uri.parse('$v1Base/exercises/custom'),
+          headers: await _headers(),
+          body: jsonEncode({
+            'name': name,
+            if (primaryMuscle != null && primaryMuscle.isNotEmpty)
+              'primaryMuscle': primaryMuscle,
+            if (equipment != null && equipment.isNotEmpty)
+              'equipment': equipment,
+          }),
+        )
+        .withTimeout();
     if (res.statusCode != 201 && res.statusCode != 200) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final ex = data['exercise'] ?? data;
@@ -573,13 +645,16 @@ class WorkoutService {
   }
 
   /// POST /v1/me/planned-workouts/generate-weekly
-  Future<GenerateWeeklyPlanResult> generateWeeklyPlan({bool force = false}) async {
+  Future<GenerateWeeklyPlanResult> generateWeeklyPlan(
+      {bool force = false}) async {
     final tzOffset = DateTime.now().timeZoneOffset.inMinutes;
-    final res = await http.post(
-      Uri.parse('$v1Base/me/planned-workouts/generate-weekly'),
-      headers: await _headers(),
-      body: jsonEncode({'tzOffset': tzOffset, 'force': force}),
-    ).withAiTimeout();
+    final res = await http
+        .post(
+          Uri.parse('$v1Base/me/planned-workouts/generate-weekly'),
+          headers: await _headers(),
+          body: jsonEncode({'tzOffset': tzOffset, 'force': force}),
+        )
+        .withAiTimeout();
     if (res.statusCode != 200 && res.statusCode != 201) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final workouts = (data['workouts'] as List<dynamic>)
@@ -594,41 +669,53 @@ class WorkoutService {
 
   /// PATCH /v1/me/planned-workouts/:id
   Future<void> patchPlannedWorkout(String id, String status) async {
-    final res = await http.patch(
-      Uri.parse('$v1Base/me/planned-workouts/$id'),
-      headers: await _headers(),
-      body: jsonEncode({'status': status}),
-    ).withTimeout();
+    final res = await http
+        .patch(
+          Uri.parse('$v1Base/me/planned-workouts/$id'),
+          headers: await _headers(),
+          body: jsonEncode({'status': status}),
+        )
+        .withTimeout();
     if (res.statusCode != 200) _throw(res);
   }
 
   /// DELETE /v1/me/planned-workouts/:id
   Future<void> deletePlannedWorkout(String id) async {
-    final res = await http.delete(
-      Uri.parse('$v1Base/me/planned-workouts/$id'),
-      headers: await _headers(),
-    ).withTimeout();
+    final res = await http
+        .delete(
+          Uri.parse('$v1Base/me/planned-workouts/$id'),
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode != 200 && res.statusCode != 204) _throw(res);
   }
 
   /// GET /v1/ranks/leaderboard — leaderboard sezon curent.
-  Future<SeasonLeaderboardResponse> getSeasonLeaderboard({int limit = 50}) async {
-    final res = await http.get(
-      Uri.parse('$v1Base/ranks/leaderboard').replace(queryParameters: {'limit': '$limit'}),
-      headers: await _headers(),
-    ).withTimeout();
+  Future<SeasonLeaderboardResponse> getSeasonLeaderboard(
+      {int limit = 50}) async {
+    final res = await http
+        .get(
+          Uri.parse('$v1Base/ranks/leaderboard')
+              .replace(queryParameters: {'limit': '$limit'}),
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode != 200) _throw(res);
-    return SeasonLeaderboardResponse.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    return SeasonLeaderboardResponse.fromJson(
+        jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   /// GET /v1/ranks/leaderboard — poziția ta în sezon (null dacă nu ești în top).
   Future<int?> getMySeasonLeaderboardRank({int limit = 100}) async {
     final userId = await _auth.getCurrentUserId();
     if (userId == null) return null;
-    final res = await http.get(
-      Uri.parse('$v1Base/ranks/leaderboard').replace(queryParameters: {'limit': '$limit'}),
-      headers: await _headers(),
-    ).withTimeout();
+    final res = await http
+        .get(
+          Uri.parse('$v1Base/ranks/leaderboard')
+              .replace(queryParameters: {'limit': '$limit'}),
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode != 200) return null;
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final list = data['leaderboard'] as List<dynamic>? ?? [];
@@ -639,7 +726,6 @@ class WorkoutService {
     }
     return null;
   }
-
 
   // NOTE: the old saveOutdoorSession (POST /v1/workouts/cardio) was removed —
   // that endpoint never existed server-side (silent 404). Outdoor sessions now
@@ -653,14 +739,18 @@ class WorkoutService {
     // genuinely has no ranks yet". xp_complete_screen still falls back to
     // its empty hint when this returns [].
     try {
-      final res = await http.get(
-        Uri.parse('$v1Base/ranks/me'),
-        headers: await _headers(),
-      ).withTimeout();
+      final res = await http
+          .get(
+            Uri.parse('$v1Base/ranks/me'),
+            headers: await _headers(),
+          )
+          .withTimeout();
       if (res.statusCode != 200) return [];
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final list = data['ranks'] as List<dynamic>? ?? [];
-      return list.map((e) => ExerciseRankDto.fromJson(e as Map<String, dynamic>)).toList();
+      return list
+          .map((e) => ExerciseRankDto.fromJson(e as Map<String, dynamic>))
+          .toList();
     } catch (e, st) {
       _logRankError(e, st);
       return [];
@@ -673,20 +763,24 @@ class WorkoutService {
 
   /// GET /v1/ranks/exercises/:id/explain
   Future<Map<String, dynamic>> getRankExplain(String exerciseId) async {
-    final res = await http.get(
-      Uri.parse('$v1Base/ranks/exercises/$exerciseId/explain'),
-      headers: await _headers(),
-    ).withTimeout();
+    final res = await http
+        .get(
+          Uri.parse('$v1Base/ranks/exercises/$exerciseId/explain'),
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode != 200) _throw(res);
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   /// GET /v1/ranks/me/history — progression history for all exercises
   Future<List<ExerciseProgressionDto>> getMyProgressionHistory() async {
-    final res = await http.get(
-      Uri.parse('$v1Base/ranks/me/history'),
-      headers: await _headers(),
-    ).withTimeout();
+    final res = await http
+        .get(
+          Uri.parse('$v1Base/ranks/me/history'),
+          headers: await _headers(),
+        )
+        .withTimeout();
     if (res.statusCode != 200) _throw(res);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final progressions = (data['progressions'] as List<dynamic>?) ?? [];
@@ -704,7 +798,8 @@ class WorkoutService {
   /// cached UI without surfacing a snackbar.
   ///
   /// Accepts both `{ dates: [{ date }] }` and a bare `[{ date }]` envelope.
-  Future<List<DateTime>> getWorkoutCalendar({DateTime? from, DateTime? to}) async {
+  Future<List<DateTime>> getWorkoutCalendar(
+      {DateTime? from, DateTime? to}) async {
     String ymd(DateTime d) {
       final l = d.toLocal();
       return '${l.year}-${l.month.toString().padLeft(2, '0')}-${l.day.toString().padLeft(2, '0')}';
@@ -723,7 +818,8 @@ class WorkoutService {
 
     final uri = Uri.parse('$v1Base/me/workouts/calendar')
         .replace(queryParameters: qp.isEmpty ? null : qp);
-    final res = await http.get(uri, headers: headers)
+    final res = await http
+        .get(uri, headers: headers)
         .withTimeout(const Duration(seconds: 12));
 
     if (res.statusCode == 401 || res.statusCode == 403) {
@@ -934,6 +1030,7 @@ class CompleteWorkoutResult {
 
   final WorkoutDto workout;
   final int xpGain;
+
   /// Age-based XP bonus applied by the server (e.g. 1.22 for a 55-year-old).
   /// 1.0 means no bonus or no birth year on profile. Surface this on the XP
   /// screen so older lifters see why their XP is higher than the same lift
@@ -966,9 +1063,8 @@ class ProgressionSuggestion {
   static ProgressionSuggestion fromJson(Map<String, dynamic> j) {
     final w = j['suggestedWeightKg'];
     return ProgressionSuggestion(
-      suggestedWeightKg: w == null
-          ? null
-          : (w is num ? w.toDouble() : double.tryParse('$w')),
+      suggestedWeightKg:
+          w == null ? null : (w is num ? w.toDouble() : double.tryParse('$w')),
       suggestedReps: (j['suggestedReps'] as num?)?.toInt() ?? 8,
       source: j['source'] as String? ?? 'progression',
       reason: j['reason'] as String? ?? '',
@@ -1004,13 +1100,35 @@ class WorkoutDto {
     return t.isEmpty ? null : t;
   }
 
+  /// Best human-facing session title carried by the backend notes field.
+  String? get sessionTitle {
+    final n = notes?.trim();
+    if (n == null || n.isEmpty) return null;
+    const planPrefix = 'From plan: ';
+    if (n.startsWith(planPrefix)) {
+      final t = n.substring(planPrefix.length).trim();
+      return t.isEmpty ? null : t;
+    }
+    const sessionPrefix = 'Session: ';
+    if (n.startsWith(sessionPrefix)) {
+      final t = n.substring(sessionPrefix.length).trim();
+      return t.isEmpty ? null : t;
+    }
+    if (!n.contains('\n') && n.length <= 80) return n;
+    return null;
+  }
+
   static WorkoutDto fromJson(Map<String, dynamic> j) {
-    final exercises = (j['exercises'] as List<dynamic>?)?.map((e) => WorkoutExerciseDto.fromJson(e as Map<String, dynamic>)).toList() ?? [];
+    final exercises = (j['exercises'] as List<dynamic>?)
+            ?.map((e) => WorkoutExerciseDto.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
     return WorkoutDto(
       id: j['id'] as String,
       status: j['status'] as String? ?? 'draft',
       startedAt: DateTime.parse(j['startedAt'] as String),
-      endedAt: j['endedAt'] != null ? DateTime.parse(j['endedAt'] as String) : null,
+      endedAt:
+          j['endedAt'] != null ? DateTime.parse(j['endedAt'] as String) : null,
       notes: j['notes'] as String?,
       exercises: exercises,
     );
@@ -1036,11 +1154,16 @@ class WorkoutExerciseDto {
   final int? restSecondsDefault;
 
   static WorkoutExerciseDto fromJson(Map<String, dynamic> j) {
-    final sets = (j['sets'] as List<dynamic>?)?.map((s) => WorkoutSetDto.fromJson(s as Map<String, dynamic>)).toList() ?? [];
+    final sets = (j['sets'] as List<dynamic>?)
+            ?.map((s) => WorkoutSetDto.fromJson(s as Map<String, dynamic>))
+            .toList() ??
+        [];
     return WorkoutExerciseDto(
       id: j['id'] as String,
       exerciseId: j['exerciseId'] as String,
-      position: j['position'] is num ? (j['position'] as num).toInt() : int.parse(j['position'].toString()),
+      position: j['position'] is num
+          ? (j['position'] as num).toInt()
+          : int.parse(j['position'].toString()),
       exercise: ExerciseDto.fromJson(j['exercise'] as Map<String, dynamic>),
       sets: sets,
       repRangeHint: j['repRangeHint'] as String?,
@@ -1111,6 +1234,7 @@ class ExerciseDto {
   final String? equipment;
   final String? category;
   final String? movementPattern;
+
   /// WEIGHTED | BW_REPS | TIME — from API / Prisma.
   final String? rankModel;
   final List<String> secondaryPatterns;
@@ -1141,12 +1265,14 @@ class ExerciseDto {
       slug: _pickStr(j, 'slug'),
       description: _pickStr(j, 'description'),
       primaryMuscle: _pickStr(j, 'primaryMuscle', 'primary_muscle'),
-      secondaryMuscles: _stringList(j['secondaryMuscles'] ?? j['secondary_muscles']),
+      secondaryMuscles:
+          _stringList(j['secondaryMuscles'] ?? j['secondary_muscles']),
       equipment: _pickStr(j, 'equipment'),
       category: _pickStr(j, 'category'),
       movementPattern: _pickStr(j, 'movementPattern', 'movement_pattern'),
       rankModel: _pickStr(j, 'rankModel', 'rank_model'),
-      secondaryPatterns: _stringList(j['secondaryPatterns'] ?? j['secondary_patterns']),
+      secondaryPatterns:
+          _stringList(j['secondaryPatterns'] ?? j['secondary_patterns']),
       fatigueScore: _asNullableInt(j['fatigueScore'] ?? j['fatigue_score']),
       goalTags: _stringList(j['goalTags'] ?? j['goal_tags']),
       contraindications: _stringList(j['contraindications']),
@@ -1180,9 +1306,13 @@ class ExerciseMediaDto {
   final String? attribution;
   final String? sourcePageUrl;
 
-  bool get isVideo => kind == 'video' || url.toLowerCase().endsWith('.mp4') || url.toLowerCase().endsWith('.webm');
+  bool get isVideo =>
+      kind == 'video' ||
+      url.toLowerCase().endsWith('.mp4') ||
+      url.toLowerCase().endsWith('.webm');
 
-  String get previewUrl => thumbnailUrl?.isNotEmpty == true ? thumbnailUrl! : url;
+  String get previewUrl =>
+      thumbnailUrl?.isNotEmpty == true ? thumbnailUrl! : url;
 
   static ExerciseMediaDto fromJson(Map<String, dynamic> j) {
     return ExerciseMediaDto(
@@ -1203,7 +1333,9 @@ class WorkoutsResponse {
   final WorkoutsMeta meta;
 
   static WorkoutsResponse fromJson(Map<String, dynamic> j) {
-    final data = (j['data'] as List<dynamic>).map((e) => WorkoutDto.fromJson(e as Map<String, dynamic>)).toList();
+    final data = (j['data'] as List<dynamic>)
+        .map((e) => WorkoutDto.fromJson(e as Map<String, dynamic>))
+        .toList();
     return WorkoutsResponse(
       data: data,
       meta: WorkoutsMeta.fromJson(j['meta'] as Map<String, dynamic>),
@@ -1212,7 +1344,11 @@ class WorkoutsResponse {
 }
 
 class WorkoutsMeta {
-  WorkoutsMeta({required this.page, required this.limit, required this.total, required this.totalPages});
+  WorkoutsMeta(
+      {required this.page,
+      required this.limit,
+      required this.total,
+      required this.totalPages});
   final int page;
   final int limit;
   final int total;
@@ -1233,7 +1369,9 @@ class ExercisesResponse {
   final List<ExerciseDto> data;
 
   static ExercisesResponse fromJson(Map<String, dynamic> j) {
-    final data = (j['data'] as List<dynamic>).map((e) => ExerciseDto.fromJson(e as Map<String, dynamic>)).toList();
+    final data = (j['data'] as List<dynamic>)
+        .map((e) => ExerciseDto.fromJson(e as Map<String, dynamic>))
+        .toList();
     return ExercisesResponse(data: data);
   }
 }
@@ -1260,10 +1398,13 @@ class SuggestedExerciseDto {
   final int sets;
   final String repRange;
   final int restSeconds;
+
   /// AI-calculated starting weight; 0 = bodyweight / no load.
   final double suggestedWeightKg;
+
   /// 'history' | 'heuristic' | 'bodyweight' — used for UI hints.
   final String weightSource;
+
   /// One-sentence rationale for why THIS exercise fits the user's stated goal.
   /// Null when the AI omitted it (older cached sessions) or when no goal was set.
   final String? whyThisExercise;
@@ -1304,10 +1445,13 @@ class WorkoutSuggestionDto {
 
   static WorkoutSuggestionDto fromJson(Map<String, dynamic> j) {
     final ex = (j['exercises'] as List<dynamic>?)
-            ?.map((e) => SuggestedExerciseDto.fromJson(e as Map<String, dynamic>))
+            ?.map(
+                (e) => SuggestedExerciseDto.fromJson(e as Map<String, dynamic>))
             .toList() ??
         const [];
-    final w = (j['warnings'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [];
+    final w =
+        (j['warnings'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+            const [];
     return WorkoutSuggestionDto(
       blueprintId: j['blueprintId'] as String? ?? '',
       title: j['title'] as String? ?? 'Workout',
@@ -1334,16 +1478,20 @@ class PlannedWorkoutDto {
   });
 
   final String id;
+
   /// ISO date string "YYYY-MM-DD"
   final String day;
   final String weekStart;
   final String title;
   final String kind;
+
   /// "pending" | "completed"
   final String status;
+
   /// AI plan for the day. Each item has name, sets, reps, restSeconds and
   /// (optionally) a resolved exerciseId pointing at a real Exercise row.
   final List<PlannedExerciseDto> exercises;
+
   /// Free-text focus / coaching note for the day.
   final String? notes;
 
@@ -1363,7 +1511,8 @@ class PlannedWorkoutDto {
     final exercises = exRaw is List
         ? exRaw
             .whereType<Map>()
-            .map((m) => PlannedExerciseDto.fromJson(Map<String, dynamic>.from(m)))
+            .map((m) =>
+                PlannedExerciseDto.fromJson(Map<String, dynamic>.from(m)))
             .toList()
         : const <PlannedExerciseDto>[];
     return PlannedWorkoutDto(
@@ -1398,15 +1547,20 @@ class PlannedExerciseDto {
   final int reps;
   final int restSeconds;
   final String? notes;
+
   /// Set when name matched an existing Exercise row server-side; null when the
   /// AI invented a name and the resolver gave up. UI should still show `name`.
   final String? exerciseId;
+
   /// Deterministic progressive-overload pick (null for bodyweight / no history).
   final double? suggestedWeightKg;
+
   /// 'progression' | 'hold' | 'no_history' — drives "why this load?" tooltip.
   final String? loadSource;
+
   /// One-line human-readable reason for the chosen load (explainability).
   final String? loadReason;
+
   /// Two short sentences from the AI: (1) what the exercise builds, (2) why
   /// it's the right pick for the user's stated goal. Null on older plans
   /// generated before the prompt change.
@@ -1421,7 +1575,8 @@ class PlannedExerciseDto {
       restSeconds: _asIntOr(j['restSeconds'] ?? j['rest_seconds'], 90),
       notes: j['notes'] as String?,
       exerciseId: j['exerciseId'] as String? ?? j['exercise_id'] as String?,
-      suggestedWeightKg: _asNullableDouble(j['suggestedWeightKg'] ?? j['suggested_weight_kg']),
+      suggestedWeightKg:
+          _asNullableDouble(j['suggestedWeightKg'] ?? j['suggested_weight_kg']),
       loadSource: j['loadSource'] as String? ?? j['load_source'] as String?,
       loadReason: j['loadReason'] as String? ?? j['load_reason'] as String?,
       whyThisExercise: (whyRaw != null && whyRaw.isNotEmpty) ? whyRaw : null,
@@ -1460,7 +1615,15 @@ class ExerciseRankDto {
   int get lpInTier => lpTotal % 100;
 
   static String _lpToTier(int lp) {
-    const tiers = ['Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Olympian'];
+    const tiers = [
+      'Iron',
+      'Bronze',
+      'Silver',
+      'Gold',
+      'Platinum',
+      'Diamond',
+      'Olympian'
+    ];
     return tiers[(lp ~/ 100).clamp(0, tiers.length - 1)];
   }
 
@@ -1468,8 +1631,10 @@ class ExerciseRankDto {
     final lp = (j['lpTotal'] as num?)?.toInt() ?? 0;
     return ExerciseRankDto(
       exerciseId: j['exerciseId'] as String? ?? '',
-      exerciseName: (j['exercise'] as Map<String, dynamic>?)?['name'] as String? ??
-          j['exerciseName'] as String? ?? '',
+      exerciseName:
+          (j['exercise'] as Map<String, dynamic>?)?['name'] as String? ??
+              j['exerciseName'] as String? ??
+              '',
       lpTotal: lp,
       tier: j['tier'] as String? ?? _lpToTier(lp),
       bestE1rmKg: _asDoubleOr(j['bestE1rmKg'] ?? 0, 0),
@@ -1528,7 +1693,8 @@ class ExerciseProgressionDto {
 
   static ExerciseProgressionDto fromJson(Map<String, dynamic> j) {
     final points = (j['dataPoints'] as List<dynamic>?)
-            ?.map((p) => ProgressionPointDto.fromJson(p as Map<String, dynamic>))
+            ?.map(
+                (p) => ProgressionPointDto.fromJson(p as Map<String, dynamic>))
             .toList() ??
         [];
     return ExerciseProgressionDto(
@@ -1559,7 +1725,8 @@ class SeasonLeaderboardEntry {
 
   String get label => displayName.isNotEmpty ? displayName : username;
 
-  static SeasonLeaderboardEntry fromJson(Map<String, dynamic> j) => SeasonLeaderboardEntry(
+  static SeasonLeaderboardEntry fromJson(Map<String, dynamic> j) =>
+      SeasonLeaderboardEntry(
         rank: (j['rank'] as num?)?.toInt() ?? 0,
         userId: j['userId'] as String? ?? '',
         username: j['username'] as String? ?? 'Anonymous',
@@ -1585,7 +1752,8 @@ class SeasonLeaderboardResponse {
       seasonName: seasonName,
       entries: list
           .whereType<Map>()
-          .map((e) => SeasonLeaderboardEntry.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) =>
+              SeasonLeaderboardEntry.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
     );
   }

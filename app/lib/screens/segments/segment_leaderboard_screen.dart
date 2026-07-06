@@ -123,7 +123,7 @@ class _SegmentLeaderboardScreenState extends State<SegmentLeaderboardScreen> {
       final lbRes = results[1];
 
       if (segRes.statusCode != 200) {
-        throw Exception('Segmentul nu a putut fi încărcat (${segRes.statusCode})');
+        throw Exception('Could not load segment (${segRes.statusCode})');
       }
 
       final segBody = jsonDecode(segRes.body) as Map<String, dynamic>;
@@ -492,7 +492,7 @@ class _StatsRow extends StatelessWidget {
         Expanded(
           child: _StatTile(
             icon: AppIcons.ruler_horizontal,
-            label: 'Distanță',
+            label: 'Distance',
             value: _distanceLabel,
           ),
         ),
@@ -500,7 +500,7 @@ class _StatsRow extends StatelessWidget {
         Expanded(
           child: _StatTile(
             icon: AppIcons.arrow_trend_up,
-            label: 'Denivelare',
+            label: 'Elevation',
             value: _elevationLabel,
           ),
         ),
@@ -508,7 +508,7 @@ class _StatsRow extends StatelessWidget {
         Expanded(
           child: _StatTile(
             icon: AppIcons.trophy,
-            label: 'Recordul tău',
+            label: 'Your record',
             value: _prLabel,
             highlight: _hasPr,
           ),
@@ -623,7 +623,7 @@ class _EmptyLeaderboard extends StatelessWidget {
             ),
             const SizedBox(height: ZveltTokens.s2),
             Text(
-              'Fii primul pe leaderboard!',
+              'Be the first on the leaderboard!',
               style: ZType.bodyM.copyWith(
                 color: ZveltTokens.text2,
               ),
@@ -714,7 +714,7 @@ class _LeaderboardRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  entry.isMe ? '${entry.name} (tu)' : entry.name,
+                  entry.isMe ? '${entry.name} (you)' : entry.name,
                   style: TextStyle(
                     color:
                         entry.isMe ? ZveltTokens.success : ZveltTokens.text,
@@ -772,7 +772,7 @@ class _NavigateButton extends StatelessWidget {
         ),
         icon: const Icon(AppIcons.navigation, size: 20),
         label: const Text(
-          'Încearcă segmentul',
+          'Try segment',
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
@@ -810,7 +810,7 @@ class _ErrorView extends StatelessWidget {
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(AppIcons.refresh),
-              label: const Text('Încearcă din nou'),
+              label: const Text('Try again'),
               style:
                   FilledButton.styleFrom(backgroundColor: ZveltTokens.brand),
             ),

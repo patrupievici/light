@@ -433,6 +433,8 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
   }
 
   String _sessionLabel(WorkoutDto w) {
+    final sessionTitle = w.sessionTitle;
+    if (sessionTitle != null) return sessionTitle;
     final vol = <String, double>{};
     for (final we in w.exercises) {
       final g = _muscleGroup(we.exercise.primaryMuscle);
@@ -888,7 +890,8 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
         return;
       }
 
-      final workout = await _workoutService.createWorkout();
+      final workout =
+          await _workoutService.createWorkout(label: widget.preset.name);
       final added = <WorkoutExerciseDto>[];
       final display = <_GymExercise>[];
       // Track preset exercises that couldn't be resolved so the user sees
@@ -1462,7 +1465,8 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
 
   Widget _buildCardioLive() {
     final topPad = MediaQuery.paddingOf(context).top;
-    final kcal = _estimateCardioKcal(_cardioMode, _elapsedSeconds, _routeTracker.meters);
+    final kcal =
+        _estimateCardioKcal(_cardioMode, _elapsedSeconds, _routeTracker.meters);
     final avgKmh = _elapsedSeconds >= 5 && _routeTracker.meters >= 5
         ? (_routeTracker.meters / _elapsedSeconds) * 3.6
         : 0.0;

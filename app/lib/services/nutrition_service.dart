@@ -695,7 +695,7 @@ class Recipe {
     final food = FoodItem(
       id: 'recipe:$id',
       name: name,
-      brand: 'Rețetă',
+      brand: 'Recipe',
       caloriesPer100g: perServingCalories * servingsToLog,
       proteinPer100g: perServingProtein * servingsToLog,
       fatPer100g: perServingFat * servingsToLog,
@@ -712,7 +712,7 @@ class Recipe {
 
   static Recipe fromJson(Map<String, dynamic> j) => Recipe(
         id: j['id'] as String,
-        name: j['name'] as String? ?? 'Rețetă',
+        name: j['name'] as String? ?? 'Recipe',
         servings: (j['servings'] as num?)?.toInt() ?? 1,
         ingredients: ((j['ingredientsJson'] ?? j['ingredients'])
                     as List<dynamic>? ??
@@ -771,7 +771,7 @@ class MealTemplateItem {
     final food = FoodItem(
       id: 'tpl:$name',
       name: name,
-      brand: 'Mesele mele',
+      brand: 'My Meals',
       caloriesPer100g: (calories ?? 0) * per,
       proteinPer100g: (proteinG ?? 0) * per,
       fatPer100g: (fatG ?? 0) * per,
@@ -1358,7 +1358,7 @@ class NutritionService {
       // 5xx = server fault: never surface raw server text to the user. 4xx may
       // carry an actionable validation message worth showing.
       final friendly = res.statusCode >= 500
-          ? 'Nu am putut genera planul tău acum. Încearcă din nou în câteva momente.'
+          ? 'Could not generate your plan right now. Try again in a few moments.'
           : detail;
       throw NutritionPlanException(friendly);
     }
@@ -1488,7 +1488,7 @@ class NutritionService {
   }) async {
     final headers = await _jsonAuthHeaders();
     if (headers == null) {
-      throw const NutritionPlanException('Nu ești autentificat');
+      throw const NutritionPlanException('You are not signed in');
     }
     final res = await http
         .post(Uri.parse('$v1Base/nutrition/custom-foods'),
@@ -1527,7 +1527,7 @@ class NutritionService {
         customId.startsWith('custom:') ? customId.substring(7) : customId;
     final headers = await _jsonAuthHeaders();
     if (headers == null) {
-      throw const NutritionPlanException('Nu ești autentificat');
+      throw const NutritionPlanException('You are not signed in');
     }
     final res = await http
         .put(Uri.parse('$v1Base/nutrition/custom-foods/$id'),
@@ -1648,7 +1648,7 @@ class NutritionService {
   }) async {
     final headers = await _jsonAuthHeaders();
     if (headers == null) {
-      throw const NutritionPlanException('Nu ești autentificat');
+      throw const NutritionPlanException('You are not signed in');
     }
     final res = await http
         .post(Uri.parse('$v1Base/nutrition/recipes'),
@@ -1674,7 +1674,7 @@ class NutritionService {
   }) async {
     final headers = await _jsonAuthHeaders();
     if (headers == null) {
-      throw const NutritionPlanException('Nu ești autentificat');
+      throw const NutritionPlanException('You are not signed in');
     }
     final res = await http
         .put(Uri.parse('$v1Base/nutrition/recipes/$id'),
@@ -1726,7 +1726,7 @@ class NutritionService {
     }
   }
 
-  // ── Meal templates ("Mesele mele") ─────────────────────────────────────────
+  // ── Meal templates ("My Meals") ───────────────────────────────────────────
   Future<List<MealTemplate>> getMealTemplates() async {
     final headers = await _jsonAuthHeaders();
     if (headers == null) return [];
@@ -1752,7 +1752,7 @@ class NutritionService {
       String name, List<MealTemplateItem> items) async {
     final headers = await _jsonAuthHeaders();
     if (headers == null) {
-      throw const NutritionPlanException('Nu ești autentificat');
+      throw const NutritionPlanException('You are not signed in');
     }
     final res = await http
         .post(Uri.parse('$v1Base/nutrition/templates'),

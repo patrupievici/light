@@ -611,7 +611,7 @@ class _ShimmerOverlay extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Se încarcă rutele…',
+                  'Loading routes…',
                   style: TextStyle(
                     fontFamily: ZveltTokens.fontMono,
                     fontSize: 12,

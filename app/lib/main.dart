@@ -365,15 +365,11 @@ class ZveltApp extends StatelessWidget {
                 // saved choice (null = follow system); resolution always lands
                 // on a locale the app can render, with English as the fallback.
                 locale: appLocale,
-                // i18n scaffold — generated AppLocalizations delegate plus the
-                // Flutter Material/Cupertino/Widgets delegates. supportedLocales
-                // comes from the generated set (en + ro skeleton); keys missing
-                // in ro fall back to the English template, so the UI stays fully
-                // rendered while translation lands incrementally. Only the pilot
-                // (settings/language_screen.dart) consumes AppLocalizations so
-                // far — full migration is incremental.
+                // English-only UI for this release. Keep the generated delegates
+                // for Material widgets, but expose only English so the system
+                // locale cannot partially localize app screens.
                 localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
+                supportedLocales: LocaleNotifier.supportedLocales,
                 localeResolutionCallback: LocaleNotifier.localeResolution,
                 theme: AppTheme.lightThemeData.copyWith(
                   colorScheme: AppTheme.lightThemeData.colorScheme

@@ -85,6 +85,7 @@ flutter:
     - assets/dotenv
     - assets/foods.db
     - assets/images/zvelt_logo.png
+    - assets/images/zvelt_splash.png
     # ZVELT coach mascot (3D rabbit) — periwinkle "De ce ai nevoie?" design.
     - assets/mascot/
   fonts:

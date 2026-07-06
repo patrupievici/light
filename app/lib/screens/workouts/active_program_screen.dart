@@ -163,7 +163,7 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
       appBar: AppBar(
         backgroundColor: ZveltTokens.bg,
         elevation: 0,
-        title: Text('Programul meu', style: ZType.h4.copyWith(color: ZveltTokens.text)),
+        title: Text('My Program', style: ZType.h4.copyWith(color: ZveltTokens.text)),
         actions: [
           if (isActive)
             PopupMenuButton<String>(
@@ -175,9 +175,9 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
               },
               itemBuilder: (_) => [
                 if (_tmLifts.isNotEmpty)
-                  const PopupMenuItem<String>(value: 'tm', child: Text('Editează 1RM')),
-                const PopupMenuItem<String>(value: 'skip', child: Text('Sari peste sesiune')),
-                const PopupMenuItem<String>(value: 'archive', child: Text('Arhivează programul')),
+                  const PopupMenuItem<String>(value: 'tm', child: Text('Edit 1RM')),
+                const PopupMenuItem<String>(value: 'skip', child: Text('Skip session')),
+                const PopupMenuItem<String>(value: 'archive', child: Text('Archive program')),
               ],
             ),
         ],
@@ -195,7 +195,7 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
 
     if (program == null) {
       return _EmptyState(
-        message: _error ?? 'Niciun program activ',
+        message: _error ?? 'No active program',
         onPick: () => Navigator.of(context).pop(),
       );
     }
@@ -227,7 +227,7 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
               children: [
                 Text(program.title, style: ZType.h3.copyWith(color: ZveltTokens.text)),
                 const SizedBox(height: ZveltTokens.s1),
-                Text('Săptămâna ${program.currentWeek} din ${program.totalWeeks}',
+                Text('Week ${program.currentWeek} of ${program.totalWeeks}',
                     style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
                 const SizedBox(height: ZveltTokens.s3),
                 ClipRRect(
@@ -252,7 +252,7 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
             const SizedBox(height: ZveltTokens.s4),
           ],
           if (today == null)
-            Text('Nicio sesiune de afișat.', style: ZType.bodyM.copyWith(color: ZveltTokens.text2))
+            Text('No session to show.', style: ZType.bodyM.copyWith(color: ZveltTokens.text2))
           else
             _TodayCard(day: today, starting: _starting, onStart: _startSession),
         ],
@@ -283,7 +283,7 @@ class _EmptyState extends StatelessWidget {
               style: FilledButton.styleFrom(
                   backgroundColor: ZveltTokens.brand, foregroundColor: ZveltTokens.onBrand),
               onPressed: onPick,
-              child: const Text('Alege un program'),
+              child: const Text('Choose a program'),
             ),
           ],
         ),
@@ -314,13 +314,13 @@ class _CompletionCard extends StatelessWidget {
                 child: const Icon(AppIcons.trophy, color: ZveltTokens.onBrand, size: 28),
               ),
               const SizedBox(height: ZveltTokens.s4),
-              Text('Program complet!', style: ZType.h3.copyWith(color: ZveltTokens.text)),
+              Text('Program complete!', style: ZType.h3.copyWith(color: ZveltTokens.text)),
               const SizedBox(height: ZveltTokens.s1),
-              Text('${program.title} · ${program.totalWeeks} săptămâni',
+              Text('${program.title} · ${program.totalWeeks} weeks',
                   textAlign: TextAlign.center,
                   style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
               const SizedBox(height: ZveltTokens.s2),
-              Text('Felicitări — ai dus blocul până la capăt. 💪',
+              Text('Great work — you finished the full block.',
                   textAlign: TextAlign.center,
                   style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
               const SizedBox(height: ZveltTokens.s5),
@@ -335,7 +335,7 @@ class _CompletionCard extends StatelessWidget {
                         RoundedRectangleBorder(borderRadius: BorderRadius.circular(ZveltTokens.rMd)),
                   ),
                   onPressed: onPick,
-                  child: const Text('Alege următorul program'),
+                  child: const Text('Choose next program'),
                 ),
               ),
             ],
@@ -371,10 +371,10 @@ class _NeedsTmBanner extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Setează-ți 1RM-urile',
+                    Text('Set your 1RMs',
                         style: ZType.bodyM.copyWith(
                             color: ZveltTokens.text, fontWeight: FontWeight.w600)),
-                    Text('Programul calculează greutățile din 1RM — atinge ca să le introduci.',
+                    Text('The program calculates working weights from 1RM. Tap to enter them.',
                         style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
                   ],
                 ),
@@ -407,10 +407,10 @@ class _DeloadBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Săptămână de deload',
+                Text('Deload week',
                     style: ZType.bodyM.copyWith(
                         color: ZveltTokens.text, fontWeight: FontWeight.w600)),
-                Text('Greutate și volum reduse — lasă oboseala să se disipeze.',
+                Text('Reduced weight and volume so fatigue can drop.',
                     style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
               ],
             ),
@@ -432,8 +432,8 @@ class _TodayCard extends StatelessWidget {
       final weights = e.setsDetail.map((s) => s.weightKg).whereType<double>().toList();
       final top = weights.isEmpty ? null : weights.reduce((a, b) => a > b ? a : b);
       final amrap = e.setsDetail.any((s) => s.amrap);
-      return '${e.setsDetail.length} seturi'
-          '${top != null ? ' · top ${_fmtKg(top)}kg' : ' · setează 1RM'}'
+      return '${e.setsDetail.length} sets'
+          '${top != null ? ' · top ${_fmtKg(top)}kg' : ' · set 1RM'}'
           '${amrap ? ' · AMRAP' : ''}';
     }
     final w = e.suggestedWeightKg;
@@ -452,7 +452,7 @@ class _TodayCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('SESIUNEA DE AZI',
+                    Text("TODAY'S SESSION",
                         style: ZType.eyebrow.copyWith(color: ZveltTokens.brandDeep)),
                     const SizedBox(height: 2),
                     Text(day.title, style: ZType.h4.copyWith(color: ZveltTokens.text)),
@@ -517,7 +517,7 @@ class _TodayCard extends StatelessWidget {
                       child: CircularProgressIndicator(
                           strokeWidth: 2.5, color: ZveltTokens.onBrand))
                   : const Icon(AppIcons.play, size: 18),
-              label: Text('Începe sesiunea',
+              label: Text('Start session',
                   style: ZType.bodyM.copyWith(
                       color: ZveltTokens.onBrand, fontWeight: FontWeight.w600)),
             ),
@@ -577,7 +577,7 @@ class _TrainingMaxSheetState extends State<_TrainingMaxSheet> {
       if (v != null && v > 0) oneRepMaxes[lift] = v;
     });
     if (oneRepMaxes.isEmpty) {
-      setState(() => _error = 'Introdu cel puțin un 1RM');
+      setState(() => _error = 'Enter at least one 1RM');
       return;
     }
     setState(() {
@@ -625,7 +625,7 @@ class _TrainingMaxSheetState extends State<_TrainingMaxSheet> {
             ),
             Text('Training max (1RM)', style: ZType.h3.copyWith(color: ZveltTokens.text)),
             const SizedBox(height: ZveltTokens.s1),
-            Text('Introdu 1RM-ul (kg) pentru fiecare lift. Greutățile de lucru se calculează din el.',
+            Text('Enter your 1RM (kg) for each lift. Working weights are calculated from it.',
                 style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
             const SizedBox(height: ZveltTokens.s4),
             for (final lift in widget.lifts) ...[
@@ -681,7 +681,7 @@ class _TrainingMaxSheetState extends State<_TrainingMaxSheet> {
                         height: 22,
                         child: CircularProgressIndicator(
                             strokeWidth: 2.5, color: ZveltTokens.onBrand))
-                    : Text('Salvează',
+                    : Text('Save',
                         style: ZType.bodyM.copyWith(
                             color: ZveltTokens.onBrand, fontWeight: FontWeight.w600)),
               ),

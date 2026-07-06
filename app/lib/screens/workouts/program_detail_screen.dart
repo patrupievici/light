@@ -93,7 +93,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                   ),
                   onPressed: _openStartSheet,
                   icon: const Icon(AppIcons.play, size: 18),
-                  label: Text('Pornește programul',
+                  label: Text('Start program',
                       style: ZType.bodyM.copyWith(
                           color: ZveltTokens.onBrand, fontWeight: FontWeight.w600)),
                 ),
@@ -114,7 +114,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error ?? 'Eroare',
+              Text(_error ?? 'Error',
                   textAlign: TextAlign.center,
                   style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
               const SizedBox(height: ZveltTokens.s4),
@@ -122,7 +122,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                 style: FilledButton.styleFrom(
                     backgroundColor: ZveltTokens.brand, foregroundColor: ZveltTokens.onBrand),
                 onPressed: _load,
-                child: const Text('Reîncearcă'),
+                child: const Text('Try again'),
               ),
             ],
           ),
@@ -143,13 +143,13 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
           spacing: ZveltTokens.s2,
           runSpacing: ZveltTokens.s2,
           children: [
-            _pill('${detail.daysPerWeek}×/săpt'),
-            _pill('${detail.defaultWeeks} săptămâni'),
+            _pill('${detail.daysPerWeek}×/week'),
+            _pill('${detail.defaultWeeks} weeks'),
             _pill(programSchemeLabel(detail.scheme)),
           ],
         ),
         const SizedBox(height: ZveltTokens.s5),
-        Text('SESIUNI', style: ZType.eyebrow.copyWith(color: ZveltTokens.text3)),
+        Text('SESSIONS', style: ZType.eyebrow.copyWith(color: ZveltTokens.text3)),
         const SizedBox(height: ZveltTokens.s3),
         for (final d in detail.days) ...[
           _DayCard(day: d),
@@ -237,15 +237,15 @@ class _StartProgramSheet extends StatefulWidget {
 /// User equipment tags (value, label) — matches the backend's
 /// equipment-compatibility mapping. Empty selection = no filtering (full gym).
 const List<(String, String)> kEquipmentOptions = [
-  ('full_commercial_gym', 'Sală full'),
-  ('barbell_rack', 'Bară + rack'),
-  ('dumbbells', 'Gantere'),
-  ('cables', 'Cabluri'),
-  ('machines', 'Aparate'),
-  ('pullup_bar', 'Bară tracțiuni'),
+  ('full_commercial_gym', 'Full gym'),
+  ('barbell_rack', 'Barbell + rack'),
+  ('dumbbells', 'Dumbbells'),
+  ('cables', 'Cables'),
+  ('machines', 'Machines'),
+  ('pullup_bar', 'Pull-up bar'),
   ('kettlebells', 'Kettlebells'),
-  ('resistance_bands', 'Benzi elastice'),
-  ('bodyweight_only', 'Doar greutatea corpului'),
+  ('resistance_bands', 'Resistance bands'),
+  ('bodyweight_only', 'Bodyweight only'),
 ];
 
 class _StartProgramSheetState extends State<_StartProgramSheet> {
@@ -327,10 +327,10 @@ class _StartProgramSheetState extends State<_StartProgramSheet> {
                     borderRadius: BorderRadius.circular(ZveltTokens.rPill)),
               ),
             ),
-            Text('Pornește ${detail.title}',
+            Text('Start ${detail.title}',
                 style: ZType.h3.copyWith(color: ZveltTokens.text)),
             const SizedBox(height: ZveltTokens.s4),
-            Text('DURATĂ', style: ZType.eyebrow.copyWith(color: ZveltTokens.text3)),
+            Text('DURATION', style: ZType.eyebrow.copyWith(color: ZveltTokens.text3)),
             const SizedBox(height: ZveltTokens.s2),
             Wrap(
               spacing: ZveltTokens.s2,
@@ -344,9 +344,9 @@ class _StartProgramSheetState extends State<_StartProgramSheet> {
               ],
             ),
             const SizedBox(height: ZveltTokens.s5),
-            Text('ECHIPAMENT (opțional)', style: ZType.eyebrow.copyWith(color: ZveltTokens.text3)),
+            Text('EQUIPMENT (optional)', style: ZType.eyebrow.copyWith(color: ZveltTokens.text3)),
             const SizedBox(height: ZveltTokens.s1),
-            Text('Lasă gol pentru sală completă. Alege ce ai și înlocuim automat exercițiile incompatibile.',
+            Text("Leave blank for a full gym. Choose what you have and we'll automatically swap incompatible exercises.",
                 style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
             const SizedBox(height: ZveltTokens.s3),
             Wrap(
@@ -365,10 +365,10 @@ class _StartProgramSheetState extends State<_StartProgramSheet> {
             ),
             if (detail.requiresTrainingMax) ...[
               const SizedBox(height: ZveltTokens.s5),
-              Text('1RM (kg) — pentru greutățile de lucru',
+              Text('1RM (kg) — for working weights',
                   style: ZType.eyebrow.copyWith(color: ZveltTokens.text3)),
               const SizedBox(height: ZveltTokens.s1),
-              Text('Opțional — le poți seta și mai târziu în antrenament.',
+              Text('Optional — you can also set them later in the workout.',
                   style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
               const SizedBox(height: ZveltTokens.s3),
               for (final lift in detail.trainingMaxLifts) ...[
@@ -398,7 +398,7 @@ class _StartProgramSheetState extends State<_StartProgramSheet> {
                         height: 22,
                         child: CircularProgressIndicator(
                             strokeWidth: 2.5, color: ZveltTokens.onBrand))
-                    : Text('Începe',
+                    : Text('Start',
                         style: ZType.bodyM.copyWith(
                             color: ZveltTokens.onBrand, fontWeight: FontWeight.w600)),
               ),
@@ -426,7 +426,7 @@ class _WeekChip extends StatelessWidget {
           color: selected ? ZveltTokens.brand : ZveltTokens.bg2,
           borderRadius: BorderRadius.circular(ZveltTokens.rMd),
         ),
-        child: Text('$weeks săpt',
+        child: Text('$weeks weeks',
             style: ZType.bodyM.copyWith(
               color: selected ? ZveltTokens.onBrand : ZveltTokens.text2,
               fontWeight: FontWeight.w600,

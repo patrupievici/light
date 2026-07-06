@@ -65,11 +65,11 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
   Future<void> _save() async {
     final name = _name.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Dă un nume rețetei');
+      setState(() => _error = 'Give the recipe a name');
       return;
     }
     if (_ingredients.isEmpty) {
-      setState(() => _error = 'Adaugă cel puțin un ingredient');
+      setState(() => _error = 'Add at least one ingredient');
       return;
     }
     setState(() {
@@ -100,7 +100,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
       appBar: AppBar(
         backgroundColor: ZveltTokens.bg,
         elevation: 0,
-        title: Text(widget.editing == null ? 'Rețetă nouă' : 'Editează rețeta',
+        title: Text(widget.editing == null ? 'New Recipe' : 'Edit Recipe',
             style: ZType.h4.copyWith(color: ZveltTokens.text)),
       ),
       body: SafeArea(
@@ -112,7 +112,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
               controller: _name,
               style: ZType.bodyM.copyWith(color: ZveltTokens.text),
               decoration: InputDecoration(
-                hintText: 'Nume rețetă',
+                hintText: 'Recipe name',
                 hintStyle: ZType.bodyS.copyWith(color: ZveltTokens.text3),
                 filled: true,
                 fillColor: ZveltTokens.surface,
@@ -127,7 +127,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
                 children: [
                   Row(
                     children: [
-                      Text('Porții', style: ZType.bodyM.copyWith(color: ZveltTokens.text)),
+                      Text('Servings', style: ZType.bodyM.copyWith(color: ZveltTokens.text)),
                       const Spacer(),
                       _StepBtn(icon: AppIcons.minus, onTap: () => setState(() => _servings = (_servings - 1).clamp(1, 50))),
                       SizedBox(
@@ -142,7 +142,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
                   Row(
                     children: [
                       _macro('Total', '${_totalCal.round()} kcal'),
-                      _macro('Pe porție', '${perServ.round()} kcal'),
+                      _macro('Per serving', '${perServ.round()} kcal'),
                     ],
                   ),
                   const SizedBox(height: ZveltTokens.s2),
@@ -154,19 +154,19 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
             const SizedBox(height: ZveltTokens.s4),
             Row(
               children: [
-                Text('INGREDIENTE', style: ZType.eyebrow.copyWith(color: ZveltTokens.text3)),
+                Text('INGREDIENTS', style: ZType.eyebrow.copyWith(color: ZveltTokens.text3)),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: _addIngredient,
                   icon: const Icon(AppIcons.plus, size: 16),
-                  label: const Text('Adaugă'),
+                  label: const Text('Add'),
                 ),
               ],
             ),
             if (_ingredients.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(ZveltTokens.s4),
-                child: Text('Niciun ingredient încă.', style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
+                child: Text('No ingredients yet.', style: ZType.bodyS.copyWith(color: ZveltTokens.text3)),
               )
             else
               for (int i = 0; i < _ingredients.length; i++)
@@ -199,7 +199,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
                     ? const SizedBox(
                         width: 22, height: 22,
                         child: CircularProgressIndicator(strokeWidth: 2.5, color: ZveltTokens.onBrand))
-                    : Text('Salvează rețeta',
+                    : Text('Save recipe',
                         style: ZType.bodyM.copyWith(color: ZveltTokens.onBrand, fontWeight: FontWeight.w600)),
               ),
             ),
@@ -309,7 +309,7 @@ class _IngredientPickerSheetState extends State<_IngredientPickerSheet> {
               onChanged: _search,
               style: ZType.bodyM.copyWith(color: ZveltTokens.text),
               decoration: InputDecoration(
-                hintText: 'Caută ingredient…',
+                hintText: 'Search ingredient…',
                 hintStyle: ZType.bodyM.copyWith(color: ZveltTokens.text3),
                 prefixIcon: Icon(AppIcons.search, color: ZveltTokens.text3, size: 20),
                 filled: true,
@@ -374,14 +374,14 @@ class _GramsDialogState extends State<_GramsDialog> {
         decoration: const InputDecoration(suffixText: 'g'),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Anulează')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: ZveltTokens.brand, foregroundColor: ZveltTokens.onBrand),
           onPressed: () {
             final g = double.tryParse(_ctrl.text.trim().replaceAll(',', '.'));
             Navigator.pop(context, (g != null && g > 0) ? g : null);
           },
-          child: const Text('Adaugă'),
+          child: const Text('Add'),
         ),
       ],
     );

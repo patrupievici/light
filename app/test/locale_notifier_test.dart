@@ -25,7 +25,7 @@ void main() {
     });
 
     test('a not-yet-translated code falls back to English', () {
-      // 'ro' is offered in the picker but has no framework translation yet.
+      // Legacy saved preferences from older builds still resolve safely.
       expect(LocaleNotifier.resolve('ro'), const Locale('en'));
       expect(LocaleNotifier.resolve('zz'), const Locale('en'));
     });
