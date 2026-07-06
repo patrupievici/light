@@ -72,7 +72,8 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
       }
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
         setState(() {
           _error = 'Location permission is required to show your route.';
           _locBusy = false;
@@ -128,7 +129,8 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
-    if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+    if (perm == LocationPermission.denied ||
+        perm == LocationPermission.deniedForever) {
       setState(() => _error = 'Enable location to record a route.');
       return;
     }
@@ -165,7 +167,8 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
     _tick?.cancel();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_tracking || _trackStart == null || !mounted) return;
-      setState(() => _elapsedSec = DateTime.now().difference(_trackStart!).inSeconds);
+      setState(() =>
+          _elapsedSec = DateTime.now().difference(_trackStart!).inSeconds);
     });
 
     const settings = LocationSettings(
@@ -173,7 +176,8 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
       distanceFilter: 5,
     );
 
-    _sub = Geolocator.getPositionStream(locationSettings: settings).listen((pos) {
+    _sub =
+        Geolocator.getPositionStream(locationSettings: settings).listen((pos) {
       if (!mounted) return;
       // RouteTracker filters jitter/teleports; rejected fixes shouldn't move
       // the marker or camera either, so the route stays honest.
@@ -219,8 +223,12 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
           content: Text('Only ${_elapsedSec}s recorded. Save anyway?',
               style: TextStyle(color: ZveltTokens.text2)),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
           ],
         ),
       );
@@ -232,7 +240,8 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
     // Canonical wire shape: {lat, lng, t: epoch ms}. The server recomputes
     // distance/duration/elevation from these points (anti-cheat) — an ISO
     // timestamp here would be silently dropped by the backend normalizer.
-    final route = ActivityService.routePointsFrom(_tracker.points, _tracker.pointTs);
+    final route =
+        ActivityService.routePointsFrom(_tracker.points, _tracker.pointTs);
 
     var storedOffline = false;
     var xpGain = 0;
@@ -305,9 +314,12 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
         builder: (ctx) => AlertDialog(
           backgroundColor: ZveltTokens.surface,
           title: const Text('Could not save'),
-          content: Text(err.toString(), style: TextStyle(color: ZveltTokens.text2)),
+          content:
+              Text(err.toString(), style: TextStyle(color: ZveltTokens.text2)),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close')),
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
@@ -329,7 +341,13 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
                   ? 'Run saved · +$xpGain XP · view it in Activity'
                   : 'Run saved · view it in Activity')),
     );
-    Navigator.of(context).pop();
+    _returnToAppRoot();
+  }
+
+  void _returnToAppRoot() {
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true)
+        .popUntil((route) => route.isFirst);
   }
 
   @override
@@ -361,7 +379,8 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
       body: _locBusy
-          ? const Center(child: CircularProgressIndicator(color: ZveltTokens.brand))
+          ? const Center(
+              child: CircularProgressIndicator(color: ZveltTokens.brand))
           : Stack(
               fit: StackFit.expand,
               children: [
@@ -398,7 +417,9 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
                             width: 36,
                             height: 36,
                             child: Icon(
-                              _mode == 'bike' ? AppIcons.bike : AppIcons.running,
+                              _mode == 'bike'
+                                  ? AppIcons.bike
+                                  : AppIcons.running,
                               color: ZveltTokens.brand,
                               size: 32,
                             ),
@@ -463,7 +484,8 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
     return Container(
       decoration: BoxDecoration(
         color: ZveltTokens.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(ZveltTokens.rLg)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(ZveltTokens.rLg)),
         boxShadow: ZveltTokens.shadowFloat,
       ),
       child: SafeArea(
@@ -501,24 +523,30 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed:
-                        (_saving || _saved || _tracker.points.isEmpty) ? null : _saveSession,
+                    onPressed: (_saving || _saved || _tracker.points.isEmpty)
+                        ? null
+                        : _saveSession,
                     icon: _saving
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: ZveltTokens.onBrand),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: ZveltTokens.onBrand),
                           )
                         : Icon(_saved ? AppIcons.check : AppIcons.disk),
                     label: Text(_tracker.points.isEmpty
                         ? 'No route captured'
-                        : (_saved ? 'Saved' : (_saving ? 'Saving…' : 'Save workout'))),
+                        : (_saved
+                            ? 'Saved'
+                            : (_saving ? 'Saving…' : 'Save workout'))),
                   ),
                 ),
               ],
               if (_error != null) ...[
                 const SizedBox(height: 8),
-                Text(_error!, style: const TextStyle(color: ZveltTokens.error, fontSize: 13)),
+                Text(_error!,
+                    style: const TextStyle(
+                        color: ZveltTokens.error, fontSize: 13)),
               ],
               const SizedBox(height: 4),
               Text(
@@ -539,7 +567,8 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
 // ─── Floating round map button ───────────────────────────────────────────────
 
 class _RoundMapButton extends StatelessWidget {
-  const _RoundMapButton({required this.icon, required this.onTap, this.tooltip});
+  const _RoundMapButton(
+      {required this.icon, required this.onTap, this.tooltip});
   final IconData icon;
   final VoidCallback onTap;
   final String? tooltip;
@@ -563,7 +592,8 @@ class _RoundMapButton extends StatelessWidget {
 // ─── Run / Bike pill toggle ──────────────────────────────────────────────────
 
 class _ModeToggle extends StatelessWidget {
-  const _ModeToggle({required this.mode, required this.enabled, required this.onChanged});
+  const _ModeToggle(
+      {required this.mode, required this.enabled, required this.onChanged});
   final String mode;
   final bool enabled;
   final ValueChanged<String> onChanged;
@@ -575,7 +605,8 @@ class _ModeToggle extends StatelessWidget {
       return GestureDetector(
         onTap: enabled ? () => onChanged(value) : null,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s3, vertical: 7),
+          padding: const EdgeInsets.symmetric(
+              horizontal: ZveltTokens.s3, vertical: 7),
           decoration: BoxDecoration(
             color: selected ? ZveltTokens.brand : Colors.transparent,
             borderRadius: BorderRadius.circular(ZveltTokens.rPill),
@@ -583,7 +614,9 @@ class _ModeToggle extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 15, color: selected ? ZveltTokens.onBrand : ZveltTokens.text2),
+              Icon(icon,
+                  size: 15,
+                  color: selected ? ZveltTokens.onBrand : ZveltTokens.text2),
               const SizedBox(width: 5),
               Text(
                 label,

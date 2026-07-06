@@ -288,16 +288,25 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
     WorkoutDto? draftWorkout;
     ActiveProgramView? active;
     WorkoutsResponse? workouts;
-    try { draft = await WorkoutDraftStore().load(); } catch (_) {}
+    try {
+      draft = await WorkoutDraftStore().load();
+    } catch (_) {}
     if (draft != null) {
-      try { draftWorkout = await WorkoutService().getWorkout(draft.workoutId); } catch (_) {}
+      try {
+        draftWorkout = await WorkoutService().getWorkout(draft.workoutId);
+      } catch (_) {}
     }
-    try { active = await ProgramService().getActive(); } catch (_) {}
-    try { workouts = await WorkoutService().getWorkouts(); } catch (_) {}
+    try {
+      active = await ProgramService().getActive();
+    } catch (_) {}
+    try {
+      workouts = await WorkoutService().getWorkouts();
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _draft = draft;
-      _hubData = _buildHubData(draft, draftWorkout, active, workouts?.data ?? const []);
+      _hubData = _buildHubData(
+          draft, draftWorkout, active, workouts?.data ?? const []);
       _loadingHub = false;
     });
   }
@@ -346,7 +355,8 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
       ];
       return QsHubData(
         primary: QsPrimaryKind.next,
-        nextTitle: (dayTitle != null && dayTitle.isNotEmpty) ? dayTitle : prog.title,
+        nextTitle:
+            (dayTitle != null && dayTitle.isNotEmpty) ? dayTitle : prog.title,
         nextMuscles: prog.title,
         nextMeta: meta.join(' · '),
       );
@@ -394,11 +404,29 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
   String _muscleGroup(String? raw) {
     final v = (raw ?? '').toLowerCase();
     if (v.contains('chest') || v.contains('pec')) return 'Chest';
-    if (v.contains('back') || v.contains('lat') || v.contains('trap') || v.contains('rhom')) return 'Back';
-    if (v.contains('quad') || v.contains('glute') || v.contains('ham') || v.contains('calf') || v.contains('leg')) return 'Legs';
+    if (v.contains('back') ||
+        v.contains('lat') ||
+        v.contains('trap') ||
+        v.contains('rhom')) {
+      return 'Back';
+    }
+    if (v.contains('quad') ||
+        v.contains('glute') ||
+        v.contains('ham') ||
+        v.contains('calf') ||
+        v.contains('leg')) {
+      return 'Legs';
+    }
     if (v.contains('delt') || v.contains('shoulder')) return 'Shoulders';
-    if (v.contains('bicep') || v.contains('tricep') || v.contains('forearm') || v.contains('arm')) return 'Arms';
-    if (v.contains('ab') || v.contains('core') || v.contains('oblique')) return 'Core';
+    if (v.contains('bicep') ||
+        v.contains('tricep') ||
+        v.contains('forearm') ||
+        v.contains('arm')) {
+      return 'Arms';
+    }
+    if (v.contains('ab') || v.contains('core') || v.contains('oblique')) {
+      return 'Core';
+    }
     return 'Other';
   }
 
@@ -470,7 +498,8 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
     if (_loadingHub) {
       return Scaffold(
         backgroundColor: ZveltTokens.bg,
-        body: const Center(child: CircularProgressIndicator(color: ZveltTokens.brand)),
+        body: const Center(
+            child: CircularProgressIndicator(color: ZveltTokens.brand)),
       );
     }
     return QuickStartHub(
@@ -499,7 +528,8 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
     final nav = Navigator.of(context);
     nav.pop();
     await nav.push<void>(MaterialPageRoute<void>(
-      builder: (_) => ActiveWorkoutView.forExistingWorkout(workoutId: draft.workoutId),
+      builder: (_) =>
+          ActiveWorkoutView.forExistingWorkout(workoutId: draft.workoutId),
     ));
   }
 
@@ -507,7 +537,12 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
   // same _kAllPresets the workout engine actually starts, so what you preview
   // is exactly what you train.
   List<QsTemplate> _quickStartTemplates() {
-    const ids = {'push': 'push', 'pull': 'pull', 'legs': 'legs', 'full': 'fullbody'};
+    const ids = {
+      'push': 'push',
+      'pull': 'pull',
+      'legs': 'legs',
+      'full': 'fullbody'
+    };
     final out = <QsTemplate>[];
     ids.forEach((presetId, hubId) {
       final p = _presetById(presetId);
@@ -516,7 +551,10 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
         p.name,
         p.subtitle,
         p.exercises.length,
-        [for (final e in p.exercises) (e.name, '${e.sets}×${e.repsRange} · ${e.weight}')],
+        [
+          for (final e in p.exercises)
+            (e.name, '${e.sets}×${e.repsRange} · ${e.weight}')
+        ],
       ));
     });
     return out;
@@ -580,19 +618,42 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
   void _startSmart(String goal, int duration, String equip) {
     const pools = <String, List<String>>{
       'gym': [
-        'Back Squat', 'Bench Press', 'Deadlift', 'Overhead Press', 'Barbell Row',
-        'Lat Pulldown', 'Leg Press', 'Romanian Deadlift', 'Lateral Raise',
-        'Tricep Pushdown', 'Barbell Curl', 'Leg Curl',
+        'Back Squat',
+        'Bench Press',
+        'Deadlift',
+        'Overhead Press',
+        'Barbell Row',
+        'Lat Pulldown',
+        'Leg Press',
+        'Romanian Deadlift',
+        'Lateral Raise',
+        'Tricep Pushdown',
+        'Barbell Curl',
+        'Leg Curl',
       ],
       'dumbbells': [
-        'Dumbbell Bench Press', 'Goblet Squat', 'Dumbbell Row',
-        'Dumbbell Shoulder Press', 'Dumbbell Romanian Deadlift', 'Dumbbell Lunge',
-        'Dumbbell Lateral Raise', 'Hammer Curl', 'Overhead Tricep Extension',
+        'Dumbbell Bench Press',
+        'Goblet Squat',
+        'Dumbbell Row',
+        'Dumbbell Shoulder Press',
+        'Dumbbell Romanian Deadlift',
+        'Dumbbell Lunge',
+        'Dumbbell Lateral Raise',
+        'Hammer Curl',
+        'Overhead Tricep Extension',
         'Dumbbell Curl',
       ],
       'bodyweight': [
-        'Pull-up', 'Push-up', 'Bodyweight Squat', 'Walking Lunge', 'Dip',
-        'Pike Push-up', 'Glute Bridge', 'Plank', 'Mountain Climber', 'Burpee',
+        'Pull-up',
+        'Push-up',
+        'Bodyweight Squat',
+        'Walking Lunge',
+        'Dip',
+        'Pike Push-up',
+        'Glute Bridge',
+        'Plank',
+        'Mountain Climber',
+        'Burpee',
       ],
     };
     final pool = pools[equip] ?? pools['gym']!;
@@ -632,19 +693,22 @@ class _QuickLaunchSheetState extends State<QuickLaunchSheet> {
   void _openActiveProgram() {
     final nav = Navigator.of(context);
     nav.pop();
-    nav.push<void>(MaterialPageRoute<void>(builder: (_) => const ActiveProgramScreen()));
+    nav.push<void>(
+        MaterialPageRoute<void>(builder: (_) => const ActiveProgramScreen()));
   }
 
   void _openPrograms() {
     final nav = Navigator.of(context);
     nav.pop();
-    nav.push<void>(MaterialPageRoute<void>(builder: (_) => const ProgramsLibraryScreen()));
+    nav.push<void>(
+        MaterialPageRoute<void>(builder: (_) => const ProgramsLibraryScreen()));
   }
 
   void _openExerciseLibrary() {
     final nav = Navigator.of(context);
     nav.pop();
-    nav.push<void>(MaterialPageRoute<void>(builder: (_) => const ExerciseLibraryScreen()));
+    nav.push<void>(
+        MaterialPageRoute<void>(builder: (_) => const ExerciseLibraryScreen()));
   }
 }
 
@@ -721,7 +785,6 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
   bool _cardioTracking = false;
 
   List<_GymExercise> _displayExercises = [];
-
 
   String get _cardioMode => widget.preset.id == 'bike'
       ? 'bike'
@@ -857,7 +920,10 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
       // user's most recent working weight per lift (best-effort; falls back to
       // the preset label when there's no history). Kills the "edit 6 fake sets
       // before you start" tax and stops showing a beginner 140kg deadlifts.
-      final matchedIds = [for (final m in matches) if (m != null) m.id];
+      final matchedIds = [
+        for (final m in matches)
+          if (m != null) m.id
+      ];
       final lastWeights =
           await _workoutService.getLastWorkingWeights(matchedIds);
       // Adds stay SEQUENTIAL in preset order: the backend auto-assigns
@@ -875,7 +941,8 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
         final weightLabel = histKg != null
             ? '${histKg.toStringAsFixed(histKg % 1 == 0 ? 0 : 1)} kg'
             : ex.weight;
-        display.add(_GymExercise(match.name, ex.sets, ex.repsRange, weightLabel));
+        display
+            .add(_GymExercise(match.name, ex.sets, ex.repsRange, weightLabel));
       }
       if (!mounted) return;
       setState(() {
@@ -1077,15 +1144,13 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
               onTap: () => Navigator.pop(ctx, 'minimize'),
             ),
             ListTile(
-              leading: const Icon(AppIcons.flag,
-                  color: ZveltTokens.success),
+              leading: const Icon(AppIcons.flag, color: ZveltTokens.success),
               title: const Text('Complete workout'),
               subtitle: const Text('Complete session and earn XP'),
               onTap: () => Navigator.pop(ctx, 'end'),
             ),
             ListTile(
-              leading:
-                  const Icon(AppIcons.trash, color: ZveltTokens.error),
+              leading: const Icon(AppIcons.trash, color: ZveltTokens.error),
               title: const Text('Discard session',
                   style: TextStyle(color: ZveltTokens.error)),
               onTap: () => Navigator.pop(ctx, 'discard'),
@@ -1124,7 +1189,10 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
         startedAt: cardioEnd.subtract(Duration(seconds: _elapsedSeconds)),
         endedAt: cardioEnd,
         afterDone: () {
-          if (mounted) Navigator.of(context).pop();
+          if (mounted) {
+            Navigator.of(context, rootNavigator: true)
+                .popUntil((route) => route.isFirst);
+          }
         },
       );
       return;
@@ -1198,7 +1266,8 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
           done = true;
         } on WeightJumpNoteRequiredException catch (ex) {
           if (!mounted) return;
-          final entered = await showWeightJumpNoteSheet(context, message: ex.message);
+          final entered =
+              await showWeightJumpNoteSheet(context, message: ex.message);
           if (entered == null) {
             cancelled = true;
           } else {
@@ -1530,8 +1599,8 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
           child: Container(
             decoration: BoxDecoration(
               color: ZveltTokens.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(ZveltTokens.rLg)),
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(ZveltTokens.rLg)),
               boxShadow: const [
                 BoxShadow(
                     color: Color(0x33000000),
@@ -1552,8 +1621,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                         if (avgKmh > 0) '${avgKmh.toStringAsFixed(1)} km/h avg',
                         _cardioTracking ? 'GPS live' : 'GPS —',
                       ].join(' · '),
-                      style: TextStyle(
-                          color: ZveltTokens.text2, fontSize: 12),
+                      style: TextStyle(color: ZveltTokens.text2, fontSize: 12),
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -1561,9 +1629,8 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: _togglePause,
-                            icon: Icon(_paused
-                                ? AppIcons.play
-                                : AppIcons.pause),
+                            icon:
+                                Icon(_paused ? AppIcons.play : AppIcons.pause),
                             label: Text(_paused ? 'Resume' : 'Pause'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: ZveltTokens.text,
@@ -1675,8 +1742,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                 children: [
                   IconButton(
                     onPressed: _confirmExitGym,
-                    icon: Icon(AppIcons.cross_small,
-                        color: ZveltTokens.text2),
+                    icon: Icon(AppIcons.cross_small, color: ZveltTokens.text2),
                   ),
                   Expanded(
                     child: Column(
