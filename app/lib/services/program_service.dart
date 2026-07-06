@@ -305,7 +305,8 @@ class ActiveProgramView {
 
 class ProgramService {
   final _auth = AuthService();
-  Future<Map<String, String>> _headers() => authedJsonHeaders(auth: _auth);
+  Future<Map<String, String>> _jsonHeaders() => authedJsonHeaders(auth: _auth);
+  Future<Map<String, String>> _readHeaders() => authedReadHeaders(auth: _auth);
 
   String _errorMessage(http.Response res, String fallback) {
     try {
@@ -321,7 +322,8 @@ class ProgramService {
   /// GET /v1/programs/templates — the program library.
   Future<List<ProgramSummary>> getTemplates() async {
     final res = await http
-        .get(Uri.parse('$v1Base/programs/templates'), headers: await _headers())
+        .get(Uri.parse('$v1Base/programs/templates'),
+            headers: await _readHeaders())
         .withTimeout();
     if (res.statusCode != 200) {
       throw Exception('Could not load programs (${res.statusCode})');
@@ -338,7 +340,7 @@ class ProgramService {
   Future<ProgramTemplateDetail> getTemplate(String id) async {
     final res = await http
         .get(Uri.parse('$v1Base/programs/templates/$id'),
-            headers: await _headers())
+            headers: await _readHeaders())
         .withTimeout();
     if (res.statusCode != 200) {
       throw Exception('Could not load program (${res.statusCode})');
@@ -350,7 +352,8 @@ class ProgramService {
   /// GET /v1/programs/active — current active program + today's materialized day.
   Future<ActiveProgramView> getActive() async {
     final res = await http
-        .get(Uri.parse('$v1Base/programs/active'), headers: await _headers())
+        .get(Uri.parse('$v1Base/programs/active'),
+            headers: await _readHeaders())
         .withTimeout();
     if (res.statusCode != 200) {
       throw Exception('Could not load active program (${res.statusCode})');
@@ -374,7 +377,7 @@ class ProgramService {
     final res = await http
         .patch(
           Uri.parse('$v1Base/programs/$programId'),
-          headers: await _headers(),
+          headers: await _jsonHeaders(),
           body: jsonEncode({'oneRepMaxes': oneRepMaxes}),
         )
         .withTimeout();
@@ -395,7 +398,7 @@ class ProgramService {
     final res = await http
         .post(
           Uri.parse('$v1Base/programs/start'),
-          headers: await _headers(),
+          headers: await _jsonHeaders(),
           body: jsonEncode({
             'templateId': templateId,
             if (weeks != null) 'weeks': weeks,
@@ -416,8 +419,11 @@ class ProgramService {
   /// POST /v1/programs/:id/start-day — materialize today → returns a draft workoutId.
   Future<String> startProgramDay(String programId) async {
     final res = await http
-        .post(Uri.parse('$v1Base/programs/$programId/start-day'),
-            headers: await _headers())
+        .post(
+          Uri.parse('$v1Base/programs/$programId/start-day'),
+          headers: await _jsonHeaders(),
+          body: jsonEncode({}),
+        )
         .withTimeout();
     if (res.statusCode != 201) {
       throw Exception(_errorMessage(res, 'Could not start session'));
@@ -440,8 +446,11 @@ class ProgramService {
   /// POST /v1/programs/:id/advance — mark the session done, advance week/TM.
   Future<ActiveProgram> advance(String programId) async {
     final res = await http
-        .post(Uri.parse('$v1Base/programs/$programId/advance'),
-            headers: await _headers())
+        .post(
+          Uri.parse('$v1Base/programs/$programId/advance'),
+          headers: await _jsonHeaders(),
+          body: jsonEncode({}),
+        )
         .withTimeout();
     if (res.statusCode != 200) {
       throw Exception('Could not advance program (${res.statusCode})');
@@ -455,7 +464,7 @@ class ProgramService {
     final res = await http
         .patch(
           Uri.parse('$v1Base/programs/$programId'),
-          headers: await _headers(),
+          headers: await _jsonHeaders(),
           body: jsonEncode({'status': 'archived'}),
         )
         .withTimeout();
