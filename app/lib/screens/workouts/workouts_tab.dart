@@ -4,6 +4,7 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../../models/activity_kind.dart';
 import '../../services/activity_calendar_store.dart';
+import '../../services/feed_refresh_notifier.dart';
 import '../../services/stats_charts_service.dart';
 import '../../services/workout_service.dart';
 import '../../theme/zvelt_tokens.dart';
@@ -76,6 +77,25 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   @override
   void initState() {
     super.initState();
+    // Reload when a session completes anywhere in the app (quick-launch ⚡,
+    // Home hero, GPS run) — WorkoutService / ActivityCalendarStore bump
+    // [RefreshScope.home] on save so the cached tab can't go stale.
+    FeedRefreshNotifier.instance
+        .notifier(RefreshScope.home)
+        .addListener(_onHomeBump);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    FeedRefreshNotifier.instance
+        .notifier(RefreshScope.home)
+        .removeListener(_onHomeBump);
+    super.dispose();
+  }
+
+  void _onHomeBump() {
+    if (!mounted || _loading) return;
     _load();
   }
 
@@ -432,8 +452,9 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     return h > 0 ? '${h}h ${m}m' : '${m}m';
   }
 
+  // UTC server timestamps → LOCAL day, matching the Activity calendar.
   String _workoutDayKey(WorkoutDto w) =>
-      _ymdKey(DateUtils.dateOnly(w.endedAt ?? w.startedAt));
+      _ymdKey(DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal()));
 
   Map<String, int> _completedWorkoutCountsByDay([List<WorkoutDto>? completed]) {
     final counts = <String, int>{};
@@ -1306,7 +1327,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
         }
       }
       sessions.add(HistorySession(
-        date: DateUtils.dateOnly(w.endedAt ?? w.startedAt),
+        date: DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal()),
         volumeKg: vol,
         sets: sets,
         muscleVolume: mv,
@@ -1316,7 +1337,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     // Workout log (newest 10).
     final log = <HistoryLogEntry>[];
     for (final w in completed.take(10)) {
-      final d = w.endedAt ?? w.startedAt;
+      final d = (w.endedAt ?? w.startedAt).toLocal();
       final dur = w.endedAt != null
           ? _durLabel(w.endedAt!.difference(w.startedAt))
           : '—';
@@ -1342,7 +1363,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
         DateUtils.dateOnly(now).subtract(Duration(days: now.weekday - 1));
     var wtw = 0;
     for (final w in completed) {
-      final d = DateUtils.dateOnly(w.endedAt ?? w.startedAt);
+      final d = DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal());
       if (!d.isBefore(monday)) wtw++;
     }
 

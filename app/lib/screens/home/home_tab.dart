@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../models/activity_kind.dart';
 import '../../models/social_feed_post.dart';
 import '../../services/activity_calendar_store.dart';
+import '../../services/feed_refresh_notifier.dart';
 import '../../services/nutrition_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/social_feed_service.dart';
@@ -79,6 +80,26 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
+    // Completion flows bump [RefreshScope.home] (WorkoutService.completeWorkout,
+    // ActivityCalendarStore.addManualSession) — reload so "logged today" /
+    // consistency / weekly cardio reflect sessions finished from ANY flow
+    // (center ⚡ quick-launch, Train tab, GPS run), not just Home's hero button.
+    FeedRefreshNotifier.instance
+        .notifier(RefreshScope.home)
+        .addListener(_onHomeBump);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    FeedRefreshNotifier.instance
+        .notifier(RefreshScope.home)
+        .removeListener(_onHomeBump);
+    super.dispose();
+  }
+
+  void _onHomeBump() {
+    if (!mounted || _loading) return;
     _load();
   }
 
@@ -125,9 +146,13 @@ class _HomeTabState extends State<HomeTab> {
         const <NutritionDaySnapshot>[];
 
     // Completed gym sessions this week ('completed' or 'posted'; drafts out).
+    // Server timestamps are UTC — attribute to the LOCAL calendar day, same
+    // as the Activity calendar, or late-evening sessions land on the wrong
+    // day and "logged today" fails (Romania is UTC+2/+3).
     final calendar = <DateTime>[
       for (final w in workoutsRes?.data ?? const <WorkoutDto>[])
-        if (w.status != 'draft') DateUtils.dateOnly(w.endedAt ?? w.startedAt),
+        if (w.status != 'draft')
+          DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal()),
     ];
 
     final profile = me?['profile'] as Map<String, dynamic>?;
@@ -307,7 +332,7 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   DateTime _workoutDate(WorkoutDto w) =>
-      DateUtils.dateOnly(w.endedAt ?? w.startedAt);
+      DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal());
 
   static String _homeYmd(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -726,7 +751,7 @@ class _HomeTabState extends State<HomeTab> {
     return const Column(
       children: [
         ZCollapsibleChartCard(
-          title: 'Recorduri recente',
+          title: 'Recent records',
           icon: AppIcons.trophy,
           child: RecentPrsCard(),
         ),

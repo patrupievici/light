@@ -324,8 +324,17 @@ class AuthService {
     return _refreshAccessTokenDeduped();
   }
 
-  /// După refresh reușit / access valid.
+  /// Offline-safe: decode the uid straight from the stored JWT — the claim
+  /// doesn't change when the access token expires, and cache keys / "is this
+  /// mine" checks must not flip to `anonymous` in airplane mode (that made
+  /// logged nutrition/cardio days look empty after an offline restart and
+  /// stranded new offline logs under `anonymous_*` keys). Only falls back to
+  /// the refreshing path when no token is stored at all. Tokens are cleared
+  /// on logout / rejected refresh, so a stored token always identifies the
+  /// current user. Never use this for auth decisions — only for namespacing.
   Future<String?> getCurrentUserId() async {
+    final stored = await getStoredUserId();
+    if (stored != null && stored.isNotEmpty) return stored;
     final token = await getAccessToken();
     if (token == null || token.isEmpty) return null;
     return _decodeUserIdFromJwt(token);

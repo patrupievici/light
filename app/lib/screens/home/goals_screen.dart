@@ -53,8 +53,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
       final workouts = results[0] as WorkoutsResponse;
       final cardioByDay = results[1] as Map<String, List<ManualCardioSession>>;
       final trained = <String>{
+        // UTC server timestamps → LOCAL day, matching the Activity calendar.
         for (final w in workouts.data)
-          if (w.status != 'draft') _ymd(w.endedAt ?? w.startedAt),
+          if (w.status != 'draft') _ymd((w.endedAt ?? w.startedAt).toLocal()),
         for (final entry in cardioByDay.entries)
           if (entry.value.isNotEmpty) entry.key,
       };

@@ -7,6 +7,7 @@ import '../models/game_xp_models.dart';
 import 'activity_service.dart';
 import 'app_data_cache.dart';
 import 'auth_service.dart';
+import 'feed_refresh_notifier.dart';
 import 'http_client.dart';
 
 /// SharedPreferences key holding the JSON snapshot of the active (in-progress)
@@ -157,18 +158,57 @@ class WorkoutService {
     return w;
   }
 
-  /// GET /v1/workouts — list past workouts (non-draft)
+  /// Offline fallback for [getWorkouts] page 1 — Home / History / streak /
+  /// goals all read this list, so after a restart with no network they must
+  /// render the last-known truth instead of a fabricated "nothing logged".
+  static const String _workoutsListCacheKey = 'workouts_list_p1_v1';
+
+  /// GET /v1/workouts — list past workouts (non-draft).
+  ///
+  /// Page 1 is cached per-user in [AppDataCache]; when the request fails
+  /// (airplane mode, backend cold start) the cached copy is served so weekly
+  /// consistency / "workout logged" truth survives restarts offline.
   Future<WorkoutsResponse> getWorkouts({int page = 1, int limit = 20}) async {
-    final res = await http
-        .get(
-          Uri.parse('$v1Base/workouts')
-              .replace(queryParameters: {'page': '$page', 'limit': '$limit'}),
-          headers: await _headers(),
-        )
-        .withTimeout();
-    if (res.statusCode != 200) _throw(res);
-    return WorkoutsResponse.fromJson(
-        jsonDecode(res.body) as Map<String, dynamic>);
+    http.Response res;
+    try {
+      res = await http
+          .get(
+            Uri.parse('$v1Base/workouts').replace(
+                queryParameters: {'page': '$page', 'limit': '$limit'}),
+            headers: await _headers(),
+          )
+          .withTimeout();
+    } catch (e) {
+      final cached = page == 1 ? await _loadCachedWorkoutsList() : null;
+      if (cached != null) return cached;
+      rethrow;
+    }
+    if (res.statusCode != 200) {
+      final cached = page == 1 ? await _loadCachedWorkoutsList() : null;
+      if (cached != null) return cached;
+      _throw(res);
+    }
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
+    if (page == 1) {
+      try {
+        await AppDataCache.instance.putJson(_workoutsListCacheKey, json);
+      } catch (e) {
+        debugPrint('[getWorkouts] cache write failed: $e');
+      }
+    }
+    return WorkoutsResponse.fromJson(json);
+  }
+
+  Future<WorkoutsResponse?> _loadCachedWorkoutsList() async {
+    try {
+      final json =
+          await AppDataCache.instance.getJsonObject(_workoutsListCacheKey);
+      if (json == null) return null;
+      return WorkoutsResponse.fromJson(json);
+    } catch (e) {
+      debugPrint('[getWorkouts] cache read failed: $e');
+      return null;
+    }
   }
 
   /// GET /v1/workouts/:id
@@ -396,6 +436,10 @@ class WorkoutService {
     // Workout finished server-side — drop the resume pointer so we don't
     // re-prompt next launch (P1.11).
     await clearActiveWorkoutPointer(matchingId: workoutId);
+    // Wake the cached Home / Train tabs so consistency + "logged today"
+    // reflect this session no matter which flow completed it (hero button,
+    // center ⚡ quick-launch, Train tab, AI chat).
+    FeedRefreshNotifier.instance.bump(RefreshScope.home);
     return CompleteWorkoutResult(
       workout: WorkoutDto.fromJson(data['workout'] as Map<String, dynamic>),
       xpGain: (data['xpGain'] as num?)?.toInt() ?? 0,

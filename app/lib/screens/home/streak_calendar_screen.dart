@@ -52,7 +52,9 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
 
       final trained = <String>{};
       for (final w in workouts) {
-        trained.add(_ymd(DateUtils.dateOnly(w.endedAt ?? w.startedAt)));
+        // UTC server timestamps → LOCAL day, matching the Activity calendar.
+        trained
+            .add(_ymd(DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal())));
       }
       manual.forEach((day, sessions) {
         if (sessions.isNotEmpty) trained.add(day);

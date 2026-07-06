@@ -3,18 +3,30 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/activity_kind.dart';
 import '_crash_reporter.dart';
 import 'auth_service.dart';
+import 'feed_refresh_notifier.dart';
 
 /// Sesiune cardio manuală (todo Excel #19) — distanță/timp opționale.
 class ManualCardioSession {
-  ManualCardioSession({required this.kind, this.distanceKm, this.durationMin});
+  ManualCardioSession({
+    required this.kind,
+    this.distanceKm,
+    this.durationMin,
+    this.id,
+  });
   final ActivityKind kind;
   final double? distanceKm;
   final int? durationMin;
+
+  /// Optional client id (e.g. the session's start epoch). When present,
+  /// [ActivityCalendarStore.addManualSession] is idempotent for it — retrying
+  /// a failed upload can't double-count the session in the weekly card.
+  final String? id;
 
   Map<String, dynamic> toJson() => {
         'kind': kind.id,
         if (distanceKm != null) 'distanceKm': distanceKm,
         if (durationMin != null) 'durationMin': durationMin,
+        if (id != null) 'id': id,
       };
 
   static ManualCardioSession? fromJson(dynamic o) {
@@ -26,6 +38,9 @@ class ManualCardioSession {
       kind: k,
       distanceKm: (m['distanceKm'] as num?)?.toDouble(),
       durationMin: (m['durationMin'] as num?)?.toInt(),
+      id: (m['id'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (m['id'] as String).trim(),
     );
   }
 
@@ -244,9 +259,16 @@ class ActivityCalendarStore {
   Future<void> addManualSession(String dayYmd, ManualCardioSession session) async {
     final all = await loadManualSessions();
     final list = List<ManualCardioSession>.from(all[dayYmd] ?? []);
+    // Idempotent for id-carrying sessions: a save Retry (4xx / cold backend)
+    // replaces the earlier mirror instead of double-counting it.
+    if (session.id != null) {
+      list.removeWhere((s) => s.id == session.id);
+    }
     list.add(session);
     all[dayYmd] = list;
     await _saveManual(all);
+    // Home's weekly cardio card reads this store — wake it on every save.
+    FeedRefreshNotifier.instance.bump(RefreshScope.home);
   }
 
   Future<void> removeManualSessionAt(String dayYmd, int index) async {
@@ -260,6 +282,7 @@ class ActivityCalendarStore {
       all[dayYmd] = list;
     }
     await _saveManual(all);
+    FeedRefreshNotifier.instance.bump(RefreshScope.home);
   }
 
   Future<void> _saveManual(Map<String, List<ManualCardioSession>> all) async {
