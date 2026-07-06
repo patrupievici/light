@@ -48,7 +48,8 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
   /// Drives ONLY the appbar clock. Ticking this every second via
   /// [ValueListenableBuilder] keeps the per-second rebuild scoped to the
   /// timer text — the exercise list is no longer rebuilt once a second.
-  final ValueNotifier<Duration> _elapsed = ValueNotifier<Duration>(Duration.zero);
+  final ValueNotifier<Duration> _elapsed =
+      ValueNotifier<Duration>(Duration.zero);
 
   /// Drives the prescribed rest-timer countdown banner only. Null = no rest
   /// countdown is currently running (the common case: between sets the user is
@@ -92,12 +93,13 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     for (final we in w.exercises) {
       final id = we.exerciseId;
       if (id.isEmpty || !seen.add(id)) continue;
-      final reps = int.tryParse(we.repRangeHint?.split(RegExp(r'\D+')).firstWhere(
-                (s) => s.isNotEmpty,
-                orElse: () => '',
-              ) ??
-              '') ??
-          8;
+      final reps =
+          int.tryParse(we.repRangeHint?.split(RegExp(r'\D+')).firstWhere(
+                        (s) => s.isNotEmpty,
+                        orElse: () => '',
+                      ) ??
+                  '') ??
+              8;
       final s = await _service.getProgression(id, reps: reps);
       if (!mounted) return;
       if (s != null) setState(() => _progression[id] = s);
@@ -143,6 +145,69 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     ));
   }
 
+  bool _isTransientSetFailure(Object e) {
+    if (e is WorkoutApiException) {
+      return e.statusCode == 408 || e.statusCode == 429 || e.statusCode >= 500;
+    }
+    return true;
+  }
+
+  void _showSetSaveError(Object e) {
+    if (!mounted) return;
+    final message = e.toString().replaceFirst('Exception: ', '').trim();
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message.isEmpty ? 'Could not log set' : message),
+        backgroundColor: ZveltTokens.error,
+      ),
+    );
+  }
+
+  WorkoutSetDto _completedSetSnapshot(
+    WorkoutSetDto set, {
+    required double weightKg,
+    required int reps,
+    double? rpe,
+  }) {
+    return WorkoutSetDto(
+      id: set.id,
+      setIndex: set.setIndex,
+      weightKg: weightKg,
+      reps: reps,
+      rpe: rpe,
+      tag: set.tag,
+      isCompleted: true,
+    );
+  }
+
+  Future<void> _applyCompletedSetLocally({
+    required WorkoutExerciseDto we,
+    required WorkoutSetDto set,
+    required double weightKg,
+    required int reps,
+    WorkoutSetDto? serverSet,
+  }) async {
+    final completed = serverSet ??
+        _completedSetSnapshot(set,
+            weightKg: weightKg, reps: reps, rpe: set.rpe);
+    await _recordSetCompletion(we: we, setId: completed.id);
+    if (!mounted) return;
+    _patchWorkoutSets(we.id, (sets) {
+      final idx = sets.indexWhere((s) => s.id == completed.id);
+      if (idx >= 0) sets[idx] = completed;
+      return sets;
+    });
+    _maybeFlagPr(
+      exerciseId: we.exerciseId,
+      weightKg: weightKg,
+      reps: reps,
+      tag: completed.tag,
+      setId: completed.id,
+    );
+  }
+
   Future<void> _recordSetCompletion({
     required WorkoutExerciseDto we,
     required String setId,
@@ -155,7 +220,9 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     // Done before the early-return so the first set of an exercise still kicks
     // off a rest timer for the gap before its second set.
     _startRestCountdown(we);
-    if (prev == null) return; // First completed set on this exercise — no rest yet.
+    if (prev == null) {
+      return; // First completed set on this exercise — no rest yet.
+    }
     final rest = now.difference(prev).inSeconds;
     await RestIntervalStore.instance.logRestInterval(
       exerciseId: we.exerciseId,
@@ -339,7 +406,8 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
   }
 
   Future<void> _addSet(WorkoutExerciseDto we) async {
-    final vals = await _showSetDialog(exercise: we.exercise, allowTagSelection: true);
+    final vals =
+        await _showSetDialog(exercise: we.exercise, allowTagSelection: true);
     if (vals == null || !mounted) return;
     final tag = vals.$4;
     // Same client-side UUID for the POST and any later offline-queue replay, so
@@ -383,12 +451,17 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
         return;
       } on WeightJumpNoteRequiredException catch (ex) {
         if (!mounted) return;
-        final entered = await showWeightJumpNoteSheet(context, message: ex.message);
+        final entered =
+            await showWeightJumpNoteSheet(context, message: ex.message);
         if (entered == null) return; // user cancelled → set is NOT logged
         note = entered;
         // loop again, now with the note attached
       } catch (e) {
         if (!mounted) return;
+        if (!_isTransientSetFailure(e)) {
+          _showSetSaveError(e);
+          return;
+        }
         // Offline-first: enqueue an ADD op instead of dropping the set. The
         // coordinator's connectivity listener flushes on reconnect; the server
         // dedupes on clientSetId. Any note the user gave rides along.
@@ -462,28 +535,26 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
           isCompleted: true,
           note: note,
         );
-        await _recordSetCompletion(we: we, setId: set.id);
-        if (!mounted) return;
-        _patchWorkoutSets(we.id, (sets) {
-          final idx = sets.indexWhere((s) => s.id == updated.id);
-          if (idx >= 0) sets[idx] = updated;
-          return sets;
-        });
-        _maybeFlagPr(
-          exerciseId: we.exerciseId,
+        await _applyCompletedSetLocally(
+          we: we,
+          set: set,
           weightKg: vals.$1,
           reps: vals.$2,
-          tag: set.tag,
-          setId: updated.id,
+          serverSet: updated,
         );
         return;
       } on WeightJumpNoteRequiredException catch (ex) {
         if (!mounted) return;
-        final entered = await showWeightJumpNoteSheet(context, message: ex.message);
+        final entered =
+            await showWeightJumpNoteSheet(context, message: ex.message);
         if (entered == null) return; // user cancelled → set is NOT changed
         note = entered;
       } catch (e) {
         if (!mounted) return;
+        if (!_isTransientSetFailure(e)) {
+          _showSetSaveError(e);
+          return;
+        }
         // Offline-first: enqueue an UPDATE op (not a fresh ADD) so the existing
         // set row is patched on reconnect instead of being duplicated.
         await _enqueueOfflineSet(
@@ -497,6 +568,12 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
             rpe: vals.$3,
             note: note,
           ),
+        );
+        await _applyCompletedSetLocally(
+          we: we,
+          set: set,
+          weightKg: vals.$1,
+          reps: vals.$2,
         );
         return;
       }
@@ -523,28 +600,26 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
           isCompleted: true,
           note: note,
         );
-        await _recordSetCompletion(we: we, setId: set.id);
-        if (!mounted) return;
-        _patchWorkoutSets(we.id, (sets) {
-          final idx = sets.indexWhere((s) => s.id == updated.id);
-          if (idx >= 0) sets[idx] = updated;
-          return sets;
-        });
-        _maybeFlagPr(
-          exerciseId: we.exerciseId,
+        await _applyCompletedSetLocally(
+          we: we,
+          set: set,
           weightKg: weightKg,
           reps: reps,
-          tag: set.tag,
-          setId: updated.id,
+          serverSet: updated,
         );
         return;
       } on WeightJumpNoteRequiredException catch (ex) {
         if (!mounted) return;
-        final entered = await showWeightJumpNoteSheet(context, message: ex.message);
+        final entered =
+            await showWeightJumpNoteSheet(context, message: ex.message);
         if (entered == null) return; // user cancelled → set is NOT changed
         note = entered;
       } catch (e) {
         if (!mounted) return;
+        if (!_isTransientSetFailure(e)) {
+          _showSetSaveError(e);
+          return;
+        }
         // Offline-first: enqueue an UPDATE op targeting this set so reconnect
         // patches the existing row instead of creating a duplicate ADD.
         await _enqueueOfflineSet(
@@ -558,6 +633,12 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
             rpe: set.rpe,
             note: note,
           ),
+        );
+        await _applyCompletedSetLocally(
+          we: we,
+          set: set,
+          weightKg: weightKg,
+          reps: reps,
         );
         return;
       }
@@ -608,7 +689,9 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
           onSubmitted: (v) => Navigator.of(ctx).pop(v),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text),
             child: const Text('Save'),
@@ -618,7 +701,9 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     );
     if (name == null || name.trim().isEmpty || !mounted) return;
     final exercises = w.exercises.map((we) {
-      final reps = we.sets.isNotEmpty ? we.sets.first.reps : int.tryParse(we.repRangeHint ?? '');
+      final reps = we.sets.isNotEmpty
+          ? we.sets.first.reps
+          : int.tryParse(we.repRangeHint ?? '');
       return RoutineExercise(
         name: we.exercise.name,
         exerciseId: we.exerciseId,
@@ -629,7 +714,8 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     }).toList();
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await _routineService.createRoutine(name: name.trim(), exercises: exercises);
+      await _routineService.createRoutine(
+          name: name.trim(), exercises: exercises);
       messenger.showSnackBar(const SnackBar(
         content: Text('Saved as routine'),
         backgroundColor: ZveltTokens.success,
@@ -660,7 +746,8 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: ZveltTokens.error));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString()), backgroundColor: ZveltTokens.error));
     }
   }
 
@@ -669,7 +756,8 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     if (_loading && _workout == null) {
       return Scaffold(
         backgroundColor: ZveltTokens.bg,
-        body: const Center(child: CircularProgressIndicator(color: ZveltTokens.info)),
+        body: const Center(
+            child: CircularProgressIndicator(color: ZveltTokens.info)),
       );
     }
     if (_error != null && _workout == null) {
@@ -680,7 +768,9 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, style: const TextStyle(color: ZveltTokens.error), textAlign: TextAlign.center),
+              Text(_error!,
+                  style: const TextStyle(color: ZveltTokens.error),
+                  textAlign: TextAlign.center),
               const SizedBox(height: 16),
               FilledButton(onPressed: _load, child: const Text('Retry')),
             ],
@@ -736,17 +826,23 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
               child: ValueListenableBuilder<Duration>(
                 valueListenable: _elapsed,
                 builder: (context, elapsed, _) {
-                  final minutes =
-                      elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
-                  final seconds =
-                      elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
+                  final minutes = elapsed.inMinutes
+                      .remainder(60)
+                      .toString()
+                      .padLeft(2, '0');
+                  final seconds = elapsed.inSeconds
+                      .remainder(60)
+                      .toString()
+                      .padLeft(2, '0');
                   final hours = elapsed.inHours;
                   return Text(
-                    hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds',
+                    hours > 0
+                        ? '$hours:$minutes:$seconds'
+                        : '$minutes:$seconds',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: ZveltTokens.info,
-                          fontFeatures: [const FontFeature.tabularFigures()],
-                        ),
+                      color: ZveltTokens.info,
+                      fontFeatures: [const FontFeature.tabularFigures()],
+                    ),
                   );
                 },
               ),
@@ -809,7 +905,8 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
               padding: const EdgeInsets.all(24),
               child: FilledButton(
                 onPressed: _complete,
-                style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 52)),
                 child: const Text('Complete workout'),
               ),
             ),
@@ -830,7 +927,8 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
         title: const Text('Discard workout?'),
         content: const Text('Progress will not be saved.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: ZveltTokens.error),
             onPressed: () async {
@@ -840,9 +938,8 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
               // fire-and-forget) ensures an offline/slow discard isn't silently
               // lost; discardWorkout already swallows network errors internally,
               // and .catchError logs any unexpected throw so the pop still runs.
-              await _service
-                  .discardWorkout(widget.workoutId)
-                  .catchError((Object e) => debugPrint('discardWorkout failed: $e'));
+              await _service.discardWorkout(widget.workoutId).catchError(
+                  (Object e) => debugPrint('discardWorkout failed: $e'));
               if (screenNavigator.mounted) screenNavigator.pop();
             },
             child: const Text('Discard'),
@@ -866,7 +963,8 @@ class _ExerciseCard extends StatefulWidget {
   final WorkoutExerciseDto we;
   final void Function(WorkoutSetDto s) onLogPendingSet;
   final VoidCallback onAddSet;
-  final Future<void> Function(WorkoutSetDto set, double weightKg, int reps) onSaveSet;
+  final Future<void> Function(WorkoutSetDto set, double weightKg, int reps)
+      onSaveSet;
 
   /// Ids of sets flagged as a personal record this session (parent-computed).
   final Set<String> prSetIds;
@@ -934,13 +1032,14 @@ class _ExerciseCardState extends State<_ExerciseCard> {
       set.id,
       () {
         final c = TextEditingController(
-          text: set.weightKg > 0 ? set.weightKg.toStringAsFixed(set.weightKg % 1 == 0 ? 0 : 1) : '',
+          text: set.weightKg > 0
+              ? set.weightKg.toStringAsFixed(set.weightKg % 1 == 0 ? 0 : 1)
+              : '',
         );
         c.addListener(() {
           final (_, err) = _validateKg(c.text);
-          if (_kgErrors[set.id] != err) {
-            setState(() => _kgErrors[set.id] = err);
-          }
+          if (!mounted) return;
+          setState(() => _kgErrors[set.id] = err);
         });
         return c;
       },
@@ -956,9 +1055,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
         );
         c.addListener(() {
           final (_, err) = _validateReps(c.text);
-          if (_repsErrors[set.id] != err) {
-            setState(() => _repsErrors[set.id] = err);
-          }
+          if (!mounted) return;
+          setState(() => _repsErrors[set.id] = err);
         });
         return c;
       },
@@ -1006,7 +1104,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
       kg = parsedKg;
     }
 
-    final sorted = [...widget.we.sets]..sort((a, b) => a.setIndex.compareTo(b.setIndex));
+    final sorted = [...widget.we.sets]
+      ..sort((a, b) => a.setIndex.compareTo(b.setIndex));
     WorkoutSetDto? nextPending;
     for (final s in sorted) {
       if (s.setIndex > set.setIndex && !s.isCompleted) {
@@ -1016,9 +1115,14 @@ class _ExerciseCardState extends State<_ExerciseCard> {
     }
 
     setState(() => _savingSetIds.add(set.id));
-    await widget.onSaveSet(set, kg, parsedReps);
+    try {
+      await widget.onSaveSet(set, kg, parsedReps);
+    } finally {
+      if (mounted) {
+        setState(() => _savingSetIds.remove(set.id));
+      }
+    }
     if (!mounted) return;
-    setState(() => _savingSetIds.remove(set.id));
 
     if (nextPending != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1035,7 +1139,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
   @override
   Widget build(BuildContext context) {
     final we = widget.we;
-    final sortedSets = [...we.sets]..sort((a, b) => a.setIndex.compareTo(b.setIndex));
+    final sortedSets = [...we.sets]
+      ..sort((a, b) => a.setIndex.compareTo(b.setIndex));
     final mode = setLogModeForExercise(we.exercise);
     final showKg = mode != SetLogMode.bodyweightReps;
 
@@ -1093,7 +1198,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                     tooltip: 'Plate calculator',
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    constraints:
+                        const BoxConstraints(minWidth: 36, minHeight: 36),
                     icon: Icon(
                       Icons.fitness_center,
                       color: ZveltTokens.text2,
@@ -1105,7 +1211,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                   tooltip: 'View reference GIF',
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
                   icon: Icon(
                     AppIcons.play,
                     color: ZveltTokens.text2,
@@ -1135,13 +1242,17 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                     ),
               ),
             ],
-            if (we.restSecondsDefault != null && we.restSecondsDefault! > 0) ...[
+            if (we.restSecondsDefault != null &&
+                we.restSecondsDefault! > 0) ...[
               const SizedBox(height: 4),
               Text(
                 'Rest ~${we.restSecondsDefault}s',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: ZveltTokens.text2),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: ZveltTokens.text2),
               ),
             ],
             if (sortedSets.isNotEmpty) const SizedBox(height: 10),
@@ -1150,11 +1261,33 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
                 child: Row(
                   children: [
-                    SizedBox(width: 44, child: Text('SET', style: TextStyle(color: ZveltTokens.text2, fontSize: 11, fontWeight: FontWeight.w600))),
-                    SizedBox(width: 56, child: Text('PREV', style: TextStyle(color: ZveltTokens.text2, fontSize: 11, fontWeight: FontWeight.w600))),
-                    Expanded(child: Text('KG', style: TextStyle(color: ZveltTokens.text2, fontSize: 11, fontWeight: FontWeight.w600))),
+                    SizedBox(
+                        width: 44,
+                        child: Text('SET',
+                            style: TextStyle(
+                                color: ZveltTokens.text2,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600))),
+                    SizedBox(
+                        width: 56,
+                        child: Text('PREV',
+                            style: TextStyle(
+                                color: ZveltTokens.text2,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600))),
+                    Expanded(
+                        child: Text('KG',
+                            style: TextStyle(
+                                color: ZveltTokens.text2,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600))),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('REPS', style: TextStyle(color: ZveltTokens.text2, fontSize: 11, fontWeight: FontWeight.w600))),
+                    Expanded(
+                        child: Text('REPS',
+                            style: TextStyle(
+                                color: ZveltTokens.text2,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600))),
                     const SizedBox(width: 44),
                   ],
                 ),
@@ -1179,7 +1312,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                       color: ZveltTokens.bg2,
                       borderRadius: BorderRadius.circular(ZveltTokens.rSm),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s2, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: ZveltTokens.s2, vertical: 6),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1189,7 +1323,10 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                               width: 44,
                               child: Text(
                                 '${s.setIndex + 1}',
-                                style: ZType.num_.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w600, fontSize: 13),
+                                style: ZType.num_.copyWith(
+                                    color: ZveltTokens.text,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1198,7 +1335,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                               width: 56,
                               child: Text(
                                 prevLabel,
-                                style: ZType.num_.copyWith(color: ZveltTokens.text2, fontSize: 12),
+                                style: ZType.num_.copyWith(
+                                    color: ZveltTokens.text2, fontSize: 12),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -1207,20 +1345,26 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                                   ? TextField(
                                       controller: _kgCtrlFor(s),
                                       focusNode: _kgFocusFor(s),
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                              decimal: true),
                                       textInputAction: TextInputAction.next,
                                       decoration: InputDecoration(
                                         hintText: '0',
                                         isDense: true,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 10),
                                         // Underline-only color flip; full error text shown below.
                                         errorText: kgError == null ? null : '',
-                                        errorStyle: const TextStyle(height: 0, fontSize: 0),
+                                        errorStyle: const TextStyle(
+                                            height: 0, fontSize: 0),
                                       ),
                                     )
                                   : Text(
                                       '-',
-                                      style: TextStyle(color: ZveltTokens.text2),
+                                      style:
+                                          TextStyle(color: ZveltTokens.text2),
                                       textAlign: TextAlign.center,
                                     ),
                             ),
@@ -1235,9 +1379,11 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                                 decoration: InputDecoration(
                                   hintText: '0',
                                   isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 10),
                                   errorText: repsError == null ? null : '',
-                                  errorStyle: const TextStyle(height: 0, fontSize: 0),
+                                  errorStyle:
+                                      const TextStyle(height: 0, fontSize: 0),
                                 ),
                               ),
                             ),
@@ -1249,7 +1395,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                                   loading: _savingSetIds.contains(s.id),
                                   // Disable until inputs are in-bounds; defense-in-depth
                                   // re-checks happen inside `_submitSet` and the service.
-                                  onTap: inputValid ? () => _submitSet(s) : null,
+                                  onTap:
+                                      inputValid ? () => _submitSet(s) : null,
                                 ),
                               ),
                             ),
@@ -1257,10 +1404,12 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                         ),
                         if (inlineError != null)
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(44 + 56, 2, 4, 4),
+                            padding:
+                                const EdgeInsets.fromLTRB(44 + 56, 2, 4, 4),
                             child: Text(
                               inlineError,
-                              style: const TextStyle(color: ZveltTokens.error, fontSize: 11),
+                              style: const TextStyle(
+                                  color: ZveltTokens.error, fontSize: 11),
                             ),
                           ),
                       ],
@@ -1275,7 +1424,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                     color: ZveltTokens.bg2.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(ZveltTokens.rSm),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s2, vertical: ZveltTokens.s2),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: ZveltTokens.s2, vertical: ZveltTokens.s2),
                   child: Row(
                     children: [
                       SizedBox(
@@ -1289,11 +1439,13 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                               children: [
                                 Text(
                                   '${s.setIndex + 1}',
-                                  style: ZType.num_.copyWith(color: ZveltTokens.text, fontSize: 13),
+                                  style: ZType.num_.copyWith(
+                                      color: ZveltTokens.text, fontSize: 13),
                                 ),
                                 if (widget.prSetIds.contains(s.id)) ...[
                                   const SizedBox(width: 3),
-                                  const Icon(AppIcons.trophy, size: 12, color: ZveltTokens.warn),
+                                  const Icon(AppIcons.trophy,
+                                      size: 12, color: ZveltTokens.warn),
                                 ],
                               ],
                             ),
@@ -1305,15 +1457,20 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                         width: 56,
                         child: Text(
                           prevLabel,
-                          style: ZType.num_.copyWith(color: ZveltTokens.text2, fontSize: 12),
+                          style: ZType.num_
+                              .copyWith(color: ZveltTokens.text2, fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Expanded(
                         child: Text(
-                          showKg ? s.weightKg.toStringAsFixed(s.weightKg % 1 == 0 ? 0 : 1) : '-',
-                          style: ZType.num_.copyWith(color: ZveltTokens.text, fontSize: 13),
+                          showKg
+                              ? s.weightKg
+                                  .toStringAsFixed(s.weightKg % 1 == 0 ? 0 : 1)
+                              : '-',
+                          style: ZType.num_
+                              .copyWith(color: ZveltTokens.text, fontSize: 13),
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1323,7 +1480,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                       Expanded(
                         child: Text(
                           '${s.reps}',
-                          style: ZType.num_.copyWith(color: ZveltTokens.text, fontSize: 13),
+                          style: ZType.num_
+                              .copyWith(color: ZveltTokens.text, fontSize: 13),
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1367,12 +1525,15 @@ class _ProgressionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kg = suggestion.suggestedWeightKg!;
-    final (Color color, IconData icon, String label) = switch (suggestion.source) {
+    final (Color color, IconData icon, String label) =
+        switch (suggestion.source) {
       'deload' => (ZveltTokens.warn, AppIcons.arrow_small_down, 'Deload'),
       'hold' => (ZveltTokens.text2, AppIcons.minus, 'Hold'),
       _ => (ZveltTokens.success, AppIcons.arrow_small_up, 'Next'),
     };
-    final kgStr = kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : kg.toStringAsFixed(1);
+    final kgStr = kg == kg.roundToDouble()
+        ? kg.toStringAsFixed(0)
+        : kg.toStringAsFixed(1);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1400,10 +1561,12 @@ class _ProgressionChip extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 '$label $kgStr kg',
-                style: ZType.bodyS.copyWith(color: color, fontWeight: FontWeight.w600),
+                style: ZType.bodyS
+                    .copyWith(color: color, fontWeight: FontWeight.w600),
               ),
               const SizedBox(width: 4),
-              Icon(AppIcons.info, size: 12, color: color.withValues(alpha: 0.7)),
+              Icon(AppIcons.info,
+                  size: 12, color: color.withValues(alpha: 0.7)),
             ],
           ),
         ),
@@ -1464,7 +1627,8 @@ class _WorkoutSetDoneGlyph extends StatelessWidget {
         height: _size,
         child: Padding(
           padding: EdgeInsets.all(7),
-          child: CircularProgressIndicator(strokeWidth: 2, color: ZveltTokens.info),
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: ZveltTokens.info),
         ),
       );
     }
@@ -1479,7 +1643,8 @@ class _WorkoutSetDoneGlyph extends StatelessWidget {
             shape: BoxShape.circle,
             color: ZveltTokens.success,
           ),
-          child: const Icon(AppIcons.check, color: ZveltTokens.onBrand, size: 22),
+          child:
+              const Icon(AppIcons.check, color: ZveltTokens.onBrand, size: 22),
         ),
       );
     }
