@@ -157,7 +157,9 @@ class SocialChallengeService {
   Future<void> publish(SocialChallenge draft) async {
     final headers = await _headersAuth();
     if (headers.isEmpty) {
-      await _addLocal(draft);
+      // Creator is always a participant of their own challenge — without
+      // joined:true the offline copy rendered a "Join" CTA on it.
+      await _addLocal(draft.copyWith(joined: true));
       return;
     }
 
@@ -186,7 +188,9 @@ class SocialChallengeService {
           final saved = SocialChallenge.fromJson(row);
           if (saved != null) {
             await _removeLocal(draft.id);
-            await _upsertLocal(saved);
+            // The server marks the creator joined (auto-accepted); force it
+            // locally too in case an older deployed API omits the flag.
+            await _upsertLocal(saved.copyWith(joined: true));
           }
         } catch (e, st) {
           reportError(e, st, reason: 'challenges:publish-decode');
@@ -204,7 +208,7 @@ class SocialChallengeService {
       throw Exception(msg);
     } catch (e) {
       if (_looksLikeNetworkError(e)) {
-        await _addLocal(draft);
+        await _addLocal(draft.copyWith(joined: true));
         return;
       }
       rethrow;
@@ -259,15 +263,25 @@ class SocialChallengeService {
     throw Exception(msg);
   }
 
+  /// DELETE /v1/challenges/:id (owner-only). Throws on non-2xx and on network
+  /// failure — previously it swallowed both and cleared only the local copy,
+  /// so the card silently reappeared on the next feed load. 404 counts as
+  /// success (already gone server-side). Local-only ids skip the HTTP call.
   Future<void> remove(String id) async {
     final headers = await _headersAuth();
     if (headers.isNotEmpty && _looksLikeUuid(id)) {
-      try {
-        await http
-            .delete(Uri.parse('$v1Base/challenges/$id'), headers: headers)
-            .timeout(const Duration(seconds: 18));
-      } catch (e, st) {
-        reportError(e, st, reason: 'challenges:delete');
+      final res = await http
+          .delete(Uri.parse('$v1Base/challenges/$id'), headers: headers)
+          .timeout(const Duration(seconds: 18));
+      if (res.statusCode != 204 && res.statusCode != 200 && res.statusCode != 404) {
+        var msg = 'Could not remove challenge (${res.statusCode})';
+        try {
+          final j = jsonDecode(res.body);
+          if (j is Map && j['message'] is String) msg = j['message'] as String;
+        } catch (e) {
+          debugPrint('[SocialChallenge.remove] error-body decode best-effort skip: $e');
+        }
+        throw Exception(msg);
       }
     }
     await _removeLocal(id);

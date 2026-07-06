@@ -5,7 +5,7 @@ import '../../services/activity_service.dart';
 import '../../theme/zvelt_tokens.dart';
 
 /// Summary after outdoor cardio — save, discard, or share.
-class CardioRecapScreen extends StatelessWidget {
+class CardioRecapScreen extends StatefulWidget {
   const CardioRecapScreen({
     super.key,
     required this.mode,
@@ -23,28 +23,58 @@ class CardioRecapScreen extends StatelessWidget {
   final VoidCallback onDiscard;
   final VoidCallback? onShare;
 
+  @override
+  State<CardioRecapScreen> createState() => _CardioRecapScreenState();
+}
+
+class _CardioRecapScreenState extends State<CardioRecapScreen> {
+  bool _saving = false;
+
   String get _distanceLabel {
-    if (meters < 1000) return '${meters.toStringAsFixed(0)} m';
-    return '${(meters / 1000).toStringAsFixed(2)} km';
+    if (widget.meters < 1000) return '${widget.meters.toStringAsFixed(0)} m';
+    return '${(widget.meters / 1000).toStringAsFixed(2)} km';
   }
 
   String get _timeLabel {
-    final m = elapsedSeconds ~/ 60;
-    final s = elapsedSeconds % 60;
+    final m = widget.elapsedSeconds ~/ 60;
+    final s = widget.elapsedSeconds % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   String get _paceLabel {
-    if (meters < 50 || elapsedSeconds < 10) return '—';
-    final minPerKm = (elapsedSeconds / 60) / (meters / 1000);
+    if (widget.meters < 50 || widget.elapsedSeconds < 10) return '—';
+    final minPerKm = (widget.elapsedSeconds / 60) / (widget.meters / 1000);
     final min = minPerKm.floor();
     final sec = ((minPerKm - min) * 60).round().clamp(0, 59);
     return "$min'${sec.toString().padLeft(2, '0')}\" /km";
   }
 
+  // Double-tap guard + failure surface: a failed save used to throw out of the
+  // button handler and strand this screen with no feedback.
+  Future<void> _handleSave() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final result = await widget.onSave();
+      if (!mounted) return;
+      Navigator.of(context).pop(result);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Could not save: ${e.toString().replaceFirst('Exception: ', '')}'),
+          backgroundColor: ZveltTokens.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final title = mode == 'bike' ? 'Ride complete' : 'Run complete';
+    final title = widget.mode == 'bike' ? 'Ride complete' : 'Run complete';
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
       body: SafeArea(
@@ -56,7 +86,7 @@ class CardioRecapScreen extends StatelessWidget {
               Row(
                 children: [
                   IconButton(
-                    onPressed: onDiscard,
+                    onPressed: _saving ? null : widget.onDiscard,
                     icon: Icon(AppIcons.cross_small, color: ZveltTokens.text2),
                   ),
                   Expanded(
@@ -85,9 +115,9 @@ class CardioRecapScreen extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              if (onShare != null) ...[
+              if (widget.onShare != null) ...[
                 OutlinedButton.icon(
-                  onPressed: onShare,
+                  onPressed: _saving ? null : widget.onShare,
                   icon: const Icon(AppIcons.share),
                   label: const Text('Share to feed'),
                   style: OutlinedButton.styleFrom(
@@ -99,19 +129,24 @@ class CardioRecapScreen extends StatelessWidget {
                 const SizedBox(height: ZveltTokens.s3),
               ],
               FilledButton(
-                onPressed: () async {
-                  final result = await onSave();
-                  if (context.mounted) Navigator.of(context).pop(result);
-                },
+                onPressed: _saving ? null : _handleSave,
                 style: FilledButton.styleFrom(
                   backgroundColor: ZveltTokens.brand,
                   padding: const EdgeInsets.symmetric(vertical: ZveltTokens.s4),
                 ),
-                child: const Text('Save session', style: TextStyle(fontWeight: FontWeight.w700)),
+                child: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: ZveltTokens.onBrand),
+                      )
+                    : const Text('Save session',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
               ),
               const SizedBox(height: ZveltTokens.s2),
               TextButton(
-                onPressed: onDiscard,
+                onPressed: _saving ? null : widget.onDiscard,
                 child: Text('Discard', style: TextStyle(color: ZveltTokens.text2)),
               ),
             ],

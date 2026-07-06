@@ -739,7 +739,10 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
           builder: (_) => XpCompleteScreen(
             workoutId: widget.workoutId,
             xpGain: result.xpGain,
+            ageMultiplier: result.ageMultiplier,
             gameXp: result.gameXp,
+            xpBreakdown: result.xpBreakdown,
+            newAchievements: result.newAchievements,
             onDone: () => widget.onComplete?.call(),
           ),
         ),

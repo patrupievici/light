@@ -30,7 +30,7 @@ const PatchSchema = z
     oneRepMaxes: z.record(z.string().max(80), z.number().min(1).max(600)).optional(),
   })
   .refine((v) => v.status !== undefined || v.oneRepMaxes !== undefined, {
-    message: 'Nimic de actualizat (status sau oneRepMaxes)',
+    message: 'Nothing to update (status or oneRepMaxes)',
   })
 
 function serializeProgram(p: {
@@ -79,7 +79,7 @@ export async function programRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const tpl = getProgramTemplate(id)
     if (!tpl) {
-      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program negăsit', requestId: request.id })
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program not found', requestId: request.id })
     }
     return reply.send({ template: tpl })
   })
@@ -91,7 +91,7 @@ export async function programRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'VALIDATION_ERROR',
-        message: 'Date invalide pentru pornirea programului',
+        message: 'Invalid data for starting the program',
         requestId: request.id,
         details: parsed.error.flatten(),
       })
@@ -131,7 +131,7 @@ export async function programRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const program = await prisma.userProgram.findFirst({ where: { id, userId } })
     if (!program) {
-      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program negăsit', requestId: request.id })
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program not found', requestId: request.id })
     }
     const day = await materializeCurrentDay(userId, program)
     return reply.send({ day })
@@ -143,10 +143,10 @@ export async function programRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const program = await prisma.userProgram.findFirst({ where: { id, userId } })
     if (!program) {
-      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program negăsit', requestId: request.id })
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program not found', requestId: request.id })
     }
     if (program.status !== 'active') {
-      return reply.code(409).send({ error: 'NOT_ACTIVE', message: 'Programul nu este activ', requestId: request.id })
+      return reply.code(409).send({ error: 'NOT_ACTIVE', message: 'Program is not active', requestId: request.id })
     }
     try {
       const result = await startProgramDay(userId, program)
@@ -165,10 +165,10 @@ export async function programRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const program = await prisma.userProgram.findFirst({ where: { id, userId } })
     if (!program) {
-      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program negăsit', requestId: request.id })
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program not found', requestId: request.id })
     }
     if (program.status !== 'active') {
-      return reply.code(409).send({ error: 'NOT_ACTIVE', message: 'Programul nu este activ', requestId: request.id })
+      return reply.code(409).send({ error: 'NOT_ACTIVE', message: 'Program is not active', requestId: request.id })
     }
     const updated = await advanceProgram(userId, program)
     return reply.send({ program: serializeProgram(updated) })
@@ -182,14 +182,14 @@ export async function programRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'VALIDATION_ERROR',
-        message: 'Date invalide',
+        message: 'Invalid data',
         requestId: request.id,
         details: parsed.error.flatten(),
       })
     }
     const program = await prisma.userProgram.findFirst({ where: { id, userId } })
     if (!program) {
-      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program negăsit', requestId: request.id })
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program not found', requestId: request.id })
     }
     let updated = program
     if (parsed.data.oneRepMaxes && Object.keys(parsed.data.oneRepMaxes).length > 0) {
@@ -207,7 +207,7 @@ export async function programRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const program = await prisma.userProgram.findFirst({ where: { id, userId } })
     if (!program) {
-      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program negăsit', requestId: request.id })
+      return reply.code(404).send({ error: 'NOT_FOUND', message: 'Program not found', requestId: request.id })
     }
     await prisma.userProgram.delete({ where: { id } })
     return reply.code(204).send()

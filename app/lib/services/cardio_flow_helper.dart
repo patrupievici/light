@@ -25,6 +25,10 @@ class CardioFlowHelper {
     List<Map<String, dynamic>>? routePoints,
     DateTime? startedAt,
     DateTime? endedAt,
+    // Stable client id (e.g. the session's start epoch ms) — makes the local
+    // calendar mirror idempotent, so a save Retry replaces instead of
+    // double-counting the session in the weekly cardio card.
+    String? sessionId,
   }) async {
     if (elapsedSeconds < 30 && meters < 50) return null;
     final store = ActivityCalendarStore();
@@ -37,6 +41,7 @@ class CardioFlowHelper {
     await store.addManualSession(
       day,
       ManualCardioSession(
+        id: sessionId,
         kind: kind,
         distanceKm: meters > 0 ? meters / 1000 : null,
         durationMin: (elapsedSeconds / 60).ceil().clamp(1, 999),
@@ -129,8 +134,17 @@ class CardioFlowHelper {
           const SnackBar(content: Text('Session too short to save (need 30s or 50m).')),
         );
       }
+      // The caller already stopped GPS before invoking this flow — finish it
+      // (pop the live screen) instead of stranding a dead tracker whose
+      // timer keeps ticking.
+      afterDone?.call();
       return;
     }
+
+    // Stable per-session id: every Save retry from this recap reuses it, so
+    // the calendar mirror replaces instead of duplicating.
+    final sessionId =
+        (startedAt ?? DateTime.now()).millisecondsSinceEpoch.toString();
 
     CardioCompleteResult? xpResult;
     try {
@@ -148,6 +162,7 @@ class CardioFlowHelper {
               routePoints: routePoints,
               startedAt: startedAt,
               endedAt: endedAt,
+              sessionId: sessionId,
             ),
             onDiscard: () => Navigator.of(ctx).pop(),
           ),
@@ -172,8 +187,11 @@ class CardioFlowHelper {
             gameXp: xpResult.gameXp,
             xpBreakdown: xpResult.breakdown,
             title: 'Cardio complete!',
+            // No "(masters bonus applied)" claim — the backend folds the age
+            // bonus into pct silently and doesn't return the multiplier, so
+            // the client can't know whether one applied (most users get none).
             subtitle: xpResult.pctOfWr > 0
-                ? '${xpResult.pctOfWr}% vs world-class pace (masters bonus applied)'
+                ? '${xpResult.pctOfWr}% vs world-class pace'
                 : null,
             shareCaption: caption,
             showRanks: false,

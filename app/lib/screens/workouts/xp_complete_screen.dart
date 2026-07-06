@@ -22,6 +22,25 @@ enum _RankEmptyHint {
   generic,
 }
 
+/// Human label for a server achievement key ('first_workout' → "First workout",
+/// 'workouts_10' → "10 workouts"). Purely presentational — unknown keys still
+/// render honestly instead of being dropped.
+String _achievementLabel(String key) {
+  // "<thing>_<count>" keys read better with the count first.
+  final counted = RegExp(r'^([a-z]+(?:_[a-z]+)*)_(\d+k?)$').firstMatch(key);
+  String text;
+  if (counted != null) {
+    final noun = counted.group(1)!.replaceAll('_', ' ');
+    final count = counted.group(2)!;
+    text = noun == 'streak' ? '$count-day streak' : '$count $noun';
+  } else {
+    text = key.replaceAll('_', ' ');
+  }
+  text = text.trim();
+  if (text.isEmpty) return key;
+  return text[0].toUpperCase() + text.substring(1);
+}
+
 double? _profileBodyweightKg(Map<String, dynamic>? profile) {
   if (profile == null) return null;
   final v = profile['bodyweightKg'] ?? profile['bodweightKg'] ?? profile['bodyweight_kg'];
@@ -48,6 +67,7 @@ class XpCompleteScreen extends StatefulWidget {
     this.showRanks = true,
     this.showShare = true,
     this.xpBreakdown = const [],
+    this.newAchievements = const [],
     this.shareCaption,
   });
 
@@ -63,6 +83,11 @@ class XpCompleteScreen extends StatefulWidget {
   final bool showRanks;
   final bool showShare;
   final List<XpBreakdownLine> xpBreakdown;
+
+  /// Achievement keys unlocked by this completion (server `newAchievements`,
+  /// e.g. 'first_workout'). Rendered as small "unlocked" chips under the XP
+  /// number so an unlock is never silently dropped.
+  final List<String> newAchievements;
   final String? shareCaption;
 
   @override
@@ -389,6 +414,50 @@ class _XpCompleteScreenState extends State<XpCompleteScreen> with SingleTickerPr
                                         ],
                                       ),
                                     ),
+                                  ],
+                                  if (widget.newAchievements.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    for (final key in widget.newAchievements)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: ZveltTokens.warn
+                                                .withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(
+                                                ZveltTokens.rPill),
+                                            border: Border.all(
+                                                color: ZveltTokens.warn
+                                                    .withValues(alpha: 0.5)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(AppIcons.trophy,
+                                                  size: 14,
+                                                  color: ZveltTokens.warn),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  'ACHIEVEMENT · ${_achievementLabel(key)}',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: ZveltTokens.warn,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 0.4,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
                                   ],
                                   const SizedBox(height: 8),
                                   Text(

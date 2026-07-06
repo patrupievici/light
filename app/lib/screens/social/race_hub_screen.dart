@@ -125,7 +125,10 @@ class _RaceHubScreenState extends State<RaceHubScreen> {
         // showed 'JOIN THE RACE' forever, and re-tapping it bumped the
         // participant count past reality.
         for (final c in challenges) {
-          _joinedChallenges[c.id] = c.joined;
+          // isMine counts as joined: creators are auto-accepted on create, and
+          // the offline local copy of an unsynced own draft may still carry
+          // joined=false — never show "JOIN THE RACE" on your own race.
+          _joinedChallenges[c.id] = c.joined || c.isMine;
           _participantCounts[c.id] = c.participantsCount;
         }
       });

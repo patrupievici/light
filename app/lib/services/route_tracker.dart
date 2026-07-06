@@ -67,6 +67,7 @@ class RouteTracker {
   DateTime? _pendingUnknownSpeedTs;
   double? _altBase;
   bool _movementArmed = false;
+  bool _pendingRebase = false;
 
   double get _maxSpeedMs => isBike ? 30.0 : 12.0;
 
@@ -83,6 +84,15 @@ class RouteTracker {
     _pendingUnknownSpeedTs = null;
     _altBase = null;
     _movementArmed = false;
+    _pendingRebase = false;
+  }
+
+  /// Re-arm the movement baseline (e.g. when resuming after a pause) so the
+  /// next accepted fix only anchors the new position: displacement covered
+  /// while paused is never credited and no line is drawn across the gap.
+  void rebase() {
+    _pendingRebase = true;
+    _clearPendingUnknownSpeed();
   }
 
   /// Feed a raw GPS fix. Returns true if it was accepted (route/distance
@@ -98,6 +108,15 @@ class RouteTracker {
     // reject every fix; those devices fall through to the displacement floor.
     final ll = LatLng(pos.latitude, pos.longitude);
     final ts = pos.timestamp;
+
+    // Post-pause rebase: anchor the new position without counting the jump
+    // and without appending to the polyline (same idea as the teleport guard).
+    if (_pendingRebase) {
+      _pendingRebase = false;
+      _last = ll;
+      _lastTs = ts;
+      return true;
+    }
 
     if (_last == null) {
       _accept(ll, ts, pos);
@@ -131,7 +150,14 @@ class RouteTracker {
     // without appending to the polyline, so the drawn line doesn't streak
     // across the gap (e.g. GPS relocation after a tunnel/signal loss).
     final dtS = ts.difference(_lastTs!).inMilliseconds / 1000.0;
-    if (dtS > 0 && delta / dtS > _maxSpeedMs) {
+    if (dtS <= 0) {
+      // Duplicate/out-of-order timestamp: the implied speed can't be
+      // validated, so the teleport guard would be bypassed — drop the fix
+      // and keep the current baseline instead of ever accumulating it.
+      _clearPendingUnknownSpeed();
+      return false;
+    }
+    if (delta / dtS > _maxSpeedMs) {
       _last = ll;
       _lastTs = ts;
       _clearPendingUnknownSpeed();

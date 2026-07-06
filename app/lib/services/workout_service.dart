@@ -440,12 +440,23 @@ class WorkoutService {
     // reflect this session no matter which flow completed it (hero button,
     // center ⚡ quick-launch, Train tab, AI chat).
     FeedRefreshNotifier.instance.bump(RefreshScope.home);
+    // Achievement keys unlocked by THIS completion (server `newAchievements`,
+    // e.g. 'first_workout') — parsed so the XP screen can surface the unlock
+    // instead of silently dropping it.
+    final rawAch = data['newAchievements'];
+    final newAchievements = rawAch is List
+        ? rawAch
+            .whereType<String>()
+            .where((k) => k.trim().isNotEmpty)
+            .toList()
+        : <String>[];
     return CompleteWorkoutResult(
       workout: WorkoutDto.fromJson(data['workout'] as Map<String, dynamic>),
       xpGain: (data['xpGain'] as num?)?.toInt() ?? 0,
       ageMultiplier: (data['ageMultiplier'] as num?)?.toDouble() ?? 1.0,
       gameXp: gx != null ? GameXpSnapshot.fromJson(gx) : null,
       xpBreakdown: breakdown,
+      newAchievements: newAchievements,
     );
   }
 
@@ -1070,10 +1081,15 @@ class CompleteWorkoutResult {
     this.ageMultiplier = 1.0,
     this.gameXp,
     this.xpBreakdown = const [],
+    this.newAchievements = const [],
   });
 
   final WorkoutDto workout;
   final int xpGain;
+
+  /// Achievement keys unlocked by this completion (server `newAchievements`,
+  /// e.g. 'first_workout'). Empty when nothing new was unlocked.
+  final List<String> newAchievements;
 
   /// Age-based XP bonus applied by the server (e.g. 1.22 for a 55-year-old).
   /// 1.0 means no bonus or no birth year on profile. Surface this on the XP

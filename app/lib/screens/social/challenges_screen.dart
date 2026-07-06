@@ -309,7 +309,10 @@ class _ChallengeCard extends StatelessWidget {
           const SizedBox(height: ZveltTokens.s3),
           Row(
             children: [
-              if (!challenge.joined)
+              // isMine guard: creators are auto-accepted server-side, so a
+              // "Join" CTA on your OWN challenge is always wrong — the offline
+              // local copy of an unsynced draft could still carry joined=false.
+              if (!challenge.joined && !challenge.isMine)
                 Expanded(
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
@@ -327,7 +330,8 @@ class _ChallengeCard extends StatelessWidget {
                         : const Text('Join'),
                   ),
                 ),
-              if (!challenge.joined) const SizedBox(width: ZveltTokens.s2),
+              if (!challenge.joined && !challenge.isMine)
+                const SizedBox(width: ZveltTokens.s2),
               Expanded(
                 child: FilledButton.tonal(
                   style: FilledButton.styleFrom(

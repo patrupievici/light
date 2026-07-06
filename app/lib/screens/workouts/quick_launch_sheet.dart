@@ -1217,6 +1217,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
               ageMultiplier: result.ageMultiplier,
               gameXp: result.gameXp,
               xpBreakdown: result.xpBreakdown,
+              newAchievements: result.newAchievements,
               onDone: () => Navigator.of(ctx).pop(),
             ),
           ),
@@ -1351,7 +1352,13 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
   }
 
   void _togglePause() {
+    final resuming = _paused;
     setState(() => _paused = !_paused);
+    if (resuming && widget.preset.isCardio) {
+      // Drop the GPS baseline so distance covered while paused is never
+      // credited — the first post-resume fix only re-anchors the position.
+      _routeTracker.rebase();
+    }
   }
 
   @override
@@ -1376,17 +1383,53 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
+  /// System/app-bar back while GPS is actively recording — confirm before the
+  /// recording is silently discarded.
+  Future<void> _confirmDiscardCardio() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ZveltTokens.surface,
+        title: const Text('Discard recording?'),
+        content: Text(
+          'GPS is still recording. Leaving now discards this session.',
+          style: TextStyle(color: ZveltTokens.text2),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep recording')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: ZveltTokens.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (leave != true || !mounted) return;
+    await _stopCardioTracking(save: false);
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ZveltTokens.bg,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 400),
-        child: _phase == _WorkoutPhase.countdown
-            ? _buildCountdown()
-            : widget.preset.isCardio
-                ? _buildCardioLive()
-                : _buildGymLive(),
+    return PopScope(
+      canPop: !(widget.preset.isCardio && _cardioTracking),
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _confirmDiscardCardio();
+      },
+      child: Scaffold(
+        backgroundColor: ZveltTokens.bg,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          child: _phase == _WorkoutPhase.countdown
+              ? _buildCountdown()
+              : widget.preset.isCardio
+                  ? _buildCardioLive()
+                  : _buildGymLive(),
+        ),
       ),
     );
   }

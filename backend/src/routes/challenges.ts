@@ -221,7 +221,10 @@ export async function challengeRoutes(app: FastifyInstance) {
     }
 
     return reply.code(201).send({
-      data: serializeChallenge(row, userId),
+      // joined:true — the creator was just auto-accepted above. Without it the
+      // client default (false) made the creator's own local copy show a "Join"
+      // CTA (mirrors the /feed joined logic).
+      data: serializeChallenge(row, userId, { joined: true }),
       requestId: request.id,
     })
   })
@@ -349,7 +352,10 @@ export async function challengeRoutes(app: FastifyInstance) {
         _count: { challengeId: true },
       }),
       prisma.challengeParticipant.findMany({
-        where: { challengeId: { in: ids }, userId: me },
+        // status:'accepted' mirrors /feed — creators count (auto-accepted on
+        // create) while pending 'invited' / 'declined' rows must NOT flip the
+        // CTA to "Open" for users who never actually joined the room.
+        where: { challengeId: { in: ids }, userId: me, status: 'accepted' },
         select: { challengeId: true },
       }),
     ])

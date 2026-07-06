@@ -17,8 +17,9 @@ import '../../widgets/zvelt_tertiary_button.dart';
 /// Handles three steady states:
 ///  - data: ListView with unblock action
 ///  - empty: "you haven't blocked anyone" copy
-///  - not-deployed (404): "Available once backend ships" — still empty so the
-///    user can tell the surface exists and works end-to-end.
+///  - not-deployed (404): shows the same friendly empty-state copy (no
+///    dev-speak) — blocking still applies locally, so the surface keeps
+///    working end-to-end.
 class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({super.key, ModerationService? service})
       : _service = service;
@@ -208,7 +209,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
         icon: AppIcons.ban,
         title: 'Blocked users will appear here',
         subtitle:
-            'Available once the backend ships. The feature still works locally — block someone to see it kick in.',
+            'When you block someone, they no longer show up in your feed or comments. You can unblock them anytime.',
       );
     }
     if (_items.isEmpty) {

@@ -238,14 +238,23 @@ class _NutritionTabState extends State<NutritionTab> {
     // empty. One-shot per session to avoid repeated 30-120s AI calls.
     if (mounted && _signedIn && _weekPlan.isEmpty && !_autoBootstrapTried) {
       _autoBootstrapTried = true;
-      unawaited(_bootstrapWeekPlan());
+      unawaited(_bootstrapWeekPlan(userInitiated: false));
     }
   }
 
-  Future<void> _bootstrapWeekPlan() async {
+  /// [userInitiated] — false for the automatic once-per-session bootstrap:
+  /// that path must fail SILENTLY (debugPrint only), otherwise opening the
+  /// tab offline surfaces an unprompted "sign in again" snackbar. Explicit
+  /// taps (Create weekly plan / RETRY) keep the full snackbar feedback.
+  Future<void> _bootstrapWeekPlan({bool userInitiated = true}) async {
     if (!_signedIn) return;
     final bearer = await _auth.getAccessToken();
     if (bearer == null) {
+      if (!userInitiated) {
+        debugPrint(
+            '[NutritionTab] auto plan bootstrap skipped: no server session');
+        return;
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -263,18 +272,26 @@ class _NutritionTabState extends State<NutritionTab> {
       await _service.generateWeeklyPlan(force: false);
       await _load(showSpinner: false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _weekPlan.isEmpty
-                ? 'Could not create a plan (backend, network, or account).'
-                : 'Weekly plan created.',
+      if (_weekPlan.isEmpty && !userInitiated) {
+        debugPrint('[NutritionTab] auto plan bootstrap produced no plan');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _weekPlan.isEmpty
+                  ? 'Could not create a plan (backend, network, or account).'
+                  : 'Weekly plan created.',
+            ),
           ),
-        ),
-      );
+        );
+      }
     } catch (e) {
       if (!mounted) return;
-      _showPlanError(context, e);
+      if (userInitiated) {
+        _showPlanError(context, e);
+      } else {
+        debugPrint('[NutritionTab] auto plan bootstrap failed: $e');
+      }
     } finally {
       if (mounted) setState(() => _planGenerating = false);
     }
@@ -402,9 +419,10 @@ class _NutritionTabState extends State<NutritionTab> {
         meal: meal,
         onAdd: (entry) async {
           await _service.addEntry(entry);
-          // Local mutation already persisted to prefs + pushed — apply the
-          // exact next state directly instead of a full _load() reload (which
-          // flashes the spinner and re-hits the network).
+          // Local mutation persisted to prefs (server push runs in the
+          // background, dirty-flag protected) — apply the exact next state
+          // directly instead of a full _load() reload (which flashes the
+          // spinner and re-hits the network).
           if (mounted) {
             setState(() {
               _setDay(DailyNutrition(
@@ -550,8 +568,9 @@ class _NutritionTabState extends State<NutritionTab> {
     );
     if (result != null) {
       await _service.updateWater(result, _today);
-      // Persisted + pushed already — apply the new water value directly
-      // instead of a full _load() (spinner + network re-fetch).
+      // Persisted locally (server push runs in the background) — apply the
+      // new water value directly instead of a full _load() (spinner +
+      // network re-fetch).
       if (mounted) {
         setState(() {
           _setDay(DailyNutrition(
@@ -586,8 +605,9 @@ class _NutritionTabState extends State<NutritionTab> {
         return;
       }
       await _service.updateWeight(result, _today);
-      // Persisted + pushed already — apply the new weight directly instead of
-      // a full _load() (spinner + network re-fetch).
+      // Persisted locally (server push runs in the background) — apply the
+      // new weight directly instead of a full _load() (spinner + network
+      // re-fetch).
       if (mounted) {
         setState(() {
           _setDay(DailyNutrition(
@@ -635,10 +655,13 @@ class _NutritionTabState extends State<NutritionTab> {
                         children: [
                           const SizedBox(height: ZveltTokens.s3),
                           // "AI plan ready" only when a plan actually exists
-                          // and we're not mid-generation — previously ungated,
-                          // so it rendered alongside "Building your weekly
-                          // plan…" during the first bootstrap (contradiction).
-                          if (_weekPlan.isNotEmpty && !_planGenerating) ...[
+                          // with AI meal lines and we're not mid-generation.
+                          // Macro-only plans (cron weeks / DeepSeek fallback)
+                          // show ONLY the "Tap ✨ for AI meal lines" hint on
+                          // the week card — the two states are mutually
+                          // exclusive, never a "ready" banner + "only macros"
+                          // notice contradiction.
+                          if (_weekPlanHasAiMeals && !_planGenerating) ...[
                             _buildPlanBanner(),
                             const SizedBox(height: ZveltTokens.s3),
                           ],
@@ -704,9 +727,10 @@ class _NutritionTabState extends State<NutritionTab> {
                               onAdd: () => _showAddFood(meal),
                               onRemove: (id) async {
                                 await _service.removeEntry(id, _today);
-                                // Persisted + pushed already — drop the entry
-                                // from local state directly instead of a full
-                                // _load() (spinner + network re-fetch).
+                                // Persisted locally (server push runs in the
+                                // background) — drop the entry from local
+                                // state directly instead of a full _load()
+                                // (spinner + network re-fetch).
                                 if (mounted) {
                                   setState(() {
                                     _setDay(DailyNutrition(
@@ -860,6 +884,12 @@ class _NutritionTabState extends State<NutritionTab> {
       ),
     );
   }
+
+  /// True when at least one plan day carries AI meal lines (same predicate as
+  /// _WeeklyPlanCard._hasAiMeals). Gates the "AI plan ready" banner so it
+  /// never contradicts the week card's macro-only hint.
+  bool get _weekPlanHasAiMeals =>
+      _weekPlan.any((d) => d.mealPlan != null && d.mealPlan!.meals.isNotEmpty);
 
   Widget _buildPlanBanner() {
     // ── Design parity: the 'AI plan ready' banner card (padding 14, r18,

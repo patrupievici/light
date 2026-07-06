@@ -37,11 +37,11 @@ class _MuscleMapWidgetState extends State<MuscleMapWidget> {
   int _pageIndex = 0;
   late final VoidCallback _onCacheRevision;
 
-  // Colors — V2 light: subtle surface for untrained, strain amber for recovering, brand orange for ready.
+  // Colors — V2 light: subtle surface for untrained, strain amber for recovering, brand periwinkle for ready.
   // Hex strings mirror ZveltTokens (SVG fills take string colors): surface3 / strain / brand.
-  static const _colorUntrained  = '#E6E8E4'; // ZveltTokens.surface3
-  static const _colorRecovering = '#FFB86B'; // ZveltTokens.strain
-  static const _colorReady      = '#FF7A2F'; // ZveltTokens.brand
+  static const _colorUntrained  = '#E9EAF1'; // ZveltTokens.surface3 (light)
+  static const _colorRecovering = '#F2C94C'; // ZveltTokens.strain
+  static const _colorReady      = '#7C84EC'; // ZveltTokens.brand
 
   @override
   void initState() {

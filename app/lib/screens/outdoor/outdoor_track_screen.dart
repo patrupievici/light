@@ -296,6 +296,9 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
     await ActivityCalendarStore().addManualSession(
       dayYmd,
       ManualCardioSession(
+        // Stable id (session start epoch): the Retry path re-runs this whole
+        // method, so the mirror must replace, not duplicate, on each attempt.
+        id: start.millisecondsSinceEpoch.toString(),
         kind: _mode == 'bike' ? ActivityKind.cycle : ActivityKind.run,
         distanceKm: _tracker.meters / 1000.0,
         durationMin: (_elapsedSec / 60).round(),
@@ -350,6 +353,34 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
         .popUntil((route) => route.isFirst);
   }
 
+  /// Back pressed while GPS is actively recording — confirm before the
+  /// recording is silently discarded.
+  Future<void> _confirmDiscardRecording() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ZveltTokens.surface,
+        title: const Text('Discard recording?'),
+        content: Text(
+          'GPS is still recording. Leaving now discards this session.',
+          style: TextStyle(color: ZveltTokens.text2),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep recording')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: ZveltTokens.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (leave != true || !mounted) return;
+    Navigator.of(context).pop();
+  }
+
   @override
   void dispose() {
     _sub?.cancel();
@@ -378,7 +409,13 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
   Widget build(BuildContext context) {
     final topPad = MediaQuery.paddingOf(context).top;
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_tracking,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _confirmDiscardRecording();
+      },
+      child: Scaffold(
       backgroundColor: ZveltTokens.bg,
       body: _locBusy
           ? const Center(
@@ -479,6 +516,7 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
                 ),
               ],
             ),
+      ),
     );
   }
 

@@ -6,6 +6,7 @@ import Fastify from 'fastify'
 // → prisma.friendship) runs end-to-end.
 const challengeFindUnique = vi.fn()
 const challengeFindMany = vi.fn()
+const challengeCreate = vi.fn()
 const friendshipFindMany = vi.fn()
 const participantFindUnique = vi.fn()
 const participantCreate = vi.fn()
@@ -22,6 +23,7 @@ vi.mock('../lib/prisma', () => ({
     challenge: {
       findUnique: (...a: unknown[]) => challengeFindUnique(...a),
       findMany: (...a: unknown[]) => challengeFindMany(...a),
+      create: (...a: unknown[]) => challengeCreate(...a),
     },
     friendship: { findMany: (...a: unknown[]) => friendshipFindMany(...a) },
     challengeParticipant: {
@@ -63,6 +65,7 @@ beforeEach(() => {
   meId = 'me'
   challengeFindUnique.mockReset()
   challengeFindMany.mockReset()
+  challengeCreate.mockReset()
   friendshipFindMany.mockReset()
   participantFindUnique.mockReset()
   participantCreate.mockReset()
@@ -133,6 +136,10 @@ describe('GET /v1/challenges/discover', () => {
     const where = challengeFindMany.mock.calls[0][0].where
     expect(where.visibility).toBe('public')
     expect(where.endsAt.gt).toBeInstanceOf(Date)
+    // joined must count only ACCEPTED participation (mirrors /feed) — an
+    // 'invited' or 'declined' row must not flip the CTA to "Open".
+    const participantWhere = participantFindMany.mock.calls[0][0].where
+    expect(participantWhere.status).toBe('accepted')
     await app.close()
   })
 
@@ -289,6 +296,41 @@ describe('GET /v1/challenges/:id/participants', () => {
 })
 
 describe('POST /v1/challenges — create', () => {
+  it('201 — response marks the creator as joined (auto-accepted participant)', async () => {
+    challengeCreate.mockResolvedValue({
+      id: CID,
+      creatorId: 'me',
+      kind: 'squat',
+      customTitle: null,
+      visibility: 'public',
+      targetHint: null,
+      durationDays: 30,
+      endsAt: FUTURE,
+      createdAt: new Date(),
+      creator: { profile: { username: 'me', displayName: 'Me' } },
+    })
+    participantCreate.mockResolvedValue({})
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/challenges',
+      payload: { kind: 'squat', visibility: 'public', durationDays: 30 },
+    })
+
+    expect(res.statusCode).toBe(201)
+    // Creator auto-joins as accepted — the client's local copy must never
+    // render a "Join" CTA on the user's own freshly-created challenge.
+    expect(res.json().data).toMatchObject({ id: CID, isMine: true, joined: true })
+    // The accepted participant row was actually written.
+    expect(participantCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ challengeId: CID, userId: 'me', status: 'accepted' }),
+      }),
+    )
+    await app.close()
+  })
+
   it('422-style 400 when kind=custom but no customTitle', async () => {
     const app = await buildApp()
     const res = await app.inject({

@@ -895,6 +895,22 @@ class NutritionService {
         await _dayKey(date), jsonEncode(_dayToPrefsJson(day)));
   }
 
+  /// Tail of the serialized day-push queue — see [_enqueueDayPush].
+  Future<void> _pushChain = Future<void>.value();
+
+  /// Serializes day PUTs so background pushes land on the server in the
+  /// order they were enqueued. Without this, two quick logs fire concurrent
+  /// full-day PUTs and an OLDER snapshot finishing last would regress the
+  /// server copy while its 2xx clears the dirty flag on stale data.
+  Future<bool> _enqueueDayPush(DateTime date, DailyNutrition day) {
+    final push = _pushChain.then((_) => _pushDayToServer(date, day));
+    _pushChain = push.then<void>((_) {}).catchError((Object e) {
+      // _pushDayToServer catches internally; keep the chain alive regardless.
+      debugPrint('[NutritionService] day push chain best-effort skip: $e');
+    });
+    return push;
+  }
+
   /// Returns true when the server confirmed the write (2xx). On any failure
   /// the day stays marked dirty, so sync-down keeps treating the local copy
   /// as the source of truth until a later push succeeds.
@@ -963,7 +979,7 @@ class NutritionService {
           // Local day has unsynced changes (e.g. a meal logged offline) —
           // replay it UP instead of letting the stale server copy erase it.
           final local = await _loadDayFromPrefsOnly(dayDate);
-          await _pushDayToServer(dayDate, local);
+          await _enqueueDayPush(dayDate, local);
           continue;
         }
         final daily = _dailyFromServerJson(raw);
@@ -1134,7 +1150,7 @@ class NutritionService {
             // (covers offline adds AND offline deletes — an empty-but-dirty
             // local day must win too, or deleted entries resurrect).
             daily = local;
-            await _pushDayToServer(date, local);
+            await _enqueueDayPush(date, local);
           } else {
             await _saveDayToPrefs(date, daily);
           }
@@ -1176,7 +1192,11 @@ class NutritionService {
       weightKg: day.weightKg,
     );
     await prefs.setString(key, jsonEncode(_dayToPrefsJson(next)));
-    await _pushDayToServer(entry.loggedAt, next);
+    // Local-first: mark dirty BEFORE returning (so a concurrent sync-down
+    // cannot overwrite the fresh local write), then push in the background —
+    // the UI must not block 30-60s on a cold server to confirm a local log.
+    await _markDayDirty(entry.loggedAt, true);
+    unawaited(_enqueueDayPush(entry.loggedAt, next));
   }
 
   Future<void> removeEntry(String entryId, DateTime date) async {
@@ -1190,7 +1210,9 @@ class NutritionService {
       weightKg: day.weightKg,
     );
     await prefs.setString(key, jsonEncode(_dayToPrefsJson(next)));
-    await _pushDayToServer(date, next);
+    // Local-first: see addEntry — dirty flag first, push in the background.
+    await _markDayDirty(date, true);
+    unawaited(_enqueueDayPush(date, next));
   }
 
   Future<void> updateWater(int ml, DateTime date) async {
@@ -1203,7 +1225,9 @@ class NutritionService {
       weightKg: day.weightKg,
     );
     await prefs.setString(key, jsonEncode(_dayToPrefsJson(next)));
-    await _pushDayToServer(date, next);
+    // Local-first: see addEntry — dirty flag first, push in the background.
+    await _markDayDirty(date, true);
+    unawaited(_enqueueDayPush(date, next));
   }
 
   Future<void> updateWeight(double kg, DateTime date) async {
@@ -1216,7 +1240,9 @@ class NutritionService {
       weightKg: kg,
     );
     await prefs.setString(key, jsonEncode(_dayToPrefsJson(next)));
-    await _pushDayToServer(date, next);
+    // Local-first: see addEntry — dirty flag first, push in the background.
+    await _markDayDirty(date, true);
+    unawaited(_enqueueDayPush(date, next));
   }
 
   Future<NutritionGoals> getGoals() async {

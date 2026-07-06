@@ -154,11 +154,34 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     _feedRefreshTrigger.addListener(_onFeedRefreshHint);
+    _resolveMeId();
     _load();
     _loadRecentPrs();
     _loadInvites();
     _loadFriendCount();
   }
+
+  /// Resolves the viewer's id up-front (offline-safe: decodes the stored JWT)
+  /// so the Following filter can exclude own posts even if the stories fetch
+  /// — which also resolves it — fails or hasn't landed yet.
+  Future<void> _resolveMeId() async {
+    try {
+      final id = await _authService.getCurrentUserId();
+      if (!mounted || id == null) return;
+      setState(() => _meId ??= id);
+    } catch (_) {
+      // Best-effort — _loadStories retries the same lookup.
+    }
+  }
+
+  /// Posts as shown for the current filter. The backend feed is already
+  /// self + friends and ignores `scope=following`, so without this the
+  /// Following pill showed the identical list as All. Following = people
+  /// you follow — your own posts are excluded client-side.
+  List<SocialFeedPost> get _visiblePosts =>
+      _feedFilter == 'following' && _meId != null
+          ? _posts.where((p) => p.userId != _meId).toList()
+          : _posts;
 
   Future<void> _loadFriendCount() async {
     try {
@@ -690,7 +713,19 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       ),
     );
     if (remove != true || !mounted) return;
-    await _challengeService.remove(c.id);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _challengeService.remove(c.id);
+    } catch (e) {
+      // remove() now throws on non-2xx / network failure — surface it instead
+      // of silently no-op'ing and letting the card reappear.
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+      return;
+    }
+    if (!mounted) return;
     await _load();
   }
 
@@ -725,6 +760,10 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     } finally {
       _openingRaceHub = false;
     }
+    // Refresh after the hub pops — a join made inside (or via the hero's
+    // "Join challenge" pill on the way in) must flip the hero to "Joined";
+    // without this the stale joined=false kept the pill on screen.
+    if (mounted) _load();
   }
 
   /// Picks the "Race of the Week" hero — currently the most-recently-created
@@ -806,6 +845,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
+    final visiblePosts = _visiblePosts;
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
       body: SafeArea(
@@ -842,11 +882,20 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                           SliverToBoxAdapter(child: _buildChallengeHeader()),
                           SliverList(
                             delegate: SliverChildBuilderDelegate(
-                              (_, i) => SocialChallengeCard(
-                                key: ValueKey('chall-${_challenges[i].id}'),
-                                challenge: _challenges[i],
-                                onDelete: () => _confirmRemoveChallenge(_challenges[i]),
-                              ),
+                              (_, i) {
+                                final c = _challenges[i];
+                                return SocialChallengeCard(
+                                  key: ValueKey('chall-${c.id}'),
+                                  challenge: c,
+                                  // Remove (X) only on challenges the user owns —
+                                  // DELETE is owner-only server-side, so offering
+                                  // it on friends'/public challenges silently
+                                  // 403'd and the card reappeared on reload.
+                                  onDelete: c.isMine
+                                      ? () => _confirmRemoveChallenge(c)
+                                      : null,
+                                );
+                              },
                               childCount: _challenges.length,
                             ),
                           ),
@@ -854,7 +903,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                         if (_feedFilter == 'prs')
                           SliverToBoxAdapter(child: _buildPrRecords()),
                         SliverToBoxAdapter(child: _buildFeedHeader()),
-                        if (_posts.isEmpty)
+                        if (visiblePosts.isEmpty)
                           SliverToBoxAdapter(
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -885,7 +934,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                           SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (_, i) {
-                                final post = _posts[i];
+                                final post = visiblePosts[i];
                                 return RepaintBoundary(
                                   child: SocialFeedPostCard(
                                   key: ValueKey(post.id),
@@ -906,10 +955,10 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                                   ),
                                 );
                               },
-                              childCount: _posts.length,
+                              childCount: visiblePosts.length,
                             ),
                           ),
-                        if (_posts.isNotEmpty)
+                        if (visiblePosts.isNotEmpty)
                           SliverToBoxAdapter(child: _buildFeedFooter()),
                         SliverToBoxAdapter(child: SizedBox(height: mq.padding.bottom + 24)),
                       ],
