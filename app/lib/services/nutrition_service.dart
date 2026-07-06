@@ -9,6 +9,7 @@ import '../config/api_config.dart' show v1Base;
 import '_crash_reporter.dart';
 import 'auth_service.dart';
 import 'http_client.dart';
+import 'local_food_database.dart';
 import 'nutrition_food_labels.dart';
 import 'open_food_facts_client.dart';
 import 'usda_fdc_client.dart';
@@ -23,7 +24,8 @@ String _nutritionApiErrorDetail(http.Response res) {
       if (err != null && err.isNotEmpty) return err;
     }
   } catch (e) {
-    debugPrint('[NutritionService._nutritionApiErrorDetail] decode best-effort skip: $e');
+    debugPrint(
+        '[NutritionService._nutritionApiErrorDetail] decode best-effort skip: $e');
   }
   final b = res.body.trim();
   if (b.length > 280) return '${b.substring(0, 280)}…';
@@ -71,9 +73,11 @@ class FoodItem {
   final String? imageUrl;
   final String? barcode;
   final String? category;
+
   /// Grame într-o porție (euristică USDA / etichetă). `null` = doar introdus manual în g.
   final double? servingGrams;
   final String? servingLabel;
+
   /// `egg`, `slice`, `serving` … — pentru „3 eggs”.
   final String? portionUnitKey;
 
@@ -335,6 +339,7 @@ class NutritionMealPlanItem {
   });
 
   final String text;
+
   /// Explicit metric portion from AI (grams/ml/count).
   final String? portion;
   final MealItemMacros? macros;
@@ -391,7 +396,10 @@ class NutritionMealPlanItem {
     final rawChoices = j['proteinChoices'];
     List<String>? choices;
     if (rawChoices is List) {
-      choices = rawChoices.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+      choices = rawChoices
+          .map((e) => e.toString().trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
       if (choices.isEmpty) choices = null;
     }
     final sel = j['selectedProtein']?.toString().trim();
@@ -403,7 +411,8 @@ class NutritionMealPlanItem {
       portion: portion,
       macros: MealItemMacros.tryParse(j['macros']),
       proteinChoices: choices,
-      selectedProtein: sel ?? (choices?.isNotEmpty == true ? choices!.first : null),
+      selectedProtein:
+          sel ?? (choices?.isNotEmpty == true ? choices!.first : null),
     );
   }
 }
@@ -439,7 +448,8 @@ class NutritionPlannedMeal {
     final meal = j['meal']?.toString() ?? '';
     final items = (j['items'] as List<dynamic>? ?? [])
         .whereType<Map>()
-        .map((e) => NutritionMealPlanItem.fromJson(Map<String, dynamic>.from(e)))
+        .map(
+            (e) => NutritionMealPlanItem.fromJson(Map<String, dynamic>.from(e)))
         .toList();
     return NutritionPlannedMeal(mealKey: meal, items: items);
   }
@@ -490,7 +500,9 @@ class NutritionDayMealPlan {
                               carbsG: it.macros!.carbsG,
                               fatG: it.macros!.fatG,
                             ),
-                      proteinChoices: it.proteinChoices == null ? null : List<String>.from(it.proteinChoices!),
+                      proteinChoices: it.proteinChoices == null
+                          ? null
+                          : List<String>.from(it.proteinChoices!),
                       selectedProtein: it.selectedProtein,
                     ),
                   )
@@ -501,7 +513,8 @@ class NutritionDayMealPlan {
     );
   }
 
-  NutritionDayMealPlan copyUpdatingMeal(int mealIndex, NutritionPlannedMeal nextMeal) {
+  NutritionDayMealPlan copyUpdatingMeal(
+      int mealIndex, NutritionPlannedMeal nextMeal) {
     final copy = List<NutritionPlannedMeal>.from(meals);
     if (mealIndex < 0 || mealIndex >= copy.length) {
       return NutritionDayMealPlan(meals: copy);
@@ -564,6 +577,7 @@ class NutritionXpClaimResult {
   final double ageMultiplier;
   final bool bonusApplied;
   final String? message;
+
   /// Per-macro breakdown (alias to lines for legacy widget readers).
   final List<NutritionXpClaimLine> breakdown;
 }
@@ -583,6 +597,7 @@ class NutritionXpClaimLine {
   final String? detail;
   final int pctOfTarget;
   final bool hit;
+
   /// Macro key (calories|protein|carbs|fat) — used by widget to pick a label.
   final String macro;
 }
@@ -635,7 +650,8 @@ class RecipeIngredient {
         foodId: j['foodId'] as String?,
       );
 
-  static RecipeIngredient fromFood(FoodItem f, double grams) => RecipeIngredient(
+  static RecipeIngredient fromFood(FoodItem f, double grams) =>
+      RecipeIngredient(
         name: f.name,
         grams: grams,
         caloriesPer100g: f.caloriesPer100g,
@@ -664,9 +680,12 @@ class Recipe {
   final List<RecipeIngredient> ingredients;
   final double totalCalories, totalProtein, totalCarbs, totalFat;
 
-  double get perServingCalories => servings > 0 ? totalCalories / servings : totalCalories;
-  double get perServingProtein => servings > 0 ? totalProtein / servings : totalProtein;
-  double get perServingCarbs => servings > 0 ? totalCarbs / servings : totalCarbs;
+  double get perServingCalories =>
+      servings > 0 ? totalCalories / servings : totalCalories;
+  double get perServingProtein =>
+      servings > 0 ? totalProtein / servings : totalProtein;
+  double get perServingCarbs =>
+      servings > 0 ? totalCarbs / servings : totalCarbs;
   double get perServingFat => servings > 0 ? totalFat / servings : totalFat;
 
   /// Client-side apply: build a diary entry for `servingsToLog` servings. The
@@ -695,7 +714,9 @@ class Recipe {
         id: j['id'] as String,
         name: j['name'] as String? ?? 'Rețetă',
         servings: (j['servings'] as num?)?.toInt() ?? 1,
-        ingredients: ((j['ingredientsJson'] ?? j['ingredients']) as List<dynamic>? ?? const [])
+        ingredients: ((j['ingredientsJson'] ?? j['ingredients'])
+                    as List<dynamic>? ??
+                const [])
             .whereType<Map>()
             .map((e) => RecipeIngredient.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
@@ -768,7 +789,8 @@ class MealTemplateItem {
 
 /// A saved meal (multiple foods) for one-tap re-logging.
 class MealTemplate {
-  const MealTemplate({required this.id, required this.name, required this.items});
+  const MealTemplate(
+      {required this.id, required this.name, required this.items});
   final String id, name;
   final List<MealTemplateItem> items;
 
@@ -862,13 +884,15 @@ class NutritionService {
     return DailyNutrition(
       entries: entries,
       waterMl: (j['waterMl'] as num?)?.toInt() ?? 0,
-      weightKg: j['weightKg'] != null ? (j['weightKg'] as num).toDouble() : null,
+      weightKg:
+          j['weightKg'] != null ? (j['weightKg'] as num).toDouble() : null,
     );
   }
 
   Future<void> _saveDayToPrefs(DateTime date, DailyNutrition day) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(await _dayKey(date), jsonEncode(_dayToPrefsJson(day)));
+    await prefs.setString(
+        await _dayKey(date), jsonEncode(_dayToPrefsJson(day)));
   }
 
   /// Returns true when the server confirmed the write (2xx). On any failure
@@ -879,17 +903,19 @@ class NutritionService {
     final token = await _auth.getAccessToken();
     if (token == null) return false;
     try {
-      final res = await http.put(
-        Uri.parse('$v1Base/nutrition/day'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'date': formatLocalDate(date),
-          ..._dayToPrefsJson(day),
-        }),
-      ).withTimeout();
+      final res = await http
+          .put(
+            Uri.parse('$v1Base/nutrition/day'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'date': formatLocalDate(date),
+              ..._dayToPrefsJson(day),
+            }),
+          )
+          .withTimeout();
       if (res.statusCode >= 200 && res.statusCode < 300) {
         await _markDayDirty(date, false);
         return true;
@@ -953,7 +979,8 @@ class NutritionService {
     return FoodItem(
       id: 'usda_fdc_${h.fdcId}',
       name: h.description,
-      brand: h.dataType != null ? 'USDA · ${h.dataType}' : 'USDA FoodData Central',
+      brand:
+          h.dataType != null ? 'USDA · ${h.dataType}' : 'USDA FoodData Central',
       caloriesPer100g: h.caloriesPer100g,
       proteinPer100g: h.proteinPer100g,
       fatPer100g: h.fatPer100g,
@@ -966,7 +993,8 @@ class NutritionService {
     );
   }
 
-  static List<FoodItem> _foodItemsFromUsdaHits(List<UsdaSearchFoodHit> hits, {String? barcode}) {
+  static List<FoodItem> _foodItemsFromUsdaHits(List<UsdaSearchFoodHit> hits,
+      {String? barcode}) {
     return hits.map((h) => _foodItemFromUsdaHit(h, barcode: barcode)).toList();
   }
 
@@ -980,23 +1008,35 @@ class NutritionService {
       final hits = await UsdaFdcClient.searchFoods(q);
       final items = _foodItemsFromUsdaHits(hits);
       if (items.isNotEmpty) return (items: items, errorMessage: null);
+      final local = await LocalFoodDatabase.searchByName(q);
+      if (local.isNotEmpty) return (items: local, errorMessage: null);
       final off = await OpenFoodFactsClient.searchByName(q);
       return (items: off, errorMessage: null);
     } on UsdaFdcException catch (e) {
+      final local = await LocalFoodDatabase.searchByName(q);
+      if (local.isNotEmpty) return (items: local, errorMessage: null);
       final off = await OpenFoodFactsClient.searchByName(q);
       // Only surface the USDA error if OFF found nothing either.
       return (items: off, errorMessage: off.isEmpty ? e.userMessage : null);
     } on TimeoutException catch (e) {
       debugPrint('[NutritionService] food search timeout: $e');
+      final local = await LocalFoodDatabase.searchByName(q);
+      if (local.isNotEmpty) return (items: local, errorMessage: null);
       final off = await OpenFoodFactsClient.searchByName(q);
       return (
         items: off,
-        errorMessage: off.isEmpty ? 'Search timed out — check your connection.' : null,
+        errorMessage:
+            off.isEmpty ? 'Search timed out — check your connection.' : null,
       );
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:search-foods');
+      final local = await LocalFoodDatabase.searchByName(q);
+      if (local.isNotEmpty) return (items: local, errorMessage: null);
       final off = await OpenFoodFactsClient.searchByName(q);
-      return (items: off, errorMessage: off.isEmpty ? 'Food search failed — try again.' : null);
+      return (
+        items: off,
+        errorMessage: off.isEmpty ? 'Food search failed — try again.' : null
+      );
     }
   }
 
@@ -1017,9 +1057,15 @@ class NutritionService {
     try {
       final hit = await UsdaFdcClient.lookupBrandedByGtin(code);
       if (hit != null) {
-        return (food: _foodItemFromUsdaHit(hit, barcode: code), errorMessage: null);
+        return (
+          food: _foodItemFromUsdaHit(hit, barcode: code),
+          errorMessage: null
+        );
       }
-      return (food: await OpenFoodFactsClient.lookupByBarcode(code), errorMessage: null);
+      return (
+        food: await OpenFoodFactsClient.lookupByBarcode(code),
+        errorMessage: null
+      );
     } on UsdaFdcException catch (e) {
       final off = await OpenFoodFactsClient.lookupByBarcode(code);
       return (food: off, errorMessage: off == null ? e.userMessage : null);
@@ -1027,12 +1073,17 @@ class NutritionService {
       final off = await OpenFoodFactsClient.lookupByBarcode(code);
       return (
         food: off,
-        errorMessage: off == null ? 'Barcode lookup timed out — check your connection.' : null,
+        errorMessage: off == null
+            ? 'Barcode lookup timed out — check your connection.'
+            : null,
       );
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:lookup-gtin');
       final off = await OpenFoodFactsClient.lookupByBarcode(code);
-      return (food: off, errorMessage: off == null ? 'Barcode lookup failed — try again.' : null);
+      return (
+        food: off,
+        errorMessage: off == null ? 'Barcode lookup failed — try again.' : null
+      );
     }
   }
 
@@ -1048,10 +1099,12 @@ class NutritionService {
       return DailyNutrition(
         entries: entries,
         waterMl: j['waterMl'] as int? ?? 0,
-        weightKg: j['weightKg'] != null ? (j['weightKg'] as num).toDouble() : null,
+        weightKg:
+            j['weightKg'] != null ? (j['weightKg'] as num).toDouble() : null,
       );
     } catch (e) {
-      debugPrint('[NutritionService._loadDayFromPrefsOnly] decode best-effort skip: $e');
+      debugPrint(
+          '[NutritionService._loadDayFromPrefsOnly] decode best-effort skip: $e');
       return DailyNutrition.empty;
     }
   }
@@ -1103,7 +1156,8 @@ class NutritionService {
       return DailyNutrition(
         entries: entries,
         waterMl: j['waterMl'] as int? ?? 0,
-        weightKg: j['weightKg'] != null ? (j['weightKg'] as num).toDouble() : null,
+        weightKg:
+            j['weightKg'] != null ? (j['weightKg'] as num).toDouble() : null,
       );
     } catch (e) {
       debugPrint('[NutritionService.getDay] prefs decode best-effort skip: $e');
@@ -1180,7 +1234,8 @@ class NutritionService {
     return _goalsFromServerOrPrefs(NutritionGoals.fromServerProfile(profile));
   }
 
-  Future<NutritionGoals> _goalsFromServerOrPrefs(NutritionGoals? fromServer) async {
+  Future<NutritionGoals> _goalsFromServerOrPrefs(
+      NutritionGoals? fromServer) async {
     if (fromServer != null) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(await _goalsKey(), jsonEncode(fromServer.toJson()));
@@ -1193,7 +1248,8 @@ class NutritionService {
     try {
       return NutritionGoals.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (e) {
-      debugPrint('[NutritionService.getGoals] prefs decode best-effort skip: $e');
+      debugPrint(
+          '[NutritionService.getGoals] prefs decode best-effort skip: $e');
       return const NutritionGoals();
     }
   }
@@ -1218,7 +1274,8 @@ class NutritionService {
 
   /// Ultimele [days] zile (inclusiv azi), ordine cronologică vechi → nou.
   /// Uses batch sync endpoint instead of N sequential requests.
-  Future<List<NutritionDaySnapshot>> loadNutritionHistory({int days = 30}) async {
+  Future<List<NutritionDaySnapshot>> loadNutritionHistory(
+      {int days = 30}) async {
     final n = days.clamp(1, 365);
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
@@ -1252,20 +1309,22 @@ class NutritionService {
     final token = await _auth.getAccessToken();
     if (token == null) return;
     try {
-      await http.patch(
-        Uri.parse('$v1Base/me/profile'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'dailyCalories': goals.calories,
-          'dailyProtein': goals.proteinG,
-          'dailyCarbs': goals.carbsG,
-          'dailyFat': goals.fatG,
-          'dailyWaterMl': goals.waterMl,
-        }),
-      ).withTimeout();
+      await http
+          .patch(
+            Uri.parse('$v1Base/me/profile'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'dailyCalories': goals.calories,
+              'dailyProtein': goals.proteinG,
+              'dailyCarbs': goals.carbsG,
+              'dailyFat': goals.fatG,
+              'dailyWaterMl': goals.waterMl,
+            }),
+          )
+          .withTimeout();
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:save-goals-patch');
     }
@@ -1277,17 +1336,20 @@ class NutritionService {
   }) async {
     final token = await _auth.getAccessToken();
     if (token == null) throw Exception('Not signed in');
-    final res = await http.post(
-      Uri.parse('$v1Base/nutrition/plan/generate-weekly'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'force': force,
-        'tzOffset': tzOffsetMinutes ?? DateTime.now().timeZoneOffset.inMinutes,
-      }),
-    ).withTimeout(kNutritionWeeklyPlanGenerateTimeout);
+    final res = await http
+        .post(
+          Uri.parse('$v1Base/nutrition/plan/generate-weekly'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'force': force,
+            'tzOffset':
+                tzOffsetMinutes ?? DateTime.now().timeZoneOffset.inMinutes,
+          }),
+        )
+        .withTimeout(kNutritionWeeklyPlanGenerateTimeout);
     if (res.statusCode != 200) {
       final detail = _nutritionApiErrorDetail(res); // logged only
       debugPrint(
@@ -1315,7 +1377,8 @@ class NutritionService {
       final res = await http.get(
         Uri.parse('$v1Base/nutrition/plan/week').replace(
           queryParameters: {
-            if (weekStart != null && weekStart.isNotEmpty) 'weekStart': weekStart,
+            if (weekStart != null && weekStart.isNotEmpty)
+              'weekStart': weekStart,
             'tzOffset': '${DateTime.now().timeZoneOffset.inMinutes}',
           },
         ),
@@ -1334,20 +1397,23 @@ class NutritionService {
     }
   }
 
-  Future<void> patchNutritionPlanDay(String dateYmd, NutritionDayMealPlan plan) async {
+  Future<void> patchNutritionPlanDay(
+      String dateYmd, NutritionDayMealPlan plan) async {
     final token = await _auth.getAccessToken();
     if (token == null) throw Exception('Not signed in');
-    final res = await http.patch(
-      Uri.parse('$v1Base/nutrition/plan/day'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'date': dateYmd,
-        'mealPlan': plan.toPatchJson(),
-      }),
-    ).withTimeout();
+    final res = await http
+        .patch(
+          Uri.parse('$v1Base/nutrition/plan/day'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'date': dateYmd,
+            'mealPlan': plan.toPatchJson(),
+          }),
+        )
+        .withTimeout();
     if (res.statusCode != 200) {
       throw Exception(_nutritionApiErrorDetail(res));
     }
@@ -1360,7 +1426,10 @@ class NutritionService {
   Future<Map<String, String>?> _jsonAuthHeaders() async {
     final token = await _auth.getAccessToken();
     if (token == null) return null;
-    return {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'};
+    return {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json'
+    };
   }
 
   Map<String, dynamic> _customFoodBody({
@@ -1381,7 +1450,8 @@ class NutritionService {
         'carbsPer100g': carbsPer100g,
         'fatPer100g': fatPer100g,
         if (servingGrams != null) 'servingGrams': servingGrams,
-        if (servingLabel != null && servingLabel.isNotEmpty) 'servingLabel': servingLabel,
+        if (servingLabel != null && servingLabel.isNotEmpty)
+          'servingLabel': servingLabel,
       };
 
   /// User's custom food catalog. `FoodItem.id` is `custom:<uuid>`.
@@ -1389,10 +1459,17 @@ class NutritionService {
     final headers = await _jsonAuthHeaders();
     if (headers == null) return [];
     try {
-      final res = await http.get(Uri.parse('$v1Base/nutrition/custom-foods'), headers: headers).withTimeout();
+      final res = await http
+          .get(Uri.parse('$v1Base/nutrition/custom-foods'), headers: headers)
+          .withTimeout();
       if (res.statusCode != 200) return [];
-      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
-      return data.whereType<Map>().map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e))).toList();
+      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data']
+              as List<dynamic>? ??
+          [];
+      return data
+          .whereType<Map>()
+          .map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:custom-foods-list');
       return [];
@@ -1410,7 +1487,9 @@ class NutritionService {
     String? servingLabel,
   }) async {
     final headers = await _jsonAuthHeaders();
-    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    if (headers == null) {
+      throw const NutritionPlanException('Nu ești autentificat');
+    }
     final res = await http
         .post(Uri.parse('$v1Base/nutrition/custom-foods'),
             headers: headers,
@@ -1425,8 +1504,11 @@ class NutritionService {
               servingLabel: servingLabel,
             )))
         .withTimeout();
-    if (res.statusCode != 201) throw NutritionPlanException(_nutritionApiErrorDetail(res));
-    return FoodItem.fromJson((jsonDecode(res.body) as Map<String, dynamic>)['food'] as Map<String, dynamic>);
+    if (res.statusCode != 201) {
+      throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    }
+    return FoodItem.fromJson((jsonDecode(res.body)
+        as Map<String, dynamic>)['food'] as Map<String, dynamic>);
   }
 
   /// `customId` is the raw uuid (strip the `custom:` prefix from FoodItem.id).
@@ -1441,9 +1523,12 @@ class NutritionService {
     double? servingGrams,
     String? servingLabel,
   }) async {
-    final id = customId.startsWith('custom:') ? customId.substring(7) : customId;
+    final id =
+        customId.startsWith('custom:') ? customId.substring(7) : customId;
     final headers = await _jsonAuthHeaders();
-    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    if (headers == null) {
+      throw const NutritionPlanException('Nu ești autentificat');
+    }
     final res = await http
         .put(Uri.parse('$v1Base/nutrition/custom-foods/$id'),
             headers: headers,
@@ -1458,16 +1543,22 @@ class NutritionService {
               servingLabel: servingLabel,
             )))
         .withTimeout();
-    if (res.statusCode != 200) throw NutritionPlanException(_nutritionApiErrorDetail(res));
-    return FoodItem.fromJson((jsonDecode(res.body) as Map<String, dynamic>)['food'] as Map<String, dynamic>);
+    if (res.statusCode != 200) {
+      throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    }
+    return FoodItem.fromJson((jsonDecode(res.body)
+        as Map<String, dynamic>)['food'] as Map<String, dynamic>);
   }
 
   Future<void> deleteCustomFood(String customId) async {
-    final id = customId.startsWith('custom:') ? customId.substring(7) : customId;
+    final id =
+        customId.startsWith('custom:') ? customId.substring(7) : customId;
     final headers = await _jsonAuthHeaders();
     if (headers == null) return;
-    final res =
-        await http.delete(Uri.parse('$v1Base/nutrition/custom-foods/$id'), headers: headers).withTimeout();
+    final res = await http
+        .delete(Uri.parse('$v1Base/nutrition/custom-foods/$id'),
+            headers: headers)
+        .withTimeout();
     if (res.statusCode != 204 && res.statusCode != 200) {
       throw NutritionPlanException(_nutritionApiErrorDetail(res));
     }
@@ -1478,10 +1569,17 @@ class NutritionService {
     final headers = await _jsonAuthHeaders();
     if (headers == null) return [];
     try {
-      final res = await http.get(Uri.parse('$v1Base/nutrition/favorite-foods'), headers: headers).withTimeout();
+      final res = await http
+          .get(Uri.parse('$v1Base/nutrition/favorite-foods'), headers: headers)
+          .withTimeout();
       if (res.statusCode != 200) return [];
-      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
-      return data.whereType<Map>().map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e))).toList();
+      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data']
+              as List<dynamic>? ??
+          [];
+      return data
+          .whereType<Map>()
+          .map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:favorites-list');
       return [];
@@ -1505,14 +1603,19 @@ class NutritionService {
               if (f.servingGrams != null) 'servingGrams': f.servingGrams,
             }))
         .withTimeout();
-    if (res.statusCode != 201) throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    if (res.statusCode != 201) {
+      throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    }
   }
 
   Future<void> removeFavorite(String foodId) async {
     final headers = await _jsonAuthHeaders();
     if (headers == null) return;
     await http
-        .delete(Uri.parse('$v1Base/nutrition/favorite-foods/${Uri.encodeComponent(foodId)}'), headers: headers)
+        .delete(
+            Uri.parse(
+                '$v1Base/nutrition/favorite-foods/${Uri.encodeComponent(foodId)}'),
+            headers: headers)
         .withTimeout();
   }
 
@@ -1521,10 +1624,17 @@ class NutritionService {
     final headers = await _jsonAuthHeaders();
     if (headers == null) return [];
     try {
-      final res = await http.get(Uri.parse('$v1Base/nutrition/recipes'), headers: headers).withTimeout();
+      final res = await http
+          .get(Uri.parse('$v1Base/nutrition/recipes'), headers: headers)
+          .withTimeout();
       if (res.statusCode != 200) return [];
-      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
-      return data.whereType<Map>().map((e) => Recipe.fromJson(Map<String, dynamic>.from(e))).toList();
+      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data']
+              as List<dynamic>? ??
+          [];
+      return data
+          .whereType<Map>()
+          .map((e) => Recipe.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:recipes-list');
       return [];
@@ -1537,7 +1647,9 @@ class NutritionService {
     required List<RecipeIngredient> ingredients,
   }) async {
     final headers = await _jsonAuthHeaders();
-    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    if (headers == null) {
+      throw const NutritionPlanException('Nu ești autentificat');
+    }
     final res = await http
         .post(Uri.parse('$v1Base/nutrition/recipes'),
             headers: headers,
@@ -1547,8 +1659,11 @@ class NutritionService {
               'ingredients': ingredients.map((i) => i.toJson()).toList(),
             }))
         .withTimeout();
-    if (res.statusCode != 201) throw NutritionPlanException(_nutritionApiErrorDetail(res));
-    return Recipe.fromJson((jsonDecode(res.body) as Map<String, dynamic>)['recipe'] as Map<String, dynamic>);
+    if (res.statusCode != 201) {
+      throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    }
+    return Recipe.fromJson((jsonDecode(res.body)
+        as Map<String, dynamic>)['recipe'] as Map<String, dynamic>);
   }
 
   Future<Recipe> updateRecipe(
@@ -1558,7 +1673,9 @@ class NutritionService {
     required List<RecipeIngredient> ingredients,
   }) async {
     final headers = await _jsonAuthHeaders();
-    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    if (headers == null) {
+      throw const NutritionPlanException('Nu ești autentificat');
+    }
     final res = await http
         .put(Uri.parse('$v1Base/nutrition/recipes/$id'),
             headers: headers,
@@ -1568,14 +1685,19 @@ class NutritionService {
               'ingredients': ingredients.map((i) => i.toJson()).toList(),
             }))
         .withTimeout();
-    if (res.statusCode != 200) throw NutritionPlanException(_nutritionApiErrorDetail(res));
-    return Recipe.fromJson((jsonDecode(res.body) as Map<String, dynamic>)['recipe'] as Map<String, dynamic>);
+    if (res.statusCode != 200) {
+      throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    }
+    return Recipe.fromJson((jsonDecode(res.body)
+        as Map<String, dynamic>)['recipe'] as Map<String, dynamic>);
   }
 
   Future<void> deleteRecipe(String id) async {
     final headers = await _jsonAuthHeaders();
     if (headers == null) return;
-    final res = await http.delete(Uri.parse('$v1Base/nutrition/recipes/$id'), headers: headers).withTimeout();
+    final res = await http
+        .delete(Uri.parse('$v1Base/nutrition/recipes/$id'), headers: headers)
+        .withTimeout();
     if (res.statusCode != 204 && res.statusCode != 200) {
       throw NutritionPlanException(_nutritionApiErrorDetail(res));
     }
@@ -1587,11 +1709,17 @@ class NutritionService {
     if (headers == null) return [];
     try {
       final res = await http
-          .get(Uri.parse('$v1Base/nutrition/recent-foods?limit=$limit'), headers: headers)
+          .get(Uri.parse('$v1Base/nutrition/recent-foods?limit=$limit'),
+              headers: headers)
           .withTimeout();
       if (res.statusCode != 200) return [];
-      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
-      return data.whereType<Map>().map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e))).toList();
+      final data = (jsonDecode(res.body) as Map<String, dynamic>)['data']
+              as List<dynamic>? ??
+          [];
+      return data
+          .whereType<Map>()
+          .map((e) => FoodItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:recent-foods');
       return [];
@@ -1603,25 +1731,38 @@ class NutritionService {
     final headers = await _jsonAuthHeaders();
     if (headers == null) return [];
     try {
-      final res = await http.get(Uri.parse('$v1Base/nutrition/templates'), headers: headers).withTimeout();
+      final res = await http
+          .get(Uri.parse('$v1Base/nutrition/templates'), headers: headers)
+          .withTimeout();
       if (res.statusCode != 200) return [];
-      final list = (jsonDecode(res.body) as Map<String, dynamic>)['templates'] as List<dynamic>? ?? [];
-      return list.whereType<Map>().map((e) => MealTemplate.fromJson(Map<String, dynamic>.from(e))).toList();
+      final list = (jsonDecode(res.body) as Map<String, dynamic>)['templates']
+              as List<dynamic>? ??
+          [];
+      return list
+          .whereType<Map>()
+          .map((e) => MealTemplate.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:templates-list');
       return [];
     }
   }
 
-  Future<MealTemplate> createMealTemplate(String name, List<MealTemplateItem> items) async {
+  Future<MealTemplate> createMealTemplate(
+      String name, List<MealTemplateItem> items) async {
     final headers = await _jsonAuthHeaders();
-    if (headers == null) throw const NutritionPlanException('Nu ești autentificat');
+    if (headers == null) {
+      throw const NutritionPlanException('Nu ești autentificat');
+    }
     final res = await http
         .post(Uri.parse('$v1Base/nutrition/templates'),
             headers: headers,
-            body: jsonEncode({'name': name, 'items': items.map((i) => i.toJson()).toList()}))
+            body: jsonEncode(
+                {'name': name, 'items': items.map((i) => i.toJson()).toList()}))
         .withTimeout();
-    if (res.statusCode != 201) throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    if (res.statusCode != 201) {
+      throw NutritionPlanException(_nutritionApiErrorDetail(res));
+    }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     final tpl = body['template'] ?? body;
     return MealTemplate.fromJson(Map<String, dynamic>.from(tpl as Map));
@@ -1630,7 +1771,9 @@ class NutritionService {
   Future<void> deleteMealTemplate(String id) async {
     final headers = await _jsonAuthHeaders();
     if (headers == null) return;
-    final res = await http.delete(Uri.parse('$v1Base/nutrition/templates/$id'), headers: headers).withTimeout();
+    final res = await http
+        .delete(Uri.parse('$v1Base/nutrition/templates/$id'), headers: headers)
+        .withTimeout();
     if (res.statusCode != 204 && res.statusCode != 200) {
       throw NutritionPlanException(_nutritionApiErrorDetail(res));
     }

@@ -1,5 +1,9 @@
 import { prisma } from '../lib/prisma'
-import { resolveExerciseByName } from '../lib/exercise-resolver'
+import {
+  _clearExerciseResolverCache,
+  normalizeExerciseName,
+  resolveExerciseByName,
+} from '../lib/exercise-resolver'
 import { computeProgressiveLoads, type ProgressionLevel } from '../lib/progressive-overload'
 import {
   getProgramTemplate,
@@ -258,6 +262,162 @@ function parseEquipmentTags(raw: unknown): string[] {
   return raw.filter((t): t is string => typeof t === 'string')
 }
 
+type ProgramExerciseDefaults = {
+  name: string
+  primaryMuscle: string
+  equipment: string
+  movementPattern: string
+  rankModel: string
+  category: string
+  secondaryPatterns: string[]
+  fatigueScore: number
+  goalTags: string[]
+  beginnerSuitable: boolean
+}
+
+const PROGRAM_EXERCISE_DEFAULTS: Record<string, ProgramExerciseDefaults> = {
+  squat: {
+    name: 'Squat',
+    primaryMuscle: 'quads',
+    equipment: 'barbell',
+    movementPattern: 'squat',
+    rankModel: 'WEIGHTED',
+    category: 'strength',
+    secondaryPatterns: [],
+    fatigueScore: 5,
+    goalTags: ['strength', 'hypertrophy'],
+    beginnerSuitable: true,
+  },
+  'bench press': {
+    name: 'Bench Press',
+    primaryMuscle: 'chest',
+    equipment: 'barbell',
+    movementPattern: 'horizontal_push',
+    rankModel: 'WEIGHTED',
+    category: 'strength',
+    secondaryPatterns: [],
+    fatigueScore: 3,
+    goalTags: ['strength', 'hypertrophy'],
+    beginnerSuitable: true,
+  },
+  deadlift: {
+    name: 'Deadlift',
+    primaryMuscle: 'back',
+    equipment: 'barbell',
+    movementPattern: 'hinge',
+    rankModel: 'WEIGHTED',
+    category: 'strength',
+    secondaryPatterns: [],
+    fatigueScore: 5,
+    goalTags: ['strength', 'hypertrophy'],
+    beginnerSuitable: true,
+  },
+  'overhead press': {
+    name: 'Overhead Press',
+    primaryMuscle: 'shoulders',
+    equipment: 'barbell',
+    movementPattern: 'vertical_push',
+    rankModel: 'WEIGHTED',
+    category: 'strength',
+    secondaryPatterns: [],
+    fatigueScore: 3,
+    goalTags: ['strength', 'hypertrophy'],
+    beginnerSuitable: true,
+  },
+  'barbell row': {
+    name: 'Barbell Row',
+    primaryMuscle: 'back',
+    equipment: 'barbell',
+    movementPattern: 'horizontal_pull',
+    rankModel: 'WEIGHTED',
+    category: 'strength',
+    secondaryPatterns: [],
+    fatigueScore: 3,
+    goalTags: ['strength', 'hypertrophy'],
+    beginnerSuitable: true,
+  },
+}
+
+export function programExerciseDefaultsFor(rawName: string): ProgramExerciseDefaults {
+  const norm = normalizeExerciseName(rawName)
+  const exact = PROGRAM_EXERCISE_DEFAULTS[norm]
+  if (exact) return exact
+
+  const lower = norm || rawName.trim().toLowerCase()
+  const equipment =
+    lower.includes('dumbbell') ? 'dumbbell' :
+    lower.includes('cable') ? 'cable' :
+    lower.includes('machine') || lower.includes('pulldown') || lower.includes('leg press') ? 'machine' :
+    lower.includes('kettlebell') ? 'kettlebell' :
+    lower.includes('pull up') || lower.includes('pullup') || lower.includes('push up') || lower.includes('plank') ? 'bodyweight' :
+    'barbell'
+
+  const movementPattern =
+    lower.includes('squat') || lower.includes('leg press') ? 'squat' :
+    lower.includes('deadlift') || lower.includes('hinge') || lower.includes('curl') ? 'hinge' :
+    lower.includes('row') ? 'horizontal_pull' :
+    lower.includes('pull') || lower.includes('pulldown') ? 'vertical_pull' :
+    lower.includes('press') || lower.includes('pushdown') ? 'horizontal_push' :
+    lower.includes('raise') ? 'vertical_push' :
+    'skill_stability'
+
+  const primaryMuscle =
+    movementPattern === 'squat' ? 'quads' :
+    movementPattern === 'hinge' ? 'hamstrings' :
+    movementPattern === 'horizontal_pull' || movementPattern === 'vertical_pull' ? 'back' :
+    movementPattern === 'vertical_push' ? 'shoulders' :
+    movementPattern === 'horizontal_push' ? 'chest' :
+    'full_body'
+
+  return {
+    name: rawName.trim() || 'Program Exercise',
+    primaryMuscle,
+    equipment,
+    movementPattern,
+    rankModel: equipment === 'bodyweight' ? 'BW_REPS' : 'WEIGHTED',
+    category: equipment === 'bodyweight' ? 'bodyweight' : 'strength',
+    secondaryPatterns: [],
+    fatigueScore: movementPattern === 'squat' || movementPattern === 'hinge' ? 4 : 3,
+    goalTags: ['strength', 'hypertrophy'],
+    beginnerSuitable: true,
+  }
+}
+
+async function resolveProgramExerciseByName(rawName: string) {
+  const resolved = await resolveExerciseByName(rawName)
+  if (resolved) return resolved
+
+  const fallback = programExerciseDefaultsFor(rawName)
+  const existing = await prisma.exercise.findFirst({
+    where: { name: { equals: fallback.name, mode: 'insensitive' }, isCustom: false },
+    select: { id: true, name: true },
+  })
+  if (existing) return existing
+
+  const created = await prisma.exercise.create({
+    data: {
+      name: fallback.name,
+      primaryMuscle: fallback.primaryMuscle,
+      equipment: fallback.equipment,
+      movementPattern: fallback.movementPattern,
+      rankModel: fallback.rankModel,
+      category: fallback.category,
+      secondaryPatterns: fallback.secondaryPatterns,
+      fatigueScore: fallback.fatigueScore,
+      goalTags: fallback.goalTags,
+      beginnerSuitable: fallback.beginnerSuitable,
+      isRanked: true,
+      isCustom: false,
+      provenance: 'program_fallback',
+      sourceLicense: 'zvelt',
+      reviewStatus: 'fallback',
+    },
+    select: { id: true, name: true },
+  })
+  _clearExerciseResolverCache()
+  return created
+}
+
 /** Catalog fields needed for resolution, warmups, and equipment substitution. */
 const EX_SELECT = {
   id: true,
@@ -284,7 +444,7 @@ export async function materializeCurrentDay(userId: string, program: ProgramRow)
   const tags = parseEquipmentTags(program.equipmentTags)
 
   // Resolve every slot's exercise name → catalog row.
-  const resolved = await Promise.all(day.slots.map(async (s) => ({ slot: s, ex: await resolveExerciseByName(s.exercise) })))
+  const resolved = await Promise.all(day.slots.map(async (s) => ({ slot: s, ex: await resolveProgramExerciseByName(s.exercise) })))
   const ids = resolved.map((x) => x.ex?.id).filter((x): x is string => !!x)
   const rows = ids.length
     ? await prisma.exercise.findMany({ where: { id: { in: ids } }, select: EX_SELECT })

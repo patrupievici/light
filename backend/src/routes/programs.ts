@@ -15,6 +15,7 @@ import {
   getEnrichedTemplateSummaries,
   ProgramError,
 } from '../services/program.service'
+import { PlannedConvertError } from '../services/planned-workout-converter.service'
 
 const StartSchema = z.object({
   templateId: z.string().min(1).max(64),
@@ -147,8 +148,15 @@ export async function programRoutes(app: FastifyInstance) {
     if (program.status !== 'active') {
       return reply.code(409).send({ error: 'NOT_ACTIVE', message: 'Programul nu este activ', requestId: request.id })
     }
-    const result = await startProgramDay(userId, program)
-    return reply.code(201).send(result)
+    try {
+      const result = await startProgramDay(userId, program)
+      return reply.code(201).send(result)
+    } catch (err) {
+      if (err instanceof PlannedConvertError) {
+        return reply.code(400).send({ error: err.code, message: err.message, requestId: request.id })
+      }
+      throw err
+    }
   })
 
   // POST /v1/programs/:id/advance — mark the current session done, advance state.

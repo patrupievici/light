@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { computeProgramAdvance, readState, type ProgramState } from './program.service'
+import {
+  computeProgramAdvance,
+  programExerciseDefaultsFor,
+  readState,
+  type ProgramState,
+} from './program.service'
 import { getProgramTemplate } from '../programming/program-templates'
 
 /** Apply N sessions of advance, threading state through. */
@@ -20,6 +25,29 @@ describe('readState', () => {
     expect(readState({ sessionIndex: 3, tm: { Squat: 140, junk: 'x' } })).toEqual({
       sessionIndex: 3,
       tm: { Squat: 140 },
+    })
+  })
+})
+
+describe('programExerciseDefaultsFor', () => {
+  it('keeps StrongLifts core lifts mapped to ranked barbell exercises', () => {
+    expect(programExerciseDefaultsFor('Squat')).toMatchObject({
+      name: 'Squat',
+      equipment: 'barbell',
+      movementPattern: 'squat',
+      rankModel: 'WEIGHTED',
+    })
+    expect(programExerciseDefaultsFor('Bench Press')).toMatchObject({
+      name: 'Bench Press',
+      equipment: 'barbell',
+      movementPattern: 'horizontal_push',
+      rankModel: 'WEIGHTED',
+    })
+    expect(programExerciseDefaultsFor('Barbell Row')).toMatchObject({
+      name: 'Barbell Row',
+      equipment: 'barbell',
+      movementPattern: 'horizontal_pull',
+      rankModel: 'WEIGHTED',
     })
   })
 })

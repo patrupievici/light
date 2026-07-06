@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart' show v1Base;
 import 'auth_service.dart';
 import 'http_client.dart';
+import 'workout_service.dart';
 
 /// Multi-week training programs (the "Programe" library). Mirrors the backend
 /// `/v1/programs` API. The program structure lives server-side (code templates);
@@ -86,7 +87,9 @@ class ProgramSlotView {
   static String _label(Map<String, dynamic>? sets) {
     if (sets == null) return '';
     final kind = sets['kind'] as String?;
-    if (kind == 'straight') return '${_toInt(sets['sets'])}×${_toInt(sets['reps'])}';
+    if (kind == 'straight') {
+      return '${_toInt(sets['sets'])}×${_toInt(sets['reps'])}';
+    }
     if (kind == 'range') {
       return '${_toInt(sets['sets'])}×${_toInt(sets['minReps'])}–${_toInt(sets['maxReps'])}';
     }
@@ -116,7 +119,8 @@ class ProgramSlotView {
 }
 
 class ProgramDayView {
-  ProgramDayView({required this.dayKey, required this.title, required this.slots});
+  ProgramDayView(
+      {required this.dayKey, required this.title, required this.slots});
   final String dayKey, title;
   final List<ProgramSlotView> slots;
 
@@ -150,7 +154,8 @@ class ProgramTemplateDetail {
 
   bool get requiresTrainingMax => trainingMaxLifts.isNotEmpty;
 
-  static ProgramTemplateDetail fromJson(Map<String, dynamic> j) => ProgramTemplateDetail(
+  static ProgramTemplateDetail fromJson(Map<String, dynamic> j) =>
+      ProgramTemplateDetail(
         id: j['id'] as String,
         title: j['title'] as String? ?? 'Program',
         description: j['description'] as String? ?? '',
@@ -211,12 +216,14 @@ class ActiveProgram {
 }
 
 class MaterializedSetView {
-  MaterializedSetView({required this.weightKg, required this.reps, required this.amrap});
+  MaterializedSetView(
+      {required this.weightKg, required this.reps, required this.amrap});
   final double? weightKg;
   final int reps;
   final bool amrap;
 
-  static MaterializedSetView fromJson(Map<String, dynamic> j) => MaterializedSetView(
+  static MaterializedSetView fromJson(Map<String, dynamic> j) =>
+      MaterializedSetView(
         weightKg: _toDouble(j['weightKg']),
         reps: _toInt(j['reps'], 1),
         amrap: j['amrap'] == true,
@@ -241,7 +248,8 @@ class MaterializedExercise {
   final List<MaterializedSetView> warmups;
   final String? notes;
 
-  static MaterializedExercise fromJson(Map<String, dynamic> j) => MaterializedExercise(
+  static MaterializedExercise fromJson(Map<String, dynamic> j) =>
+      MaterializedExercise(
         name: j['name'] as String? ?? 'Exercise',
         sets: _toInt(j['sets'], 3),
         reps: _toInt(j['reps'], 8),
@@ -278,13 +286,15 @@ class MaterializedDay {
         weekInCycle: _toInt(j['weekInCycle'], 1),
         isDeload: j['isDeload'] == true,
         exercises: (j['exercises'] as List<dynamic>? ?? [])
-            .map((e) => MaterializedExercise.fromJson(e as Map<String, dynamic>))
+            .map(
+                (e) => MaterializedExercise.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 }
 
 class ActiveProgramView {
-  ActiveProgramView({required this.program, required this.today, required this.completed});
+  ActiveProgramView(
+      {required this.program, required this.today, required this.completed});
   final ActiveProgram? program;
   final MaterializedDay? today;
 
@@ -297,6 +307,17 @@ class ProgramService {
   final _auth = AuthService();
   Future<Map<String, String>> _headers() => authedJsonHeaders(auth: _auth);
 
+  String _errorMessage(http.Response res, String fallback) {
+    try {
+      final body = jsonDecode(res.body);
+      if (body is Map && body['message'] is String) {
+        final message = (body['message'] as String).trim();
+        if (message.isNotEmpty) return message;
+      }
+    } catch (_) {}
+    return '$fallback (${res.statusCode})';
+  }
+
   /// GET /v1/programs/templates — the program library.
   Future<List<ProgramSummary>> getTemplates() async {
     final res = await http
@@ -305,20 +326,25 @@ class ProgramService {
     if (res.statusCode != 200) {
       throw Exception('Could not load programs (${res.statusCode})');
     }
-    final data = (jsonDecode(res.body) as Map<String, dynamic>)['data'] as List<dynamic>? ?? [];
-    return data.map((p) => ProgramSummary.fromJson(p as Map<String, dynamic>)).toList();
+    final data = (jsonDecode(res.body) as Map<String, dynamic>)['data']
+            as List<dynamic>? ??
+        [];
+    return data
+        .map((p) => ProgramSummary.fromJson(p as Map<String, dynamic>))
+        .toList();
   }
 
   /// GET /v1/programs/templates/:id — full preview (days × slots).
   Future<ProgramTemplateDetail> getTemplate(String id) async {
     final res = await http
-        .get(Uri.parse('$v1Base/programs/templates/$id'), headers: await _headers())
+        .get(Uri.parse('$v1Base/programs/templates/$id'),
+            headers: await _headers())
         .withTimeout();
     if (res.statusCode != 200) {
       throw Exception('Could not load program (${res.statusCode})');
     }
-    return ProgramTemplateDetail.fromJson(
-        (jsonDecode(res.body) as Map<String, dynamic>)['template'] as Map<String, dynamic>);
+    return ProgramTemplateDetail.fromJson((jsonDecode(res.body)
+        as Map<String, dynamic>)['template'] as Map<String, dynamic>);
   }
 
   /// GET /v1/programs/active — current active program + today's materialized day.
@@ -333,14 +359,18 @@ class ProgramService {
     final prog = body['program'];
     final today = body['today'];
     return ActiveProgramView(
-      program: prog is Map<String, dynamic> ? ActiveProgram.fromJson(prog) : null,
-      today: today is Map<String, dynamic> ? MaterializedDay.fromJson(today) : null,
+      program:
+          prog is Map<String, dynamic> ? ActiveProgram.fromJson(prog) : null,
+      today: today is Map<String, dynamic>
+          ? MaterializedDay.fromJson(today)
+          : null,
       completed: body['completed'] == true,
     );
   }
 
   /// PATCH /v1/programs/:id — set/refresh training maxes from 1RMs.
-  Future<ActiveProgram> setTrainingMaxes(String programId, Map<String, double> oneRepMaxes) async {
+  Future<ActiveProgram> setTrainingMaxes(
+      String programId, Map<String, double> oneRepMaxes) async {
     final res = await http
         .patch(
           Uri.parse('$v1Base/programs/$programId'),
@@ -351,8 +381,8 @@ class ProgramService {
     if (res.statusCode != 200) {
       throw Exception('Could not save training maxes (${res.statusCode})');
     }
-    return ActiveProgram.fromJson(
-        (jsonDecode(res.body) as Map<String, dynamic>)['program'] as Map<String, dynamic>);
+    return ActiveProgram.fromJson((jsonDecode(res.body)
+        as Map<String, dynamic>)['program'] as Map<String, dynamic>);
   }
 
   /// POST /v1/programs/start — start a template (archives any active program).
@@ -369,30 +399,40 @@ class ProgramService {
           body: jsonEncode({
             'templateId': templateId,
             if (weeks != null) 'weeks': weeks,
-            if (oneRepMaxes != null && oneRepMaxes.isNotEmpty) 'oneRepMaxes': oneRepMaxes,
-            if (equipmentTags != null && equipmentTags.isNotEmpty) 'equipmentTags': equipmentTags,
+            if (oneRepMaxes != null && oneRepMaxes.isNotEmpty)
+              'oneRepMaxes': oneRepMaxes,
+            if (equipmentTags != null && equipmentTags.isNotEmpty)
+              'equipmentTags': equipmentTags,
           }),
         )
         .withTimeout();
     if (res.statusCode != 201) {
       throw Exception('Could not start program (${res.statusCode})');
     }
-    return ActiveProgram.fromJson(
-        (jsonDecode(res.body) as Map<String, dynamic>)['program'] as Map<String, dynamic>);
+    return ActiveProgram.fromJson((jsonDecode(res.body)
+        as Map<String, dynamic>)['program'] as Map<String, dynamic>);
   }
 
   /// POST /v1/programs/:id/start-day — materialize today → returns a draft workoutId.
   Future<String> startProgramDay(String programId) async {
     final res = await http
-        .post(Uri.parse('$v1Base/programs/$programId/start-day'), headers: await _headers())
+        .post(Uri.parse('$v1Base/programs/$programId/start-day'),
+            headers: await _headers())
         .withTimeout();
     if (res.statusCode != 201) {
-      throw Exception('Could not start session (${res.statusCode})');
+      throw Exception(_errorMessage(res, 'Could not start session'));
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     final id = body['workoutId'];
     if (id is! String || id.isEmpty) {
       throw Exception('Session has no exercises to start');
+    }
+    try {
+      final workout = await WorkoutService().getWorkout(id);
+      await WorkoutService.saveActiveWorkoutPointer(workout,
+          label: 'Program session');
+    } catch (_) {
+      // Best-effort only: the tracker still opens from the returned id.
     }
     return id;
   }
@@ -400,13 +440,14 @@ class ProgramService {
   /// POST /v1/programs/:id/advance — mark the session done, advance week/TM.
   Future<ActiveProgram> advance(String programId) async {
     final res = await http
-        .post(Uri.parse('$v1Base/programs/$programId/advance'), headers: await _headers())
+        .post(Uri.parse('$v1Base/programs/$programId/advance'),
+            headers: await _headers())
         .withTimeout();
     if (res.statusCode != 200) {
       throw Exception('Could not advance program (${res.statusCode})');
     }
-    return ActiveProgram.fromJson(
-        (jsonDecode(res.body) as Map<String, dynamic>)['program'] as Map<String, dynamic>);
+    return ActiveProgram.fromJson((jsonDecode(res.body)
+        as Map<String, dynamic>)['program'] as Map<String, dynamic>);
   }
 
   /// PATCH /v1/programs/:id — archive the active program.

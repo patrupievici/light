@@ -40,7 +40,8 @@ void main() {
       tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0));
       for (var i = 1; i <= 60; i++) {
         final wiggle = (i.isEven ? 0.5 : -0.5) * _degPerMeter;
-        tracker.add(_fix(lat: 51.5 + wiggle, lng: -0.12, ts: t0.add(Duration(seconds: i))));
+        tracker.add(_fix(
+            lat: 51.5 + wiggle, lng: -0.12, ts: t0.add(Duration(seconds: i))));
       }
       expect(tracker.meters, 0);
     });
@@ -88,6 +89,8 @@ void main() {
         lat: 51.5 + 510 * _degPerMeter,
         lng: -0.12,
         ts: t0.add(const Duration(seconds: 5)),
+        speed: 3,
+        speedAccuracy: 0.5,
       ));
       expect(tracker.meters, closeTo(10, 1));
     });
@@ -102,6 +105,8 @@ void main() {
           lat: 51.5 + 20 * _degPerMeter,
           lng: -0.12,
           ts: t0.add(const Duration(seconds: 1)),
+          speed: 20,
+          speedAccuracy: 0.5,
         ));
       }
       expect(run.meters, 0); // rebased as a teleport
@@ -129,6 +134,8 @@ void main() {
         lng: -0.12,
         ts: t0.add(const Duration(seconds: 2)),
         accuracy: 2,
+        speed: 3,
+        speedAccuracy: 0.5,
       ));
       expect(short, isFalse);
       expect(tracker.meters, 0);
@@ -138,6 +145,8 @@ void main() {
         lng: -0.12,
         ts: t0.add(const Duration(seconds: 4)),
         accuracy: 2,
+        speed: 3,
+        speedAccuracy: 0.5,
       ));
       expect(long, isTrue);
       expect(tracker.meters, closeTo(10, 1));
@@ -159,11 +168,12 @@ void main() {
       expect(tracker.meters, 0);
     });
 
-    test('speed gate: a trustworthy near-zero speed drops the fix (couch drift)',
+    test(
+        'speed gate: a trustworthy near-zero speed drops the fix (couch drift)',
         () {
       final tracker = RouteTracker();
-      tracker.add(_fix(
-          lat: 51.5, lng: -0.12, ts: t0, speed: 0.1, speedAccuracy: 0.5));
+      tracker.add(
+          _fix(lat: 51.5, lng: -0.12, ts: t0, speed: 0.1, speedAccuracy: 0.5));
       // Sitting still: the device reports ~0 m/s (confident), but the position
       // jitters 12 m — far past the distance floor. The speed gate must drop it
       // so distance stays 0 (this is the real-device "counts on the couch" bug).
@@ -178,25 +188,56 @@ void main() {
       expect(tracker.meters, 0);
     });
 
-    test('speed gate ignores speed==0 (unknown) so tracking never fully stalls',
-        () {
+    test('unknown-speed single GPS jump is only a candidate, not distance', () {
       final tracker = RouteTracker();
-      // Device with no speed sensor reports speed=0/speedAccuracy=0 → the gate
-      // must NOT reject; a real 10 m move still counts via the distance floor.
+      // With speed unavailable, a lone 12 m jump can be couch GPS drift. It
+      // becomes a pending candidate and needs a follow-up fix before counting.
       tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0));
       final accepted = tracker.add(_fix(
-        lat: 51.5 + 10 * _degPerMeter,
+        lat: 51.5 + 12 * _degPerMeter,
         lng: -0.12,
         ts: t0.add(const Duration(seconds: 4)),
       ));
+      expect(accepted, isFalse);
+      expect(tracker.meters, 0);
+    });
+
+    test('unknown-speed slow 9m couch drift over 90s stays at zero', () {
+      final tracker = RouteTracker();
+      tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0));
+      for (var i = 1; i <= 6; i++) {
+        final driftM = i.isEven ? 9.0 : 6.0;
+        tracker.add(_fix(
+          lat: 51.5 + driftM * _degPerMeter,
+          lng: -0.12,
+          ts: t0.add(Duration(seconds: i * 15)),
+          accuracy: 5,
+        ));
+      }
+      expect(tracker.meters, 0);
+    });
+
+    test('unknown-speed sustained movement still starts tracking', () {
+      final tracker = RouteTracker();
+      tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0));
+      tracker.add(_fix(
+        lat: 51.5 + 14 * _degPerMeter,
+        lng: -0.12,
+        ts: t0.add(const Duration(seconds: 4)),
+      ));
+      final accepted = tracker.add(_fix(
+        lat: 51.5 + 17 * _degPerMeter,
+        lng: -0.12,
+        ts: t0.add(const Duration(seconds: 5)),
+      ));
       expect(accepted, isTrue);
-      expect(tracker.meters, closeTo(10, 1));
+      expect(tracker.meters, closeTo(17, 1));
     });
 
     test('real movement with a healthy reported speed is counted', () {
       final tracker = RouteTracker();
-      tracker.add(_fix(
-          lat: 51.5, lng: -0.12, ts: t0, speed: 3, speedAccuracy: 0.5));
+      tracker.add(
+          _fix(lat: 51.5, lng: -0.12, ts: t0, speed: 3, speedAccuracy: 0.5));
       final accepted = tracker.add(_fix(
         lat: 51.5 + 10 * _degPerMeter,
         lng: -0.12,
@@ -243,6 +284,8 @@ void main() {
         lat: 51.5 + 10 * _degPerMeter,
         lng: -0.12,
         ts: t0.add(const Duration(seconds: 5)),
+        speed: 2,
+        speedAccuracy: 0.5,
       ));
       expect(tracker.meters, greaterThan(0));
       tracker.reset();
