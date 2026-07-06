@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../models/activity_kind.dart';
 import '../../models/social_feed_post.dart';
+import '../../services/activity_calendar_store.dart';
 import '../../services/nutrition_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/social_feed_service.dart';
@@ -15,6 +17,7 @@ import '../../widgets/z/z_collapsible_chart_card.dart';
 import '../../widgets/charts/cumulative_volume_card.dart';
 import '../../widgets/charts/recent_prs_card.dart';
 import '../../widgets/charts/workout_consistency_heatmap.dart';
+import '../calendar/activity_calendar_screen.dart';
 import '../workouts/workout_tracker_screen.dart';
 
 /// HOME — the "today dashboard" from Razvan's light redesign (brief §7, mockup
@@ -61,6 +64,11 @@ class _HomeTabState extends State<HomeTab> {
   List<bool> _week = List<bool>.filled(7, false);
   int _weekCount = 0;
   int _weekGoal = 5;
+  // Weekly cardio (runs/rides/walks) — from ActivityCalendarStore.
+  int _cardioCount = 0;
+  double _cardioKm = 0;
+  int _cardioMin = 0;
+  String? _cardioLatestLine;
   SocialFeedPost? _friendPost;
 
   @override
@@ -89,18 +97,31 @@ class _HomeTabState extends State<HomeTab> {
       _safe(_profile.getMe()),
       _safe(NutritionService.instance.getDay(now)),
       _safe(NutritionService.instance.getGoals()),
-      _safe(_workouts.getWorkoutCalendar(from: monday, to: sunday)),
+      // Same source of truth History uses (GET /v1/workouts). The old
+      // getWorkoutCalendar hit a nonexistent endpoint and ALWAYS returned []
+      // — Home showed "Not logged yet" / 0-consistency while History was right.
+      _safe(_workouts.getWorkouts(limit: 50)),
       _safe(_feed.getFeed()),
       _safe(_recovery.getMuscleLevels(windowDays: 90)),
+      // Weekly cardio summary (offline-first — written on every cardio save).
+      _safe(ActivityCalendarStore().loadManualSessions()),
     ]);
     if (!mounted) return;
 
     final me = results[0] as Map<String, dynamic>?;
     final day = results[1] as DailyNutrition?;
     final goals = results[2] as NutritionGoals?;
-    final calendar = (results[3] as List<DateTime>?) ?? const [];
+    final workoutsRes = results[3] as WorkoutsResponse?;
     final posts = (results[4] as List<SocialFeedPost>?) ?? const [];
     final muscleLevels = (results[5] as Map<String, MuscleLevel>?) ?? const {};
+    final cardioByDay =
+        (results[6] as Map<String, List<ManualCardioSession>>?) ?? const {};
+
+    // Completed gym sessions this week ('completed' or 'posted'; drafts out).
+    final calendar = <DateTime>[
+      for (final w in workoutsRes?.data ?? const <WorkoutDto>[])
+        if (w.status != 'draft') DateUtils.dateOnly(w.endedAt ?? w.startedAt),
+    ];
 
     final profile = me?['profile'] as Map<String, dynamic>?;
     final name = profile?['displayName'] as String?;
@@ -121,6 +142,38 @@ class _HomeTabState extends State<HomeTab> {
       if (dd == today) workedOutToday = true;
     }
 
+    // Weekly cardio aggregates (Mon–Sun window, latest session for the line).
+    var cardioCount = 0;
+    var cardioKm = 0.0;
+    var cardioMin = 0;
+    ManualCardioSession? latestCardio;
+    DateTime? latestCardioDay;
+    cardioByDay.forEach((key, sessions) {
+      final d = DateTime.tryParse(key);
+      if (d == null) return;
+      final dd = DateUtils.dateOnly(d);
+      if (dd.isBefore(monday) || dd.isAfter(sunday)) return;
+      for (final s in sessions) {
+        cardioCount++;
+        cardioKm += s.distanceKm ?? 0;
+        cardioMin += s.durationMin ?? 0;
+        if (latestCardioDay == null || !dd.isBefore(latestCardioDay!)) {
+          latestCardioDay = dd;
+          latestCardio = s;
+        }
+      }
+    });
+    String? cardioLatestLine;
+    if (latestCardio != null) {
+      final kindLabel = switch (latestCardio!.kind) {
+        ActivityKind.cycle => 'Ride',
+        ActivityKind.walk => 'Walk',
+        ActivityKind.swim => 'Swim',
+        _ => 'Run',
+      };
+      cardioLatestLine = '$kindLabel · ${latestCardio!.subtitle}';
+    }
+
     setState(() {
       _loading = false;
       _displayName = (name != null && name.trim().isNotEmpty) ? name.trim() : 'Athlete';
@@ -132,6 +185,10 @@ class _HomeTabState extends State<HomeTab> {
       _weekCount = week.where((e) => e).length;
       _weekGoal = (daysPerWeek != null && daysPerWeek > 0) ? daysPerWeek : 5;
       _workoutToday = workedOutToday;
+      _cardioCount = cardioCount;
+      _cardioKm = cardioKm;
+      _cardioMin = cardioMin;
+      _cardioLatestLine = cardioLatestLine;
       _muscleLevels = muscleLevels;
       // "Friend activity" must be a FRIEND's post — the friends feed includes
       // the user's own posts, so drop those before taking the latest.
@@ -203,6 +260,8 @@ class _HomeTabState extends State<HomeTab> {
             const _Eyebrow('THIS WEEK'),
             const SizedBox(height: ZveltTokens.s3),
             _weekCard(),
+            const SizedBox(height: ZveltTokens.s3),
+            _cardioWeekCard(),
             const SizedBox(height: ZveltTokens.s6),
             const _Eyebrow('MUSCLES'),
             const SizedBox(height: ZveltTokens.s3),
@@ -408,6 +467,62 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   // ── Weekly consistency strip ───────────────────────────────────────────────
+  /// Weekly cardio strip (count · km · min + latest session). Reads the same
+  /// per-user store every cardio save writes, so it survives restarts and
+  /// works offline. Tap → the Activity calendar with the full session list.
+  Widget _cardioWeekCard() {
+    final hasCardio = _cardioCount > 0;
+    final kmStr = _cardioKm >= 0.05 ? ' · ${_cardioKm.toStringAsFixed(1)} km' : '';
+    final minStr = _cardioMin > 0 ? ' · $_cardioMin min' : '';
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(builder: (_) => const ActivityCalendarScreen()),
+      ),
+      child: _Card(
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ZveltTokens.brandTint,
+                borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+              ),
+              child: const Icon(AppIcons.running, size: 20, color: ZveltTokens.brand),
+            ),
+            const SizedBox(width: ZveltTokens.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Cardio', style: ZType.h4),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasCardio
+                        ? (_cardioLatestLine ?? 'Latest session saved')
+                        : 'No runs or rides yet this week',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: ZveltTokens.s2),
+            Text(
+              hasCardio ? '$_cardioCount$kmStr$minStr' : '0',
+              style: ZType.bodyS.copyWith(
+                color: ZveltTokens.brandDeep,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _weekCard() {
     const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     return _Card(

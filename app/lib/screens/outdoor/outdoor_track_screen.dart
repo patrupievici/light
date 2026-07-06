@@ -365,8 +365,10 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
   }
 
   /// MET aproximativ: alergare ~9, bike ~6; greutate implicită 70 kg dacă nu e în profil.
+  /// Gated on real distance too — a time-only estimate ticked up while the
+  /// user stood still, contradicting the frozen 0 m distance (no fake metrics).
   int get _kcalEstimate {
-    if (_elapsedSec < 10) return 0;
+    if (_elapsedSec < 10 || _tracker.meters < 20) return 0;
     final met = _mode == 'bike' ? 6.0 : 9.0;
     final hours = _elapsedSec / 3600;
     return (met * 70 * hours).round();

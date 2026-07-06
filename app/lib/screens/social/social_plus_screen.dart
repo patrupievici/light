@@ -1090,38 +1090,68 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
               const SizedBox(height: ZveltTokens.s3),
               Row(
                 children: [
-                  // Compact dark join pill (design PillBtn dark/sm + bolt).
-                  Semantics(
-                    button: true,
-                    label: 'Join challenge',
-                    child: GestureDetector(
-                    onTap: () => _joinAndOpenRace(top),
-                    child: Container(
+                  // Compact dark join pill (design PillBtn dark/sm + bolt) —
+                  // only for challenges the viewer hasn't joined. Creators are
+                  // auto-participants, so showing them "Join challenge" was a
+                  // device-QA bug; they (and joined users) get a static chip
+                  // instead — the whole card still opens the hub on tap.
+                  if (!top.isMine && !top.joined)
+                    Semantics(
+                      button: true,
+                      label: 'Join challenge',
+                      child: GestureDetector(
+                        onTap: () => _joinAndOpenRace(top),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: ZveltTokens.s4, vertical: ZveltTokens.s2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(AppIcons.bolt, size: 14, color: ZveltTokens.brand),
+                              SizedBox(width: 6),
+                              Text(
+                                'Join challenge',
+                                style: TextStyle(
+                                  fontFamily: ZveltTokens.fontPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: ZveltTokens.brand,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: ZveltTokens.s4, vertical: ZveltTokens.s2),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Colors.white.withValues(alpha: 0.22),
                         borderRadius: BorderRadius.circular(ZveltTokens.rPill),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(AppIcons.bolt, size: 14, color: ZveltTokens.brand),
-                          SizedBox(width: 6),
+                          const Icon(AppIcons.check, size: 14, color: Colors.white),
+                          const SizedBox(width: 6),
                           Text(
-                            'Join challenge',
-                            style: TextStyle(
+                            top.isMine ? 'Yours' : 'Joined',
+                            style: const TextStyle(
                               fontFamily: ZveltTokens.fontPrimary,
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: ZveltTokens.brand,
+                              color: Colors.white,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  ),
                   const Spacer(),
                   // Overlapping participant initials — real names only.
                   if (initials.isNotEmpty) ...[

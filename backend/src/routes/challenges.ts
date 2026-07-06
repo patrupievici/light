@@ -254,7 +254,23 @@ export async function challengeRoutes(app: FastifyInstance) {
       },
     })
 
-    const data = rows.map((r) => serializeChallenge(r, me))
+    // Viewer's joined-set so cards can gate their "Join" CTA — without this
+    // the feed omitted `joined` and the client default (false) showed "Join
+    // challenge" even on challenges the viewer created or already joined.
+    // 'accepted' covers creators too (auto-accepted on create) and correctly
+    // excludes pending 'invited' / 'declined' rows.
+    const ids = rows.map((r) => r.id)
+    const mine = ids.length === 0
+      ? []
+      : await prisma.challengeParticipant.findMany({
+          where: { challengeId: { in: ids }, userId: me, status: 'accepted' },
+          select: { challengeId: true },
+        })
+    const joinedSet = new Set(mine.map((m) => m.challengeId))
+
+    const data = rows.map((r) =>
+      serializeChallenge(r, me, { joined: joinedSet.has(r.id) }),
+    )
     return reply.send({ data, requestId: request.id })
   })
 

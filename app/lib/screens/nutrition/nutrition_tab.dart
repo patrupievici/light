@@ -634,8 +634,14 @@ class _NutritionTabState extends State<NutritionTab> {
                         padding: EdgeInsets.fromLTRB(ZveltTokens.s4, 0, ZveltTokens.s4, ZveltMainNavBar.reservedBottomHeight(context) + ZveltTokens.s4),
                         children: [
                           const SizedBox(height: ZveltTokens.s3),
-                          _buildPlanBanner(),
-                          const SizedBox(height: ZveltTokens.s3),
+                          // "AI plan ready" only when a plan actually exists
+                          // and we're not mid-generation — previously ungated,
+                          // so it rendered alongside "Building your weekly
+                          // plan…" during the first bootstrap (contradiction).
+                          if (_weekPlan.isNotEmpty && !_planGenerating) ...[
+                            _buildPlanBanner(),
+                            const SizedBox(height: ZveltTokens.s3),
+                          ],
                           if (_planGenerating)
                             _buildPlanGeneratingCard()
                           else

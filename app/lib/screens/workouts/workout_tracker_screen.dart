@@ -1393,6 +1393,7 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                                 child: _WorkoutSetDoneGlyph(
                                   completed: false,
                                   loading: _savingSetIds.contains(s.id),
+                                  setNumber: s.setIndex + 1,
                                   // Disable until inputs are in-bounds; defense-in-depth
                                   // re-checks happen inside `_submitSet` and the service.
                                   onTap:
@@ -1487,12 +1488,13 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(
+                      SizedBox(
                         width: 44,
                         child: Center(
                           child: _WorkoutSetDoneGlyph(
                             completed: true,
                             loading: false,
+                            setNumber: s.setIndex + 1,
                           ),
                         ),
                       ),
@@ -1610,66 +1612,87 @@ class _WorkoutSetDoneGlyph extends StatelessWidget {
   const _WorkoutSetDoneGlyph({
     required this.completed,
     required this.loading,
+    this.setNumber,
     this.onTap,
   });
 
   final bool completed;
   final bool loading;
+
+  /// 1-based set number — gives screen readers real context
+  /// ("Mark set 2 complete") instead of an unlabeled circle.
+  final int? setNumber;
   final VoidCallback? onTap;
 
-  static const double _size = 36;
+  // 44 = minimum touch target (was 36; the parent SizedBox is already 44-wide,
+  // so the bump fills it without layout shift).
+  static const double _size = 44;
+
+  String get _setRef => setNumber != null ? 'set $setNumber' : 'set';
 
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const SizedBox(
+      return SizedBox(
         width: _size,
         height: _size,
-        child: Padding(
-          padding: EdgeInsets.all(7),
-          child: CircularProgressIndicator(
-              strokeWidth: 2, color: ZveltTokens.info),
+        child: Semantics(
+          label: 'Logging $_setRef',
+          child: const Padding(
+            padding: EdgeInsets.all(11),
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: ZveltTokens.info),
+          ),
         ),
       );
     }
 
     if (completed) {
-      return Tooltip(
-        message: 'Logged',
-        child: Container(
-          width: _size,
-          height: _size,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: ZveltTokens.success,
+      return Semantics(
+        label: '${_setRef[0].toUpperCase()}${_setRef.substring(1)} completed',
+        child: Tooltip(
+          message: 'Logged',
+          child: Container(
+            width: _size,
+            height: _size,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: ZveltTokens.success,
+            ),
+            child: const Icon(AppIcons.check,
+                color: ZveltTokens.onBrand, size: 22),
           ),
-          child:
-              const Icon(AppIcons.check, color: ZveltTokens.onBrand, size: 22),
         ),
       );
     }
 
-    return Tooltip(
-      message: 'Log set',
-      child: Material(
-        elevation: 3.5,
-        shadowColor: Colors.black.withValues(alpha: 0.22),
-        surfaceTintColor: Colors.transparent,
-        color: ZveltTokens.bg,
-        shape: CircleBorder(
-          side: BorderSide(color: ZveltTokens.border.withValues(alpha: 0.95)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: _size,
-            height: _size,
-            child: Icon(
-              AppIcons.check,
-              color: ZveltTokens.text2.withValues(alpha: 0.72),
-              size: 22,
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: 'Mark $_setRef complete',
+      child: Tooltip(
+        message: 'Log set',
+        child: Material(
+          elevation: 3.5,
+          shadowColor: Colors.black.withValues(alpha: 0.22),
+          surfaceTintColor: Colors.transparent,
+          color: ZveltTokens.bg,
+          shape: CircleBorder(
+            side: BorderSide(color: ZveltTokens.border.withValues(alpha: 0.95)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: _size,
+              height: _size,
+              child: Icon(
+                AppIcons.check,
+                color: ZveltTokens.text2.withValues(alpha: 0.72),
+                size: 22,
+              ),
             ),
           ),
         ),

@@ -982,13 +982,27 @@ class WorkoutDto {
     required this.status,
     required this.startedAt,
     this.endedAt,
+    this.notes,
     this.exercises = const [],
   });
   final String id;
   final String status;
   final DateTime startedAt;
   final DateTime? endedAt;
+
+  /// Program/planned sessions carry their real name here as
+  /// "From plan: <title>" (planned-workout-converter) — used to show a
+  /// meaningful title instead of the generated "<Muscle> Day".
+  final String? notes;
   final List<WorkoutExerciseDto> exercises;
+
+  /// The planned/program session title when present, else null.
+  String? get planTitle {
+    final n = notes?.trim();
+    if (n == null || !n.startsWith('From plan: ')) return null;
+    final t = n.substring('From plan: '.length).trim();
+    return t.isEmpty ? null : t;
+  }
 
   static WorkoutDto fromJson(Map<String, dynamic> j) {
     final exercises = (j['exercises'] as List<dynamic>?)?.map((e) => WorkoutExerciseDto.fromJson(e as Map<String, dynamic>)).toList() ?? [];
@@ -997,6 +1011,7 @@ class WorkoutDto {
       status: j['status'] as String? ?? 'draft',
       startedAt: DateTime.parse(j['startedAt'] as String),
       endedAt: j['endedAt'] != null ? DateTime.parse(j['endedAt'] as String) : null,
+      notes: j['notes'] as String?,
       exercises: exercises,
     );
   }

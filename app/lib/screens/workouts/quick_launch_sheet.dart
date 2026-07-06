@@ -239,8 +239,10 @@ int _parsePresetReps(String raw) {
   return int.tryParse(m?.group(1) ?? '') ?? 8;
 }
 
-int _estimateCardioKcal(String mode, int elapsedSec) {
-  if (elapsedSec < 10) return 0;
+int _estimateCardioKcal(String mode, int elapsedSec, double meters) {
+  // Gated on real distance — a time-only estimate ticked while standing still,
+  // contradicting the frozen 0 m distance (no fake metrics).
+  if (elapsedSec < 10 || meters < 20) return 0;
   final met = mode == 'bike'
       ? 6.0
       : mode == 'walk'
@@ -1460,7 +1462,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
 
   Widget _buildCardioLive() {
     final topPad = MediaQuery.paddingOf(context).top;
-    final kcal = _estimateCardioKcal(_cardioMode, _elapsedSeconds);
+    final kcal = _estimateCardioKcal(_cardioMode, _elapsedSeconds, _routeTracker.meters);
     final avgKmh = _elapsedSeconds >= 5 && _routeTracker.meters >= 5
         ? (_routeTracker.meters / _elapsedSeconds) * 3.6
         : 0.0;

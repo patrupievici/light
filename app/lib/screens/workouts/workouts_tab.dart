@@ -399,7 +399,11 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
   }
 
   String _durLabel(Duration d) {
+    // Never render a misleading "0m": non-positive → em-dash (unknown),
+    // genuine sub-minute sessions → "<1m".
+    if (d.inSeconds <= 0) return '—';
     final h = d.inHours, m = d.inMinutes % 60;
+    if (h == 0 && m == 0) return '<1m';
     return h > 0 ? '${h}h ${m}m' : '${m}m';
   }
 
@@ -1337,6 +1341,10 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
 
   // No workout name in the API → label from the dominant muscle group.
   String _sessionLabel(WorkoutDto w) {
+    // Program/planned sessions carry their real title ("From plan: <name>") —
+    // show that instead of the generic "<Muscle> Day".
+    final planTitle = w.planTitle;
+    if (planTitle != null) return planTitle;
     final vol = <String, double>{};
     for (final we in w.exercises) {
       final g = _muscleGroup(we.exercise.primaryMuscle);
