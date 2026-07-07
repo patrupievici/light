@@ -95,6 +95,36 @@ void main() {
       expect(tracker.meters, closeTo(10, 1));
     });
 
+    test(
+        'non-advancing provider timestamps still accumulate distance '
+        '(emulator GNSS / batched fused fixes fall back to arrival time)', () {
+      var fakeNow = t0;
+      final tracker = RouteTracker(clock: () => fakeNow);
+      tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0)); // anchor
+      // Provider clock stuck at t0 for every fix; fixes ARRIVE 3 s apart
+      // moving 10 m each (a 3.3 m/s run). Without the arrival-time fallback
+      // the dt<=0 guard froze distance at 0 for the whole session.
+      for (var i = 1; i <= 20; i++) {
+        fakeNow = t0.add(Duration(seconds: 3 * i));
+        tracker.add(
+            _fix(lat: 51.5 + i * 10 * _degPerMeter, lng: -0.12, ts: t0));
+      }
+      // 200 m real travel; the first ~2 fixes are spent arming movement.
+      expect(tracker.meters, closeTo(200, 15));
+    });
+
+    test('dt<=0 fix is dropped when the arrival clock cannot help (backstop)',
+        () {
+      // Arrival clock == anchor timestamp (clock skew) → speed can't be
+      // validated → the fix must be dropped, never accumulated.
+      final tracker = RouteTracker(clock: () => t0);
+      tracker.add(_fix(lat: 51.5, lng: -0.12, ts: t0));
+      final accepted = tracker.add(
+          _fix(lat: 51.5 + 30 * _degPerMeter, lng: -0.12, ts: t0));
+      expect(accepted, isFalse);
+      expect(tracker.meters, 0);
+    });
+
     test('bike mode allows higher speeds than run mode', () {
       // 20 m/s (72 km/h downhill sprint) — plausible on a bike, not on foot.
       final run = RouteTracker();

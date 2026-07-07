@@ -31,9 +31,14 @@ import 'package:latlong2/latlong.dart';
 /// rolling baseline before any gain is counted, and the baseline follows the
 /// lowest recent altitude, so barometric/GPS altitude noise doesn't add up.
 class RouteTracker {
-  RouteTracker({this.isBike = false});
+  RouteTracker({this.isBike = false, DateTime Function()? clock})
+      : _clock = clock ?? DateTime.now;
 
   final bool isBike;
+
+  /// Wall clock used only as a fallback when the provider's fix timestamps
+  /// don't advance (test seam).
+  final DateTime Function() _clock;
 
   static const double _kMaxAccuracyM = 25.0;
 
@@ -107,7 +112,16 @@ class RouteTracker {
     // "unknown" (some devices report 0 with no speed sensor), so this can never
     // reject every fix; those devices fall through to the displacement floor.
     final ll = LatLng(pos.latitude, pos.longitude);
-    final ts = pos.timestamp;
+    var ts = pos.timestamp;
+    // Some providers (emulator GNSS, batched fused fixes) deliver identical
+    // or non-advancing timestamps. Positions arrive in real time, so the
+    // arrival clock is a faithful substitute whenever the provider clock has
+    // not moved past the anchor — without this, the dt<=0 guard below (and
+    // the unknown-speed arming confirm) would freeze distance at 0 forever.
+    if (_lastTs != null && !ts.isAfter(_lastTs!)) {
+      final now = _clock();
+      if (now.isAfter(_lastTs!)) ts = now;
+    }
 
     // Post-pause rebase: anchor the new position without counting the jump
     // and without appending to the polyline (same idea as the teleport guard).
