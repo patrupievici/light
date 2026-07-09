@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
+import '../../theme/zvelt_tokens.dart';
 import '../../l10n/app_strings.dart';
 
 /// Avatar option: id + icon for display.
@@ -30,7 +30,7 @@ class _AvatarSelectionScreenState extends State<AvatarSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgPrimary,
+      backgroundColor: ZveltTokens.bg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -41,7 +41,7 @@ class _AvatarSelectionScreenState extends State<AvatarSelectionScreen> {
               Text(
                 AppStrings.avatarChooseTitle,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: ZveltTokens.text,
                       fontWeight: FontWeight.w700,
                     ),
                 textAlign: TextAlign.center,
@@ -66,16 +66,16 @@ class _AvatarSelectionScreenState extends State<AvatarSelectionScreen> {
                     final opt = widget.options[index];
                     final selected = _selectedId == opt.id;
                     return Material(
-                      color: selected ? AppTheme.accentBlue.withValues(alpha: 0.25) : AppTheme.bgElevated,
-                      borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+                      color: selected ? ZveltTokens.brand.withValues(alpha: 0.25) : ZveltTokens.surface,
+                      borderRadius: BorderRadius.circular(ZveltTokens.rLg),
                       child: InkWell(
                         onTap: () => setState(() => _selectedId = opt.id),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+                        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
                         child: Container(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+                            borderRadius: BorderRadius.circular(ZveltTokens.rLg),
                             border: Border.all(
-                              color: selected ? AppTheme.accentBlue : AppTheme.border,
+                              color: selected ? ZveltTokens.brand : ZveltTokens.border,
                               width: selected ? 2 : 1,
                             ),
                           ),
@@ -83,7 +83,7 @@ class _AvatarSelectionScreenState extends State<AvatarSelectionScreen> {
                             child: Icon(
                               opt.icon,
                               size: 48,
-                              color: selected ? AppTheme.accentBlue : AppTheme.textSecondary,
+                              color: selected ? ZveltTokens.brand : ZveltTokens.text2,
                             ),
                           ),
                         ),

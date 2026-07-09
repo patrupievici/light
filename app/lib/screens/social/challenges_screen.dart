@@ -352,7 +352,8 @@ class _ChallengeCard extends StatelessWidget {
   }
 
   Widget _leaderRow(int idx, Map<String, dynamic> s, bool isMe) {
-    const medal = [Color(0xFFFFB020), Color(0xFFB6BCC8), Color(0xFFCD7F45)];
+    // intentional: podium gold/silver/bronze (matches race_hub_screen) — no token roles.
+    const medal = [Color(0xFFFFC24B), Color(0xFFC8CDD4), Color(0xFFE2A06A)];
     final total = (s['total'] as num?)?.toDouble() ?? 0;
     final totalLabel =
         total % 1 == 0 ? total.toInt().toString() : total.toStringAsFixed(1);

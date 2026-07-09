@@ -205,7 +205,7 @@ class _CreateChallengeFlowState extends State<CreateChallengeFlow> {
                       height: 5,
                       decoration: BoxDecoration(
                         color: i <= _step ? ZveltTokens.brand : ZveltTokens.surface3,
-                        borderRadius: BorderRadius.circular(9),
+                        borderRadius: BorderRadius.circular(ZveltTokens.rSm),
                       ),
                     ),
                   ),

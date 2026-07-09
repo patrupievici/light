@@ -268,6 +268,7 @@ class _RaceHubScreenState extends State<RaceHubScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          backgroundColor: ZveltTokens.error,
           content: Text(e.toString().replaceFirst('Exception: ', '')),
         ),
       );
@@ -319,7 +320,9 @@ class _RaceHubScreenState extends State<RaceHubScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+          SnackBar(
+              backgroundColor: ZveltTokens.error,
+              content: Text(e.toString().replaceFirst('Exception: ', ''))),
         );
       }
     } finally {
@@ -376,7 +379,7 @@ class _RaceHubScreenState extends State<RaceHubScreen> {
                             orElse: () => _challenges.first,
                           )),
                   child: const Icon(AppIcons.comment_alt,
-                      size: 16, color: Colors.white),
+                      size: 16, color: ZveltTokens.onBrand),
                   ),
                 ),
                 const SizedBox(width: ZveltTokens.s2),
@@ -547,30 +550,28 @@ class _RaceHubScreenState extends State<RaceHubScreen> {
                                   width: 6,
                                   height: 6,
                                   decoration: const BoxDecoration(
-                                      color: Colors.white, shape: BoxShape.circle)),
+                                      color: ZveltTokens.onBrand, shape: BoxShape.circle)),
                               const SizedBox(width: ZveltTokens.s1),
-                              const Text('LIVE',
-                                  style: TextStyle(
-                                      fontSize: 11,
+                              Text('LIVE',
+                                  style: ZType.monoXS.copyWith(
+                                      height: 1.2,
                                       fontWeight: FontWeight.w900,
-                                      color: Colors.white,
+                                      color: ZveltTokens.onBrand,
                                       letterSpacing: 1.5)),
                             ]),
                             const SizedBox(height: ZveltTokens.s2),
                             Text(r.title,
-                                style: const TextStyle(
-                                    fontFamily: ZveltTokens.fontPrimary,
-                                    fontSize: 15,
+                                style: ZType.bodyM.copyWith(
                                     fontWeight: FontWeight.w800,
                                     fontStyle: FontStyle.italic,
-                                    color: Colors.white,
+                                    color: ZveltTokens.onBrand,
                                     height: 1)),
                             const SizedBox(height: ZveltTokens.s1),
                             Text('$count athletes',
-                                style: TextStyle(
-                                    fontSize: 11,
+                                style: ZType.monoXS.copyWith(
+                                    height: 1.2,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.white.withValues(alpha: 0.8))),
+                                    color: ZveltTokens.onBrand.withValues(alpha: 0.8))),
                             const Spacer(),
                             GestureDetector(
                               onTap: () => _toggleJoin(challenge.id),
@@ -578,18 +579,18 @@ class _RaceHubScreenState extends State<RaceHubScreen> {
                                 duration: const Duration(milliseconds: 200),
                                 height: 28,
                                 decoration: BoxDecoration(
-                                  color: joined ? Colors.white.withValues(alpha: 0.15) : Colors.white,
+                                  color: joined ? ZveltTokens.onBrand.withValues(alpha: 0.15) : ZveltTokens.onBrand,
                                   borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                                  border: joined ? Border.all(color: Colors.white.withValues(alpha: 0.6)) : null,
+                                  border: joined ? Border.all(color: ZveltTokens.onBrand.withValues(alpha: 0.6)) : null,
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   joined ? 'LEAVE RACE' : 'JOIN THE RACE',
-                                  style: TextStyle(
-                                    fontSize: 11,
+                                  style: ZType.monoXS.copyWith(
+                                    height: 1.2,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 1.2,
-                                    color: joined ? Colors.white : r.colors[1],
+                                    color: joined ? ZveltTokens.onBrand : r.colors[1],
                                   ),
                                 ),
                               ),
@@ -756,7 +757,9 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+            backgroundColor: ZveltTokens.error,
+            content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
   }
@@ -767,7 +770,7 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
       isScrollControlled: true,
       backgroundColor: ZveltTokens.bg,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
       ),
       builder: (_) => _RaceLogSheet(spec: _spec, onLog: _logProgress),
     );
@@ -854,7 +857,7 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: ZveltTokens.bg2,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(ZveltTokens.rMd),
                             border: Border.all(color: ZveltTokens.border),
                           ),
                           alignment: Alignment.center,
@@ -890,7 +893,9 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
       reportError(e, st, reason: 'race-chat:send');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+            backgroundColor: ZveltTokens.error,
+            content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -1136,18 +1141,16 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
                       ),
                     ],
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(AppIcons.plus, size: 18, color: Colors.white),
-                      SizedBox(width: ZveltTokens.s2),
+                      const Icon(AppIcons.plus, size: 18, color: ZveltTokens.onBrand),
+                      const SizedBox(width: ZveltTokens.s2),
                       Text(
                         'Log progress',
-                        style: TextStyle(
-                          fontFamily: ZveltTokens.fontPrimary,
-                          fontSize: 13,
+                        style: ZType.bodyS.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          color: ZveltTokens.onBrand,
                         ),
                       ),
                     ],
@@ -1182,6 +1185,7 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
   }
 
   // ── Standings card — real totals from /standings (design layout) ──────────
+  // intentional: podium gold/silver/bronze — no AppIcons/ZveltTokens equivalent roles.
   static const _medal = [Color(0xFFFFC24B), Color(0xFFC8CDD4), Color(0xFFE2A06A)];
 
   Widget _buildStandings() {
@@ -1266,10 +1270,10 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
             ),
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : 'A',
-              style: const TextStyle(
-                fontSize: 13,
+              style: ZType.bodyS.copyWith(
+                height: 1.2,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: ZveltTokens.onBrand,
               ),
             ),
           ),
@@ -1316,8 +1320,7 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
               ),
               Text(
                 spec.unit,
-                style:
-                    TextStyle(fontSize: 11, color: ZveltTokens.text3),
+                style: ZType.monoXS.copyWith(height: 1.2),
               ),
             ],
           ),
@@ -1375,9 +1378,8 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
           child: Text(
             mine ? body : '$name $body',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: ZveltTokens.fontPrimary,
-              fontSize: 11,
+            style: ZType.monoXS.copyWith(
+              height: 1.2,
               fontWeight: FontWeight.w600,
               color: ZveltTokens.brandDeep,
             ),
@@ -1402,8 +1404,8 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
             ),
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : 'A',
-              style: const TextStyle(
-                  fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+              style: ZType.monoXS.copyWith(
+                  height: 1.2, fontWeight: FontWeight.w700, color: ZveltTokens.onBrand),
             ),
           ),
           const SizedBox(width: 8),
@@ -1433,8 +1435,8 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
                     padding: const EdgeInsets.only(bottom: 2),
                     child: Text(
                       name,
-                      style: const TextStyle(
-                        fontSize: 11,
+                      style: ZType.monoXS.copyWith(
+                        height: 1.2,
                         fontWeight: FontWeight.w700,
                         color: ZveltTokens.brandDeep,
                       ),
@@ -1444,16 +1446,16 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
                   body,
                   style: ZType.bodyS.copyWith(
                     height: 1.4,
-                    color: mine ? Colors.white : ZveltTokens.text,
+                    color: mine ? ZveltTokens.onBrand : ZveltTokens.text,
                   ),
                 ),
                 const SizedBox(height: ZveltTokens.s1),
                 Text(
                   time,
-                  style: TextStyle(
-                    fontSize: 11,
+                  style: ZType.monoXS.copyWith(
+                    height: 1.2,
                     color: mine
-                        ? Colors.white.withValues(alpha: 0.75)
+                        ? ZveltTokens.onBrand.withValues(alpha: 0.75)
                         : ZveltTokens.text3,
                   ),
                 ),
@@ -1499,9 +1501,8 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
                       child: Center(
                         child: Text(
                           q,
-                          style: TextStyle(
-                            fontFamily: ZveltTokens.fontPrimary,
-                            fontSize: 11,
+                          style: ZType.monoXS.copyWith(
+                            height: 1.2,
                             fontWeight: FontWeight.w600,
                             color: ZveltTokens.text2,
                           ),
@@ -1574,11 +1575,11 @@ class _RaceChatScreenState extends State<RaceChatScreen> {
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                                  AlwaysStoppedAnimation<Color>(ZveltTokens.onBrand),
                             ),
                           )
                         : const Icon(AppIcons.arrow_small_right,
-                            size: 16, color: Colors.white),
+                            size: 16, color: ZveltTokens.onBrand),
                   ),
                 ),
               ),
@@ -1777,10 +1778,9 @@ class _RaceLogSheetState extends State<_RaceLogSheet> {
                       ),
                       Text(
                         spec.unit.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 11,
+                        style: ZType.monoXS.copyWith(
+                          height: 1.2,
                           letterSpacing: 0.7,
-                          color: ZveltTokens.text3,
                         ),
                       ),
                     ],
@@ -1805,7 +1805,7 @@ class _RaceLogSheetState extends State<_RaceLogSheet> {
                           color: _amount == c
                               ? ZveltTokens.brandTint
                               : ZveltTokens.surface,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(ZveltTokens.rMd),
                           border: Border.all(
                             color: _amount == c
                                 ? ZveltTokens.brand3
@@ -1850,11 +1850,10 @@ class _RaceLogSheetState extends State<_RaceLogSheet> {
                 alignment: Alignment.center,
                 child: Text(
                   'Add ${_fmt(_amount)} ${spec.unit}',
-                  style: const TextStyle(
-                    fontFamily: ZveltTokens.fontPrimary,
-                    fontSize: 13,
+                  style: ZType.bodyS.copyWith(
+                    height: 1.2,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: ZveltTokens.onBrand,
                   ),
                 ),
               ),
@@ -1863,7 +1862,7 @@ class _RaceLogSheetState extends State<_RaceLogSheet> {
             Center(
               child: Text(
                 'Stored on this device — server sync is on the roadmap.',
-                style: TextStyle(fontSize: 11, color: ZveltTokens.text3),
+                style: ZType.monoXS.copyWith(height: 1.2),
               ),
             ),
           ],
@@ -1962,12 +1961,12 @@ class _DiscCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(icon, size: 20, color: selected ? Colors.white : ZveltTokens.text2),
+              Icon(icon, size: 20, color: selected ? ZveltTokens.onBrand : ZveltTokens.text2),
               const SizedBox(height: ZveltTokens.s2),
               Text(label,
                   style: ZType.bodyS.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: selected ? Colors.white : ZveltTokens.text2)),
+                      color: selected ? ZveltTokens.onBrand : ZveltTokens.text2)),
             ],
           ),
         ),
@@ -1994,7 +1993,7 @@ class _PresetPill extends StatelessWidget {
           child: Text(label,
               style: ZType.bodyM.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : ZveltTokens.text2)),
+                  color: selected ? ZveltTokens.onBrand : ZveltTokens.text2)),
         ),
       );
 }

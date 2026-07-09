@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart' show v1Base;
 import 'auth_service.dart';
 import 'http_client.dart';
+import 'workout_service.dart';
 
 /// One exercise slot in a saved routine (mirrors the backend exercisesJson item).
 class RoutineExercise {
@@ -125,7 +126,16 @@ class RoutineService {
     if (res.statusCode != 201) {
       throw Exception('Could not start routine (${res.statusCode})');
     }
-    final w = (jsonDecode(res.body) as Map<String, dynamic>)['workout'] as Map<String, dynamic>;
-    return w['id'] as String;
+    final w = (jsonDecode(res.body) as Map<String, dynamic>)['workout']
+        as Map<String, dynamic>;
+    final workoutId = w['id'] as String;
+    final rawStartedAt = w['startedAt'];
+    await WorkoutService.saveActiveWorkoutPointerById(
+      workoutId: workoutId,
+      startedAt:
+          rawStartedAt is String ? DateTime.tryParse(rawStartedAt) : null,
+      label: 'Routine',
+    );
+    return workoutId;
   }
 }

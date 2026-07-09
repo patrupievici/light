@@ -145,13 +145,6 @@ class LocationService {
       return AndroidSettings(
         accuracy: accuracy,
         distanceFilter: distanceFilter,
-        // Keep the screen and GPS awake during workout tracking.
-        // The FOREGROUND_SERVICE permission is declared in AndroidManifest.xml.
-        foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'Zvelt — workout active',
-          notificationText: 'Recording your route…',
-          enableWakeLock: true,
-        ),
       );
     }
     if (!kIsWeb && Platform.isIOS) {

@@ -38,10 +38,11 @@ class BodyweightBanner extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Add bodyweight to unlock ranks',
-                          style: TextStyle(color: ZveltTokens.text, fontWeight: FontWeight.w700, fontSize: 13)),
+                          style: ZType.bodyS.copyWith(
+                              color: ZveltTokens.text, fontWeight: FontWeight.w700, height: 1.2)),
                       const SizedBox(height: ZveltTokens.s1),
                       Text('Required for LP and seasonal leaderboard.',
-                          style: TextStyle(color: ZveltTokens.text2, fontSize: 11)),
+                          style: ZType.monoXS.copyWith(color: ZveltTokens.text2, height: 1.2)),
                     ],
                   ),
                 ),

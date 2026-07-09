@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/zvelt_tokens.dart';
+import 'z/z_pressable.dart';
 
 /// Tertiary CTA — text-only / ghost button. Lowest emphasis tier.
 ///
@@ -46,35 +47,33 @@ class ZveltTertiaryButton extends StatelessWidget {
 
     return Opacity(
       opacity: disabled ? 0.55 : 1,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: disabled ? null : onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: ConstrainedBox(
-            // Enforce ≥44pt touch target even in dense mode.
-            constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
-            child: Padding(
-              padding: padding,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: iconSize, color: fg),
-                    const SizedBox(width: 6),
-                  ],
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: fg,
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: ZveltTokens.fontPrimary,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
+      child: ZPressable(
+        onTap: disabled ? null : onTap,
+        semanticLabel: label,
+        pressedScale: 0.975,
+        child: ConstrainedBox(
+          // Enforce ≥44pt touch target even in dense mode.
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+          child: Padding(
+            padding: padding,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: iconSize, color: fg),
+                  const SizedBox(width: 6),
                 ],
-              ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: ZveltTokens.fontPrimary,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

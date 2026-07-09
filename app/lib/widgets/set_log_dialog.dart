@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/exercise_load_policy.dart';
 import '../services/workout_service.dart';
+import '../theme/app_icons.dart';
 import '../theme/zvelt_tokens.dart';
 import 'plate_calculator.dart';
 
@@ -109,7 +110,7 @@ class _SetLogDialogState extends State<SetLogDialog> {
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
                   onPressed: () => showPlateCalculator(context, _weightKg),
-                  icon: const Icon(Icons.fitness_center, size: 16),
+                  icon: const Icon(AppIcons.gym, size: 16),
                   label: const Text('Plate calculator'),
                   style: TextButton.styleFrom(
                     foregroundColor: ZveltTokens.brandDeep,

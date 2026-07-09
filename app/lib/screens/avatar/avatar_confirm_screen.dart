@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
+import '../../theme/zvelt_tokens.dart';
 import '../../l10n/app_strings.dart';
 import 'avatar_selection_screen.dart';
 
@@ -17,7 +17,7 @@ class AvatarConfirmScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgPrimary,
+      backgroundColor: ZveltTokens.bg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -29,18 +29,18 @@ class AvatarConfirmScreen extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentBlue.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusCard * 2),
-                    border: Border.all(color: AppTheme.accentBlue, width: 2),
+                    color: ZveltTokens.brand.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(ZveltTokens.rLg * 2),
+                    border: Border.all(color: ZveltTokens.brand, width: 2),
                   ),
-                  child: Icon(avatarOption.icon, size: 80, color: AppTheme.accentBlue),
+                  child: Icon(avatarOption.icon, size: 80, color: ZveltTokens.brand),
                 ),
               ),
               const SizedBox(height: 28),
               Text(
                 AppStrings.avatarConfirmTitle,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: ZveltTokens.text,
                       fontWeight: FontWeight.w700,
                     ),
                 textAlign: TextAlign.center,
@@ -49,7 +49,7 @@ class AvatarConfirmScreen extends StatelessWidget {
               Text(
                 AppStrings.avatarConfirmMessage,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: ZveltTokens.text2,
                       height: 1.5,
                     ),
                 textAlign: TextAlign.center,

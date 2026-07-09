@@ -213,7 +213,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       reportError(e, st, reason: 'stories:delete');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Couldn\'t delete the story.')),
+        const SnackBar(
+            backgroundColor: ZveltTokens.error,
+            content: Text('Couldn\'t delete the story.')),
       );
       _setPaused(false);
     }
@@ -241,18 +243,18 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   Widget build(BuildContext context) {
     // Defensive: a delete that empties everything pops before this runs, but
     // guard anyway so we never index into an empty list.
-    if (_groups.isEmpty) return const Scaffold(backgroundColor: Colors.black);
+    if (_groups.isEmpty) return const Scaffold(backgroundColor: Colors.black); // media backdrop
     final story = _story;
     final group = _group;
     final hasImage = story.imageUrl != null && story.imageUrl!.isNotEmpty;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.black, // media backdrop (full-bleed viewer)
       body: Stack(
         children: [
           // ── Media ────────────────────────────────────────────────────────
           Positioned.fill(
             child: Container(
-              color: Colors.black,
+              color: Colors.black, // media backdrop
               alignment: Alignment.center,
               child: hasImage
                   ? ZveltNetworkImage(
@@ -265,7 +267,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                         child: SizedBox(
                           width: 28,
                           height: 28,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white), // on-image
                         ),
                       ),
                     )
@@ -331,12 +333,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: ZType.bodyM.copyWith(
-                                  color: Colors.white, fontWeight: FontWeight.w600),
+                                  color: Colors.white, fontWeight: FontWeight.w600), // on-image
                             ),
                             Text(
                               relativeTime(story.createdAt.toLocal()),
                               style: ZType.bodyS.copyWith(
-                                  color: Colors.white70, fontSize: 11),
+                                  color: Colors.white70, fontSize: 11), // on-image
                             ),
                           ],
                         ),
@@ -344,12 +346,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                       if (group.isMe)
                         IconButton(
                           onPressed: _confirmDelete,
-                          icon: const Icon(AppIcons.trash, color: Colors.white, size: 20),
+                          icon: const Icon(AppIcons.trash, color: Colors.white, size: 20), // on-image
                           tooltip: 'Delete',
                         ),
                       IconButton(
                         onPressed: _close,
-                        icon: const Icon(AppIcons.cross_small, color: Colors.white, size: 24),
+                        icon: const Icon(AppIcons.cross_small, color: Colors.white, size: 24), // on-image
                         tooltip: 'Close',
                       ),
                     ],
@@ -389,7 +391,7 @@ class _Segment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final track = Colors.white.withValues(alpha: 0.3);
+    final track = Colors.white.withValues(alpha: 0.3); // on-image progress track
     return ClipRRect(
       borderRadius: BorderRadius.circular(2),
       child: SizedBox(

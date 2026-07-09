@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/zvelt_tokens.dart';
+import 'z/z_pressable.dart';
 
 /// Visual variant for [ZveltPrimaryButton].
 ///
@@ -94,9 +95,11 @@ class ZveltPrimaryButton extends StatelessWidget {
 
     return Opacity(
       opacity: interactable ? 1 : 0.55,
-      child: Material(
-        color: Colors.transparent,
-        child: Ink(
+      child: ZPressable(
+        onTap: interactable ? onTap : null,
+        semanticLabel: currentLabel,
+        pressedScale: 0.975,
+        child: Container(
           height: height,
           decoration: BoxDecoration(
             color: bg,
@@ -104,10 +107,9 @@ class ZveltPrimaryButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(radius),
             border: border,
           ),
-          child: InkWell(
-            onTap: interactable ? onTap : null,
-            borderRadius: BorderRadius.circular(radius),
-            child: Center(
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -124,6 +126,8 @@ class ZveltPrimaryButton extends StatelessWidget {
                   ],
                   Text(
                     currentLabel,
+                    maxLines: 1,
+                    softWrap: false,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontSize: fontSize,
                           fontWeight: FontWeight.w600,

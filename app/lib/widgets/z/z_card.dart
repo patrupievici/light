@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/zvelt_tokens.dart';
+import 'z_pressable.dart';
 
 /// V2 card primitive — white surface, soft shadow, no border, 24px radius.
 /// Mirrors the `.z-card` CSS class from the design bundle (tokens.css).
@@ -24,9 +25,11 @@ class ZCard extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry? margin;
   final double radius;
+
   /// Defaults to [ZveltTokens.surface] (white). Override only for special cases
   /// like tinted hero cards (see [ZveltTokens.surfaceTinted]).
   final Color? color;
+
   /// Defaults to [ZveltTokens.shadowCard]. Use [ZveltTokens.shadowHero] for
   /// the primary card on a screen.
   final List<BoxShadow>? shadow;
@@ -50,12 +53,12 @@ class ZCard extends StatelessWidget {
     );
 
     if (onTap != null) {
-      inner = Material(
-        color: Colors.transparent,
+      inner = ZPressable(
+        onTap: onTap,
         borderRadius: borderRadius,
-        child: InkWell(
+        child: Material(
+          color: Colors.transparent,
           borderRadius: borderRadius,
-          onTap: onTap,
           child: inner,
         ),
       );

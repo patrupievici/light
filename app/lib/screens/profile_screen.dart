@@ -7,6 +7,8 @@ import '../services/auth_service.dart';
 import '../services/http_client.dart';
 import '../theme/zvelt_tokens.dart';
 import '../widgets/z/z_card.dart';
+import '../widgets/z/z_loading.dart';
+import '../widgets/zvelt_error_state.dart';
 
 /// Physical Data screen — edit bodyweight, height, sex, birth year.
 /// All fields are persisted to the backend via PATCH /v1/me/profile.
@@ -62,9 +64,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
         return;
       }
-      final res = await http
-          .get(Uri.parse('$v1Base/me'), headers: {'Authorization': 'Bearer $token'})
-          .withTimeout();
+      final res = await http.get(Uri.parse('$v1Base/me'),
+          headers: {'Authorization': 'Bearer $token'}).withTimeout();
       if (res.statusCode == 200 && mounted) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final profile = data['profile'] as Map<String, dynamic>?;
@@ -73,7 +74,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _unitSystem = profile['unitSystem'] as String? ?? 'metric';
             final bw = profile['bodyweightKg'] ?? profile['bodweightKg'];
             if (bw != null) {
-              final v = bw is num ? bw.toDouble() : double.tryParse(bw.toString());
+              final v =
+                  bw is num ? bw.toDouble() : double.tryParse(bw.toString());
               if (v != null) _weightKg = v.clamp(_weightMin, _weightMax);
             }
             final h = profile['heightCm'];
@@ -86,8 +88,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           });
         }
       } else if (mounted && res.statusCode != 200) {
-        setState(() =>
-            _loadError = 'Could not load your data (${res.statusCode}).');
+        setState(
+            () => _loadError = 'Could not load your data (${res.statusCode}).');
       }
     } catch (e) {
       debugPrint('Physical data load error: $e');
@@ -168,95 +170,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: ZveltTokens.bg,
       appBar: AppBar(title: const Text('Physical data')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: ZveltTokens.brand))
+          ? const ZPageSkeleton(showHeader: false, itemCount: 4)
           : _loadError != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(ZveltTokens.s8),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(AppIcons.cloud_disabled,
-                            color: ZveltTokens.text2, size: 40),
-                        const SizedBox(height: ZveltTokens.s3),
-                        Text(
-                          _loadError!,
-                          textAlign: TextAlign.center,
-                          style: ZType.bodyM.copyWith(color: ZveltTokens.text2),
-                        ),
-                        const SizedBox(height: ZveltTokens.s4),
-                        FilledButton(
-                          onPressed: _load,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
+              ? ZveltErrorState(
+                  tier: ZveltErrorTier.network,
+                  title: 'Could not load physical data',
+                  message: _loadError,
+                  onRetry: _load,
                 )
               : ListView(
-              padding: const EdgeInsets.fromLTRB(ZveltTokens.s4, ZveltTokens.s2, ZveltTokens.s4, ZveltTokens.s10),
-              children: [
-                _SliderCard(
-                  label: 'Body weight',
-                  value: _weightDisplay,
-                  icon: AppIcons.balance_scale_left,
-                  sliderValue: _weightKg,
-                  min: _weightMin,
-                  max: _weightMax,
-                  divisions: (_weightMax - _weightMin).round(),
-                  onChanged: (v) => setState(() => _weightKg = v),
-                ),
-                const SizedBox(height: ZveltTokens.s3),
-                _SliderCard(
-                  label: 'Height',
-                  value: _heightDisplay,
-                  icon: AppIcons.ruler_horizontal,
-                  sliderValue: _heightCm,
-                  min: _heightMin,
-                  max: _heightMax,
-                  divisions: (_heightMax - _heightMin).round(),
-                  onChanged: (v) => setState(() => _heightCm = v),
-                ),
-                const SizedBox(height: ZveltTokens.s3),
-                _SegmentCard(
-                  label: 'Biological sex',
-                  icon: AppIcons.user,
-                  options: const [
-                    _Opt('male', 'Male'),
-                    _Opt('female', 'Female'),
-                    _Opt('other', 'Other'),
+                  padding: const EdgeInsets.fromLTRB(ZveltTokens.s4,
+                      ZveltTokens.s2, ZveltTokens.s4, ZveltTokens.s10),
+                  children: [
+                    _SliderCard(
+                      label: 'Body weight',
+                      value: _weightDisplay,
+                      icon: AppIcons.balance_scale_left,
+                      sliderValue: _weightKg,
+                      min: _weightMin,
+                      max: _weightMax,
+                      divisions: (_weightMax - _weightMin).round(),
+                      onChanged: (v) => setState(() => _weightKg = v),
+                    ),
+                    const SizedBox(height: ZveltTokens.s3),
+                    _SliderCard(
+                      label: 'Height',
+                      value: _heightDisplay,
+                      icon: AppIcons.ruler_horizontal,
+                      sliderValue: _heightCm,
+                      min: _heightMin,
+                      max: _heightMax,
+                      divisions: (_heightMax - _heightMin).round(),
+                      onChanged: (v) => setState(() => _heightCm = v),
+                    ),
+                    const SizedBox(height: ZveltTokens.s3),
+                    _SegmentCard(
+                      label: 'Biological sex',
+                      icon: AppIcons.user,
+                      options: const [
+                        _Opt('male', 'Male'),
+                        _Opt('female', 'Female'),
+                        _Opt('other', 'Other'),
+                      ],
+                      selected: _sex,
+                      onChanged: (v) => setState(() => _sex = v),
+                    ),
+                    const SizedBox(height: ZveltTokens.s3),
+                    _BirthYearCard(
+                      birthYear: _birthYear,
+                      onChanged: (v) => setState(() => _birthYear = v),
+                    ),
+                    const SizedBox(height: ZveltTokens.s8),
+                    FilledButton(
+                      onPressed: _saving ? null : _save,
+                      child: _saving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                  color: ZveltTokens.onBrand, strokeWidth: 2),
+                            )
+                          : const Text('Save'),
+                    ),
+                    const SizedBox(height: ZveltTokens.s3),
+                    Text(
+                      'Body weight is required for strength rankings. Height and sex improve accuracy.',
+                      style: ZType.bodyS.copyWith(
+                        color: ZveltTokens.text2,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ],
-                  selected: _sex,
-                  onChanged: (v) => setState(() => _sex = v),
                 ),
-                const SizedBox(height: ZveltTokens.s3),
-                _BirthYearCard(
-                  birthYear: _birthYear,
-                  onChanged: (v) => setState(() => _birthYear = v),
-                ),
-                const SizedBox(height: ZveltTokens.s8),
-                FilledButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: ZveltTokens.onBrand, strokeWidth: 2),
-                        )
-                      : const Text('Save'),
-                ),
-                const SizedBox(height: ZveltTokens.s3),
-                Text(
-                  'Body weight is required for strength rankings. Height and sex improve accuracy.',
-                  style: ZType.bodyS.copyWith(
-                    color: ZveltTokens.text2,
-                    fontSize: 12,
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
     );
   }
 }
@@ -297,14 +284,14 @@ class _SliderCard extends StatelessWidget {
                 padding: const EdgeInsets.all(ZveltTokens.s2),
                 decoration: BoxDecoration(
                   color: ZveltTokens.brandTint,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(ZveltTokens.rSm),
                 ),
                 child: Icon(icon, color: ZveltTokens.brand, size: 14),
               ),
               const SizedBox(width: 10),
               Text(label,
-                  style: ZType.bodyM.copyWith(
-                      color: ZveltTokens.text2, fontSize: 13)),
+                  style: ZType.bodyM
+                      .copyWith(color: ZveltTokens.text2, fontSize: 13)),
               const Spacer(),
               Text(
                 value,
@@ -374,14 +361,14 @@ class _SegmentCard extends StatelessWidget {
                 padding: const EdgeInsets.all(ZveltTokens.s2),
                 decoration: BoxDecoration(
                   color: ZveltTokens.brandTint,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(ZveltTokens.rSm),
                 ),
                 child: Icon(icon, color: ZveltTokens.brand, size: 14),
               ),
               const SizedBox(width: 10),
               Text(label,
-                  style: ZType.bodyM.copyWith(
-                      color: ZveltTokens.text2, fontSize: 13)),
+                  style: ZType.bodyM
+                      .copyWith(color: ZveltTokens.text2, fontSize: 13)),
             ],
           ),
           const SizedBox(height: ZveltTokens.s3),
@@ -403,12 +390,11 @@ class _SegmentCard extends StatelessWidget {
                       alignment: Alignment.center,
                       child: Text(
                         options[i].label,
-                        style: TextStyle(
-                          fontFamily: ZveltTokens.fontPrimary,
-                          fontSize: 13,
+                        style: ZType.bodyS.copyWith(
                           fontWeight: FontWeight.w700,
+                          height: 1.2,
                           color: options[i].value == selected
-                              ? Colors.white
+                              ? ZveltTokens.onBrand
                               : ZveltTokens.text2,
                         ),
                       ),
@@ -443,20 +429,19 @@ class _BirthYearCard extends StatelessWidget {
             padding: const EdgeInsets.all(ZveltTokens.s2),
             decoration: BoxDecoration(
               color: ZveltTokens.brandTint,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(ZveltTokens.rSm),
             ),
             child: const Icon(AppIcons.cake_birthday,
                 color: ZveltTokens.brand, size: 14),
           ),
           const SizedBox(width: 10),
           Text('Birth year',
-              style: ZType.bodyM.copyWith(
-                  color: ZveltTokens.text2, fontSize: 13)),
+              style:
+                  ZType.bodyM.copyWith(color: ZveltTokens.text2, fontSize: 13)),
           const Spacer(),
           Text(
             birthYear != null ? '$birthYear' : 'Optional',
-            style: TextStyle(
-              fontFamily: ZveltTokens.fontMono,
+            style: ZType.num_.copyWith(
               color: birthYear != null ? ZveltTokens.text : ZveltTokens.text3,
               fontSize: 15,
               fontWeight: birthYear != null ? FontWeight.w700 : FontWeight.w500,
@@ -472,17 +457,18 @@ class _BirthYearCard extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     final now = DateTime.now().year;
     final years = List.generate(now - 1919, (i) => now - 14 - i);
-    final initIndex = birthYear != null
-        ? years.indexOf(birthYear!)
-        : years.indexOf(now - 25);
-    final ctrl = FixedExtentScrollController(initialItem: initIndex.clamp(0, years.length - 1));
+    final initIndex =
+        birthYear != null ? years.indexOf(birthYear!) : years.indexOf(now - 25);
+    final ctrl = FixedExtentScrollController(
+        initialItem: initIndex.clamp(0, years.length - 1));
     int? picked = birthYear;
 
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: ZveltTokens.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
       ),
       builder: (ctx) => SizedBox(
         height: 300,
@@ -503,7 +489,8 @@ class _BirthYearCard extends StatelessWidget {
                 children: [
                   Text(
                     'Birth year',
-                    style: ZType.h3.copyWith(color: ZveltTokens.text, fontSize: 15),
+                    style: ZType.h3
+                        .copyWith(color: ZveltTokens.text, fontSize: 15),
                   ),
                   const Spacer(),
                   TextButton(
@@ -512,7 +499,9 @@ class _BirthYearCard extends StatelessWidget {
                       Navigator.pop(ctx);
                     },
                     child: Text('Clear',
-                        style: TextStyle(color: ZveltTokens.text2, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: ZveltTokens.text2,
+                            fontWeight: FontWeight.w600)),
                   ),
                   TextButton(
                     onPressed: () {
@@ -541,12 +530,7 @@ class _BirthYearCard extends StatelessWidget {
                   builder: (ctx, i) => Center(
                     child: Text(
                       '${years[i]}',
-                      style: TextStyle(
-                        fontFamily: ZveltTokens.fontMono,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: ZveltTokens.text,
-                      ),
+                      style: ZType.stat.copyWith(fontSize: 20),
                     ),
                   ),
                 ),

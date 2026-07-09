@@ -7,11 +7,11 @@ import '../../services/social_challenge_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import 'challenge_kind_picker_screen.dart';
 
-/// Bottom sheet: creează o provocare (vizibilitate prieteni / public).
+/// Bottom sheet: create a challenge (friends / public visibility).
 class CreateChallengeSheet extends StatefulWidget {
   const CreateChallengeSheet({super.key});
 
-  /// Tag comun pentru [Hero] între declanșator și [ChallengeKindPickerPage].
+  /// Shared tag for the [Hero] between the trigger and [ChallengeKindPickerPage].
   static const String challengeKindHeroTag = 'zvelt_create_challenge_kind';
 
   @override
@@ -65,14 +65,16 @@ class _CreateChallengeSheetState extends State<CreateChallengeSheet> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(
+            backgroundColor: ZveltTokens.error,
+            content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
       setState(() => _saving = false);
     }
   }
 
   Future<void> _openKindPicker() async {
-    // Fără rootNavigator: Hero trebuie să rămână pe același Navigator cu modalul bottom sheet.
+    // No rootNavigator: the Hero must stay on the same Navigator as the modal bottom sheet.
     final picked = await Navigator.of(context).push<ChallengeCatalogEntry?>(
       ChallengeKindPickerPage.route(
         heroTag: CreateChallengeSheet.challengeKindHeroTag,
@@ -117,16 +119,12 @@ class _CreateChallengeSheetState extends State<CreateChallengeSheet> {
                 const SizedBox(height: 8),
                 Text(
                   'Friends see friends-only challenges; public is visible to everyone active on the app. Offline creates are saved on device and retry when you refresh.',
-                  style: TextStyle(color: ZveltTokens.text2, fontSize: 12, height: 1.35),
+                  style: ZType.monoS.copyWith(height: 1.35),
                 ),
                 const SizedBox(height: ZveltTokens.s5),
                 Text(
                   'Who can see it?',
-                  style: TextStyle(
-                    color: ZveltTokens.text2,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: ZType.monoS.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<String>(
@@ -147,11 +145,7 @@ class _CreateChallengeSheetState extends State<CreateChallengeSheet> {
                 const SizedBox(height: ZveltTokens.s5),
                 Text(
                   'Challenge type',
-                  style: TextStyle(
-                    color: ZveltTokens.text2,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: ZType.monoS.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 10),
                 Hero(
@@ -182,11 +176,7 @@ class _CreateChallengeSheetState extends State<CreateChallengeSheet> {
                                 children: [
                                   Text(
                                     'Tap to choose',
-                                    style: TextStyle(
-                                      color: ZveltTokens.text2,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: ZType.monoS.copyWith(fontWeight: FontWeight.w600),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
@@ -229,11 +219,7 @@ class _CreateChallengeSheetState extends State<CreateChallengeSheet> {
                 const SizedBox(height: ZveltTokens.s4),
                 Text(
                   'Duration',
-                  style: TextStyle(
-                    color: ZveltTokens.text2,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: ZType.monoS.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 Wrap(

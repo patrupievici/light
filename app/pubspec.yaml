@@ -22,7 +22,6 @@ dependencies:
   # (Android). Min Android API 23; we ship minSdk=28, so this is safe.
   flutter_secure_storage: ^9.2.4
   google_sign_in: ^6.2.2
-  health: ^13.3.1
   flutter_svg: ^2.0.10+1
   image_picker: ^1.0.7
   # Calendar UI — Apache-2.0, https://github.com/aleksanderwozniak/table_calendar
@@ -59,8 +58,6 @@ dependencies:
   uuid: ^4.5.1
   intl: any
   package_info_plus: ^9.0.1
-  # Health Connect incremental sync (Wave 8). Android-only WorkManager wrapper.
-  workmanager: ^0.9.0+3
   # Wave 19b — disk-backed image cache. Flutter's default ImageCache is in-memory
   # only (100MB, evicted on pressure), so every screen revisit re-downloads from
   # network. Killer for retention on cellular. cached_network_image stores

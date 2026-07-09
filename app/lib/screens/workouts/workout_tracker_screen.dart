@@ -330,6 +330,12 @@ class _WorkoutTrackerScreenState extends State<WorkoutTrackerScreen> {
     });
     try {
       final w = await _service.getWorkout(widget.workoutId);
+      if (w.endedAt == null && w.status.toLowerCase() != 'completed') {
+        await WorkoutService.saveActiveWorkoutPointer(
+          w,
+          label: w.sessionTitle ?? 'Workout',
+        );
+      }
       if (!mounted) return;
       _elapsed.value = DateTime.now().difference(w.startedAt);
       setState(() {

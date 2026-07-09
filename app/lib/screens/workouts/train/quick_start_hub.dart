@@ -176,7 +176,7 @@ class _QuickStartHubState extends State<QuickStartHub> {
         margin: const EdgeInsets.only(bottom: 22),
         child: Material(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: BorderRadius.circular(ZveltTokens.rSm),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: widget.onClose,
@@ -185,7 +185,7 @@ class _QuickStartHubState extends State<QuickStartHub> {
               height: 5,
               decoration: BoxDecoration(
                 color: ZveltTokens.surface3,
-                borderRadius: BorderRadius.circular(9),
+                borderRadius: BorderRadius.circular(ZveltTokens.rSm),
               ),
             ),
           ),
@@ -229,25 +229,16 @@ class _QuickStartHubState extends State<QuickStartHub> {
               children: [
                 Text(
                   'Quick Start',
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontPrimary,
+                  style: ZType.h1.copyWith(
                     fontWeight: FontWeight.w800,
-                    fontSize: 28,
                     letterSpacing: -0.02 * 28,
                     height: 1.1,
-                    color: ZveltTokens.text,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Start your next workout or choose what to train.',
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontPrimary,
-                    fontWeight: FontWeight.w400,
-                    fontSize: 13,
-                    height: 1.4,
-                    color: ZveltTokens.text2,
-                  ),
+                  style: ZType.bodyS.copyWith(height: 1.4),
                 ),
               ],
             ),
@@ -289,17 +280,13 @@ class _QuickStartHubState extends State<QuickStartHub> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFE85D04), Color(0xFFF48C06)],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        color: ZveltTokens.challenge,
+        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x61E85D04),
+            color: ZveltTokens.challenge.withValues(alpha: 0.38),
             blurRadius: 28,
-            offset: Offset(0, 12),
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -316,19 +303,20 @@ class _QuickStartHubState extends State<QuickStartHub> {
           ],
           const SizedBox(height: 16),
           ClipRRect(
-            borderRadius: BorderRadius.circular(9),
+            borderRadius: BorderRadius.circular(ZveltTokens.rSm),
             child: LinearProgressIndicator(
               value: d.resumeProgress.clamp(0.0, 1.0),
               minHeight: 6,
-              backgroundColor: Colors.white.withValues(alpha: 0.18),
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              backgroundColor: ZveltTokens.onBrand.withValues(alpha: 0.18),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(ZveltTokens.onBrand),
             ),
           ),
           const SizedBox(height: 16),
           _solidCta(
             label: 'Resume →',
-            bg: Colors.white,
-            fg: const Color(0xFFE85D04),
+            bg: ZveltTokens.onBrand,
+            fg: ZveltTokens.challenge,
             onTap: widget.onResume,
           ),
         ],
@@ -343,7 +331,7 @@ class _QuickStartHubState extends State<QuickStartHub> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: ZveltTokens.gradBrand,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
         boxShadow: ZveltTokens.glowBrand,
       ),
       child: Column(
@@ -364,7 +352,7 @@ class _QuickStartHubState extends State<QuickStartHub> {
           const SizedBox(height: 16),
           _solidCta(
             label: 'Start →',
-            bg: Colors.white,
+            bg: ZveltTokens.onBrand,
             fg: ZveltTokens.brand,
             onTap: widget.onStartNext,
           ),

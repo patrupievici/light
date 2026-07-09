@@ -275,7 +275,7 @@ class _ShimmerLinesState extends State<_ShimmerLines>
         width: width,
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(ZveltTokens.rSm),
         ),
       );
 }

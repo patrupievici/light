@@ -131,8 +131,8 @@ class ZveltAvatar extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           _initials,
-          style: TextStyle(
-            color: Colors.white,
+          style: ZType.clean.copyWith(
+            color: ZveltTokens.onBrand,
             fontSize: size.initialsFontSize,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.2,

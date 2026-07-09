@@ -383,12 +383,7 @@ class _SkeletonProfileTabState extends State<SkeletonProfileTab> {
             child: Center(
               child: Text(
                 'Profile',
-                style: TextStyle(
-                  fontFamily: ZveltTokens.fontPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: ZveltTokens.text,
-                ),
+                style: ZType.h4.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -658,11 +653,10 @@ class _ProfileHero extends StatelessWidget {
               ),
               child: Text(
                 _tierLabel,
-                style: const TextStyle(
-                  fontFamily: ZveltTokens.fontPrimary,
-                  fontSize: 11,
+                style: ZType.monoXS.copyWith(
                   fontWeight: FontWeight.w600,
                   color: ZveltTokens.brandDeep,
+                  height: 1.2,
                 ),
               ),
             ),
@@ -683,11 +677,10 @@ class _ProfileHero extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     '${streak}d',
-                    style: TextStyle(
-                      fontFamily: ZveltTokens.fontPrimary,
-                      fontSize: 11,
+                    style: ZType.monoXS.copyWith(
                       fontWeight: FontWeight.w600,
                       color: ZveltTokens.text,
+                      height: 1.2,
                     ),
                   ),
                 ],

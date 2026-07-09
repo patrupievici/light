@@ -3,6 +3,7 @@ import 'package:zvelt_app/theme/app_icons.dart';
 
 import '../../theme/zvelt_tokens.dart';
 import '../../services/ai_chat_service.dart';
+import '../../services/workout_service.dart';
 import '../workouts/workout_tracker_screen.dart';
 
 /// Chat AI prin backend DeepSeek (todo #31 / #26).
@@ -110,6 +111,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
       setState(() => _msgs.add(_Msg(role: 'assistant', text: reply)));
       if (createdWorkout is Map && createdWorkout['id'] is String) {
         final workoutId = createdWorkout['id'] as String;
+        final rawStartedAt = createdWorkout['startedAt'];
+        await WorkoutService.saveActiveWorkoutPointerById(
+          workoutId: workoutId,
+          startedAt:
+              rawStartedAt is String ? DateTime.tryParse(rawStartedAt) : null,
+          label: 'AI workout',
+        );
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('New workout created from AI plan. Opening tracker...'),

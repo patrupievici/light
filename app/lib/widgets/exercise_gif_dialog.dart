@@ -29,7 +29,7 @@ class ExerciseGifDialog extends StatefulWidget {
   }) {
     return showDialog<void>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5), // scrim
       builder: (_) => ExerciseGifDialog(
         exerciseName: exerciseName,
         service: service,
@@ -147,9 +147,7 @@ class _DialogHeader extends StatelessWidget {
               children: [
                 Text(
                   'REFERENCE',
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontPrimary,
-                    fontWeight: FontWeight.w500,
+                  style: ZType.eyebrow.copyWith(
                     fontSize: 11,
                     letterSpacing: 1.2,
                     color: ZveltTokens.text2,
@@ -465,10 +463,8 @@ class _Chip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontFamily: ZveltTokens.fontPrimary,
+        style: ZType.monoXS.copyWith(
           fontWeight: FontWeight.w500,
-          fontSize: 11,
           letterSpacing: 0.2,
           color: emphasis ? ZveltTokens.brand : ZveltTokens.text,
         ),
@@ -485,9 +481,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: TextStyle(
-        fontFamily: ZveltTokens.fontPrimary,
-        fontWeight: FontWeight.w500,
+      style: ZType.eyebrow.copyWith(
         fontSize: 11,
         letterSpacing: 1.2,
         color: ZveltTokens.text2,

@@ -83,7 +83,9 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       await _service.joinChallenge(widget.challengeId);
       await _load();
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      messenger.showSnackBar(SnackBar(
+          backgroundColor: ZveltTokens.error,
+          content: Text(e.toString().replaceFirst('Exception: ', ''))));
     } finally {
       if (mounted) setState(() => _acting = false);
     }
@@ -114,7 +116,9 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
       messenger.showSnackBar(const SnackBar(content: Text('Shared to your feed')));
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      messenger.showSnackBar(SnackBar(
+          backgroundColor: ZveltTokens.error,
+          content: Text(e.toString().replaceFirst('Exception: ', ''))));
     } finally {
       if (mounted) setState(() => _sharing = false);
     }
@@ -229,13 +233,13 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(typeLabel.toUpperCase(),
-              style: ZType.eyebrow.copyWith(color: Colors.white.withValues(alpha: 0.85), letterSpacing: 0.1 * 10)),
+              style: ZType.eyebrow.copyWith(color: ZveltTokens.onBrand.withValues(alpha: 0.85), letterSpacing: 0.1 * 10)),
           const SizedBox(height: 8),
           Text(widget.title?.trim().isNotEmpty == true ? widget.title!.trim() : typeLabel,
-              style: ZType.h2.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+              style: ZType.h2.copyWith(color: ZveltTokens.onBrand, fontWeight: FontWeight.w700)),
           if (_daysLeft().isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(_daysLeft(), style: ZType.bodyS.copyWith(color: Colors.white.withValues(alpha: 0.85))),
+            Text(_daysLeft(), style: ZType.bodyS.copyWith(color: ZveltTokens.onBrand.withValues(alpha: 0.85))),
           ],
         ],
       ),

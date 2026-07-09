@@ -36,7 +36,7 @@ class GameXpBarCard extends StatelessWidget {
                     padding: const EdgeInsets.all(ZveltTokens.s2),
                     decoration: BoxDecoration(
                       color: ZveltTokens.brandTint,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(ZveltTokens.rSm),
                     ),
                     child: const Icon(AppIcons.bolt, color: ZveltTokens.brand, size: 16),
                   ),

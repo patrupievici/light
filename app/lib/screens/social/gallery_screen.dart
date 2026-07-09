@@ -208,12 +208,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
           Expanded(
             child: Text(
               'EXPLORE MOMENTUM',
-              style: TextStyle(
-                fontFamily: ZveltTokens.fontPrimary,
-                fontSize: 18,
+              style: ZType.h4.copyWith(
                 fontWeight: FontWeight.w900,
                 fontStyle: FontStyle.italic,
-                color: ZveltTokens.text,
                 letterSpacing: 1.5,
               ),
             ),
@@ -261,12 +258,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 alignment: Alignment.center,
                 child: Text(
                   f.toUpperCase(),
-                  style: TextStyle(
+                  style: ZType.monoXS.copyWith(
+                    height: 1.2,
                     color: sel ? ZveltTokens.bg : ZveltTokens.text2,
-                    fontSize: 11,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.6,
-                    fontFamily: ZveltTokens.fontPrimary,
                   ),
                 ),
               ),
@@ -404,20 +400,20 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
+                      color: Colors.black.withValues(alpha: 0.55), // scrim
                       borderRadius: BorderRadius.circular(ZveltTokens.rPill),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(AppIcons.heart,
-                            color: Colors.redAccent, size: 9),
+                            color: ZveltTokens.cardio, size: 9),
                         const SizedBox(width: 3),
                         Text(
                           '$likes',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
+                          style: ZType.monoXS.copyWith(
+                            height: 1.2,
+                            color: Colors.white, // on-image
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -448,7 +444,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
             gradient: RadialGradient(
               center: const Alignment(0, 0.4),
               radius: 0.8,
-              colors: [Colors.black.withValues(alpha: 0.35), Colors.transparent],
+              colors: [Colors.black.withValues(alpha: 0.35), Colors.transparent], // scrim
             ),
           ),
         ),
@@ -465,14 +461,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.45),
+              color: Colors.black.withValues(alpha: 0.45), // scrim
               borderRadius: BorderRadius.circular(ZveltTokens.rPill),
             ),
             child: Text(
               initials,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
+              style: ZType.monoXS.copyWith(
+                height: 1.2,
+                color: Colors.white, // on-image
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.8,
               ),
@@ -536,7 +532,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
 class _SilhouettePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = Colors.white;
+    final p = Paint()..color = Colors.white; // on-image (decorative silhouette on gradient)
     canvas.drawCircle(
         Offset(size.width / 2, size.height * 0.15), size.width * 0.22, p);
     final body = Path()

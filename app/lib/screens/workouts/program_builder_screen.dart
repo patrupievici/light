@@ -178,6 +178,7 @@ class _ProgramBuilderScreenState extends State<ProgramBuilderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: ZveltTokens.error,
         ),
       );
     }

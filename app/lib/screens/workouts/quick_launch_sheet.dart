@@ -99,7 +99,7 @@ const _kAllPresets = <FabPreset>[
     subtitle: 'Speed · Elev · Distance',
     tagline: 'Ride out',
     icon: AppIcons.bike,
-    accent: [Color(0xFF4DA3FF), Color(0xFF1E5BCC)],
+    accent: [ZveltTokens.recovery, ZveltTokens.brandDeep],
   ),
   FabPreset(
     id: 'walk',
@@ -108,7 +108,7 @@ const _kAllPresets = <FabPreset>[
     subtitle: 'Distance · Pace · Time',
     tagline: 'Step out',
     icon: AppIcons.running,
-    accent: [ZveltTokens.info, Color(0xFF1E5BCC)],
+    accent: [ZveltTokens.info, ZveltTokens.brandDeep],
   ),
   FabPreset(
     id: 'push',
@@ -134,7 +134,7 @@ const _kAllPresets = <FabPreset>[
     subtitle: 'Back · Biceps · Rear Delts',
     tagline: 'Pull hard',
     icon: AppIcons.gym,
-    accent: [Color(0xFF1E5BCC), Color(0xFF4DA3FF)],
+    accent: [ZveltTokens.brandDeep, ZveltTokens.recovery],
     exercises: [
       _GymExercise('Deadlift', 4, '5', '140 kg'),
       _GymExercise('Pull-Ups', 4, '6-10', 'BW'),
@@ -151,7 +151,7 @@ const _kAllPresets = <FabPreset>[
     subtitle: 'Quads · Hamstrings · Calves',
     tagline: 'Grind it',
     icon: AppIcons.gym,
-    accent: [Color(0xFF7C3AED), Color(0xFFA855F7)],
+    accent: [ZveltTokens.brandDeep, ZveltTokens.sleep],
     exercises: [
       _GymExercise('Back Squat', 5, '5', '120 kg'),
       _GymExercise('Romanian Deadlift', 4, '8', '100 kg'),
@@ -184,7 +184,7 @@ const _kAllPresets = <FabPreset>[
     subtitle: 'Chest · Back · Shoulders · Arms',
     tagline: 'Upper cut',
     icon: AppIcons.gym,
-    accent: [Color(0xFF22C55E), Color(0xFF0F8C40)],
+    accent: [ZveltTokens.strength, ZveltTokens.success],
     exercises: [
       _GymExercise('Bench Press', 4, '6-8', '80 kg'),
       _GymExercise('Pull-Ups', 4, '6-8', '+10 kg'),
@@ -201,7 +201,7 @@ const _kAllPresets = <FabPreset>[
     subtitle: 'Legs · Glutes · Core',
     tagline: 'Leg press',
     icon: AppIcons.gym,
-    accent: [Color(0xFFEAB308), Color(0xFFFFB14A)],
+    accent: [ZveltTokens.stress, ZveltTokens.challenge],
     exercises: [
       _GymExercise('Front Squat', 4, '6', '95 kg'),
       _GymExercise('Hip Thrust', 4, '8', '110 kg'),
@@ -733,7 +733,7 @@ class ActiveWorkoutView extends StatefulWidget {
           subtitle: 'Your session',
           tagline: 'Let\'s go',
           icon: AppIcons.gym,
-          accent: [ZveltTokens.info, Color(0xFF4DA3FF)],
+          accent: [ZveltTokens.info, ZveltTokens.recovery],
         ),
         existingWorkoutId = workoutId;
 
@@ -1136,7 +1136,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
       backgroundColor: ZveltTokens.surface,
       shape: const RoundedRectangleBorder(
         borderRadius:
-            BorderRadius.vertical(top: Radius.circular(ZveltTokens.rLg)),
+            BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
       ),
       builder: (ctx) => SafeArea(
         child: Column(
@@ -1455,18 +1455,15 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
           children: [
             Text(
               widget.preset.name,
-              style: TextStyle(
-                fontFamily: ZveltTokens.fontPrimary,
+              style: ZType.h4.copyWith(
                 color: ZveltTokens.text2,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Starting in',
-              style: TextStyle(color: ZveltTokens.text2, fontSize: 13),
+              style: ZType.bodyS,
             ),
             const SizedBox(height: 40),
             ScaleTransition(
@@ -1474,11 +1471,11 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                   parent: _countdownScale, curve: Curves.elasticOut),
               child: Text(
                 _countdownValue > 0 ? '$_countdownValue' : 'GO!',
-                style: TextStyle(
-                  fontFamily: ZveltTokens.fontPrimary,
+                style: ZType.display.copyWith(
                   fontStyle: FontStyle.italic,
                   fontSize: 200,
                   fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
                   height: 0.9,
                   color: ZveltTokens.text,
                   shadows: [
@@ -1495,7 +1492,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
                 'Cancel',
-                style: TextStyle(color: ZveltTokens.text2, fontSize: 15),
+                style: ZType.bodyM.copyWith(color: ZveltTokens.text2),
               ),
             ),
           ],
@@ -1621,8 +1618,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                   Expanded(
                     child: Text(
                       _cardioError!,
-                      style: const TextStyle(
-                          color: ZveltTokens.error, fontSize: 12),
+                      style: ZType.monoS.copyWith(color: ZveltTokens.error),
                     ),
                   ),
                   TextButton(
@@ -1632,9 +1628,10 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       foregroundColor: ZveltTokens.brand,
                     ),
-                    child: const Text('Retry',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 12)),
+                    child: Text('Retry',
+                        style: ZType.monoS.copyWith(
+                            color: ZveltTokens.brand,
+                            fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
@@ -1650,11 +1647,12 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
               color: ZveltTokens.surface,
               borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(ZveltTokens.rLg)),
-              boxShadow: const [
+              // Upward shadow (bottom-anchored panel) with the token shadow tint.
+              boxShadow: [
                 BoxShadow(
-                    color: Color(0x33000000),
+                    color: ZveltTokens.shadowFloat.first.color,
                     blurRadius: 18,
-                    offset: Offset(0, -4)),
+                    offset: const Offset(0, -4)),
               ],
             ),
             child: SafeArea(
@@ -1670,7 +1668,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                         if (avgKmh > 0) '${avgKmh.toStringAsFixed(1)} km/h avg',
                         _cardioTracking ? 'GPS live' : 'GPS —',
                       ].join(' · '),
-                      style: TextStyle(color: ZveltTokens.text2, fontSize: 12),
+                      style: ZType.monoS,
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -1798,7 +1796,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                       children: [
                         Text(
                           widget.preset.name.toUpperCase(),
-                          style: TextStyle(
+                          style: ZType.eyebrow.copyWith(
                             color: ZveltTokens.text2,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -1860,8 +1858,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Text(
                       _bootstrapError!,
-                      style: const TextStyle(
-                          color: ZveltTokens.warn, fontSize: 12),
+                      style: ZType.monoS.copyWith(color: ZveltTokens.warn),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -1888,7 +1885,7 @@ class _ActiveWorkoutViewState extends State<ActiveWorkoutView>
                 // Exercise list
                 Text(
                   'EXERCISES',
-                  style: TextStyle(
+                  style: ZType.eyebrow.copyWith(
                     color: ZveltTokens.text2,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -1956,17 +1953,12 @@ class _SetCard extends StatelessWidget {
           Text(
             exercise.name,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: ZveltTokens.fontPrimary,
-              color: ZveltTokens.text,
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-            ),
+            style: ZType.h2.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),
           Text(
             'Set ${currentSet + 1} of ${exercise.sets}',
-            style: TextStyle(color: ZveltTokens.text2, fontSize: 13),
+            style: ZType.bodyS,
           ),
           const SizedBox(height: 20),
           Row(
@@ -1999,8 +1991,8 @@ class _SetCard extends StatelessWidget {
               ),
               child: Text(
                 busy ? 'Saving…' : 'Done Set ✓',
-                style:
-                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: ZType.bodyM.copyWith(
+                    color: ZveltTokens.onBrand, fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -2030,7 +2022,7 @@ class _SetStat extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(color: ZveltTokens.text2, fontSize: 12),
+          style: ZType.monoS,
         ),
       ],
     );
@@ -2079,9 +2071,8 @@ class _RestTimerCard extends StatelessWidget {
         children: [
           Text(
             'REST',
-            style: TextStyle(
+            style: ZType.monoS.copyWith(
               color: accent.first,
-              fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 2,
             ),
@@ -2099,7 +2090,7 @@ class _RestTimerCard extends StatelessWidget {
           ),
           Text(
             'seconds',
-            style: TextStyle(color: ZveltTokens.text2, fontSize: 13),
+            style: ZType.bodyS,
           ),
           const SizedBox(height: 6),
           LinearProgressIndicator(
@@ -2191,9 +2182,8 @@ class _ExerciseListRow extends StatelessWidget {
               children: [
                 Text(
                   exercise.name,
-                  style: TextStyle(
+                  style: ZType.bodyS.copyWith(
                     color: done ? ZveltTokens.text2 : ZveltTokens.text,
-                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     decoration: done ? TextDecoration.lineThrough : null,
                   ),
@@ -2203,11 +2193,7 @@ class _ExerciseListRow extends StatelessWidget {
                   // user's actual lifting weight. Mark it as such so new users
                   // don't think we're claiming they bench 80kg.
                   '${exercise.sets} × ${exercise.repsRange} · suggested ${exercise.weight}',
-                  style: TextStyle(
-                    color: ZveltTokens.text2,
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
+                  style: ZType.monoS.copyWith(fontStyle: FontStyle.italic),
                 ),
               ],
             ),
@@ -2215,19 +2201,16 @@ class _ExerciseListRow extends StatelessWidget {
           if (current)
             Text(
               '${currentSet + 1}/${exercise.sets}',
-              style: TextStyle(
+              style: ZType.bodyS.copyWith(
                 color: accent,
-                fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),
           if (done)
-            const Text(
+            Text(
               '✓',
-              style: TextStyle(
-                  color: ZveltTokens.success,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700),
+              style: ZType.bodyS.copyWith(
+                  color: ZveltTokens.success, fontWeight: FontWeight.w700),
             ),
         ],
       ),
@@ -2292,9 +2275,8 @@ class _RecordingPillState extends State<_RecordingPill>
           const SizedBox(width: 6),
           Text(
             widget.recording ? 'REC' : 'PAUSED',
-            style: TextStyle(
+            style: ZType.monoS.copyWith(
               color: ZveltTokens.text,
-              fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,
             ),

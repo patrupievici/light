@@ -305,12 +305,11 @@ class _ProgressHubScreenState extends State<ProgressHubScreen> {
                 alignment: Alignment.center,
                 child: Text(
                   _tabs[i],
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontPrimary,
-                    fontSize: 12,
+                  style: ZType.monoS.copyWith(
                     fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                     letterSpacing: -0.01 * 12,
                     color: active ? ZveltTokens.text : ZveltTokens.text3,
+                    height: 1.2,
                   ),
                 ),
               ),
@@ -889,12 +888,11 @@ class _ChipBadge extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            fontFamily: ZveltTokens.fontMono,
-            fontSize: 11,
+          style: ZType.monoXS.copyWith(
             fontWeight: FontWeight.w600,
             color: ZveltTokens.brandDeep,
             letterSpacing: 0.02 * 11,
+            height: 1.2,
           ),
         ),
       );
@@ -961,19 +959,20 @@ class _PhotoProgressCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: file != null
-                      ? Colors.black.withValues(alpha: 0.45)
+                      ? Colors.black.withValues(alpha: 0.45) // scrim
                       : ZveltTokens.surface,
                   borderRadius: BorderRadius.circular(ZveltTokens.rPill),
                   boxShadow: file != null ? null : ZveltTokens.shadowCard,
                 ),
                 child: Text(
                   label.toUpperCase(),
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontMono,
-                    fontSize: 11,
+                  style: ZType.monoXS.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: file != null ? Colors.white : ZveltTokens.text2,
+                    color: file != null
+                        ? Colors.white // on-image
+                        : ZveltTokens.text2,
                     letterSpacing: 0.08 * 10,
+                    height: 1.2,
                   ),
                 ),
               ),
@@ -1174,11 +1173,9 @@ class _NutritionTabState extends State<_NutritionTab>
                   const ZEyebrow('Macros · Today'),
                   Text(
                     '${todayKcal.round()} / ${_goals.calories} kcal',
-                    style: TextStyle(
-                      fontFamily: ZveltTokens.fontMono,
-                      fontSize: 11,
-                      color: ZveltTokens.text3,
+                    style: ZType.monoXS.copyWith(
                       fontWeight: FontWeight.w500,
+                      height: 1.2,
                     ),
                   ),
                 ],
@@ -1226,11 +1223,9 @@ class _NutritionTabState extends State<_NutritionTab>
                   const ZEyebrow('Hydration · Today'),
                   Text(
                     '${((today?.waterMl ?? 0) / 1000).toStringAsFixed(1)} / ${(_goals.waterMl / 1000).toStringAsFixed(1)} L',
-                    style: TextStyle(
-                      fontFamily: ZveltTokens.fontMono,
-                      fontSize: 11,
-                      color: ZveltTokens.text3,
+                    style: ZType.monoXS.copyWith(
                       fontWeight: FontWeight.w500,
+                      height: 1.2,
                     ),
                   ),
                 ],
@@ -1310,11 +1305,10 @@ class _NutritionTabState extends State<_NutritionTab>
                       _history.isEmpty
                           ? 'No data yet'
                           : '↑ Logged ${(_loggedDays / _history.length * 100).round()}% of days',
-                      style: const TextStyle(
-                        fontSize: 11,
+                      style: ZType.monoXS.copyWith(
                         color: ZveltTokens.success,
                         fontWeight: FontWeight.w600,
-                        fontFamily: ZveltTokens.fontPrimary,
+                        height: 1.2,
                       ),
                     ),
                   ],
@@ -1369,7 +1363,7 @@ class _HydrationCups extends StatelessWidget {
                 ),
                 child: i < filled
                     ? const Icon(AppIcons.water_bottle,
-                        color: Colors.white, size: 13)
+                        color: ZveltTokens.onBrand, size: 13)
                     : null,
               ),
             ),
@@ -1418,11 +1412,9 @@ class _RecentMealRow extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             '${entry.calories.round()} kcal',
-            style: TextStyle(
-              fontFamily: ZveltTokens.fontMono,
-              fontSize: 12,
+            style: ZType.monoS.copyWith(
               fontWeight: FontWeight.w600,
-              color: ZveltTokens.text2,
+              height: 1.2,
             ),
           ),
         ],
@@ -1462,20 +1454,17 @@ class _MacroRing extends StatelessWidget {
               children: [
                 TextSpan(
                   text: grams,
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontMono,
-                    fontSize: 11,
+                  style: ZType.monoXS.copyWith(
                     fontWeight: FontWeight.w600,
                     color: ZveltTokens.text,
+                    height: 1.2,
                   ),
                 ),
                 TextSpan(
                   text: ' / $total',
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontMono,
-                    fontSize: 11,
-                    color: ZveltTokens.text3,
+                  style: ZType.monoXS.copyWith(
                     fontWeight: FontWeight.w500,
+                    height: 1.2,
                   ),
                 ),
               ],
@@ -1656,8 +1645,7 @@ class _BodyTabState extends State<_BodyTab>
                             ),
                           ],
                         ),
-                        style: TextStyle(
-                            fontSize: 12, color: ZveltTokens.text2),
+                        style: ZType.monoS.copyWith(height: 1.4),
                       ),
                       Text.rich(
                         TextSpan(
@@ -1671,8 +1659,7 @@ class _BodyTabState extends State<_BodyTab>
                             ),
                           ],
                         ),
-                        style: TextStyle(
-                            fontSize: 12, color: ZveltTokens.text2),
+                        style: ZType.monoS.copyWith(height: 1.4),
                       ),
                       if (bf == null) ...[
                         const SizedBox(height: 6),
@@ -1715,11 +1702,11 @@ class _BodyTabState extends State<_BodyTab>
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6, left: 6),
                           child: Text('kg',
-                              style: TextStyle(
-                                fontFamily: ZveltTokens.fontMono,
+                              style: ZType.monoS.copyWith(
                                 fontSize: 13,
                                 color: ZveltTokens.text3,
                                 fontWeight: FontWeight.w500,
+                                height: 1.2,
                               )),
                         ),
                       ],
@@ -1784,12 +1771,11 @@ class _BodyTabState extends State<_BodyTab>
                           color: ZveltTokens.brandTint,
                           borderRadius: BorderRadius.circular(ZveltTokens.rPill),
                         ),
-                        child: const Text('+ Log',
-                            style: TextStyle(
-                              fontFamily: ZveltTokens.fontPrimary,
-                              fontSize: 11,
+                        child: Text('+ Log',
+                            style: ZType.monoXS.copyWith(
                               fontWeight: FontWeight.w600,
                               color: ZveltTokens.brandDeep,
+                              height: 1.2,
                             )),
                       ),
                     ),

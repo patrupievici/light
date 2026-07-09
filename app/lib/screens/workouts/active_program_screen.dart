@@ -70,11 +70,10 @@ class _ActiveProgramScreenState extends State<ActiveProgramScreen> {
 
   void _toast(String msg, Color bg) {
     if (!mounted) return;
+    // Behavior/shape come from the global SnackBarTheme (app_theme.dart).
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
       backgroundColor: bg,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ZveltTokens.rSm)),
     ));
   }
 

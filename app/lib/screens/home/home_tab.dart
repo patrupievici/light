@@ -18,6 +18,7 @@ import '../../widgets/zvelt_main_nav_bar.dart';
 import '../../widgets/muscle_map_widget.dart';
 import '../../widgets/z/z_card.dart';
 import '../../widgets/z/z_collapsible_chart_card.dart';
+import '../../widgets/z/z_pressable.dart';
 import '../../widgets/charts/recent_prs_card.dart';
 import '../calendar/activity_calendar_screen.dart';
 import '../workouts/workout_tracker_screen.dart';
@@ -382,7 +383,7 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: ZveltTokens.s5),
             _coachCard(),
             const SizedBox(height: ZveltTokens.s6),
-            const _Eyebrow('THIS WEEK'),
+            const _Eyebrow('This week'),
             const SizedBox(height: ZveltTokens.s3),
             _streakCalendarCard(),
             const SizedBox(height: ZveltTokens.s3),
@@ -392,15 +393,15 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: ZveltTokens.s3),
             _cardioWeekCard(),
             const SizedBox(height: ZveltTokens.s6),
-            const _Eyebrow('MUSCLES'),
+            const _Eyebrow('Muscles'),
             const SizedBox(height: ZveltTokens.s3),
             _muscleSection(),
             const SizedBox(height: ZveltTokens.s6),
-            const _Eyebrow('PROGRESS'),
+            const _Eyebrow('Progress'),
             const SizedBox(height: ZveltTokens.s3),
             _progressCharts(),
             const SizedBox(height: ZveltTokens.s6),
-            const _Eyebrow('FRIEND ACTIVITY'),
+            const _Eyebrow('Friend activity'),
             const SizedBox(height: ZveltTokens.s3),
             _friendCard(),
           ],
@@ -462,8 +463,30 @@ class _HomeTabState extends State<HomeTab> {
                 style: ZType.h1,
               ),
             ),
-            const SizedBox(width: 6),
-            const Text('👋', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: ZveltTokens.s2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: ZveltTokens.surface,
+                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                boxShadow: ZveltTokens.shadowCard,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(AppIcons.bolt, size: 13, color: ZveltTokens.brand),
+                  const SizedBox(width: 5),
+                  Text(
+                    _workoutToday ? 'Logged' : 'Ready',
+                    style: ZType.monoXS.copyWith(
+                      color: ZveltTokens.text,
+                      fontWeight: FontWeight.w700,
+                      height: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 2),
@@ -473,81 +496,97 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  // ── Coach card — periwinkle gradient panel + 3D rabbit mascot ──────────────
+  // ── Coach card — premium first action + 3D rabbit mascot ───────────────────
   Widget _coachCard() {
     final msg = _workoutToday
         ? 'Nice work today. Recovery is where the muscle is built.'
         : "Ready to move? You're 1 workout away from keeping your streak.";
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _startWorkout,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          height: 116,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: ZveltTokens.surface,
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: ZveltTokens.shadowCard,
-          ),
-          child: Row(
+    return ZPressable(
+      onTap: _startWorkout,
+      borderRadius: BorderRadius.circular(ZveltTokens.rXl),
+      child: ZCard(
+        padding: EdgeInsets.zero,
+        radius: ZveltTokens.rXl,
+        shadow: ZveltTokens.shadowHero,
+        child: SizedBox(
+          height: 176,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              // mascot panel — fixed-size box, gradient fills, rabbit at bottom
-              SizedBox(
-                width: 104,
-                height: 116,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [ZveltTokens.brandTint, ZveltTokens.surface],
-                        ),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Image.asset(
-                        'assets/mascot/m-think.png',
-                        height: 108,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ],
+              Positioned(
+                right: -28,
+                top: -34,
+                child: Container(
+                  width: 150,
+                  height: 158,
+                  decoration: BoxDecoration(
+                    color: ZveltTokens.brandTint,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
-              Expanded(
+              Positioned(
+                right: 2,
+                bottom: -6,
+                child: Image.asset(
+                  'assets/mascot/m-like.png',
+                  height: 166,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+              Positioned.fill(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(6, 16, 18, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 18, 132, 20),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'ZVELT COACH',
+                        'Zvelt Coach',
                         style: ZType.bodyS.copyWith(
-                          color: ZveltTokens.brand,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.06 * 11,
-                          fontSize: 11,
+                          color: ZveltTokens.brandDeep,
+                          fontWeight: FontWeight.w800,
+                          height: 1,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Flexible(
+                      const SizedBox(height: ZveltTokens.s2),
+                      Expanded(
                         child: Text(
                           msg,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          style: ZType.bodyM.copyWith(
+                          style: ZType.h4.copyWith(
                             color: ZveltTokens.text,
-                            fontWeight: FontWeight.w600,
-                            height: 1.35,
+                            fontWeight: FontWeight.w800,
+                            height: 1.22,
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: ZveltTokens.s2),
+                      Container(
+                        height: 34,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: ZveltTokens.brand,
+                          borderRadius:
+                              BorderRadius.circular(ZveltTokens.rPill),
+                          boxShadow: ZveltTokens.glowBrand,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(AppIcons.play,
+                                size: 13, color: ZveltTokens.onBrand),
+                            const SizedBox(width: 7),
+                            Text(
+                              _workoutToday ? 'Open training' : 'Start workout',
+                              style: ZType.bodyS.copyWith(
+                                color: ZveltTokens.onBrand,
+                                fontWeight: FontWeight.w800,
+                                height: 1,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -565,59 +604,111 @@ class _HomeTabState extends State<HomeTab> {
   /// per-user store every cardio save writes, so it survives restarts and
   /// works offline. Tap → the Activity calendar with the full session list.
   Widget _streakCalendarCard() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(26),
-        onTap: () => Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => const StreakCalendarScreen(),
-          ),
+    final activeDays = _trainedDayKeys.length;
+    final streakLabel = _currentStreak == 1
+        ? '1 day'
+        : _currentStreak > 1
+            ? '$_currentStreak days'
+            : 'Start today';
+    final subtitle = activeDays == 0
+        ? 'No logged days yet'
+        : '$activeDays active day${activeDays == 1 ? '' : 's'} saved';
+    final progress = (_currentStreak / 7).clamp(0.0, 1.0);
+
+    return ZCard(
+      onTap: () => Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => const StreakCalendarScreen(),
         ),
-        child: Container(
-          height: 176,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: ZveltTokens.surfaceTinted,
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: ZveltTokens.shadowCard,
+      ),
+      padding: const EdgeInsets.all(ZveltTokens.s4),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFFFC23B), Color(0xFFFF6B00)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF7A00).withValues(alpha: 0.22),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(AppIcons.flame, color: Colors.white, size: 26),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          const SizedBox(width: ZveltTokens.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Streak Calendar',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ZType.h4.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: ZveltTokens.s3),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFFFFD43B), Color(0xFFFF6B00)],
-                  ),
-                ),
-                child:
-                    const Icon(AppIcons.flame, color: Colors.white, size: 34),
-              ),
-              const SizedBox(height: ZveltTokens.s4),
               Text(
-                'Streak Calendar',
-                style: ZType.h1.copyWith(
+                streakLabel,
+                style: ZType.bodyM.copyWith(
                   color: ZveltTokens.text,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Track your consistency',
-                style: ZType.h3.copyWith(
-                  color: ZveltTokens.text2,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(height: 7),
+              SizedBox(
+                width: 56,
+                height: 5,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: ZveltTokens.surface3,
+                        borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                      ),
+                    ),
+                    FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: progress,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF6B00),
+                          borderRadius:
+                              BorderRadius.circular(ZveltTokens.rPill),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(width: ZveltTokens.s2),
+          Icon(AppIcons.arrow_small_right, size: 18, color: ZveltTokens.text3),
+        ],
       ),
     );
   }
@@ -633,6 +724,7 @@ class _HomeTabState extends State<HomeTab> {
         const SizedBox(height: ZveltTokens.s3),
         _ConsistencyGoalCard(
           currentStreak: _currentStreak,
+          trainedDayKeys: _trainedDayKeys,
           targetStreak: 7,
           onTap: () => Navigator.of(context).push<void>(
             MaterialPageRoute<void>(
@@ -869,7 +961,14 @@ class _Eyebrow extends StatelessWidget {
   const _Eyebrow(this.text);
   final String text;
   @override
-  Widget build(BuildContext context) => Text(text, style: ZType.eyebrow);
+  Widget build(BuildContext context) => Text(
+        text,
+        style: ZType.h4.copyWith(
+          color: ZveltTokens.text,
+          fontWeight: FontWeight.w800,
+          height: 1.15,
+        ),
+      );
 }
 
 class _MuscleLevelChip extends StatelessWidget {
@@ -917,11 +1016,13 @@ class _MuscleLevelChip extends StatelessWidget {
 class _ConsistencyGoalCard extends StatelessWidget {
   const _ConsistencyGoalCard({
     required this.currentStreak,
+    required this.trainedDayKeys,
     required this.targetStreak,
     required this.onTap,
   });
 
   final int currentStreak;
+  final Set<String> trainedDayKeys;
   final int targetStreak;
   final VoidCallback onTap;
 
@@ -930,110 +1031,191 @@ class _ConsistencyGoalCard extends StatelessWidget {
     final progress = targetStreak <= 0
         ? 0.0
         : (currentStreak / targetStreak).clamp(0.0, 1.0);
-    final filledSlots = currentStreak.clamp(0, targetStreak);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          padding: const EdgeInsets.all(ZveltTokens.s4),
-          decoration: BoxDecoration(
-            color: ZveltTokens.surfaceTinted,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: ZveltTokens.shadowCard,
-          ),
-          child: Column(
+    final now = DateUtils.dateOnly(DateTime.now());
+    final monday = now.subtract(Duration(days: now.weekday - 1));
+    final weekDays = List<DateTime>.generate(
+      7,
+      (index) => monday.add(Duration(days: index)),
+    );
+    final completedThisWeek = weekDays
+        .where((day) => trainedDayKeys.contains(_HomeTabState._homeYmd(day)))
+        .length;
+    final dayLabel = currentStreak == 1 ? 'day' : 'days';
+    return ZCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1DC),
+                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                ),
+                child: const Icon(
+                  AppIcons.flame,
+                  color: Color(0xFFFF7A00),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: ZveltTokens.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Current streak',
+                      style: ZType.bodyS.copyWith(
+                        color: ZveltTokens.text2,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          'Current Streak',
-                          style: ZType.bodyS.copyWith(
-                            color: ZveltTokens.text2,
-                            fontWeight: FontWeight.w700,
+                          '$currentStreak',
+                          style: ZType.stat.copyWith(
+                            fontSize: 34,
+                            fontWeight: FontWeight.w800,
+                            height: 0.95,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              '$currentStreak',
-                              style: ZType.h3.copyWith(
-                                color: ZveltTokens.text,
-                                fontWeight: FontWeight.w800,
-                              ),
+                        const SizedBox(width: 7),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Text(
+                            dayLabel,
+                            style: ZType.bodyS.copyWith(
+                              color: ZveltTokens.text2,
+                              fontWeight: FontWeight.w700,
                             ),
-                            const SizedBox(width: 4),
-                            const Icon(AppIcons.flame,
-                                color: Color(0xFFFF7A00), size: 18),
-                          ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  _GoalRing(progress: progress),
-                ],
+                    const SizedBox(height: 6),
+                    Text(
+                      currentStreak == 0
+                          ? 'Log one workout to begin'
+                          : '$completedThisWeek active day${completedThisWeek == 1 ? '' : 's'} this week',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: ZveltTokens.s4),
-              Row(
+              _GoalRing(progress: progress),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s5),
+          Row(
+            children: [
+              Text(
+                '$targetStreak-day target',
+                style: ZType.bodyS.copyWith(
+                  color: ZveltTokens.text2,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${(progress * 100).round()}%',
+                style: ZType.bodyS.copyWith(
+                  color: ZveltTokens.text,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s2),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+            child: SizedBox(
+              height: 7,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  for (var i = 0; i < 7; i++) ...[
-                    Expanded(
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: i < filledSlots
-                                ? const Color(0xFFFF6B00)
-                                : ZveltTokens.surface,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: i == 6
-                              ? Icon(
-                                  AppIcons.flag,
-                                  size: 18,
-                                  color: filledSlots >= targetStreak
-                                      ? Colors.white
-                                      : ZveltTokens.text4,
-                                )
-                              : null,
+                  DecoratedBox(
+                    decoration: BoxDecoration(color: ZveltTokens.surface3),
+                  ),
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: progress,
+                    child: const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFFFB43B), Color(0xFFFF6B00)],
                         ),
                       ),
                     ),
-                    if (i < 6) const SizedBox(width: 7),
-                  ],
+                  ),
                 ],
               ),
-              const SizedBox(height: ZveltTokens.s4),
-              Row(
-                children: [
-                  Icon(AppIcons.target, size: 18, color: ZveltTokens.text4),
-                  const SizedBox(width: ZveltTokens.s2),
-                  Expanded(
-                    child: Text(
-                      'Target Streak',
-                      style: ZType.bodyM.copyWith(color: ZveltTokens.text2),
-                    ),
+            ),
+          ),
+          const SizedBox(height: ZveltTokens.s4),
+          Row(
+            children: [
+              for (var i = 0; i < 7; i++) ...[
+                Expanded(
+                  child: _StreakSlot(
+                    label: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i],
+                    filled: trainedDayKeys
+                        .contains(_HomeTabState._homeYmd(weekDays[i])),
+                    isToday: weekDays[i] == now,
                   ),
-                  Text(
-                    '$targetStreak',
-                    style: ZType.bodyM.copyWith(
-                      color: ZveltTokens.text,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(AppIcons.flame,
-                      color: Color(0xFFFF7A00), size: 17),
-                ],
-              ),
+                ),
+                if (i < 6) const SizedBox(width: 8),
+              ],
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StreakSlot extends StatelessWidget {
+  const _StreakSlot({
+    required this.label,
+    required this.filled,
+    required this.isToday,
+  });
+
+  final String label;
+  final bool filled;
+  final bool isToday;
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 1,
+      child: AnimatedContainer(
+        duration: ZMotion.standard,
+        curve: ZMotion.emphasized,
+        decoration: BoxDecoration(
+          color: filled ? const Color(0xFFFF7A00) : ZveltTokens.surface2,
+          border: Border.all(
+            color: isToday ? ZveltTokens.brand : Colors.transparent,
+            width: isToday ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(13),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: ZType.bodyS.copyWith(
+            color: filled ? Colors.white : ZveltTokens.text3,
+            fontWeight: FontWeight.w800,
+            height: 1,
           ),
         ),
       ),
@@ -1049,22 +1231,23 @@ class _GoalRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 104,
-      height: 78,
+      width: 88,
+      height: 66,
       child: Stack(
         alignment: Alignment.center,
         children: [
           CustomPaint(
-            size: const Size(104, 78),
+            size: const Size(88, 66),
             painter: _GoalRingPainter(progress: progress),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.only(top: 10),
             child: Text(
               '${(progress * 100).round()}%',
               style: ZType.h4.copyWith(
                 color: ZveltTokens.text,
                 fontWeight: FontWeight.w800,
+                fontSize: 17,
               ),
             ),
           ),
@@ -1081,17 +1264,17 @@ class _GoalRingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(10, 4, size.width - 20, size.height + 34);
+    final rect = Rect.fromLTWH(8, 6, size.width - 16, size.height + 26);
     final bg = Paint()
-      ..color = ZveltTokens.surface.withValues(alpha: 0.75)
+      ..color = ZveltTokens.surface3.withValues(alpha: 0.85)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 10;
+      ..strokeWidth = 8;
     final fg = Paint()
       ..color = const Color(0xFFFF6B00)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 10;
+      ..strokeWidth = 8;
     canvas.drawArc(rect, math.pi, math.pi, false, bg);
     canvas.drawArc(rect, math.pi, math.pi * progress, false, fg);
   }
@@ -1116,11 +1299,28 @@ class _Last14WorkoutsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _TintPanel(
-          child: Row(
+    return ZCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brandTint,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                ),
+                child: const Icon(
+                  AppIcons.chart_line_up,
+                  color: ZveltTokens.brand,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: ZveltTokens.s3),
               Expanded(
                 child: _MetricText(
                   label: 'Volume',
@@ -1129,98 +1329,49 @@ class _Last14WorkoutsCard extends StatelessWidget {
                   subIcon: stats.volumeTrendIcon,
                 ),
               ),
+              const SizedBox(width: ZveltTokens.s3),
               SizedBox(
-                width: 150,
-                height: 58,
+                width: 126,
+                height: 62,
                 child: _WorkoutBars(values: stats.volumeBars),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: ZveltTokens.s2),
-        Row(
-          children: [
-            Expanded(
-              child: _TintPanel(
-                child: _MetricText(
+          const SizedBox(height: ZveltTokens.s4),
+          Divider(height: 1, thickness: 1, color: ZveltTokens.hairline),
+          const SizedBox(height: ZveltTokens.s3),
+          Row(
+            children: [
+              Expanded(
+                child: _CompactMetricTile(
                   label: 'Duration',
                   value: _formatDuration(stats.duration),
                 ),
               ),
-            ),
-            const SizedBox(width: ZveltTokens.s2),
-            Expanded(
-              child: _TintPanel(
-                child: _MetricText(
+              const _MetricDivider(),
+              Expanded(
+                child: _CompactMetricTile(
                   label: 'Records',
                   value: '${stats.records}',
                 ),
               ),
-            ),
-            const SizedBox(width: ZveltTokens.s2),
-            Expanded(
-              child: _TintPanel(
-                child: _MetricText(
+              const _MetricDivider(),
+              Expanded(
+                child: _CompactMetricTile(
                   label: 'Burned',
                   value: _formatCalories(stats.burnedCalories),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: ZveltTokens.s2),
-        Stack(
-          children: [
-            _TintPanel(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _MetricText(
-                      label: 'Bodyweight',
-                      value: bodyweightKg == null
-                          ? '-- kg'
-                          : '${bodyweightKg!.toStringAsFixed(1)} kg',
-                      sublabel: _bodyweightStatus(bodyweightTrend),
-                      subIcon: AppIcons.arrow_small_right,
-                    ),
-                  ),
-                  const SizedBox(width: ZveltTokens.s6),
-                  SizedBox(
-                    width: 154,
-                    height: 54,
-                    child: _BodyweightSparkline(values: bodyweightTrend),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Semantics(
-                button: true,
-                label: 'Edit bodyweight',
-                child: Material(
-                  color: Colors.transparent,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: onEditBodyweight,
-                    child: SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: Icon(
-                        AppIcons.plus,
-                        color: ZveltTokens.text2,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s3),
+          _BodyweightSummaryRow(
+            bodyweightKg: bodyweightKg,
+            trend: bodyweightTrend,
+            onEdit: onEditBodyweight,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1247,6 +1398,128 @@ class _Last14WorkoutsCard extends StatelessWidget {
     final delta = values.last - values.first;
     if (delta.abs() < 0.3) return 'Stable Weight';
     return delta > 0 ? 'Trending Up' : 'Trending Down';
+  }
+}
+
+class _MetricDivider extends StatelessWidget {
+  const _MetricDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 48,
+      margin: const EdgeInsets.symmetric(horizontal: ZveltTokens.s2),
+      color: ZveltTokens.hairline,
+    );
+  }
+}
+
+class _CompactMetricTile extends StatelessWidget {
+  const _CompactMetricTile({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 68),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ZType.eyebrow,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ZType.h4.copyWith(
+              color: ZveltTokens.text,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BodyweightSummaryRow extends StatelessWidget {
+  const _BodyweightSummaryRow({
+    required this.bodyweightKg,
+    required this.trend,
+    required this.onEdit,
+  });
+
+  final double? bodyweightKg;
+  final List<double> trend;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: ZveltTokens.surface,
+        border: Border.all(color: ZveltTokens.border),
+        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: _MetricText(
+              label: 'Bodyweight',
+              value: bodyweightKg == null
+                  ? '-- kg'
+                  : '${bodyweightKg!.toStringAsFixed(1)} kg',
+              sublabel: _Last14WorkoutsCard._bodyweightStatus(trend),
+              subIcon: AppIcons.arrow_small_right,
+            ),
+          ),
+          const SizedBox(width: ZveltTokens.s3),
+          SizedBox(
+            width: 108,
+            height: 44,
+            child: _BodyweightSparkline(values: trend),
+          ),
+          const SizedBox(width: ZveltTokens.s2),
+          Semantics(
+            button: true,
+            label: 'Edit bodyweight',
+            child: ZPressable(
+              onTap: onEdit,
+              pressedScale: 0.94,
+              borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brandTint,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  AppIcons.plus,
+                  color: ZveltTokens.brandDeep,
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1387,25 +1660,6 @@ class _BodyweightEditorSheetState extends State<_BodyweightEditorSheet> {
   }
 }
 
-class _TintPanel extends StatelessWidget {
-  const _TintPanel({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(ZveltTokens.s4),
-      decoration: BoxDecoration(
-        color: ZveltTokens.surfaceTinted,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: child,
-    );
-  }
-}
-
 class _MetricText extends StatelessWidget {
   const _MetricText({
     required this.label,
@@ -1431,21 +1685,23 @@ class _MetricText extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: ZType.bodyS.copyWith(
             color: ZveltTokens.text2,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
+            height: 1.15,
           ),
         ),
-        const SizedBox(height: ZveltTokens.s3),
+        const SizedBox(height: ZveltTokens.s2),
         Text(
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: ZType.bodyM.copyWith(
+          style: ZType.h3.copyWith(
             color: ZveltTokens.text,
             fontWeight: FontWeight.w800,
+            height: 1.05,
           ),
         ),
         if (sublabel != null) ...[
-          const SizedBox(height: 2),
+          const SizedBox(height: 5),
           Row(
             children: [
               Flexible(
@@ -1461,11 +1717,11 @@ class _MetricText extends StatelessWidget {
                 Container(
                   width: 16,
                   height: 16,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF68C8FF),
+                  decoration: BoxDecoration(
+                    color: ZveltTokens.brandTint,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(subIcon, color: Colors.white, size: 12),
+                  child: Icon(subIcon, color: ZveltTokens.brandDeep, size: 12),
                 ),
               ],
             ],
@@ -1502,8 +1758,8 @@ class _WorkoutBarsPainter extends CustomPainter {
     const gap = 5.0;
     final barW = math.max(4.0, (size.width - gap * (count - 1)) / count);
     final inactive = Paint()
-      ..color = ZveltTokens.surface.withValues(alpha: 0.72);
-    final active = Paint()..color = const Color(0xFF67C8FF);
+      ..color = ZveltTokens.surface3.withValues(alpha: 0.85);
+    final active = Paint()..color = ZveltTokens.brand;
     for (var i = 0; i < count; i++) {
       final v = i < bars.length ? bars[i] : 0.0;
       final pct = maxV <= 0 ? 0.0 : (v / maxV).clamp(0.0, 1.0);
@@ -1544,12 +1800,12 @@ class _BodyweightSparklinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final line = Paint()
-      ..color = const Color(0xFF67C8FF)
+      ..color = ZveltTokens.brand
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
     final baseline = Paint()
-      ..color = const Color(0xFF67C8FF).withValues(alpha: 0.28)
+      ..color = ZveltTokens.brand.withValues(alpha: 0.28)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     final midY = size.height * 0.62;
@@ -1680,24 +1936,10 @@ class _Card extends StatelessWidget {
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
-    final card = Container(
-      width: double.infinity,
+    return ZCard(
+      onTap: onTap,
       padding: const EdgeInsets.all(ZveltTokens.s4),
-      decoration: BoxDecoration(
-        color: ZveltTokens.surface,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        boxShadow: ZveltTokens.shadowCard,
-      ),
-      child: child,
-    );
-    if (onTap == null) return card;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        child: card,
-      ),
+      child: SizedBox(width: double.infinity, child: child),
     );
   }
 }
@@ -1713,12 +1955,15 @@ class _CircleButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: semanticLabel,
-      child: Material(
-        color: ZveltTokens.surface,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
+      child: ZPressable(
+        onTap: onTap,
+        pressedScale: 0.94,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: ZveltTokens.surface,
+            shape: BoxShape.circle,
+            boxShadow: ZveltTokens.shadowCard,
+          ),
           child: SizedBox(
             width: 44,
             height: 44,

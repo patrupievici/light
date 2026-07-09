@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/zvelt_tokens.dart';
+import 'z/z_pressable.dart';
 
 /// Secondary CTA button (outline/ghost style) aligned with Zvelt visuals.
 class ZveltSecondaryButton extends StatelessWidget {
@@ -21,19 +22,20 @@ class ZveltSecondaryButton extends StatelessWidget {
     const fg = ZveltTokens.brand;
     return Opacity(
       opacity: enabled ? 1 : 0.55,
-      child: Material(
-        color: Colors.transparent,
-        child: Ink(
+      child: ZPressable(
+        onTap: enabled ? onTap : null,
+        semanticLabel: label,
+        pressedScale: 0.975,
+        child: Container(
           height: 56,
           decoration: BoxDecoration(
             color: ZveltTokens.surface2,
             borderRadius: BorderRadius.circular(32),
             border: Border.all(color: ZveltTokens.border),
           ),
-          child: InkWell(
-            onTap: enabled ? onTap : null,
-            borderRadius: BorderRadius.circular(32),
-            child: Center(
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

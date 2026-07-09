@@ -16,8 +16,10 @@ import '../../theme/zvelt_tokens.dart';
 import '../../widgets/social_challenge_card.dart';
 import '../../widgets/social_feed_post_card.dart';
 import '../../widgets/stories_tray.dart';
+import '../../widgets/z/z_loading.dart';
 import '../../widgets/zvelt_empty_state.dart';
 import '../../widgets/zvelt_error_state.dart';
+import '../../widgets/zvelt_main_nav_bar.dart';
 import 'circle_screen.dart';
 import 'create_challenge_flow.dart';
 import 'gallery_screen.dart';
@@ -222,11 +224,15 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     try {
       await _challengeService.joinChallenge(inv.id);
       if (!mounted) return;
-      messenger.showSnackBar(const SnackBar(content: Text('Joined the challenge.')));
+      messenger
+          .showSnackBar(const SnackBar(content: Text('Joined the challenge.')));
       _load(); // the accepted challenge now belongs in the active list
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      messenger.showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: ZveltTokens.error,
+      ));
       _loadInvites(); // restore on failure
     } finally {
       _mutatingInvites.remove(inv.id);
@@ -325,7 +331,10 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     try {
       final results = await Future.wait([
         _storiesService.getFeed(),
-        if (_meId == null) _authService.getCurrentUserId() else Future.value(_meId),
+        if (_meId == null)
+          _authService.getCurrentUserId()
+        else
+          Future.value(_meId),
       ]);
       if (!mounted || gen != _loadGen) return;
       final stories = results[0] as List<Story>;
@@ -342,11 +351,11 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
 
   Future<void> _openStoryComposer() async {
     final created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => StoryComposerScreen(service: _storiesService)),
+      MaterialPageRoute(
+          builder: (_) => StoryComposerScreen(service: _storiesService)),
     );
     if (created == true && mounted) _loadStories(_loadGen);
   }
-
 
   void _openStoryGroup(int groupIndex) {
     Navigator.of(context).push<void>(
@@ -369,7 +378,11 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
   void _snackIfContentVisible(String msg) {
     if (!mounted || (_posts.isEmpty && _challenges.isEmpty)) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: ZveltTokens.error,
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
@@ -390,7 +403,10 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
         // Dedup by id: offset pagination over createdAt-desc can repeat a row
         // across a page boundary if a new post is inserted at the top.
         final existing = _posts.map((p) => p.id).toSet();
-        _posts = [..._posts, ...page.posts.where((p) => !existing.contains(p.id))];
+        _posts = [
+          ..._posts,
+          ...page.posts.where((p) => !existing.contains(p.id))
+        ];
         if (page.hasMore) _page += 1;
         _hasMore = page.hasMore;
         _loadingMore = false;
@@ -400,11 +416,13 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       if (!mounted || gen != _loadGen) return;
       setState(() => _loadingMore = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't load more. Try scrolling again.")),
+        const SnackBar(
+          content: Text("Couldn't load more. Try scrolling again."),
+          backgroundColor: ZveltTokens.error,
+        ),
       );
     }
   }
-
 
   Future<void> _newPost() async {
     final ok = await Navigator.of(context).push<bool>(
@@ -448,7 +466,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                     color: ZveltTokens.brandTint,
                     borderRadius: BorderRadius.circular(ZveltTokens.rMd),
                   ),
-                  child: const Icon(AppIcons.users, size: 20, color: ZveltTokens.brand),
+                  child: const Icon(AppIcons.users,
+                      size: 20, color: ZveltTokens.brand),
                 ),
                 const SizedBox(width: ZveltTokens.s3),
                 Expanded(
@@ -456,11 +475,14 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('YOUR CIRCLE',
-                          style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+                          style:
+                              ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
                       const SizedBox(height: 2),
                       Text(
                         _friendCount == 0
-                            ? (_friendCountLoaded ? 'Add friends to fill your feed' : 'Loading your circle…')
+                            ? (_friendCountLoaded
+                                ? 'Add friends to fill your feed'
+                                : 'Loading your circle…')
                             : 'Posts from your $_friendCount friend${_friendCount == 1 ? '' : 's'}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -471,22 +493,24 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                 ),
                 if (_friendCount > 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: ZveltTokens.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                      border: Border.all(color: ZveltTokens.success.withValues(alpha: 0.22)),
+                      border: Border.all(
+                          color: ZveltTokens.success.withValues(alpha: 0.22)),
                     ),
                     child: Text('$_friendCount IN CIRCLE',
-                        style: const TextStyle(
-                          fontSize: 11,
+                        style: ZType.monoXS.copyWith(
                           fontWeight: FontWeight.w900,
                           color: ZveltTokens.success,
                           letterSpacing: 1.6,
                         )),
                   )
                 else
-                  Icon(AppIcons.angle_small_right, size: 20, color: ZveltTokens.text3),
+                  Icon(AppIcons.angle_small_right,
+                      size: 20, color: ZveltTokens.text3),
               ],
             ),
           ),
@@ -503,7 +527,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('PENDING INVITES', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+          Text('PENDING INVITES',
+              style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
           const SizedBox(height: 12),
           for (final inv in _invites) ...[
             _inviteCard(inv),
@@ -558,7 +583,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   color: ZveltTokens.brandTint,
                   borderRadius: BorderRadius.circular(ZveltTokens.rMd),
                 ),
-                child: const Icon(AppIcons.trophy, size: 20, color: ZveltTokens.brand),
+                child: const Icon(AppIcons.trophy,
+                    size: 20, color: ZveltTokens.brand),
               ),
               const SizedBox(width: ZveltTokens.s3),
               Expanded(
@@ -568,7 +594,9 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                     Text(inv.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w700)),
+                        style: ZType.bodyM.copyWith(
+                            color: ZveltTokens.text,
+                            fontWeight: FontWeight.w700)),
                     const SizedBox(height: 2),
                     Text(_inviteSubtitle(inv),
                         maxLines: 1,
@@ -611,7 +639,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('YOUR RECENT PRs', style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
+          Text('YOUR RECENT PRs',
+              style: ZType.eyebrow.copyWith(color: ZveltTokens.text2)),
           const SizedBox(height: 12),
           for (final pr in _recentPrs.take(12)) ...[
             _prCard(pr),
@@ -643,7 +672,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   color: ZveltTokens.brandTint,
                   borderRadius: BorderRadius.circular(ZveltTokens.rMd),
                 ),
-                child: const Icon(AppIcons.trophy, size: 20, color: ZveltTokens.brand),
+                child: const Icon(AppIcons.trophy,
+                    size: 20, color: ZveltTokens.brand),
               ),
               const SizedBox(width: ZveltTokens.s3),
               Expanded(
@@ -653,15 +683,21 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                     Text(pr.exerciseName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: ZType.bodyM.copyWith(color: ZveltTokens.text, fontWeight: FontWeight.w700)),
+                        style: ZType.bodyM.copyWith(
+                            color: ZveltTokens.text,
+                            fontWeight: FontWeight.w700)),
                     const SizedBox(height: 2),
-                    Text(pr.headline, style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
+                    Text(pr.headline,
+                        style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
                   ],
                 ),
               ),
               if (delta > 0)
-                Text('+${delta % 1 == 0 ? delta.toInt() : delta.toStringAsFixed(1)} kg',
-                    style: ZType.bodyM.copyWith(color: ZveltTokens.success, fontWeight: FontWeight.w700)),
+                Text(
+                    '+${delta % 1 == 0 ? delta.toInt() : delta.toStringAsFixed(1)} kg',
+                    style: ZType.bodyM.copyWith(
+                        color: ZveltTokens.success,
+                        fontWeight: FontWeight.w700)),
             ],
           ),
           const SizedBox(height: ZveltTokens.s3),
@@ -677,7 +713,9 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Center(
                     child: Text('Challenge this PR',
-                        style: ZType.bodyS.copyWith(color: ZveltTokens.brand, fontWeight: FontWeight.w700)),
+                        style: ZType.bodyS.copyWith(
+                            color: ZveltTokens.brand,
+                            fontWeight: FontWeight.w700)),
                   ),
                 ),
               ),
@@ -707,8 +745,12 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
         title: const Text('Remove challenge?'),
         content: Text('Remove "${c.title}" from your list?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Remove')),
         ],
       ),
     );
@@ -721,7 +763,10 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
       // of silently no-op'ing and letting the card reappear.
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: ZveltTokens.error,
+        ),
       );
       return;
     }
@@ -806,14 +851,13 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
         _heroParticipantCount = (res['total'] as num?)?.toInt() ?? 0;
         // Design hero shows overlapping participant avatars — REAL initials
         // from the participants payload, never invented letters.
-        _heroParticipantInitials = ((res['data'] as List<dynamic>?) ?? const [])
-            .take(5)
-            .map((p) {
-              final name =
-                  ((p as Map<String, dynamic>)['displayName'] as String?)?.trim() ?? '';
-              return name.isNotEmpty ? name[0].toUpperCase() : '?';
-            })
-            .toList();
+        _heroParticipantInitials =
+            ((res['data'] as List<dynamic>?) ?? const []).take(5).map((p) {
+          final name =
+              ((p as Map<String, dynamic>)['displayName'] as String?)?.trim() ??
+                  '';
+          return name.isNotEmpty ? name[0].toUpperCase() : '?';
+        }).toList();
         _heroLoading = false;
       });
     } catch (e, st) {
@@ -855,7 +899,16 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
         // the list visible — previously a friend liking your post mid-read
         // wiped the feed to a spinner and reset your scroll to the top.
         child: _loading && _posts.isEmpty && _challenges.isEmpty
-            ? const Center(child: CircularProgressIndicator(color: ZveltTokens.brand))
+            ? ZPageSkeleton(
+                itemCount: 5,
+                padding: EdgeInsets.fromLTRB(
+                  ZveltTokens.screenPaddingH,
+                  ZveltTokens.s3,
+                  ZveltTokens.screenPaddingH,
+                  ZveltMainNavBar.reservedBottomHeight(context) +
+                      ZveltTokens.s4,
+                ),
+              )
             : _error != null && _posts.isEmpty
                 ? _buildFeedErrorState()
                 : RefreshIndicator(
@@ -912,7 +965,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                                       compact: true,
                                       icon: AppIcons.filter_slash,
                                       title: 'No posts matching this filter',
-                                      subtitle: 'Try the All filter to widen your feed.',
+                                      subtitle:
+                                          'Try the All filter to widen your feed.',
                                       action: TextButton(
                                         onPressed: () {
                                           _feedFilter = 'all';
@@ -926,7 +980,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                                       mascot: 'assets/mascot/m8.png',
                                       icon: AppIcons.camera,
                                       title: 'Your feed is quiet',
-                                      subtitle: 'Post your first workout or challenge a friend.',
+                                      subtitle:
+                                          'Post your first workout or challenge a friend.',
                                     ),
                             ),
                           )
@@ -937,21 +992,21 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                                 final post = visiblePosts[i];
                                 return RepaintBoundary(
                                   child: SocialFeedPostCard(
-                                  key: ValueKey(post.id),
-                                  post: post,
-                                  service: _feedService,
-                                  onLike: () {},
-                                  // Without these, Hide/Block/Delete left the
-                                  // card on screen (a blocked user's post kept
-                                  // staring at you) and edited captions only
-                                  // showed after a full reload.
-                                  onDelete: () => setState(() =>
-                                      _posts.removeWhere((p) => p.id == post.id)),
-                                  onEdit: (updated) => setState(() {
-                                    final idx = _posts
-                                        .indexWhere((p) => p.id == updated.id);
-                                    if (idx != -1) _posts[idx] = updated;
-                                  }),
+                                    key: ValueKey(post.id),
+                                    post: post,
+                                    service: _feedService,
+                                    onLike: () {},
+                                    // Without these, Hide/Block/Delete left the
+                                    // card on screen (a blocked user's post kept
+                                    // staring at you) and edited captions only
+                                    // showed after a full reload.
+                                    onDelete: () => setState(() => _posts
+                                        .removeWhere((p) => p.id == post.id)),
+                                    onEdit: (updated) => setState(() {
+                                      final idx = _posts.indexWhere(
+                                          (p) => p.id == updated.id);
+                                      if (idx != -1) _posts[idx] = updated;
+                                    }),
                                   ),
                                 );
                               },
@@ -960,7 +1015,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                           ),
                         if (visiblePosts.isNotEmpty)
                           SliverToBoxAdapter(child: _buildFeedFooter()),
-                        SliverToBoxAdapter(child: SizedBox(height: mq.padding.bottom + 24)),
+                        SliverToBoxAdapter(
+                            child: SizedBox(height: mq.padding.bottom + 24)),
                       ],
                     ),
                   ),
@@ -1000,7 +1056,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   color: ZveltTokens.surface,
                   border: Border.all(color: ZveltTokens.border),
                 ),
-                child: Icon(AppIcons.camera, color: ZveltTokens.text2, size: 20),
+                child:
+                    Icon(AppIcons.camera, color: ZveltTokens.text2, size: 20),
               ),
             ),
           ),
@@ -1028,7 +1085,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                         ),
                       ],
                     ),
-                    child: const Icon(AppIcons.users, color: Colors.white, size: 20),
+                    child: const Icon(AppIcons.users,
+                        color: ZveltTokens.onBrand, size: 20),
                   ),
                   Positioned(
                     top: -2,
@@ -1076,7 +1134,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
     // (zero participants) or "N athlete(s) competing · ends …".
     final String subtitle;
     if (_heroLoading) {
-      subtitle = endsLabel.substring(0, 1).toUpperCase() + endsLabel.substring(1);
+      subtitle =
+          endsLabel.substring(0, 1).toUpperCase() + endsLabel.substring(1);
     } else if (athletes == 0) {
       subtitle = 'Be the first to join · $endsLabel';
     } else {
@@ -1109,13 +1168,14 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(AppIcons.trophy, size: 12, color: Colors.white),
+                  const Icon(AppIcons.trophy,
+                      size: 12, color: ZveltTokens.onBrand),
                   const SizedBox(width: 4),
                   Text(
                     'ACTIVE CHALLENGE',
                     style: ZType.eyebrow.copyWith(
                       fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.85),
+                      color: ZveltTokens.onBrand.withValues(alpha: 0.85),
                     ),
                   ),
                 ],
@@ -1125,15 +1185,13 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                 top.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: ZType.h4.copyWith(color: Colors.white),
+                style: ZType.h4.copyWith(color: ZveltTokens.onBrand),
               ),
               const SizedBox(height: ZveltTokens.s1),
               Text(
                 subtitle,
-                style: TextStyle(
-                  fontFamily: ZveltTokens.fontPrimary,
-                  fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.85),
+                style: ZType.monoS.copyWith(
+                  color: ZveltTokens.onBrand.withValues(alpha: 0.85),
                 ),
               ),
               const SizedBox(height: ZveltTokens.s3),
@@ -1152,21 +1210,22 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                         onTap: () => _joinAndOpenRace(top),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: ZveltTokens.s4, vertical: ZveltTokens.s2),
+                              horizontal: ZveltTokens.s4,
+                              vertical: ZveltTokens.s2),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                            color: ZveltTokens.onBrand,
+                            borderRadius:
+                                BorderRadius.circular(ZveltTokens.rPill),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(AppIcons.bolt, size: 14, color: ZveltTokens.brand),
-                              SizedBox(width: 6),
+                              const Icon(AppIcons.bolt,
+                                  size: 14, color: ZveltTokens.brand),
+                              const SizedBox(width: 6),
                               Text(
                                 'Join challenge',
-                                style: TextStyle(
-                                  fontFamily: ZveltTokens.fontPrimary,
-                                  fontSize: 12,
+                                style: ZType.monoS.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: ZveltTokens.brand,
                                 ),
@@ -1181,21 +1240,20 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: ZveltTokens.s4, vertical: ZveltTokens.s2),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
+                        color: ZveltTokens.onBrand.withValues(alpha: 0.22),
                         borderRadius: BorderRadius.circular(ZveltTokens.rPill),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(AppIcons.check, size: 14, color: Colors.white),
+                          const Icon(AppIcons.check,
+                              size: 14, color: ZveltTokens.onBrand),
                           const SizedBox(width: 6),
                           Text(
                             top.isMine ? 'Yours' : 'Joined',
-                            style: const TextStyle(
-                              fontFamily: ZveltTokens.fontPrimary,
-                              fontSize: 12,
+                            style: ZType.monoS.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                              color: ZveltTokens.onBrand,
                             ),
                           ),
                         ],
@@ -1219,14 +1277,14 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: ZveltTokens.brandDeep,
-                                  border: Border.all(color: Colors.white, width: 2),
+                                  border: Border.all(
+                                      color: ZveltTokens.onBrand, width: 2),
                                 ),
                                 child: Text(
                                   initials[i],
-                                  style: const TextStyle(
-                                    fontSize: 11,
+                                  style: ZType.monoXS.copyWith(
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.white,
+                                    color: ZveltTokens.onBrand,
                                   ),
                                 ),
                               ),
@@ -1238,11 +1296,9 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                       const SizedBox(width: 8),
                       Text(
                         '+$overflow',
-                        style: TextStyle(
-                          fontFamily: ZveltTokens.fontPrimary,
-                          fontSize: 11,
+                        style: ZType.monoXS.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: ZveltTokens.onBrand.withValues(alpha: 0.9),
                         ),
                       ),
                     ],
@@ -1291,23 +1347,18 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   children: [
                     Text(
                       'No active races',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: ZveltTokens.text),
+                      style: ZType.bodyS.copyWith(
+                          fontWeight: FontWeight.w800, color: ZveltTokens.text),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Launch the first race in the Hub',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: ZveltTokens.text2),
+                      style: ZType.monoXS.copyWith(color: ZveltTokens.text2),
                     ),
                   ],
                 ),
               ),
-              Icon(AppIcons.angle_small_right,
-                  color: ZveltTokens.text2),
+              Icon(AppIcons.angle_small_right, color: ZveltTokens.text2),
             ],
           ),
         ),
@@ -1335,7 +1386,9 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   child: Semantics(
                     button: true,
                     selected: f.id != 'races' && sel,
-                    label: f.id == 'races' ? 'Races, opens Race Hub' : '${f.label} filter',
+                    label: f.id == 'races'
+                        ? 'Races, opens Race Hub'
+                        : '${f.label} filter',
                     child: GestureDetector(
                       onTap: () {
                         // Wave 22 P1.2 — Races pill is a navigation shortcut to
@@ -1356,21 +1409,23 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 220),
                         height: 30,
-                        padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: ZveltTokens.s3),
                         decoration: BoxDecoration(
                           color: sel ? ZveltTokens.text : ZveltTokens.surface,
-                          borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                          border: sel ? null : Border.all(color: ZveltTokens.border),
+                          borderRadius:
+                              BorderRadius.circular(ZveltTokens.rPill),
+                          border: sel
+                              ? null
+                              : Border.all(color: ZveltTokens.border),
                         ),
                         alignment: Alignment.center,
                         child: Text(
                           f.label,
-                          style: TextStyle(
+                          style: ZType.monoXS.copyWith(
                             color: sel ? ZveltTokens.bg : ZveltTokens.text2,
-                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.8,
-                            fontFamily: ZveltTokens.fontPrimary,
                           ),
                         ),
                       ),
@@ -1397,8 +1452,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
           Expanded(
             child: Text(
               'ACTIVE CHALLENGES',
-              style: TextStyle(
-                fontSize: 11,
+              style: ZType.monoXS.copyWith(
                 fontWeight: FontWeight.w800,
                 color: ZveltTokens.text2,
                 letterSpacing: 2.0,
@@ -1409,26 +1463,26 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
             button: true,
             label: 'New challenge',
             child: GestureDetector(
-            onTap: _createChallenge,
-            child: Container(
-              height: 26,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: ZveltTokens.brand.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                border: Border.all(color: ZveltTokens.brand.withValues(alpha: 0.25)),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                '+ NEW',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: ZveltTokens.brand,
-                  letterSpacing: 1.4,
+              onTap: _createChallenge,
+              child: Container(
+                height: 26,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brand.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                  border: Border.all(
+                      color: ZveltTokens.brand.withValues(alpha: 0.25)),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '+ NEW',
+                  style: ZType.monoXS.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: ZveltTokens.brand,
+                    letterSpacing: 1.4,
+                  ),
                 ),
               ),
-            ),
             ),
           ),
         ],
@@ -1446,7 +1500,8 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
           child: SizedBox(
             width: 22,
             height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2, color: ZveltTokens.brand),
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: ZveltTokens.brand),
           ),
         ),
       );
@@ -1457,7 +1512,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
         child: Center(
           child: Text(
             "You've reached the end",
-            style: TextStyle(color: ZveltTokens.text2, fontSize: 12),
+            style: ZType.monoS,
           ),
         ),
       );
@@ -1475,8 +1530,7 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
           Expanded(
             child: Text(
               'COMMUNITY FEED',
-              style: TextStyle(
-                fontSize: 11,
+              style: ZType.monoXS.copyWith(
                 fontWeight: FontWeight.w800,
                 color: ZveltTokens.text2,
                 letterSpacing: 2.0,
@@ -1503,12 +1557,11 @@ class _SocialPlusScreenState extends State<SocialPlusScreen> {
                   ],
                 ),
                 alignment: Alignment.center,
-                child: const Text(
+                child: Text(
                   '+ POST',
-                  style: TextStyle(
-                    fontSize: 11,
+                  style: ZType.monoXS.copyWith(
                     fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                    color: ZveltTokens.onBrand,
                     letterSpacing: 1.6,
                   ),
                 ),

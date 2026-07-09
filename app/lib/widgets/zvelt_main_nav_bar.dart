@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_icons.dart';
 import '../theme/zvelt_tokens.dart';
+import 'z/z_pressable.dart';
 
-/// Bottom pill: **4 destinations + a center Quick-Start action** —
-/// Home · Train · ⚡ · Feed · Nutrition.
+/// Bottom pill: 4 destinations plus a center Quick-Start action.
 ///
-/// The four [items] are the real tabs (two left, two right of center). The raised
-/// brand circle in the middle is NOT a tab — it fires [onCenterTap] (Quick Start
-/// workout). Profile is no longer a destination: it opens from the Home avatar.
+/// The center action is not a tab. It launches the workout quick-start flow.
 class ZveltMainNavBar extends StatelessWidget {
   const ZveltMainNavBar({
     super.key,
@@ -33,7 +31,7 @@ class ZveltMainNavBar extends StatelessWidget {
   /// Tab tapped, 0..3.
   final ValueChanged<int> onTap;
 
-  /// Exactly four destinations: [Home, Train, Feed, Nutrition].
+  /// Exactly four destinations: Home, Train, Feed, Nutrition.
   final List<ZveltNavItem> items;
 
   /// Center Quick-Start action.
@@ -48,7 +46,10 @@ class ZveltMainNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    assert(items.length == 4, 'ZveltMainNavBar expects 4 destinations + a center action.');
+    assert(
+      items.length == 4,
+      'ZveltMainNavBar expects 4 destinations plus a center action.',
+    );
     final bottom = MediaQuery.paddingOf(context).bottom;
     final stackHeight = pillHeight + navVerticalInset * 2 + bottom;
 
@@ -75,7 +76,8 @@ class ZveltMainNavBar extends StatelessWidget {
                   decoration: const BoxDecoration(
                     boxShadow: ZveltTokens.shadowFloat,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                   child: Row(
                     children: [
                       Expanded(child: _navCell(context, 0)),
@@ -95,23 +97,20 @@ class ZveltMainNavBar extends StatelessWidget {
   }
 
   Widget _centerCell(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '$centerLabel — quick start',
-      child: Center(
-        child: InkWell(
-          onTap: onCenterTap,
-          customBorder: const CircleBorder(),
-          child: Container(
-            width: _fabSize,
-            height: _fabSize,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: ZveltTokens.gradBrand,
-              boxShadow: ZveltTokens.shadowFloat,
-            ),
-            child: const Icon(AppIcons.bolt, color: ZveltTokens.onBrand, size: 24),
+    return Center(
+      child: ZPressable(
+        onTap: onCenterTap,
+        semanticLabel: '$centerLabel quick start',
+        pressedScale: 0.94,
+        child: Container(
+          width: _fabSize,
+          height: _fabSize,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: ZveltTokens.gradBrand,
+            boxShadow: ZveltTokens.shadowFloat,
           ),
+          child: Icon(centerIcon, color: ZveltTokens.onBrand, size: 24),
         ),
       ),
     );
@@ -120,50 +119,57 @@ class ZveltMainNavBar extends StatelessWidget {
   Widget _navCell(BuildContext context, int i) {
     final item = items[i];
     final selected = i == currentIndex;
-    return Semantics(
-      button: true,
+    return ZPressable(
+      onTap: () => onTap(i),
       selected: selected,
-      label: '${item.label} tab',
-      child: InkWell(
-        onTap: () => onTap(i),
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-            color: selected ? ZveltTokens.brandTint : Colors.transparent,
-            borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              item.iconBuilder?.call(selected) ??
-                  Icon(
+      semanticLabel: '${item.label} tab',
+      pressedScale: 0.96,
+      child: AnimatedContainer(
+        duration: ZMotion.standard,
+        curve: ZMotion.emphasized,
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: selected ? ZveltTokens.brandTint : Colors.transparent,
+          borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            item.iconBuilder?.call(selected) ??
+                AnimatedScale(
+                  scale: selected ? 1.06 : 1,
+                  duration: ZMotion.standard,
+                  curve: ZMotion.emphasized,
+                  child: Icon(
                     item.icon,
                     size: 21,
                     color: selected ? ZveltTokens.brand : ZveltTokens.text3,
                   ),
-              const SizedBox(height: 3),
-              Text(
-                item.label,
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.clip,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: ZveltTokens.fontPrimary,
-                  fontSize: 11,
-                  height: 1.05,
-                  letterSpacing: -0.1,
-                  color: selected ? ZveltTokens.brand : ZveltTokens.text3,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                ),
+            const SizedBox(height: 3),
+            SizedBox(
+              width: double.infinity,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  softWrap: false,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: ZveltTokens.fontPrimary,
+                    fontSize: 11,
+                    height: 1.05,
+                    letterSpacing: 0,
+                    color: selected ? ZveltTokens.brand : ZveltTokens.text3,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

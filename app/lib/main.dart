@@ -14,7 +14,6 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:workmanager/workmanager.dart';
 import 'config/api_config.dart' show apiBaseUrl;
 import 'config/app_navigator.dart';
 import 'config/firebase_options.dart';
@@ -28,7 +27,6 @@ import 'services/app_data_cache.dart';
 import 'services/fcm_background.dart';
 import 'services/background_tracking_service.dart';
 import 'services/moderation_service.dart';
-import 'services/health_service.dart';
 import 'services/location_service.dart';
 import 'services/offline_sync_coordinator.dart';
 import 'services/push_messaging_service.dart';
@@ -48,56 +46,6 @@ import 'services/workout_service.dart';
 /// finished the old flow are not pushed through V3 again. (V2 UI was deleted; the
 /// live flow is OnboardingV3.)
 const String kOnboardingV2CompletedKey = 'zvelt_onboarding_v2_completed';
-
-/// Wave 8 — background entry point for the Health Connect incremental sync.
-/// Runs in an isolate with no UI; keep work scoped to [HealthService] and
-/// always return a result so WorkManager doesn't retry-storm on transient
-/// failures. `@pragma('vm:entry-point')` is mandatory — without it the
-/// Dart tree-shaker drops the symbol in release builds.
-@pragma('vm:entry-point')
-void healthSyncCallbackDispatcher() {
-  Workmanager().executeTask((task, inputData) async {
-    try {
-      final inserted = await HealthService.instance.incrementalSync();
-      debugPrint('[Workmanager] $task done, inserted=$inserted');
-      return true;
-    } catch (e, st) {
-      debugPrint('[Workmanager] $task failed: $e\n$st');
-      // Returning true prevents a retry storm. The next periodic tick (~15m)
-      // will try again with a fresh state.
-      return true;
-    }
-  });
-}
-
-/// Wave 8 — periodic health sync registration. Android-only:
-/// `workmanager` on iOS uses BGTaskScheduler which requires extra
-/// `Info.plist` permitted-identifiers entries + Xcode capabilities; for the
-/// v1.0 release iOS background sync is intentionally deferred to HealthKit
-/// observer queries (separate path). On unsupported platforms this is a
-/// no-op.
-Future<void> _registerHealthBackgroundSync() async {
-  if (defaultTargetPlatform != TargetPlatform.android) return;
-  try {
-    await Workmanager().initialize(healthSyncCallbackDispatcher);
-    await Workmanager().registerPeriodicTask(
-      'health_incremental_sync',
-      'health_incremental_sync',
-      frequency: const Duration(minutes: 15),
-      // Reading Health Connect is an on-device operation — it needs no network.
-      // Requiring connectivity needlessly blocked the sync (and ColorOS/Oppo
-      // already defers background work aggressively). NotRequired lets it run.
-      constraints: Constraints(networkType: NetworkType.notRequired),
-      // update: re-register existing installs with the relaxed constraint
-      // WITHOUT cancelling the in-flight schedule. (replace would cancel +
-      // restart the 15-min clock on every cold start, so a user who opens the
-      // app more than once per 15 min would starve the background sync.)
-      existingWorkPolicy: ExistingPeriodicWorkPolicy.update,
-    );
-  } catch (e, st) {
-    debugPrint('[bootstrap] Workmanager registration failed: $e\n$st');
-  }
-}
 
 /// Fire-and-forget GET to Render at boot. Render free tier sleeps after
 /// 15 min idle and takes ~30-60s to wake. By the time the user navigates
@@ -135,33 +83,29 @@ Future<void> _configureLocalTimezone() async {
   }
 }
 
+Future<void> _initializeFirebaseCrashReporting() async {
+  if (kIsWeb || !DefaultFirebaseOptions.isConfigured) return;
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+    await FirebaseCrashlytics.instance
+        .setCrashlyticsCollectionEnabled(!kDebugMode);
+    FlutterError.onError =
+        FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  } catch (e, st) {
+    debugPrint('[bootstrap] Crashlytics init failed: $e\n$st');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // P0.6 — Crashlytics. Initialize Firebase + wire the framework / async
-  // error handlers BEFORE the first `runApp` so cold-start crashes are
-  // captured. Disabled in debug to avoid polluting the Firebase console
-  // with dev-time exceptions. Firebase init is idempotent — the lazy
-  // `Firebase.initializeApp` calls in PushMessagingService / fcm_background
-  // detect existing apps and short-circuit.
-  if (!kIsWeb && DefaultFirebaseOptions.isConfigured) {
-    try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-      }
-      await FirebaseCrashlytics.instance
-          .setCrashlyticsCollectionEnabled(!kDebugMode);
-      FlutterError.onError =
-          FirebaseCrashlytics.instance.recordFlutterFatalError;
-      PlatformDispatcher.instance.onError = (error, stack) {
-        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-        return true;
-      };
-    } catch (e, st) {
-      debugPrint('[bootstrap] Crashlytics init failed: $e\n$st');
-    }
-  }
   try {
     await dotenv.load(fileName: 'assets/dotenv');
     UsdaApiConfig.syncFromDotenv();
@@ -243,6 +187,8 @@ class _AppBootstrapState extends State<_AppBootstrap>
       // Two 16ms delays ensure the first frame is fully painted.
       await Future<void>.delayed(const Duration(milliseconds: 16));
       await Future<void>.delayed(const Duration(milliseconds: 16));
+      if (mounted) setState(() => _ready = true);
+      unawaited(_initializeFirebaseCrashReporting());
       // Wake Render free-tier dyno while the user navigates to login —
       // fire-and-forget, ~30-60s cold start happens off the critical path.
       unawaited(_warmupBackend());
@@ -262,10 +208,6 @@ class _AppBootstrapState extends State<_AppBootstrap>
       } catch (e, st) {
         debugPrint('[bootstrap] RetentionReminder init: $e\n$st');
       }
-      // Wave 8 — register the WorkManager periodic task for Health Connect
-      // incremental sync. Fire-and-forget; failures are logged but do not
-      // block bootstrap.
-      unawaited(_registerHealthBackgroundSync());
       // Wave 22 P0.2 — best-effort drain of any reports queued while the
       // moderation backend was offline. Fire-and-forget; the outbox is
       // also drained whenever the user opens BlockedUsersScreen.
@@ -285,7 +227,6 @@ class _AppBootstrapState extends State<_AppBootstrap>
               '[bootstrap] OfflineSyncCoordinator.start failed: $e\n$st');
         }),
       );
-      if (mounted) setState(() => _ready = true);
     } catch (e, st) {
       debugPrint('[bootstrap] $e\n$st');
       if (mounted) setState(() => _error = e);
@@ -449,14 +390,70 @@ class _AuthGateState extends State<AuthGate> {
     _checkAuth();
   }
 
+  bool get _runningInWidgetTest {
+    var isTest = false;
+    assert(() {
+      isTest = WidgetsBinding.instance.runtimeType
+          .toString()
+          .contains('TestWidgetsFlutterBinding');
+      return true;
+    }());
+    return isTest;
+  }
+
   Future<void> _checkAuth() async {
-    final hasToken = await _auth.hasValidToken();
-    final prefs = await SharedPreferences.getInstance();
+    final useTimeouts = !_runningInWidgetTest;
+    var hasToken = false;
+    try {
+      final authCheck = _auth.hasValidToken();
+      hasToken = useTimeouts
+          ? await authCheck.timeout(
+              const Duration(seconds: 12),
+              onTimeout: () {
+                debugPrint(
+                    '[auth-gate] hasValidToken timed out; showing onboarding');
+                return false;
+              },
+            )
+          : await authCheck;
+    } catch (e, st) {
+      debugPrint('[auth-gate] hasValidToken failed: $e\n$st');
+      hasToken = false;
+    }
+
+    late final SharedPreferences prefs;
+    try {
+      final prefsLoad = SharedPreferences.getInstance();
+      prefs = useTimeouts
+          ? await prefsLoad.timeout(const Duration(seconds: 4))
+          : await prefsLoad;
+    } catch (e, st) {
+      debugPrint('[auth-gate] SharedPreferences failed: $e\n$st');
+      if (!mounted) return;
+      setState(() {
+        _hasToken = false;
+        _onboardingDone = false;
+        _loading = false;
+      });
+      return;
+    }
     bool onboardingDone = false;
     String userId = '';
     if (hasToken) {
       // getCurrentUserId() făcea refresh HTTP fără timeout → blocare minute dacă backend-ul e oprit.
-      userId = await _auth.getStoredUserId() ?? '';
+      try {
+        final storedUser = _auth.getStoredUserId();
+        userId = (useTimeouts
+                ? await storedUser.timeout(
+                    const Duration(seconds: 4),
+                    onTimeout: () => '',
+                  )
+                : await storedUser) ??
+            '';
+      } catch (e, st) {
+        debugPrint('[auth-gate] getStoredUserId failed: $e\n$st');
+        userId = '';
+      }
       _userId = userId;
       // NOTE: do NOT trigger another refresh here — hasValidToken() above
       // already refreshed and cached a fresh access token. A second

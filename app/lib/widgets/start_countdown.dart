@@ -95,8 +95,7 @@ class _StartCountdownState extends State<StartCountdown> with SingleTickerProvid
               if (widget.title != null) ...[
                 Text(
                   widget.title!,
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontMono,
+                  style: ZType.monoS.copyWith(
                     color: ZveltTokens.text2,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -107,18 +106,19 @@ class _StartCountdownState extends State<StartCountdown> with SingleTickerProvid
               ],
               Text(
                 'Starting in',
-                style: TextStyle(color: ZveltTokens.text2.withValues(alpha: 0.7), fontSize: 13),
+                style: ZType.bodyS
+                    .copyWith(color: ZveltTokens.text2.withValues(alpha: 0.7)),
               ),
               const SizedBox(height: ZveltTokens.s10),
               ScaleTransition(
                 scale: CurvedAnimation(parent: _scale, curve: Curves.elasticOut),
                 child: Text(
                   '$_value',
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontPrimary,
+                  style: ZType.display.copyWith(
                     fontStyle: FontStyle.italic,
                     fontSize: 200,
                     fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
                     height: 0.9,
                     // Dark-theme leftover: white-on-#F6F7F5 was ~1.05:1 —
                     // the digit was legible only through its glow.
@@ -141,7 +141,8 @@ class _StartCountdownState extends State<StartCountdown> with SingleTickerProvid
                 },
                 child: Text(
                   'Cancel',
-                  style: TextStyle(color: ZveltTokens.text2.withValues(alpha: 0.7), fontSize: 15),
+                  style: ZType.bodyM
+                      .copyWith(color: ZveltTokens.text2.withValues(alpha: 0.7)),
                 ),
               ),
             ],

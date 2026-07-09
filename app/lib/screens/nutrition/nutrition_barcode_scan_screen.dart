@@ -4,6 +4,8 @@ import 'package:zvelt_app/theme/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../theme/zvelt_tokens.dart';
+
 /// Full-screen barcode scan; codul caută produs ambalat în USDA FoodData Central (Branded).
 class NutritionBarcodeScanScreen extends StatefulWidget {
   const NutritionBarcodeScanScreen({super.key});
@@ -61,10 +63,10 @@ class _NutritionBarcodeScanScreenState extends State<NutritionBarcodeScanScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.black, // scrim: camera surround
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.black, // scrim: camera surround
+        foregroundColor: Colors.white, // on-image
         title: const Text('Scan barcode'),
         actions: [
           IconButton(
@@ -93,7 +95,7 @@ class _NutritionBarcodeScanScreenState extends State<NutritionBarcodeScanScreen>
                   child: Text(
                     err.errorDetails?.message ?? err.toString(),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70),
+                    style: ZType.bodyS.copyWith(color: Colors.white70), // on-image
                   ),
                 ),
               );
@@ -104,11 +106,11 @@ class _NutritionBarcodeScanScreenState extends State<NutritionBarcodeScanScreen>
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              color: Colors.black54,
-              child: const Text(
+              color: Colors.black54, // scrim
+              child: Text(
                 'Point at the product barcode. We search USDA branded foods.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+                style: ZType.bodyS.copyWith(color: Colors.white70), // on-image
               ),
             ),
           ),

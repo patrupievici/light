@@ -18,8 +18,8 @@ class _PickerEntry extends _PickerRow {
   final ChallengeCatalogEntry entry;
 }
 
-/// Ecran modal peste fundal întunecat: căutare + listă exerciții (gym / calistenics).
-/// Folosește [Hero] cu același [heroTag] ca declanșatorul din sheet pentru o tranziție „expand din buton”.
+/// Modal screen over a dimmed background: search + exercise list (gym / calisthenics).
+/// Uses a [Hero] with the same [heroTag] as the sheet trigger for an “expand from button” transition.
 class ChallengeKindPickerPage extends StatefulWidget {
   const ChallengeKindPickerPage({
     super.key,
@@ -37,14 +37,14 @@ class ChallengeKindPickerPage extends StatefulWidget {
     return PageRouteBuilder<ChallengeCatalogEntry?>(
       opaque: false,
       barrierDismissible: true,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.45), // scrim
       barrierLabel: 'Dismiss',
       transitionDuration: const Duration(milliseconds: 800),
       reverseTransitionDuration: const Duration(milliseconds: 800),
       pageBuilder: (context, animation, secondaryAnimation) {
         return ChallengeKindPickerPage(heroTag: heroTag, selected: selected);
       },
-      // Nu fade pe întreg child-ul: ascunde zborul Hero. Barrier-ul rămâne animat de rută.
+      // Don't fade the whole child: it would hide the Hero flight. The barrier stays route-animated.
       transitionsBuilder: (context, animation, secondaryAnimation, child) => child,
     );
   }

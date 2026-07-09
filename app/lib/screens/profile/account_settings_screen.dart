@@ -6,10 +6,13 @@ import 'package:http/http.dart' as http;
 import '../../config/api_config.dart' show v1Base;
 import '../../l10n/app_strings.dart';
 import '../../services/auth_service.dart';
-import '../../theme/app_theme.dart';
+import '../../theme/app_icons.dart';
+import '../../theme/zvelt_tokens.dart';
 import '../profile_screen.dart';
 import '../social/notifications_screen.dart';
 import '../../services/social_notification_hub.dart';
+import '../../widgets/z/z_card.dart';
+import '../../widgets/z/z_loading.dart';
 import '../../widgets/zvelt_secondary_button.dart';
 
 /// Setări cont: date fizice, unități, privacy default, notificări în app, logout (Excel #8).
@@ -78,7 +81,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.bgElevated,
         title: const Text('Units'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -87,9 +89,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 (u) => ListTile(
                   title: Text(
                     u == 'metric' ? 'Metric (kg, cm)' : 'Imperial (lbs, in)',
-                    style: TextStyle(color: AppTheme.textPrimary),
+                    style: TextStyle(color: ZveltTokens.text),
                   ),
-                  trailing: _unitSystem == u ? const Icon(Icons.check, color: AppTheme.accentAmber) : null,
+                  trailing: _unitSystem == u
+                      ? const Icon(AppIcons.check, color: ZveltTokens.brand)
+                      : null,
                   onTap: () => Navigator.pop(ctx, u),
                 ),
               )
@@ -100,7 +104,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     if (result == null || !mounted) return;
     await _patchProfile({'unitSystem': result});
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Units updated')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Units updated')));
     }
   }
 
@@ -108,7 +113,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.bgElevated,
         title: const Text('Default post privacy'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -121,7 +125,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 (item) => ListTile(
                   title: Text(
                     item['label']!,
-                    style: TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                    style: ZType.bodyS
+                        .copyWith(color: ZveltTokens.text, fontSize: 14),
                   ),
                   onTap: () => Navigator.pop(ctx, item['value']),
                 ),
@@ -133,7 +138,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     if (result == null || !mounted) return;
     await _patchProfile({'privacyDefault': result});
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Privacy updated')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Privacy updated')));
     }
   }
 
@@ -141,16 +147,17 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.bgElevated,
         title: const Text('Log out?'),
         content: Text(
           'You will need to sign in again.',
-          style: TextStyle(color: AppTheme.textSecondary),
+          style: TextStyle(color: ZveltTokens.text2),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
+            style: FilledButton.styleFrom(backgroundColor: ZveltTokens.error),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Log out'),
           ),
@@ -166,36 +173,39 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgPrimary,
+      backgroundColor: ZveltTokens.bg,
       appBar: AppBar(title: const Text('Account settings')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.accentAmber))
+          ? const ZPageSkeleton(showHeader: false, itemCount: 3)
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 _Card(
                   children: [
                     _Tile(
-                      icon: Icons.person_outline,
+                      icon: AppIcons.user,
                       title: 'Physical data',
                       subtitle: 'Body weight, height',
                       onTap: () async {
                         await Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const ProfileScreen()),
                         );
                         await _load();
                       },
                     ),
                     const _Divider(),
                     _Tile(
-                      icon: Icons.straighten,
+                      icon: AppIcons.ruler_horizontal,
                       title: 'Units',
-                      subtitle: _unitSystem == 'metric' ? 'Metric (kg, cm)' : 'Imperial (lbs, in)',
+                      subtitle: _unitSystem == 'metric'
+                          ? 'Metric (kg, cm)'
+                          : 'Imperial (lbs, in)',
                       onTap: _showUnits,
                     ),
                     const _Divider(),
                     _Tile(
-                      icon: Icons.privacy_tip_outlined,
+                      icon: AppIcons.shield_check,
                       title: 'Default post privacy',
                       subtitle: _privacyLabel(_privacyDefault),
                       onTap: _showPrivacy,
@@ -206,12 +216,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 _Card(
                   children: [
                     _Tile(
-                      icon: Icons.notifications_outlined,
+                      icon: AppIcons.bell,
                       title: 'In-app notifications',
                       subtitle: 'Likes, comments, friend requests',
                       onTap: () async {
                         await Navigator.of(context).push<void>(
-                          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const NotificationsScreen()),
                         );
                         SocialNotificationHub.refresh();
                       },
@@ -222,13 +233,15 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 _Card(
                   children: [
                     _Tile(
-                      icon: Icons.restaurant_outlined,
+                      icon: AppIcons.restaurant,
                       title: 'Nutrition goals',
-                      subtitle: 'Set daily calories & macros in the Nutrition tab',
+                      subtitle:
+                          'Set daily calories & macros in the Nutrition tab',
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Open the Nutrition tab to edit goals and log meals.'),
+                            content: Text(
+                                'Open the Nutrition tab to edit goals and log meals.'),
                           ),
                         );
                       },
@@ -238,7 +251,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 const SizedBox(height: 24),
                 ZveltSecondaryButton(
                   label: AppStrings.logOut,
-                  icon: Icons.logout,
+                  icon: AppIcons.sign_out_alt,
                   onTap: _confirmLogout,
                 ),
               ],
@@ -264,12 +277,8 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.bgElevated,
-        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-        border: Border.all(color: AppTheme.border),
-      ),
+    return ZCard(
+      padding: EdgeInsets.zero,
       child: Column(children: children),
     );
   }
@@ -280,7 +289,7 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Divider(height: 1, color: AppTheme.border);
+    return Divider(height: 1, color: ZveltTokens.border);
   }
 }
 
@@ -299,10 +308,11 @@ class _Tile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: AppTheme.textSecondary),
-      title: Text(title, style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle, style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-      trailing: Icon(Icons.chevron_right, color: AppTheme.textSecondary),
+      leading: Icon(icon, color: ZveltTokens.text2),
+      title:
+          Text(title, style: ZType.bodyM.copyWith(fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle, style: ZType.bodyS),
+      trailing: Icon(AppIcons.angle_small_right, color: ZveltTokens.text2),
       onTap: onTap,
     );
   }

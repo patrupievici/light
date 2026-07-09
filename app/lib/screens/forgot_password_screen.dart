@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/auth_service.dart';
-import '../theme/app_theme.dart';
 import '../theme/zvelt_tokens.dart';
 
 /// Two-step password recovery, matching the LoginScreen visual language.
@@ -129,7 +128,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgPrimary,
+      backgroundColor: ZveltTokens.bg,
       appBar: AppBar(title: const Text('Reset password')),
       body: SafeArea(
         child: Center(
@@ -143,7 +142,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   Text(
                     _codeStep ? 'Check your email' : 'Forgot your password?',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: AppTheme.textPrimary,
+                          color: ZveltTokens.text,
                           fontWeight: FontWeight.w700,
                         ),
                     textAlign: TextAlign.center,
@@ -238,12 +237,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     Container(
                       padding: const EdgeInsets.all(ZveltTokens.s3),
                       decoration: BoxDecoration(
-                        color: AppTheme.error.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+                        color: ZveltTokens.error.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
                       ),
                       child: Text(
                         _error!,
-                        style: const TextStyle(color: AppTheme.error, fontSize: 14),
+                        style: ZType.bodyS.copyWith(color: ZveltTokens.error, fontSize: 14),
                       ),
                     ),
                   ],
@@ -256,7 +255,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             width: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: AppTheme.textPrimary,
+                              color: ZveltTokens.text,
                             ),
                           )
                         : Text(

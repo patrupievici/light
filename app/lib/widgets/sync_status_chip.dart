@@ -41,10 +41,10 @@ class SyncStatusChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             synced ? 'Synced' : 'Pending $pendingCount',
-            style: TextStyle(
-              fontSize: 11,
+            style: ZType.monoXS.copyWith(
               fontWeight: FontWeight.w700,
               color: color,
+              height: 1.2,
             ),
           ),
           if (onRetry != null) ...[

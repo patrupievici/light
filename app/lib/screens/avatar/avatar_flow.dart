@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../theme/app_icons.dart';
 import 'avatar_intro_screen.dart';
 import 'avatar_selection_screen.dart';
 import 'avatar_confirm_screen.dart';
@@ -9,15 +10,15 @@ const String kSelectedAvatarIdKey = 'selected_avatar_id';
 
 /// Default avatar options (icons). Replace with image assets later if needed.
 List<AvatarOption> get defaultAvatarOptions => const [
-  AvatarOption(id: 'avatar_1', icon: Icons.person),
-  AvatarOption(id: 'avatar_2', icon: Icons.directions_run),
-  AvatarOption(id: 'avatar_3', icon: Icons.fitness_center),
-  AvatarOption(id: 'avatar_4', icon: Icons.self_improvement),
-  AvatarOption(id: 'avatar_5', icon: Icons.sports_martial_arts),
-  AvatarOption(id: 'avatar_6', icon: Icons.bolt),
-  AvatarOption(id: 'avatar_7', icon: Icons.star),
-  AvatarOption(id: 'avatar_8', icon: Icons.emoji_events),
-  AvatarOption(id: 'avatar_9', icon: Icons.person_outline),
+  AvatarOption(id: 'avatar_1', icon: AppIcons.user),
+  AvatarOption(id: 'avatar_2', icon: AppIcons.running),
+  AvatarOption(id: 'avatar_3', icon: AppIcons.gym),
+  AvatarOption(id: 'avatar_4', icon: AppIcons.leaf),
+  AvatarOption(id: 'avatar_5', icon: AppIcons.boxing_glove),
+  AvatarOption(id: 'avatar_6', icon: AppIcons.bolt),
+  AvatarOption(id: 'avatar_7', icon: AppIcons.star),
+  AvatarOption(id: 'avatar_8', icon: AppIcons.trophy),
+  AvatarOption(id: 'avatar_9', icon: AppIcons.grin),
 ];
 
 /// Flow FIG 20–24: Intro → Selection → Confirm. Saves completion + selected avatar id.

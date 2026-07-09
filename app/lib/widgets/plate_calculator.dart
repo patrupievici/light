@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_icons.dart';
 import '../theme/zvelt_tokens.dart';
 
 /// A barbell plate-math helper (brief §8 "Plate calculator"). Given a target
@@ -108,7 +109,7 @@ class _PlateCalculatorSheetState extends State<_PlateCalculatorSheet> {
               Text('Target', style: ZType.bodyM),
               const Spacer(),
               _StepButton(
-                icon: Icons.remove,
+                icon: AppIcons.minus,
                 onTap: () => setState(
                     () => _target = (_target - 2.5).clamp(0, 500)),
               ),
@@ -123,7 +124,7 @@ class _PlateCalculatorSheetState extends State<_PlateCalculatorSheet> {
               ),
               const SizedBox(width: ZveltTokens.s3),
               _StepButton(
-                icon: Icons.add,
+                icon: AppIcons.plus,
                 onTap: () => setState(
                     () => _target = (_target + 2.5).clamp(0, 500)),
               ),

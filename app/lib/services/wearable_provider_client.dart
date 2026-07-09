@@ -1,5 +1,3 @@
-import 'package:health/health.dart';
-
 enum HealthMetricKind {
   steps,
   distance,
@@ -13,6 +11,13 @@ enum HealthMetricKind {
   weight,
   bodyFat,
   leanBodyMass,
+}
+
+/// V1 keeps wearable/Health integrations out of the native build. This tiny
+/// shape preserves provider abstractions for future wiring without pulling the
+/// Android Health plugin into app startup.
+class HealthDataPoint {
+  const HealthDataPoint();
 }
 
 enum HealthSourcePath {
@@ -137,14 +142,16 @@ class WearableProviderCatalog {
       label: 'Garmin Connect',
       preferredSourcePath: HealthSourcePath.aggregator,
       requiresCloudForBestResults: true,
-      notes: 'Use Health Connect for recent data when available; aggregator for deep history.',
+      notes:
+          'Use Health Connect for recent data when available; aggregator for deep history.',
     ),
     WearableProviderInfo(
       provider: WearableProvider.fitbit,
       label: 'Fitbit / Pixel Watch',
       preferredSourcePath: HealthSourcePath.aggregator,
       requiresCloudForBestResults: true,
-      notes: 'Health Connect can cover recent Android data; cloud link improves reliability.',
+      notes:
+          'Health Connect can cover recent Android data; cloud link improves reliability.',
     ),
     WearableProviderInfo(
       provider: WearableProvider.oura,
@@ -158,7 +165,8 @@ class WearableProviderCatalog {
       label: 'Polar Flow',
       preferredSourcePath: HealthSourcePath.aggregator,
       requiresCloudForBestResults: true,
-      notes: 'Health Connect may cover recent data; cloud link is the durable path.',
+      notes:
+          'Health Connect may cover recent data; cloud link is the durable path.',
     ),
     WearableProviderInfo(
       provider: WearableProvider.coros,
@@ -193,14 +201,16 @@ class WearableProviderCatalog {
       label: 'Amazfit / Zepp',
       preferredSourcePath: HealthSourcePath.aggregator,
       requiresCloudForBestResults: true,
-      notes: 'Use Health Connect if Zepp writes there; otherwise cloud or bridge path.',
+      notes:
+          'Use Health Connect if Zepp writes there; otherwise cloud or bridge path.',
     ),
     WearableProviderInfo(
       provider: WearableProvider.huaweiHealth,
       label: 'Huawei Health',
       preferredSourcePath: HealthSourcePath.aggregator,
       requiresCloudForBestResults: true,
-      notes: 'Huawei needs aggregator support, Health Sync bridge, or a future HMS module.',
+      notes:
+          'Huawei needs aggregator support, Health Sync bridge, or a future HMS module.',
     ),
   ];
 

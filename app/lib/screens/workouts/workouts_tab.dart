@@ -9,6 +9,8 @@ import '../../services/stats_charts_service.dart';
 import '../../services/workout_service.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/z/z_card.dart';
+import '../../widgets/z/z_loading.dart';
+import '../../widgets/z/z_pressable.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
 import '../calendar/activity_calendar_screen.dart';
 import 'quick_launch_sheet.dart';
@@ -258,8 +260,16 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
         // lazy Offstage panes stay mounted so their search/calendar/scroll
         // state survives (and the RefreshIndicator isn't torn down mid-gesture).
         child: _loading && _workouts.isEmpty
-            ? const Center(
-                child: CircularProgressIndicator(color: ZveltTokens.brand))
+            ? ZPageSkeleton(
+                itemCount: 5,
+                padding: EdgeInsets.fromLTRB(
+                  ZveltTokens.screenPaddingH,
+                  ZveltTokens.s3,
+                  ZveltTokens.screenPaddingH,
+                  ZveltMainNavBar.reservedBottomHeight(context) +
+                      ZveltTokens.s4,
+                ),
+              )
             : Column(
                 children: [
                   _trainHeader(),
@@ -562,12 +572,12 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
       color: Colors.transparent,
       child: InkWell(
         onTap: _starting ? null : _startWorkout,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(ZveltTokens.rXl),
         child: Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             gradient: ZveltTokens.gradBrand,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(ZveltTokens.rXl),
             boxShadow: ZveltTokens.glowBrand,
           ),
           child: Column(
@@ -576,7 +586,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
               Text(
                 "TODAY'S WORKOUT",
                 style: ZType.bodyS.copyWith(
-                  color: Colors.white.withValues(alpha: 0.85),
+                  color: ZveltTokens.onBrand.withValues(alpha: 0.85),
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                   letterSpacing: 0.1 * 12,
@@ -588,7 +598,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: ZType.h2.copyWith(
-                    color: Colors.white,
+                    color: ZveltTokens.onBrand,
                     fontWeight: FontWeight.w700,
                     fontSize: 26,
                     letterSpacing: -0.02 * 26),
@@ -598,12 +608,13 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                 Row(
                   children: [
                     Icon(AppIcons.gym,
-                        size: 15, color: Colors.white.withValues(alpha: 0.9)),
+                        size: 15,
+                        color: ZveltTokens.onBrand.withValues(alpha: 0.9)),
                     const SizedBox(width: 6),
                     Text(
                       '${routine.exerciseCount} exercise${routine.exerciseCount == 1 ? '' : 's'}',
                       style: ZType.bodyS.copyWith(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: ZveltTokens.onBrand.withValues(alpha: 0.9),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -627,8 +638,8 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                 padding: const EdgeInsets.all(14),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
+                  color: ZveltTokens.onBrand,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
                 ),
                 child: Text(
                   _starting ? 'Starting…' : 'Start Workout →',
@@ -865,9 +876,9 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                   ZType.h4.copyWith(color: ZveltTokens.text, fontSize: 15),
             ),
             calendarStyle: CalendarStyle(
-              defaultTextStyle: TextStyle(color: ZveltTokens.text),
-              weekendTextStyle: TextStyle(color: ZveltTokens.text),
-              outsideTextStyle: TextStyle(color: ZveltTokens.text4),
+              defaultTextStyle: ZType.bodyM.copyWith(color: ZveltTokens.text),
+              weekendTextStyle: ZType.bodyM.copyWith(color: ZveltTokens.text),
+              outsideTextStyle: ZType.bodyM.copyWith(color: ZveltTokens.text4),
               selectedDecoration: const BoxDecoration(
                 color: ZveltTokens.brand,
                 shape: BoxShape.circle,
@@ -876,7 +887,7 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                 color: ZveltTokens.brandTint,
                 shape: BoxShape.circle,
               ),
-              todayTextStyle: const TextStyle(
+              todayTextStyle: ZType.bodyM.copyWith(
                   color: ZveltTokens.brandDeep, fontWeight: FontWeight.w600),
               markerDecoration: const BoxDecoration(
                 color: ZveltTokens.brand,
@@ -1532,13 +1543,13 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(9),
+        color: ZveltTokens.onBrand.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(ZveltTokens.rSm),
       ),
       child: Text(
         label,
         style: ZType.bodyS.copyWith(
-          color: Colors.white,
+          color: ZveltTokens.onBrand,
           fontWeight: FontWeight.w600,
           fontSize: 12,
         ),
@@ -1809,7 +1820,7 @@ class _ProgramSummaryCard extends StatelessWidget {
                           horizontal: 13, vertical: 9),
                       decoration: BoxDecoration(
                         color: ZveltTokens.bg2,
-                        borderRadius: BorderRadius.circular(11),
+                        borderRadius: BorderRadius.circular(ZveltTokens.rMd),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -2001,15 +2012,18 @@ class _CircleIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final disabled = onTap == null || loading;
     // V2 primary CTA: solid brand circle with subtle shadow, white icon.
-    return Material(
-      color: disabled
-          ? ZveltTokens.brand.withValues(alpha: 0.6)
-          : ZveltTokens.brand,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: disabled ? null : onTap,
-        customBorder: const CircleBorder(),
+    return ZPressable(
+      onTap: disabled ? null : onTap,
+      pressedScale: 0.94,
+      semanticLabel: 'Start workout',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: disabled
+              ? ZveltTokens.brand.withValues(alpha: 0.6)
+              : ZveltTokens.brand,
+          shape: BoxShape.circle,
+          boxShadow: disabled ? null : ZveltTokens.glowBrand,
+        ),
         child: SizedBox(
           width: 56,
           height: 56,
@@ -2112,14 +2126,17 @@ class _SegmentedControl extends StatelessWidget {
       padding: const EdgeInsets.all(ZveltTokens.s1),
       decoration: BoxDecoration(
         color: ZveltTokens.bg2,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(ZveltTokens.rMd),
       ),
       child: Row(
         children: [
           for (var i = 0; i < labels.length; i++)
             Expanded(
-              child: GestureDetector(
+              child: ZPressable(
                 onTap: () => onChanged(i),
+                selected: selected == i,
+                semanticLabel: '${labels[i]} tab',
+                pressedScale: 0.98,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(
@@ -2128,7 +2145,7 @@ class _SegmentedControl extends StatelessWidget {
                     color: selected == i
                         ? ZveltTokens.surface
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(ZveltTokens.rSm),
                     boxShadow: selected == i ? ZveltTokens.shadowCard : null,
                   ),
                   child: Text(

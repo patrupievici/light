@@ -146,7 +146,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
                     ],
                   ),
                   const SizedBox(height: ZveltTokens.s2),
-                  Text('P ${_fmt(_totalP)}g · C ${_fmt(_totalC)}g · G ${_fmt(_totalF)}g',
+                  Text('P ${_fmt(_totalP)}g · C ${_fmt(_totalC)}g · F ${_fmt(_totalF)}g',
                       style: ZType.monoS.copyWith(color: ZveltTokens.text2)),
                 ],
               ),

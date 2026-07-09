@@ -23,40 +23,62 @@ class ZveltTokens {
   // ─── Neutral backgrounds (periwinkle "De ce ai nevoie?" system) ────────────
   /// Page background  (--bg)
   static Color get bg => _d(const Color(0xFFF4F5F9), const Color(0xFF131419));
+
   /// Inset block bg / secondary card  (--card2)
   static Color get bg2 => _d(const Color(0xFFF2F3F8), const Color(0xFF25262F));
+
   /// Card surface  (--card)
-  static Color get surface => _d(const Color(0xFFFFFFFF), const Color(0xFF1D1E25));
+  static Color get surface =>
+      _d(const Color(0xFFFFFFFF), const Color(0xFF1D1E25));
+
   /// Subtle inset inside cards  (--card2)
-  static Color get surface2 => _d(const Color(0xFFF2F3F8), const Color(0xFF25262F));
+  static Color get surface2 =>
+      _d(const Color(0xFFF2F3F8), const Color(0xFF25262F));
+
   /// Track behind progress / muted thumb  (--card3)
-  static Color get surface3 => _d(const Color(0xFFE9EAF1), const Color(0xFF2F313B));
+  static Color get surface3 =>
+      _d(const Color(0xFFE9EAF1), const Color(0xFF2F313B));
+
   /// Accent-soft hero surface  (--acsoft)
-  static Color get surfaceTinted => _d(const Color(0xFFEEEFFD), const Color(0xFF262838));
+  static Color get surfaceTinted =>
+      _d(const Color(0xFFEEEFFD), const Color(0xFF262838));
 
   // ─── Text (3 levels in the design; text3/text4 are tertiary/decorative) ─────
   static Color get text => _d(const Color(0xFF2A2B3A), const Color(0xFFF1F2F7));
-  static Color get text2 => _d(const Color(0xFF82849A), const Color(0xFF9698A8));
-  static Color get text3 => _d(const Color(0xFF9A9CAE), const Color(0xFF7E8090));
-  static Color get text4 => _d(const Color(0xFFB7B8C6), const Color(0xFF5E606C));
+  static Color get text2 =>
+      _d(const Color(0xFF82849A), const Color(0xFF9698A8));
+  static Color get text3 =>
+      _d(const Color(0xFF9A9CAE), const Color(0xFF7E8090));
+  static Color get text4 =>
+      _d(const Color(0xFFB7B8C6), const Color(0xFF5E606C));
 
   // ─── Borders — used very sparingly (shadows define cards) ───────────────────
-  static Color get border => _d(const Color(0xFFEDEEF4), const Color(0xFF292B34));
-  static Color get borderStrong => _d(const Color(0xFFDEDFEA), const Color(0xFF3A3C46));
+  static Color get border =>
+      _d(const Color(0xFFEDEEF4), const Color(0xFF292B34));
+  static Color get borderStrong =>
+      _d(const Color(0xFFDEDFEA), const Color(0xFF3A3C46));
+
   /// Hairline divider
-  static Color get hairline => _d(const Color(0x0F2D2D50), const Color(0x14FFFFFF));
+  static Color get hairline =>
+      _d(const Color(0x0F2D2D50), const Color(0x14FFFFFF));
 
   // ─── Accent — Periwinkle (signal only; constant across modes) ──────────────
   /// accent-primary  (--ac)
   static const Color brand = Color(0xFF7C84EC);
+
   /// --ac2
   static const Color brand2 = Color(0xFF9DA3F1);
+
   /// light variant — halo, gradient top
   static const Color brand3 = Color(0xFFB6BAF5);
+
   /// accent-hover — press / gradient anchor  (--ac-dark)
   static const Color brandDeep = Color(0xFF5D66D9);
+
   /// accent-soft — chip bg, hero halo  (--acsoft, theme-aware)
-  static Color get brandTint => _d(const Color(0xFFEEEFFD), const Color(0x297C84EC));
+  static Color get brandTint =>
+      _d(const Color(0xFFEEEFFD), const Color(0x297C84EC));
+
   /// accent-glow — rgba(124,132,236,0.38) for CTA glow
   static const Color brandGlow = Color(0x617C84EC);
   static const Color onBrand = Color(0xFFFFFFFF);
@@ -74,6 +96,7 @@ class ZveltTokens {
   static const Color strength2 = Color(0xFFD7F2DF);
   static const Color cardio = Color(0xFFF05252); // red
   static const Color cardio2 = Color(0xFFFBD7D7);
+
   /// challenge / "ready" accent — orange
   static const Color challenge = Color(0xFFF2994A);
 
@@ -87,8 +110,10 @@ class ZveltTokens {
   // ─── Typography families — Inter everywhere (periwinkle design) ────────────
   /// Inter — UI, body, buttons, labels.
   static const String fontPrimary = 'Inter';
+
   /// Inter — headings/display (the design is type-driven on a single family).
   static const String fontDisplay = 'Inter';
+
   /// Inter — metrics/labels too (the "De ce ai nevoie?" design is Inter-only).
   static const String fontMono = 'Inter';
 
@@ -112,6 +137,7 @@ class ZveltTokens {
 
   /// Screen edge padding L/R per design system §3
   static const double screenPaddingH = 18;
+
   /// Default card-to-card gap per design system §3
   static const double cardGap = 12;
 
@@ -119,11 +145,11 @@ class ZveltTokens {
   // Cards separate by shadow + spacing (the design forbids heavy borders). On
   // dark the surface sits lighter than the page, so cards still read clearly.
   static const List<BoxShadow> shadowCard = [
-    BoxShadow(color: Color(0x0D2D2D50), offset: Offset(0, 3), blurRadius: 12),
+    BoxShadow(color: Color(0x122D2D50), offset: Offset(0, 6), blurRadius: 20),
   ];
 
   static const List<BoxShadow> shadowHero = [
-    BoxShadow(color: Color(0x122D2D50), offset: Offset(0, 8), blurRadius: 28),
+    BoxShadow(color: Color(0x182D2D50), offset: Offset(0, 12), blurRadius: 34),
   ];
 
   static const List<BoxShadow> shadowFloat = [
@@ -154,6 +180,20 @@ class ZveltTokens {
   static const List<BoxShadow> glowBrand = [
     BoxShadow(color: Color(0x617C84EC), blurRadius: 26, offset: Offset(0, 10)),
   ];
+}
+
+/// Shared motion tokens. Keep these subtle: Zvelt is a product UI used while
+/// training, so feedback should feel crisp without slowing the user down.
+class ZMotion {
+  ZMotion._();
+
+  static const Duration instant = Duration(milliseconds: 90);
+  static const Duration quick = Duration(milliseconds: 140);
+  static const Duration standard = Duration(milliseconds: 220);
+  static const Duration slow = Duration(milliseconds: 320);
+
+  static const Curve emphasized = Curves.easeOutCubic;
+  static const Curve settle = Curves.easeOutQuart;
 }
 
 /// V2 text-style utility roles. Mirror the `.z-display .z-clean .z-stat .z-num

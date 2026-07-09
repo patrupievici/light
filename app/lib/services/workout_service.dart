@@ -515,11 +515,25 @@ class WorkoutService {
     WorkoutDto workout, {
     String? label,
   }) async {
+    await saveActiveWorkoutPointerById(
+      workoutId: workout.id,
+      startedAt: workout.startedAt,
+      label: label,
+    );
+  }
+
+  /// Persist an in-progress session when the caller only has the id and start
+  /// time shape from a non-WorkoutService creation path.
+  static Future<void> saveActiveWorkoutPointerById({
+    required String workoutId,
+    DateTime? startedAt,
+    String? label,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final ptr = ActiveWorkoutPointer(
-        workoutId: workout.id,
-        startedAt: workout.startedAt,
+        workoutId: workoutId,
+        startedAt: startedAt ?? DateTime.now(),
         label: label,
       );
       await prefs.setString(kActiveWorkoutPrefsKey, jsonEncode(ptr.toJson()));

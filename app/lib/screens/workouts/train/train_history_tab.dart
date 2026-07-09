@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/app_icons.dart';
 import '../../../theme/zvelt_tokens.dart';
+import '../../../widgets/z/z_card.dart';
 
 /// A single completed training session, used to compute the monthly summary.
 class HistorySession {
@@ -111,12 +112,23 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
   int _calOffset = 0;
 
   static const List<String> _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   static const List<String> _dow = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-  DateTime get _displayedMonth => DateTime(_today.year, _today.month + _calOffset);
+  DateTime get _displayedMonth =>
+      DateTime(_today.year, _today.month + _calOffset);
 
   @override
   Widget build(BuildContext context) {
@@ -141,92 +153,106 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
 
   // ── A. Zvelt Coach card ─────────────────────────────────────────────────────
   Widget _coachCard() {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 180),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: ZveltTokens.brand,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: ZveltTokens.shadowCard,
-      ),
-      child: Stack(
-        children: [
-          // Mascot — behind/right so the copy stays readable.
-          Positioned(
-            right: -8,
-            top: 0,
-            bottom: 0,
-            child: Image.asset(
-              'assets/mascot/m-like.png',
-              height: 175,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(22),
-            child: FractionallySizedBox(
-              widthFactor: 0.65,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'This Month',
-                    style: TextStyle(
-                      fontFamily: ZveltTokens.fontPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.8),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Keep it up, Athlete! 🔥',
-                    style: TextStyle(
-                      fontFamily: ZveltTokens.fontPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 22,
-                      height: 1.2,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.workoutsThisWeek == 0
-                        ? 'A fresh week — your next session starts the momentum.'
-                        : "You're building real momentum. ${widget.workoutsThisWeek} ${widget.workoutsThisWeek == 1 ? 'session' : 'sessions'} logged this week.",
-                    style: TextStyle(
-                      fontFamily: ZveltTokens.fontPrimary,
-                      fontWeight: FontWeight.w400,
-                      fontSize: 13,
-                      height: 1.5,
-                      color: Colors.white.withValues(alpha: 0.88),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Flexible(
-                        child: _coachStat('${widget.dayStreak}', 'Day Streak'),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 38,
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        color: Colors.white.withValues(alpha: 0.25),
-                      ),
-                      Flexible(
-                        child: _coachStat(
-                            '${widget.workoutsThisWeek}', 'Workouts This Week'),
-                      ),
-                    ],
-                  ),
-                ],
+    return ZCard(
+      padding: EdgeInsets.zero,
+      radius: ZveltTokens.rXl,
+      shadow: ZveltTokens.shadowHero,
+      child: SizedBox(
+        width: double.infinity,
+        height: 188,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              right: -44,
+              top: -44,
+              child: Container(
+                width: 190,
+                height: 190,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brandTint,
+                  shape: BoxShape.circle,
+                ),
               ),
             ),
-          ),
-        ],
+            // Mascot — behind/right so the copy stays readable.
+            Positioned(
+              right: -2,
+              top: 8,
+              bottom: -8,
+              child: Image.asset(
+                'assets/mascot/m-like.png',
+                height: 175,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 20, 132, 18),
+              child: FractionallySizedBox(
+                widthFactor: 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'This Month',
+                      style: TextStyle(
+                        fontFamily: ZveltTokens.fontPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color: ZveltTokens.brandDeep,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Keep it up, Athlete! 🔥',
+                      style: TextStyle(
+                        fontFamily: ZveltTokens.fontPrimary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                        height: 1.12,
+                        color: ZveltTokens.text,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.workoutsThisWeek == 0
+                          ? 'A fresh week — your next session starts the momentum.'
+                          : "You're building real momentum. ${widget.workoutsThisWeek} ${widget.workoutsThisWeek == 1 ? 'session' : 'sessions'} logged this week.",
+                      style: TextStyle(
+                        fontFamily: ZveltTokens.fontPrimary,
+                        fontWeight: FontWeight.w400,
+                        fontSize: 13,
+                        height: 1.5,
+                        color: ZveltTokens.text2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Flexible(
+                          child:
+                              _coachStat('${widget.dayStreak}', 'Day Streak'),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 38,
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          color: ZveltTokens.hairline,
+                        ),
+                        Flexible(
+                          child: _coachStat('${widget.workoutsThisWeek}',
+                              'Workouts This Week'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -238,12 +264,12 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: ZveltTokens.fontPrimary,
             fontWeight: FontWeight.w700,
             fontSize: 26,
             height: 1.1,
-            color: Colors.white,
+            color: ZveltTokens.text,
           ),
         ),
         const SizedBox(height: 2),
@@ -256,7 +282,7 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
             fontFamily: ZveltTokens.fontPrimary,
             fontWeight: FontWeight.w500,
             fontSize: 12,
-            color: Colors.white.withValues(alpha: 0.8),
+            color: ZveltTokens.text2,
           ),
         ),
       ],
@@ -297,7 +323,8 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _navChevron(AppIcons.angle_small_left, () => setState(() => _calOffset--)),
+              _navChevron(AppIcons.angle_small_left,
+                  () => setState(() => _calOffset--)),
               Text(
                 label,
                 style: TextStyle(
@@ -307,7 +334,8 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
                   color: ZveltTokens.text,
                 ),
               ),
-              _navChevron(AppIcons.angle_small_right, () => setState(() => _calOffset++)),
+              _navChevron(AppIcons.angle_small_right,
+                  () => setState(() => _calOffset++)),
             ],
           ),
           const SizedBox(height: 12),
@@ -389,7 +417,9 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
               : BoxDecoration(
                   color: bg,
                   shape: shape,
-                  borderRadius: shape == BoxShape.rectangle ? BorderRadius.circular(10) : null,
+                  borderRadius: shape == BoxShape.rectangle
+                      ? BorderRadius.circular(10)
+                      : null,
                 ),
           child: Text(
             '$day',
@@ -528,7 +558,8 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (var i = 0; i < widget.workoutLog.length; i++)
-                  _logRow(widget.workoutLog[i], last: i == widget.workoutLog.length - 1),
+                  _logRow(widget.workoutLog[i],
+                      last: i == widget.workoutLog.length - 1),
               ],
             ),
     );
@@ -556,7 +587,8 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
                   color: ZveltTokens.brandTint,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(AppIcons.gym, color: ZveltTokens.brand, size: 22),
+                child: const Icon(AppIcons.gym,
+                    color: ZveltTokens.brand, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -597,7 +629,8 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
                 ),
               ),
               const SizedBox(width: 2),
-              Icon(AppIcons.angle_small_right, size: 20, color: ZveltTokens.text3),
+              Icon(AppIcons.angle_small_right,
+                  size: 20, color: ZveltTokens.text3),
             ],
           ),
         ),
@@ -620,7 +653,8 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (var i = 0; i < widget.personalRecords.length; i++)
-                  _recordRow(widget.personalRecords[i], last: i == widget.personalRecords.length - 1),
+                  _recordRow(widget.personalRecords[i],
+                      last: i == widget.personalRecords.length - 1),
               ],
             ),
     );
@@ -630,7 +664,8 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        border: last ? null : Border(bottom: BorderSide(color: ZveltTokens.border)),
+        border:
+            last ? null : Border(bottom: BorderSide(color: ZveltTokens.border)),
       ),
       child: Row(
         children: [
@@ -753,9 +788,12 @@ class _TrainHistoryTabState extends State<TrainHistoryTab> {
                       if (i > 0) const SizedBox(width: 5),
                       Expanded(
                         child: Container(
-                          height: (data.bars[i].clamp(0.0, 1.0) * 52).clamp(2.0, 52.0),
+                          height: (data.bars[i].clamp(0.0, 1.0) * 52)
+                              .clamp(2.0, 52.0),
                           decoration: BoxDecoration(
-                            color: i >= data.bars.length - 3 ? ZveltTokens.brand : ZveltTokens.brand2,
+                            color: i >= data.bars.length - 3
+                                ? ZveltTokens.brand
+                                : ZveltTokens.brand2,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
