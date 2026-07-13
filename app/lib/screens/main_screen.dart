@@ -13,7 +13,7 @@ import 'settings/settings_screen.dart';
 import 'skeleton/skeleton_profile_tab.dart';
 import 'social/notifications_screen.dart';
 import 'social/social_plus_screen.dart';
-import 'workouts/workouts_tab.dart';
+import '../screens/plan/plan_tab.dart' show PlanTab;
 
 /// Main shell — **4 destinations + a center AI action** (Claude Design handoff):
 /// Home · Plan · ✦ AI · Feed · Nutrition.
@@ -60,7 +60,7 @@ class _MainScreenState extends State<MainScreen> {
           onOpenFeed: () => _switchTo(_feedIndex),
         );
       case 1:
-        return const WorkoutsTab();
+        return const PlanTab();
       case 2:
         return const SocialPlusScreen();
       case 3:

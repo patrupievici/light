@@ -422,6 +422,7 @@ class PlannedWorkoutEntry {
     required this.title,
     required this.kind,
     this.completed = false,
+    this.time,
   });
 
   final String id;
@@ -430,12 +431,17 @@ class PlannedWorkoutEntry {
   final ActivityKind kind;
   final bool completed;
 
+  /// Optional display time "HH:mm" (Plan agenda rows). Backwards-compatible:
+  /// older persisted entries simply have no time.
+  final String? time;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'dayYmd': dayYmd,
         'title': title,
         'kind': kind.id,
         'completed': completed,
+        if (time != null) 'time': time,
       };
 
   static PlannedWorkoutEntry? fromJson(dynamic o) {
@@ -452,6 +458,7 @@ class PlannedWorkoutEntry {
       title: title,
       kind: kind,
       completed: m['completed'] == true,
+      time: (m['time'] as String?)?.trim(),
     );
   }
 
@@ -461,6 +468,7 @@ class PlannedWorkoutEntry {
     String? title,
     ActivityKind? kind,
     bool? completed,
+    String? time,
   }) {
     return PlannedWorkoutEntry(
       id: id ?? this.id,
@@ -468,6 +476,7 @@ class PlannedWorkoutEntry {
       title: title ?? this.title,
       kind: kind ?? this.kind,
       completed: completed ?? this.completed,
+      time: time ?? this.time,
     );
   }
 }
