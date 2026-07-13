@@ -66,6 +66,7 @@ dependencies:
   # Flaticon UIcons (bold rounded) — app-wide icon system. Bundles the fonts;
   # icons remain under Flaticon's license (attribution shown in Settings).
   uicons: ^1.0.1
+  google_fonts: ^8.1.0
 
 dev_dependencies:
   flutter_test:
@@ -86,6 +87,12 @@ flutter:
     # ZVELT coach mascot (3D rabbit) — periwinkle "De ce ai nevoie?" design.
     - assets/mascot/
   fonts:
+    # Manrope — Claude Design handoff typeface (variable font; Flutter maps
+    # fontWeight to the wght axis 400..800). Bundled for offline first-paint
+    # and deterministic tests (avoids google_fonts' runtime network fetch).
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-var.ttf
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Variable.ttf

@@ -148,12 +148,14 @@ class AppTheme {
   }
 
   static TextTheme _buildTextTheme() {
+    // Manrope everywhere (handoff typeface) — bundled variable font.
     final base = ThemeData(
       brightness: ZveltTokens.isDark ? Brightness.dark : Brightness.light,
     ).textTheme.apply(
-      bodyColor: textPrimary,
-      displayColor: textPrimary,
-    );
+          fontFamily: ZveltTokens.fontPrimary,
+          bodyColor: textPrimary,
+          displayColor: textPrimary,
+        );
     return base.copyWith(
       displayLarge: ZType.displayL.copyWith(fontSize: 48),
       headlineMedium: ZType.displayM,
@@ -174,6 +176,7 @@ class AppTheme {
     final dark = ZveltTokens.isDark;
     return ThemeData(
       useMaterial3: true,
+      fontFamily: ZveltTokens.fontPrimary,
       // Brightness + neutrals resolve live from ZveltTokens.isDark (set in
       // main.dart BEFORE this theme is evaluated). lightThemeData and
       // darkThemeData both return this getter; MaterialApp picks whichever

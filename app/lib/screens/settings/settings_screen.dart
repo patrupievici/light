@@ -618,8 +618,12 @@ class _SettingsScreenState extends State<SettingsScreen>
           ],
         ),
         const SizedBox(height: ZveltTokens.s6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        // Wrap (not Row) so the 4 links reflow to a second line on narrow
+        // phones / large text scale instead of overflowing.
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: ZveltTokens.s4,
+          runSpacing: ZveltTokens.s2,
           children: [
             _SocialLink(
                 label: 'Instagram',
@@ -637,24 +641,28 @@ class _SettingsScreenState extends State<SettingsScreen>
           ],
         ),
         const SizedBox(height: ZveltTokens.s5),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(
-                width: 10,
-                height: 10,
-                decoration: const BoxDecoration(
-                    color: ZveltTokens.brand, shape: BoxShape.circle)),
-            const SizedBox(width: 10),
-            Text('Zvelt', style: ZType.h1.copyWith(fontSize: 26)),
-            const SizedBox(width: 3),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(_version,
-                  style: ZType.monoS.copyWith(color: ZveltTokens.text4)),
-            ),
-          ],
+        // scaleDown so the wordmark + version never overflow on a tiny phone.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                      color: ZveltTokens.brand, shape: BoxShape.circle)),
+              const SizedBox(width: 10),
+              Text('Zvelt', style: ZType.h1.copyWith(fontSize: 26)),
+              const SizedBox(width: 3),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(_version,
+                    style: ZType.monoS.copyWith(color: ZveltTokens.text4)),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: ZveltTokens.s2),
         Center(

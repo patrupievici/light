@@ -7,8 +7,10 @@ const _kThemeKey = 'zvelt_theme_mode';
 class ZveltThemeNotifier {
   ZveltThemeNotifier._();
 
+  // Dark-first (Claude Design handoff): dark is the default until the user
+  // explicitly picks another mode (persisted).
   static final ValueNotifier<ThemeMode> mode =
-      ValueNotifier<ThemeMode>(ThemeMode.light);
+      ValueNotifier<ThemeMode>(ThemeMode.dark);
 
   static Future<void> init() async {
     try {
@@ -39,7 +41,7 @@ class ZveltThemeNotifier {
       case 'dark':
         return ThemeMode.dark;
       default:
-        return ThemeMode.light;
+        return ThemeMode.dark;
     }
   }
 

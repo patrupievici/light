@@ -61,15 +61,19 @@ class ZChip extends StatelessWidget {
             Icon(icon, size: 12, color: _fg),
             const SizedBox(width: 5),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: ZveltTokens.fontPrimary,
-              fontWeight: FontWeight.w500,
-              fontSize: 11,
-              letterSpacing: 0.01 * 11,
-              color: _fg,
-              height: 1.2,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: ZveltTokens.fontPrimary,
+                fontWeight: FontWeight.w500,
+                fontSize: 11,
+                letterSpacing: 0.01 * 11,
+                color: _fg,
+                height: 1.2,
+              ),
             ),
           ),
         ],

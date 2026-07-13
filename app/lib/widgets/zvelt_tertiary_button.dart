@@ -63,14 +63,20 @@ class ZveltTertiaryButton extends StatelessWidget {
                   Icon(icon, size: iconSize, color: fg),
                   const SizedBox(width: 6),
                 ],
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: fg,
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: ZveltTokens.fontPrimary,
-                    letterSpacing: 0.2,
+                // Ellipsis rather than overflow when the label is long / the
+                // system text scale is large (Manrope ExtraBold runs wide).
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: ZveltTokens.fontPrimary,
+                      letterSpacing: 0.2,
+                    ),
                   ),
                 ),
               ],
