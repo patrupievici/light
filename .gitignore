@@ -126,3 +126,7 @@ screenshots_extracted/
 
 # Copie locală altă variantă proiect (nu în același repo)
 /beastpack-zvetutzu/
+
+# Stray QA screenshots (emulator captures live in scratchpad, not repo root)
+current_emulator*.png
+zvelt_*.png
