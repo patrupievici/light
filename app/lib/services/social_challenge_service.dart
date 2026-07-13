@@ -109,6 +109,15 @@ class SocialChallengeService {
     return list.map(SocialChallenge.fromJson).whereType<SocialChallenge>().toList();
   }
 
+  /// Ended challenges (mine/joined), newest first — from the local mirror
+  /// (the server feed only returns live ones). Powers Feed › Challenges ›
+  /// Completed.
+  Future<List<SocialChallenge>> loadCompleted() async {
+    final all = await _loadAllLocal();
+    return all.where((c) => c.isExpired).toList()
+      ..sort((a, b) => b.endsAt.compareTo(a.endsAt));
+  }
+
   Future<List<SocialChallenge>> _loadAllLocal() async {
     final p = await SharedPreferences.getInstance();
     final raw = p.getString(await _prefsKey());

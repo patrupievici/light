@@ -205,9 +205,21 @@ class _PlanTabState extends State<PlanTab> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _PlanAddSheet(dayYmd: _ymd(_selectedDay)),
+      builder: (_) => _PlanAddSheet(
+        dayYmd: _ymd(_selectedDay),
+        mode: _mode == 0 ? 'workout' : 'nutrition',
+      ),
     );
-    if (added == true) _load();
+    if (added == true) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ZveltTokens.rSm)),
+        content: const Text('Added to agenda'),
+      ));
+      _load();
+    }
   }
 
   Future<void> _toggleDone(PlannedWorkoutEntry e) async {
@@ -220,6 +232,15 @@ class _PlanTabState extends State<PlanTab> {
     final list = _planned[e.dayYmd] ?? const <PlannedWorkoutEntry>[];
     final idx = list.indexWhere((x) => x.id == e.id);
     if (idx >= 0) await _store.removePlannedWorkoutAt(e.dayYmd, idx);
+    if (mounted) {
+      // Prototype `_rmAg` shows a 'Removed' toast after the swipe-delete.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ZveltTokens.rSm)),
+        content: const Text('Removed'),
+      ));
+    }
     _load();
   }
 
@@ -665,22 +686,32 @@ class _PlanTabState extends State<PlanTab> {
 
   List<Widget> _agendaList() {
     final all = _planned[_ymd(_selectedDay)] ?? const <PlannedWorkoutEntry>[];
-    // Mode filter: Workout = training kinds; Nutrition = (no nutrition agenda
-    // source yet — shows the empty state, mirroring the prototype's filter).
-    final items = _mode == 0 ? all : const <PlannedWorkoutEntry>[];
+    // Prototype: agenda[planMode] — each mode has its own bucket.
+    final wanted = _mode == 0 ? 'workout' : 'nutrition';
+    final items = [
+      for (final e in all)
+        if (e.agendaType == wanted) e,
+    ];
 
     if (items.isEmpty) {
+      // Prototype empty state: dashed border, centered hint (HTML 365).
       return [
-        Container(
-          margin: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(ZveltTokens.rBox),
-            border: Border.all(color: ZveltTokens.borderStrong, width: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          child: CustomPaint(
+            painter: _DashedBorderPainter(
+              color: ZveltTokens.borderStrong,
+              radius: ZveltTokens.rBox,
+            ),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
+              alignment: Alignment.center,
+              child: Text('Nothing planned yet — use Auto-Plan or Add.',
+                  style: ZType.bodyS.copyWith(
+                      fontSize: 13, fontWeight: FontWeight.w500)),
+            ),
           ),
-          child: Text('Nothing planned yet — use Auto-Plan or Add.',
-              style: ZType.bodyS),
         ),
       ];
     }
@@ -691,104 +722,18 @@ class _PlanTabState extends State<PlanTab> {
         child: Column(
           children: [
             for (final e in items) ...[
-              _agendaRow(e),
+              _AgendaRow(
+                key: ValueKey('agenda-${e.id}'),
+                entry: e,
+                onToggle: () => _toggleDone(e),
+                onDelete: () => _deleteEntry(e),
+              ),
               const SizedBox(height: 10),
             ],
           ],
         ),
       ),
     ];
-  }
-
-  Widget _agendaRow(PlannedWorkoutEntry e) {
-    return Dismissible(
-      key: ValueKey('agenda-${e.id}'),
-      direction: DismissDirection.startToEnd,
-      onDismissed: (_) => _deleteEntry(e),
-      background: Container(
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: 18),
-        decoration: BoxDecoration(
-          color: ZveltTokens.error,
-          borderRadius: BorderRadius.circular(ZveltTokens.rBox),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(AppIcons.trash, size: 18, color: ZveltTokens.onBrand),
-            const SizedBox(width: 8),
-            Text('Delete',
-                style: ZType.bodyS.copyWith(
-                    fontWeight: FontWeight.w700, color: ZveltTokens.onBrand)),
-          ],
-        ),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          gradient: ZveltTokens.surface2Grad,
-          borderRadius: BorderRadius.circular(ZveltTokens.rBox),
-          border: Border.all(color: ZveltTokens.border),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              e.kind == ActivityKind.gym ? AppIcons.gym : AppIcons.running,
-              size: 20,
-              color: e.completed ? ZveltTokens.success : ZveltTokens.text2,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    e.title,
-                    style: ZType.bodyM.copyWith(
-                      fontWeight: FontWeight.w700,
-                      decoration:
-                          e.completed ? TextDecoration.lineThrough : null,
-                      color: e.completed ? ZveltTokens.text3 : ZveltTokens.text,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(e.kind == ActivityKind.gym ? 'Workout' : 'Cardio',
-                      style: ZType.bodyS.copyWith(fontSize: 12.5)),
-                ],
-              ),
-            ),
-            if (e.time != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: Text(e.time!,
-                    style: ZType.monoXS.copyWith(
-                        fontSize: 12, fontWeight: FontWeight.w700)),
-              ),
-            InkWell(
-              onTap: () => _toggleDone(e),
-              customBorder: const CircleBorder(),
-              child: Container(
-                width: 26,
-                height: 26,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: e.completed ? ZveltTokens.gradAccentDeep : null,
-                  color: e.completed ? null : ZveltTokens.chip,
-                  border: e.completed
-                      ? null
-                      : Border.all(color: ZveltTokens.borderStrong),
-                ),
-                child: e.completed
-                    ? const Icon(AppIcons.check,
-                        size: 13, color: ZveltTokens.onBrand)
-                    : null,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   // ─── PROGRAMS sub-tab ─────────────────────────────────────────────────────
@@ -1008,12 +953,231 @@ class _PlanTabState extends State<PlanTab> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Add-agenda sheet (sheetPlanAdd): editable title + time; presets prefill.
+// Agenda row — prototype swipe-to-delete (HTML 370–382 + JS agDown/agMove/agUp):
+// row follows the finger RIGHT (0..140px), a red gradient Delete layer fades in
+// behind (opacity = dx/90); release >90px deletes, a plain tap toggles done.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AgendaRow extends StatefulWidget {
+  const _AgendaRow({
+    super.key,
+    required this.entry,
+    required this.onToggle,
+    required this.onDelete,
+  });
+
+  final PlannedWorkoutEntry entry;
+  final VoidCallback onToggle;
+  final VoidCallback onDelete;
+
+  @override
+  State<_AgendaRow> createState() => _AgendaRowState();
+}
+
+class _AgendaRowState extends State<_AgendaRow> {
+  double _dx = 0;
+  bool _dragging = false;
+
+  void _onStart(DragStartDetails _) {
+    setState(() => _dragging = true);
+  }
+
+  void _onUpdate(DragUpdateDetails d) {
+    setState(() => _dx = (_dx + d.delta.dx).clamp(0.0, 140.0));
+  }
+
+  void _onEnd(DragEndDetails _) {
+    final moved = _dx;
+    setState(() {
+      _dragging = false;
+      _dx = 0;
+    });
+    if (moved > 90) widget.onDelete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final e = widget.entry;
+    final isNutrition = e.agendaType == 'nutrition';
+
+    final row = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        gradient: ZveltTokens.surface2Grad,
+        borderRadius: BorderRadius.circular(ZveltTokens.rBox),
+        border: Border.all(color: ZveltTokens.border),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 23,
+            height: 21,
+            child: Icon(
+              e.completed
+                  ? AppIcons.check
+                  : (isNutrition ? AppIcons.restaurant : AppIcons.gym),
+              size: 20,
+              color: e.completed ? ZveltTokens.text : ZveltTokens.text,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  e.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ZType.bodyL.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    decoration:
+                        e.completed ? TextDecoration.lineThrough : null,
+                    color: e.completed ? ZveltTokens.text2 : ZveltTokens.text,
+                  ),
+                ),
+                if (e.sub != null && e.sub!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(e.sub!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ZType.bodyS.copyWith(
+                          fontSize: 12.5, fontWeight: FontWeight.w500)),
+                ],
+              ],
+            ),
+          ),
+          if (e.time != null) ...[
+            const SizedBox(width: 8),
+            Text(e.time!,
+                style: ZType.bodyS.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: ZveltTokens.text3)),
+          ],
+          const SizedBox(width: 13),
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: e.completed ? ZveltTokens.brand : null,
+              border: Border.all(
+                  color: e.completed ? ZveltTokens.brand : ZveltTokens.border,
+                  width: 1.5),
+            ),
+            child: e.completed
+                ? const Icon(AppIcons.check,
+                    size: 13, color: ZveltTokens.onBrand)
+                : null,
+          ),
+        ],
+      ),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(ZveltTokens.rBox),
+      child: Stack(
+        children: [
+          // Red delete layer behind — fades in with the drag (delStyle).
+          Positioned.fill(
+            child: Opacity(
+              opacity: _dragging ? (_dx / 90).clamp(0.0, 1.0) : 0,
+              child: Container(
+                padding: const EdgeInsets.only(left: 20),
+                alignment: Alignment.centerLeft,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFC0392B), Color(0xFFE0592B)],
+                  ),
+                  borderRadius: BorderRadius.circular(ZveltTokens.rBox),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(AppIcons.trash,
+                        size: 18, color: ZveltTokens.onBrand),
+                    const SizedBox(width: 8),
+                    Text('Delete',
+                        style: ZType.bodyS.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: ZveltTokens.onBrand)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          AnimatedContainer(
+            duration: _dragging
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            transform: Matrix4.translationValues(_dx, 0, 0),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.onToggle,
+              onHorizontalDragStart: _onStart,
+              onHorizontalDragUpdate: _onUpdate,
+              onHorizontalDragEnd: _onEnd,
+              child: row,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Dashed rounded border for the prototype's empty-agenda card (HTML 365).
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({required this.color, required this.radius});
+
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+    const dash = 6.0, gap = 5.0;
+    for (final metric in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < metric.length) {
+        canvas.drawPath(
+            metric.extractPath(d, (d + dash).clamp(0, metric.length)), paint);
+        d += dash + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter old) =>
+      old.color != color || old.radius != radius;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Add-agenda sheet — 1:1 with the prototype `sheetPlanAdd` (HTML 790–816):
+// grabber · "Add to agenda"+subtitle+close · ADD YOUR OWN card (title input,
+// time picker, accent Add button) · TAP A BLOCK TO EDIT & ADD presets that
+// PREFILL the form (pickPreset), per plan mode.
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _PlanAddSheet extends StatefulWidget {
-  const _PlanAddSheet({required this.dayYmd});
+  const _PlanAddSheet({required this.dayYmd, required this.mode});
   final String dayYmd;
+
+  /// 'workout' | 'nutrition' — selects the preset list (prototype addPresets).
+  final String mode;
 
   @override
   State<_PlanAddSheet> createState() => _PlanAddSheetState();
@@ -1021,16 +1185,26 @@ class _PlanAddSheet extends StatefulWidget {
 
 class _PlanAddSheetState extends State<_PlanAddSheet> {
   final _title = TextEditingController();
-  TimeOfDay _time = const TimeOfDay(hour: 18, minute: 0);
-  ActivityKind _kind = ActivityKind.gym;
+  TimeOfDay _time = const TimeOfDay(hour: 12, minute: 0);
+  String _sub = '';
   bool _saving = false;
 
-  static const _presets = [
-    ('Push day', ActivityKind.gym),
-    ('Pull day', ActivityKind.gym),
-    ('Leg day', ActivityKind.gym),
-    ('Easy run', ActivityKind.run),
+  // Prototype addPresets (HTML/JS 1992–1995), verbatim.
+  static const _workoutPresets = [
+    (time: '07:30', title: 'Mobility', sub: '10 min warm-up'),
+    (time: '09:00', title: 'Strength', sub: 'Full Body'),
+    (time: '17:00', title: 'Cardio', sub: '30 min run'),
+    (time: '20:00', title: 'Yoga', sub: 'Recovery flow'),
   ];
+  static const _nutritionPresets = [
+    (time: '08:30', title: 'Breakfast', sub: 'Oats & fruit'),
+    (time: '13:00', title: 'Lunch', sub: 'Chicken & rice'),
+    (time: '16:30', title: 'Snack', sub: 'Protein shake'),
+    (time: '19:30', title: 'Dinner', sub: 'Salmon & greens'),
+  ];
+
+  List<({String time, String title, String sub})> get _presets =>
+      widget.mode == 'nutrition' ? _nutritionPresets : _workoutPresets;
 
   @override
   void dispose() {
@@ -1041,9 +1215,44 @@ class _PlanAddSheetState extends State<_PlanAddSheet> {
   String get _timeLabel =>
       '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
 
+  void _pickPreset(({String time, String title, String sub}) p) {
+    final parts = p.time.split(':');
+    setState(() {
+      _title.text = p.title;
+      _sub = p.sub;
+      _time = TimeOfDay(
+        hour: int.tryParse(parts[0]) ?? 12,
+        minute: int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
+      );
+    });
+  }
+
+  Future<void> _pickTime() async {
+    final t = await showTimePicker(context: context, initialTime: _time);
+    if (t != null && mounted) setState(() => _time = t);
+  }
+
+  ActivityKind get _kind {
+    if (widget.mode == 'nutrition') return ActivityKind.other;
+    final t = _title.text.trim().toLowerCase();
+    if (t.contains('run') || t.contains('cardio')) return ActivityKind.run;
+    if (t.contains('walk')) return ActivityKind.walk;
+    return ActivityKind.gym;
+  }
+
   Future<void> _add() async {
     final title = _title.text.trim();
-    if (title.isEmpty || _saving) return; // never add with empty title
+    if (_saving) return;
+    if (title.isEmpty) {
+      // Prototype addCustom: empty title → 'Enter a title' toast.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ZveltTokens.rSm)),
+        content: const Text('Enter a title'),
+      ));
+      return;
+    }
     setState(() => _saving = true);
     await ActivityCalendarStore().addPlannedWorkout(PlannedWorkoutEntry(
       id: 'plan_${DateTime.now().millisecondsSinceEpoch}',
@@ -1051,6 +1260,8 @@ class _PlanAddSheetState extends State<_PlanAddSheet> {
       title: title,
       kind: _kind,
       time: _timeLabel,
+      sub: _sub.trim().isEmpty ? 'Custom' : _sub.trim(),
+      agendaType: widget.mode,
     ));
     if (!mounted) return;
     Navigator.of(context).pop(true);
@@ -1062,13 +1273,16 @@ class _PlanAddSheetState extends State<_PlanAddSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
       child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.84,
+        ),
         decoration: BoxDecoration(
           gradient: ZveltTokens.sheetGrad,
           borderRadius: const BorderRadius.vertical(
               top: Radius.circular(ZveltTokens.rSheet)),
           border: Border.all(color: ZveltTokens.border),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 34),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1086,101 +1300,221 @@ class _PlanAddSheetState extends State<_PlanAddSheet> {
             ),
             Row(
               children: [
-                Text('Add to agenda', style: ZType.h4.copyWith(fontSize: 19)),
-                const Spacer(),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Add to agenda',
+                          style: ZType.h4.copyWith(
+                              fontSize: 19, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text('Add a custom block or pick a preset',
+                          style: ZType.bodyS.copyWith(
+                              fontSize: 12, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                ),
                 InkWell(
                   onTap: () => Navigator.of(context).pop(false),
                   customBorder: const CircleBorder(),
-                  child: Icon(AppIcons.cross_small,
-                      size: 22, color: ZveltTokens.text2),
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: ZveltTokens.chip,
+                      border: Border.all(color: ZveltTokens.border),
+                    ),
+                    child: Icon(AppIcons.cross_small,
+                        size: 16, color: ZveltTokens.text2),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final (label, kind) in _presets)
-                  InkWell(
-                    onTap: () => setState(() {
-                      _title.text = label;
-                      _kind = kind;
-                    }),
-                    borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 9),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ADD YOUR OWN (HTML 798–805)
+                    Container(
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: ZveltTokens.chip,
+                        gradient: ZveltTokens.surface2Grad,
                         borderRadius:
                             BorderRadius.circular(ZveltTokens.rControl),
-                        border: Border.all(color: ZveltTokens.borderStrong),
+                        border: Border.all(color: ZveltTokens.border),
                       ),
-                      child: Text(label,
-                          style: ZType.bodyS.copyWith(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: ZveltTokens.text)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('ADD YOUR OWN',
+                              style: ZType.eyebrow.copyWith(fontSize: 11)),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _title,
+                            textInputAction: TextInputAction.done,
+                            onChanged: (_) => _sub = '',
+                            onSubmitted: (_) => _add(),
+                            style: ZType.bodyM.copyWith(
+                                fontSize: 14, fontWeight: FontWeight.w600),
+                            decoration: InputDecoration(
+                              hintText: 'Title (e.g. Yoga, Meal prep)',
+                              hintStyle: ZType.bodyM.copyWith(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: ZveltTokens.text3),
+                              isDense: true,
+                              filled: true,
+                              fillColor: ZveltTokens.chip,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 13, vertical: 11),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    BorderSide(color: ZveltTokens.borderStrong),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: ZveltTokens.brand),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              InkWell(
+                                onTap: _pickTime,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: ZveltTokens.chip,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color: ZveltTokens.borderStrong),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(AppIcons.clock,
+                                          size: 15, color: ZveltTokens.text2),
+                                      const SizedBox(width: 7),
+                                      Text(_timeLabel,
+                                          style: ZType.bodyM.copyWith(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: _saving ? null : _add,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: ZveltTokens.brand,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: ZveltTokens.glowSm,
+                                    ),
+                                    child: _saving
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2.2,
+                                                color: ZveltTokens.onBrand))
+                                        : Text('Add to agenda',
+                                            style: ZType.bodyS.copyWith(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w700,
+                                                color: ZveltTokens.onBrand)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _title,
-              autofocus: true,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _add(),
-              style: ZType.bodyL,
-              decoration: const InputDecoration(labelText: 'Title'),
-            ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () async {
-                final t = await showTimePicker(context: context, initialTime: _time);
-                if (t != null && mounted) setState(() => _time = t);
-              },
-              borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                decoration: BoxDecoration(
-                  color: ZveltTokens.chip,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-                  border: Border.all(color: ZveltTokens.borderStrong),
-                ),
-                child: Row(
-                  children: [
-                    Icon(AppIcons.clock, size: 18, color: ZveltTokens.text2),
-                    const SizedBox(width: 10),
-                    Text(_timeLabel,
-                        style: ZType.bodyM.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: ZveltTokens.text)),
-                    const Spacer(),
-                    Text('Change',
-                        style: ZType.bodyS.copyWith(
-                            color: ZveltTokens.brand,
-                            fontWeight: FontWeight.w700)),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 15, 2, 0),
+                      child: Text('TAP A BLOCK TO EDIT & ADD',
+                          style: ZType.eyebrow.copyWith(
+                              fontSize: 11, color: ZveltTokens.text3)),
+                    ),
+                    const SizedBox(height: 9),
+                    for (var i = 0; i < _presets.length; i++) ...[
+                      _presetRow(_presets[i]),
+                      if (i < _presets.length - 1) const SizedBox(height: 9),
+                    ],
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Preset row (HTML 807–813)
+  Widget _presetRow(({String time, String title, String sub}) p) {
+    return InkWell(
+      onTap: () => _pickPreset(p),
+      borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surface2Grad,
+          borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        child: Row(
+          children: [
             SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton(
-                onPressed: _saving ? null : _add,
-                child: _saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2.2, color: ZveltTokens.onBrand))
-                    : const Text('Add'),
+              width: 52,
+              child: Text(p.time,
+                  style: ZType.bodyS.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: ZveltTokens.brand)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(p.title,
+                      style: ZType.bodyM.copyWith(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 1),
+                  Text(p.sub,
+                      style: ZType.bodyS.copyWith(
+                          fontSize: 11.5, fontWeight: FontWeight.w500)),
+                ],
               ),
+            ),
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0x26F58214),
+                border: Border.all(color: const Color(0x66F58214)),
+              ),
+              child:
+                  const Icon(AppIcons.plus, size: 14, color: ZveltTokens.brand),
             ),
           ],
         ),

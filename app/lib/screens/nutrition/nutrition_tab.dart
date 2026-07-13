@@ -1,11 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:zvelt_app/theme/app_icons.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/z/z_card.dart';
-import '../../widgets/z/z_eyebrow.dart';
 import '../../widgets/z/z_loading.dart';
 import '../../services/_crash_reporter.dart' show reportError;
 import '../../services/auth_service.dart';
@@ -17,7 +18,6 @@ import '../../services/nutrition_food_labels.dart';
 import '../../widgets/zvelt_primary_button.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
 import '../../widgets/zvelt_error_state.dart';
-import '../social/notifications_screen.dart';
 import 'recipe_builder_screen.dart';
 import 'nutrition_barcode_scan_screen.dart';
 
@@ -126,6 +126,62 @@ class _NutritionTabState extends State<NutritionTab> {
   static DateTime _midnightOf(DateTime d) => DateTime(d.year, d.month, d.day);
   final _auth = AuthService();
 
+  // ── Prototype nutrition state (HTML 217–317) ──
+  /// Day the tracker shows (week strip / calendar sheet select it).
+  DateTime _selDate = _midnightOf(DateTime.now());
+
+  /// Active meal pill: breakfast / lunch / dinner / snack.
+  String _activeMeal = 'breakfast';
+
+  /// Checked-off basket ingredient names for [_selDate] (persisted).
+  Set<String> _basketChecked = {};
+
+  /// yyyy-mm-dd keys of days with logged calories — dots in the calendar sheet.
+  Set<String> _loggedDayKeys = const {};
+
+  static String _ymd(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  String get _basketPrefsKey => 'zvelt_basket_checked_${_ymd(_selDate)}';
+
+  /// Plan day for [_selDate] (week plan is indexed by weekday).
+  NutritionPlanDay? get _selPlanDay {
+    if (_weekPlan.isEmpty) return null;
+    final i = _selDate.weekday - 1;
+    return i < _weekPlan.length ? _weekPlan[i] : _weekPlan.first;
+  }
+
+  /// Basket = ingredients of the selected day's planned meals (real plan data).
+  List<({String name, String qty})> get _basketItems {
+    final plan = _selPlanDay?.mealPlan;
+    if (plan == null) return const [];
+    const mealLabels = {
+      'breakfast': 'Breakfast',
+      'lunch': 'Lunch',
+      'dinner': 'Dinner',
+      'snack': 'Snacks',
+      'snacks': 'Snacks',
+    };
+    final out = <({String name, String qty})>[];
+    final seen = <String>{};
+    for (final meal in plan.meals) {
+      for (final item in meal.items) {
+        final name = item.text.trim();
+        if (name.isEmpty || !seen.add(name.toLowerCase())) continue;
+        out.add((
+          name: name,
+          qty: item.portion?.trim().isNotEmpty == true
+              ? item.portion!.trim()
+              : (mealLabels[meal.mealKey.toLowerCase()] ?? meal.mealKey),
+        ));
+      }
+    }
+    return out;
+  }
+
+  int get _basketCount =>
+      _basketItems.where((b) => !_basketChecked.contains(b.name)).length;
+
   // Fasting (handoff §13d) — persisted protocol + start; ring ticks live
   // from wall-clock only while a fast is active.
   FastingState _fasting = const FastingState(active: false, protocolHours: 16);
@@ -207,7 +263,7 @@ class _NutritionTabState extends State<NutritionTab> {
       // / cached-fallback side effects) instead of getGoals()+getMe() each
       // hitting /me.
       final results = await Future.wait<dynamic>([
-        _service.getDay(_today).catchError((_) => DailyNutrition.empty),
+        _service.getDay(_selDate).catchError((_) => DailyNutrition.empty),
         _service.getWeeklyPlan().catchError((_) => <NutritionPlanDay>[]),
         if (signedIn)
           _profileService.getMe().catchError((_) => null)
@@ -237,6 +293,19 @@ class _NutritionTabState extends State<NutritionTab> {
       try {
         _fasting = await FastingService().load();
       } catch (_) {/* non-fatal — card renders inactive */}
+      // Calendar-sheet dots + basket checked state (best-effort).
+      try {
+        final history = await _service.loadNutritionHistory(days: 60);
+        _loggedDayKeys = {
+          for (final d in history)
+            if (d.calories > 0) _ymd(d.date),
+        };
+      } catch (_) {/* non-fatal — calendar renders without dots */}
+      try {
+        final p = await SharedPreferences.getInstance();
+        _basketChecked =
+            (p.getStringList(_basketPrefsKey) ?? const []).toSet();
+      } catch (_) {/* non-fatal */}
     } catch (e, st) {
       // Each fetch above has its own catchError fallback, so reaching here
       // means something unexpected threw outside those guards. Flag the load
@@ -627,6 +696,8 @@ class _NutritionTabState extends State<NutritionTab> {
     // key and the screen kept showing yesterday's totals as 'today'.
     final nowDay = _midnightOf(DateTime.now());
     if (nowDay != _today) {
+      // Keep the selected day tracking "today" across midnight rollover.
+      if (_selDate == _today) _selDate = nowDay;
       _today = nowDay;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _load();
@@ -638,7 +709,7 @@ class _NutritionTabState extends State<NutritionTab> {
         bottom: false,
         child: Column(
           children: [
-            _buildNutritionHeader(context),
+            _header(),
             Expanded(
               child: _loading
                   ? ZPageSkeleton(
@@ -661,109 +732,39 @@ class _NutritionTabState extends State<NutritionTab> {
                           onRefresh: _load,
                           color: ZveltTokens.brand,
                           child: ListView(
-                            padding: EdgeInsets.fromLTRB(
-                                ZveltTokens.s4,
-                                0,
-                                ZveltTokens.s4,
-                                ZveltMainNavBar.reservedBottomHeight(context) +
+                            padding: EdgeInsets.only(
+                                bottom: ZveltMainNavBar.reservedBottomHeight(
+                                        context) +
                                     ZveltTokens.s4),
                             children: [
-                              const SizedBox(height: ZveltTokens.s3),
-                              // "AI plan ready" only when a plan actually exists
-                              // with AI meal lines and we're not mid-generation.
-                              // Macro-only plans (cron weeks / DeepSeek fallback)
-                              // show ONLY the "Tap ✨ for AI meal lines" hint on
-                              // the week card — the two states are mutually
-                              // exclusive, never a "ready" banner + "only macros"
-                              // notice contradiction.
-                              if (_weekPlanHasAiMeals && !_planGenerating) ...[
-                                _buildPlanBanner(),
-                                const SizedBox(height: ZveltTokens.s3),
-                              ],
+                              // Prototype block order (HTML 217–312): date row,
+                              // week strip, meal pills, meal log, plan card,
+                              // calories hero, macros, fasting.
+                              _dateRow(),
+                              _weekStrip(),
+                              _mealPills(),
+                              _mealLogCard(),
                               if (_planGenerating)
-                                _buildPlanGeneratingCard()
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                                  child: _buildPlanGeneratingCard(),
+                                )
+                              else if (_weekPlan.isEmpty)
+                                _aiPlanCard()
                               else
-                                _WeeklyPlanCard(
-                                  weekPlan: _weekPlan,
-                                  today: _today,
-                                  signedIn: _signedIn,
-                                  onDayTap: _openDayMealPlan,
-                                  onBootstrapWeek: _bootstrapWeekPlan,
-                                  onRegenerateWeek: _regenerateWeeklyPlanWithAi,
-                                ),
-                              const SizedBox(height: ZveltTokens.s3),
-                              _CaloriesCard(totals: _totals, goals: _goals),
-                              const SizedBox(height: ZveltTokens.s3),
-                              _MacrosRow(totals: _totals, goals: _goals),
-                              const SizedBox(height: ZveltTokens.s4),
-                              // Fasting card (prototype §13d) — replaces the
-                              // old Water/Weight row, which is NOT in the
-                              // approved design. Water logging stays available
-                              // through the service; weight lives on Home.
-                              _FastingCard(
-                                state: _fasting,
-                                onTap: _openFastingSheet,
-                                onToggle: _toggleFasting,
-                              ),
-                              const SizedBox(height: ZveltTokens.s5),
-                              // NutritionXpClaimCard removed: claimDayXp() is a
-                              // stub (always '+0 XP / Already claimed') since the
-                              // backend nutrition-xp service was dropped. A card
-                              // promising XP it can never award is fabricated
-                              // data — re-add when the endpoint returns.
+                                _weekPlanRow(),
+                              _caloriesHero(),
+                              _macrosCard(),
                               Padding(
-                                padding: const EdgeInsets.only(
-                                    bottom: ZveltTokens.s2),
-                                child: Row(
-                                  children: [
-                                    const Expanded(
-                                        child: ZEyebrow("Today's meals")),
-                                    GestureDetector(
-                                      onTap: () => _showGoalsSheet(),
-                                      child: Text(
-                                        'Edit goals',
-                                        style: ZType.bodyS.copyWith(
-                                          color: ZveltTokens.brand,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                                child: _FastingCard(
+                                  state: _fasting,
+                                  onTap: _openFastingSheet,
+                                  onToggle: _toggleFasting,
                                 ),
                               ),
-                              ...['breakfast', 'lunch', 'dinner', 'snack'].map(
-                                (meal) => _MealSection(
-                                  meal: meal,
-                                  // Pull this meal's entries from the once-per-day
-                                  // precomputed grouping (no per-rebuild .where).
-                                  entries: _totals.byMeal[meal] ??
-                                      const <MealEntry>[],
-                                  onAdd: () => _showAddFood(meal),
-                                  onRemove: (id) async {
-                                    await _service.removeEntry(id, _today);
-                                    // Persisted locally (server push runs in the
-                                    // background) — drop the entry from local
-                                    // state directly instead of a full _load()
-                                    // (spinner + network re-fetch).
-                                    if (mounted) {
-                                      setState(() {
-                                        _setDay(DailyNutrition(
-                                          entries: _day.entries
-                                              .where((e) => e.id != id)
-                                              .toList(),
-                                          waterMl: _day.waterMl,
-                                          weightKg: _day.weightKg,
-                                        ));
-                                      });
-                                    }
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: ZveltTokens.s4),
-                              _buildAddFoodCta(),
-                              const SizedBox(height: ZveltTokens.s4),
-                              _nutritionCoachCard(),
-                              const SizedBox(height: ZveltTokens.s1),
                             ],
                           ),
                         ),
@@ -774,262 +775,856 @@ class _NutritionTabState extends State<NutritionTab> {
     );
   }
 
-  // Periwinkle coach card — m-food mascot + an HONEST message derived from the
-  // real remaining calories. Hidden until a real calorie goal is set.
-  Widget _nutritionCoachCard() {
-    final goal = _goals.calories;
-    if (goal <= 0) return const SizedBox.shrink();
-    final consumed = _totals.calories.round();
-    final remaining = goal - consumed;
-    final String msg;
-    if (remaining > 200) {
-      msg =
-          "You're $remaining kcal short. Add protein before the day gets messy.";
-    } else if (remaining >= 0) {
-      msg = "Almost there — $remaining kcal to your goal. Keep it clean.";
-    } else {
-      msg = "You're ${-remaining} kcal over today. Tomorrow is a fresh log.";
-    }
-    return Container(
-      decoration: BoxDecoration(
-        gradient: ZveltTokens.gradBrand,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        boxShadow: ZveltTokens.glowBrand,
-      ),
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/mascot/m-food.png',
-            height: 92,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const SizedBox(width: 92),
-          ),
-          const SizedBox(width: ZveltTokens.s2),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'ZVELT COACH',
-                  style: ZType.bodyS.copyWith(
-                    color: ZveltTokens.onBrand.withValues(alpha: 0.9),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11,
-                    letterSpacing: 0.06 * 11,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  msg,
-                  style: ZType.bodyS.copyWith(
-                    color: ZveltTokens.onBrand,
-                    fontWeight: FontWeight.w600,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ── Prototype blocks (HTML 217–312) ────────────────────────────────────────
 
-  String _foodDateLabel() {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final d = _today;
-    final today = _midnightOf(DateTime.now());
-    final prefix = d == today ? 'Today, ' : '';
-    return '$prefix${d.day} ${months[d.month - 1]}';
-  }
-
-  Widget _buildNutritionHeader(BuildContext context) {
-    // Light-redesign header (mockup 7): "Food" + "Today, <date>" — replaces the
-    // old uppercase "NUTRITION" wordmark.
+  // Header — 'Nutrition' + basket button with badge (HTML 219–222).
+  Widget _header() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          ZveltTokens.s5, ZveltTokens.s4, ZveltTokens.s3, ZveltTokens.s2),
+      padding: const EdgeInsets.fromLTRB(22, 8, 22, 0),
       child: Row(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Nutrition', style: ZType.h1),
-                const SizedBox(height: 2),
-                Text(
-                  _foodDateLabel(),
-                  style: ZType.bodyS.copyWith(color: ZveltTokens.text3),
-                ),
-              ],
+          Text('Nutrition', style: ZType.h1.copyWith(fontSize: 24)),
+          const Spacer(),
+          InkWell(
+            onTap: _openBasket,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ZveltTokens.chip,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: ZveltTokens.border),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(AppIcons.apps, size: 20, color: ZveltTokens.text),
+                  if (_basketCount > 0)
+                    Positioned(
+                      top: -8,
+                      right: -10,
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 18),
+                        height: 18,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: ZveltTokens.brand,
+                          borderRadius: BorderRadius.circular(9),
+                          border:
+                              Border.all(color: ZveltTokens.bg, width: 2),
+                        ),
+                        child: Text('$_basketCount',
+                            style: ZType.monoXS.copyWith(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: ZveltTokens.onBrand)),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-          Row(
-            children: [
-              _NutritionHeaderBtn(
-                icon: AppIcons.bell,
-                semanticLabel: 'Notifications',
-                // No fabricated unread dot — it was hardcoded always-on,
-                // training users to ignore the badge. Re-add when wired to
-                // a real unread count.
-                hasDot: false,
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                      builder: (_) => const NotificationsScreen()),
-                ),
-              ),
-              const SizedBox(width: ZveltTokens.s2),
-              _NutritionHeaderBtn(
-                icon: AppIcons.settings_sliders,
-                semanticLabel: 'Edit goals',
-                onTap: () => _showGoalsSheet(),
-              ),
-              const SizedBox(width: ZveltTokens.s2),
-              _NutritionHeaderBtn(
-                icon: AppIcons.menu_dots,
-                semanticLabel: 'Day actions',
-                onTap: _showDayMenu,
-              ),
-            ],
           ),
         ],
       ),
     );
   }
 
-  /// True when at least one plan day carries AI meal lines (same predicate as
-  /// _WeeklyPlanCard._hasAiMeals). Gates the "AI plan ready" banner so it
-  /// never contradicts the week card's macro-only hint.
-  bool get _weekPlanHasAiMeals =>
-      _weekPlan.any((d) => d.mealPlan != null && d.mealPlan!.meals.isNotEmpty);
-
-  Widget _buildPlanBanner() {
-    // ── Design parity: the 'AI plan ready' banner card (padding 14, r18,
-    // 32px tinted icon tile, title + kcal subtitle, View action). 'View'
-    // opens today's day-plan sheet. Honest: only renders when a plan exists
-    // (gated by the caller); the kcal subtitle uses the REAL goal.
-    final today = _weekPlan.isEmpty
-        ? null
-        : _weekPlan[DateTime.now().weekday - 1 < _weekPlan.length
-            ? DateTime.now().weekday - 1
-            : 0];
-    return Container(
-      padding: const EdgeInsets.all(ZveltTokens.s4),
-      decoration: BoxDecoration(
-        color: ZveltTokens.surface,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        boxShadow: ZveltTokens.shadowCard,
+  Future<void> _openBasket() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _BasketSheet(
+        items: _basketItems,
+        checked: _basketChecked,
+        onChanged: (next) async {
+          setState(() => _basketChecked = next);
+          try {
+            final p = await SharedPreferences.getInstance();
+            await p.setStringList(_basketPrefsKey, next.toList());
+          } catch (_) {}
+        },
       ),
+    );
+    if (mounted) setState(() {}); // refresh badge
+  }
+
+  Future<void> _selectDate(DateTime d) async {
+    final day = _midnightOf(d);
+    if (day == _selDate) return;
+    setState(() => _selDate = day);
+    await _load(showSpinner: false);
+  }
+
+  Future<void> _openCalendarSheet() async {
+    final picked = await showModalBottomSheet<DateTime>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CalendarSheet(
+        selected: _selDate,
+        loggedDayKeys: _loggedDayKeys,
+      ),
+    );
+    if (picked != null && mounted) await _selectDate(picked);
+  }
+
+  // Date row — '{Month Year}' + chevron · calendar button (HTML 224–227).
+  Widget _dateRow() {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June', 'July',
+      'August', 'September', 'October', 'November', 'December',
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
       child: Row(
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: ZveltTokens.brandTint,
-              borderRadius: BorderRadius.circular(ZveltTokens.rSm),
-            ),
-            child: const Icon(AppIcons.sparkles,
-                color: ZveltTokens.brand, size: 15),
-          ),
-          const SizedBox(width: ZveltTokens.s3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          InkWell(
+            onTap: _openCalendarSheet,
+            onLongPress: _showDayMenu,
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('AI plan ready',
-                    style: ZType.bodyS.copyWith(
-                        color: ZveltTokens.text, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 1),
-                Text(
-                  '${_goals.calories} kcal · tuned to your goal',
-                  style: ZType.monoXS.copyWith(color: ZveltTokens.text2),
-                ),
+                Text('${months[_selDate.month - 1]} ${_selDate.year}',
+                    style: ZType.bodyL.copyWith(
+                        fontSize: 15, fontWeight: FontWeight.w700)),
+                const SizedBox(width: 6),
+                Icon(AppIcons.angle_small_down,
+                    size: 16, color: ZveltTokens.text2),
               ],
             ),
           ),
-          if (today != null)
-            GestureDetector(
-              onTap: () => _openDayMealPlan(today),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: ZveltTokens.s2, vertical: ZveltTokens.s2),
-                child: Text('View',
+          const Spacer(),
+          InkWell(
+            onTap: _openCalendarSheet,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ZveltTokens.chip,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: ZveltTokens.border),
+              ),
+              child: Icon(AppIcons.calendar, size: 18, color: ZveltTokens.text),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Week strip — 7 day cells, selected = orange-tinted card (HTML 229–233).
+  Widget _weekStrip() {
+    final sunday = _selDate.subtract(Duration(days: _selDate.weekday % 7));
+    const letters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          for (var i = 0; i < 7; i++)
+            _weekCell(sunday.add(Duration(days: i)), letters[i]),
+        ],
+      ),
+    );
+  }
+
+  Widget _weekCell(DateTime day, String letter) {
+    final sel = DateUtils.isSameDay(day, _selDate);
+    return InkWell(
+      onTap: () => _selectDate(day),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: sel
+            ? const EdgeInsets.fromLTRB(10, 7, 10, 9)
+            : const EdgeInsets.fromLTRB(4, 7, 4, 9),
+        decoration: sel
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0x8CF58214)),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0x33F58214), Color(0x0AF58214)],
+                ),
+              )
+            : null,
+        child: Column(
+          children: [
+            Text(letter,
+                style: ZType.bodyS.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: sel ? ZveltTokens.brand : ZveltTokens.text3)),
+            const SizedBox(height: 6),
+            Text('${day.day}',
+                style: ZType.bodyL.copyWith(
+                    fontSize: 17, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Meal pills — Breakfast/Lunch/Dinner/Snacks (HTML 235–239).
+  Widget _mealPills() {
+    const meals = [
+      ('breakfast', 'Breakfast'),
+      ('lunch', 'Lunch'),
+      ('dinner', 'Dinner'),
+      ('snack', 'Snacks'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+      child: Row(
+        children: [
+          for (var i = 0; i < meals.length; i++) ...[
+            Expanded(child: _mealPill(meals[i].$1, meals[i].$2)),
+            if (i < meals.length - 1) const SizedBox(width: 7),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _mealPill(String key, String label) {
+    final active = _activeMeal == key;
+    final count = (_totals.byMeal[key] ?? const []).length;
+    return InkWell(
+      onTap: () => setState(() => _activeMeal = key),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
+        decoration: BoxDecoration(
+          color: active ? ZveltTokens.brand : ZveltTokens.chip,
+          borderRadius: BorderRadius.circular(16),
+          border: active ? null : Border.all(color: ZveltTokens.border),
+          boxShadow: active ? ZveltTokens.glowSm : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ZType.bodyS.copyWith(
+                      fontSize: 12,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                      color:
+                          active ? ZveltTokens.onBrand : ZveltTokens.text2)),
+            ),
+            if (active) ...[
+              const SizedBox(width: 5),
+              const Icon(AppIcons.badge_check,
+                  size: 13, color: ZveltTokens.onBrand),
+            ] else if (count > 0) ...[
+              const SizedBox(width: 5),
+              Container(
+                constraints: const BoxConstraints(minWidth: 17),
+                height: 17,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.chip,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text('$count',
                     style: ZType.monoXS.copyWith(
-                        fontWeight: FontWeight.w600, color: ZveltTokens.brand)),
+                        fontSize: 10.5, fontWeight: FontWeight.w800)),
               ),
-            ),
-        ],
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildAddFoodCta() {
-    // ── Design parity: gradient CTA (brand-deep → brand → brand-2),
-    // radius 18 (not pill), orange glow shadow, padding 16/22.
-    return Semantics(
-      button: true,
-      label: 'Add food',
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: () => _showAddFood('breakfast'),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-              vertical: ZveltTokens.s4, horizontal: ZveltTokens.s6),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                ZveltTokens.brandDeep,
-                ZveltTokens.brand,
-                ZveltTokens.brand2,
+  // Meal log — active meal's entries + dashed Add-food (HTML 241–260).
+  Widget _mealLogCard() {
+    const mealLabels = {
+      'breakfast': 'Breakfast',
+      'lunch': 'Lunch',
+      'dinner': 'Dinner',
+      'snack': 'Snacks',
+    };
+    final entries = _totals.byMeal[_activeMeal] ?? const <MealEntry>[];
+    final kcal =
+        entries.fold<double>(0, (a, e) => a + e.calories).round();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surfaceGrad,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('${mealLabels[_activeMeal]} log',
+                    style: ZType.bodyL.copyWith(
+                        fontSize: 15, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                Text('$kcal kcal',
+                    style: ZType.bodyS.copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: ZveltTokens.brand)),
               ],
-              stops: [0, 0.6, 1],
             ),
-            borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-            boxShadow: [
-              BoxShadow(
-                color: ZveltTokens.brand.withValues(alpha: 0.32),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
+            if (entries.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 16, 0, 6),
+                child: Center(
+                  child: Text('No foods logged yet — tap “Add food” to start.',
+                      style: ZType.bodyS.copyWith(
+                          fontSize: 12.5, fontWeight: FontWeight.w500)),
+                ),
+              )
+            else ...[
+              const SizedBox(height: 12),
+              for (var i = 0; i < entries.length; i++) ...[
+                _foodRow(entries[i]),
+                if (i < entries.length - 1) const SizedBox(height: 9),
+              ],
             ],
+            const SizedBox(height: 14),
+            InkWell(
+              onTap: () => _showAddFood(_activeMeal),
+              borderRadius: BorderRadius.circular(15),
+              child: CustomPaint(
+                painter: const _DashedRRectPainter(
+                    color: Color(0x66F58214), radius: 15),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  decoration: BoxDecoration(
+                    color: const Color(0x14F58214),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(AppIcons.plus,
+                          size: 15, color: ZveltTokens.brand),
+                      const SizedBox(width: 7),
+                      Text('Add food',
+                          style: ZType.bodyS.copyWith(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: ZveltTokens.brand)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _foodRow(MealEntry e) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: ZveltTokens.chip,
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: ZveltTokens.border),
+          ),
+          child: Icon(AppIcons.restaurant, size: 16, color: ZveltTokens.text2),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(e.food.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ZType.bodyM.copyWith(
+                      fontSize: 13.5, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 1),
+              Text(_mealEntrySubtitle(e),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ZType.bodyS.copyWith(
+                      fontSize: 11, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text('${e.calories.round()} kcal',
+            style: ZType.bodyS.copyWith(
+                fontSize: 12.5, fontWeight: FontWeight.w700)),
+        const SizedBox(width: 8),
+        InkWell(
+          onTap: () async {
+            await _service.removeEntry(e.id, _selDate);
+            if (!mounted) return;
+            setState(() {
+              _setDay(DailyNutrition(
+                entries: _day.entries.where((x) => x.id != e.id).toList(),
+                waterMl: _day.waterMl,
+                weightKg: _day.weightKg,
+              ));
+            });
+          },
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: ZveltTokens.chip,
+              border: Border.all(color: ZveltTokens.border),
+            ),
+            child:
+                Icon(AppIcons.cross_small, size: 13, color: ZveltTokens.text2),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // AI Meal Plan card — noPlan state (HTML 262–270).
+  Widget _aiPlanCard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surfaceGrad,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [ZveltTokens.brand2, ZveltTokens.brandDeep],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: ZveltTokens.glowSm,
+                  ),
+                  child: const Icon(AppIcons.sparkles,
+                      size: 22, color: ZveltTokens.onBrand),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('AI Meal Plan',
+                          style: ZType.bodyL.copyWith(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(
+                        _signedIn
+                            ? 'Answer a few questions and we’ll build your week.'
+                            : 'Sign in and we’ll build your week.',
+                        style: ZType.bodyS.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            InkWell(
+              onTap: _signedIn ? () => _bootstrapWeekPlan() : null,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brand,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: ZveltTokens.glowMd,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(AppIcons.sparkles,
+                        size: 16, color: ZveltTokens.onBrand),
+                    const SizedBox(width: 7),
+                    Text('Generate meal plan',
+                        style: ZType.bodyS.copyWith(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: ZveltTokens.onBrand)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // This week's plan row — hasPlan state (HTML 271–277).
+  Widget _weekPlanRow() {
+    final day = _selPlanDay;
+    final goal = day?.goal.trim() ?? '';
+    final goalLabel = goal.isEmpty
+        ? 'Plan'
+        : '${goal[0].toUpperCase()}${goal.substring(1)}';
+    final summary =
+        '$goalLabel · ${_fmtInt(day?.calories ?? _goals.calories)} kcal/day';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: InkWell(
+        onTap: _openWeekPlanSheet,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          decoration: BoxDecoration(
+            gradient: ZveltTokens.heroGrad,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: ZveltTokens.heroBorder),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(AppIcons.plus, size: 18, color: ZveltTokens.onBrand),
-              const SizedBox(width: ZveltTokens.s2),
-              Text(
-                'Add food',
-                style: ZType.bodyM.copyWith(
-                  color: ZveltTokens.onBrand,
-                  fontWeight: FontWeight.w700,
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [ZveltTokens.brand2, ZveltTokens.brandDeep],
+                  ),
+                  borderRadius: BorderRadius.circular(13),
                 ),
+                child: const Icon(AppIcons.sparkles,
+                    size: 20, color: ZveltTokens.onBrand),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('This week’s plan',
+                        style: ZType.bodyM.copyWith(
+                            fontSize: 14.5, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(summary,
+                        style: ZType.bodyS.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: ZveltTokens.brand)),
+                  ],
+                ),
+              ),
+              Icon(AppIcons.angle_small_right,
+                  size: 18, color: ZveltTokens.text2),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openWeekPlanSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.84),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.sheetGrad,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(ZveltTokens.rSheet)),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _sheetHandle(),
+            const SizedBox(height: 4),
+            Flexible(
+              child: SingleChildScrollView(
+                child: _WeeklyPlanCard(
+                  weekPlan: _weekPlan,
+                  today: _today,
+                  signedIn: _signedIn,
+                  onDayTap: _openDayMealPlan,
+                  onBootstrapWeek: _bootstrapWeekPlan,
+                  onRegenerateWeek: _regenerateWeeklyPlanWithAi,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Calories hero — ring + consumed/goal/left (HTML 279–292).
+  Widget _caloriesHero() {
+    final goal = _goals.calories;
+    final consumed = _totals.calories.round();
+    final frac = goal <= 0 ? 0.0 : (consumed / goal).clamp(0.0, 1.0);
+    final left = goal - consumed;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+      child: InkWell(
+        onTap: _showGoalsSheet, // goals editor lives behind the calories card
+        borderRadius: BorderRadius.circular(28),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+          decoration: BoxDecoration(
+            gradient: ZveltTokens.heroGrad,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: ZveltTokens.heroBorder),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: -60,
+                top: -50,
+                child: Container(
+                  width: 210,
+                  height: 210,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                        colors: [Color(0x4DF58214), Color(0x00F58214)]),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 118,
+                    height: 118,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: const Size(118, 118),
+                            painter: _CalorieRingPainter(
+                                progress: frac, track: ZveltTokens.track),
+                          ),
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('${(frac * 100).round()}%',
+                                style: ZType.stat.copyWith(fontSize: 28)),
+                            Text('filled',
+                                style: ZType.bodyS.copyWith(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Calories',
+                            style: ZType.bodyL.copyWith(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: ZveltTokens.text2)),
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(_fmtInt(consumed),
+                                    style: ZType.stat
+                                        .copyWith(fontSize: 40, height: 1)),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text('/ ${_fmtInt(goal)} cal',
+                                style: ZType.bodyS.copyWith(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          left >= 0
+                              ? '${_fmtInt(left)} cal left today'
+                              : '${_fmtInt(-left)} cal over today',
+                          style: ZType.bodyS.copyWith(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: ZveltTokens.brand),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  // Macros card — Carbs / Fat / Protein bars with knob (HTML 294–298).
+  Widget _macrosCard() {
+    Widget macro(String label, double value, int goal, Color color,
+        {bool trailingGap = true}) {
+      final frac = goal <= 0 ? 0.0 : (value / goal).clamp(0.0, 1.0);
+      return Expanded(
+        child: Padding(
+          padding: EdgeInsets.only(right: trailingGap ? 14 : 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text('${value.round()}',
+                      style: ZType.stat.copyWith(fontSize: 22)),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text('/$goal g',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.bodyS.copyWith(
+                            fontSize: 11.5, fontWeight: FontWeight.w500)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              Text(label,
+                  style: ZType.bodyS.copyWith(
+                      fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 9),
+              SizedBox(
+                height: 10,
+                child: LayoutBuilder(
+                  builder: (context, c) {
+                    final x = frac * c.maxWidth;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        Container(
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: ZveltTokens.track,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        Container(
+                          height: 6,
+                          width: x,
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        Positioned(
+                          left: (x - 5).clamp(0.0, c.maxWidth - 10),
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: color,
+                              border: Border.all(
+                                  color: ZveltTokens.bg, width: 2.5),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surfaceGrad,
+          borderRadius: BorderRadius.circular(ZveltTokens.rCard),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        child: Row(
+          children: [
+            macro('Carbs', _totals.carbs, _goals.carbsG, ZveltTokens.brand),
+            macro('Fat', _totals.fat, _goals.fatG, const Color(0xFFE8A33D)),
+            macro('Protein', _totals.protein, _goals.proteinG,
+                const Color(0xFFE8724E),
+                trailingGap: false),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _fmtInt(int v) {
+    final s = '$v';
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return '$buf';
   }
 
   void _showGoalsSheet() async {
@@ -1043,61 +1638,6 @@ class _NutritionTabState extends State<NutritionTab> {
           await _service.saveGoals(g);
           await _load(showSpinner: false);
         },
-      ),
-    );
-  }
-}
-
-class _NutritionHeaderBtn extends StatelessWidget {
-  const _NutritionHeaderBtn({
-    required this.icon,
-    required this.onTap,
-    required this.semanticLabel,
-    this.hasDot = false,
-  });
-  final IconData icon;
-  final VoidCallback onTap;
-  final String semanticLabel;
-  final bool hasDot;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: ZveltTokens.surface,
-                border: Border.all(color: ZveltTokens.border),
-                boxShadow: ZveltTokens.shadowCard,
-              ),
-              child: Icon(icon, color: ZveltTokens.text2, size: 18),
-            ),
-            if (hasDot)
-              Positioned(
-                top: 9,
-                right: 10,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: ZveltTokens.brand,
-                    border: Border.all(color: ZveltTokens.surface, width: 1.5),
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -1387,386 +1927,6 @@ class _DayCell extends StatelessWidget {
 // CALORIES CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CaloriesCard extends StatelessWidget {
-  const _CaloriesCard({required this.totals, required this.goals});
-  final _DiaryTotals totals;
-  final NutritionGoals goals;
-
-  @override
-  Widget build(BuildContext context) {
-    final consumed = totals.calories.round();
-    final goal = goals.calories;
-    final remaining = goal - consumed;
-    // Guard goal==0 → consumed/goal is NaN/Infinity and .clamp() then throws /
-    // renders garbage. Mirrors the _MacroRing `goal > 0 ? … : 0.0` guard.
-    final progress = goal > 0 ? (consumed / goal).clamp(0.0, 1.0) : 0.0;
-    final overGoal = consumed > goal;
-    final accent = overGoal ? ZveltTokens.error : ZveltTokens.brand;
-
-    // ── Design parity: padding 16, soft radial brand glow top-right.
-    return Semantics(
-      container: true,
-      label: overGoal
-          ? 'Calories: $consumed of $goal kcal, ${consumed - goal} over goal'
-          : 'Calories: $consumed of $goal kcal, $remaining remaining',
-      child: ZCard(
-        padding: EdgeInsets.zero,
-        child: Container(
-          padding: const EdgeInsets.all(ZveltTokens.s4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-            gradient: RadialGradient(
-              center: const Alignment(1.1, -1.1),
-              radius: 1.2,
-              colors: [
-                ZveltTokens.brand.withValues(alpha: 0.10),
-                Colors.transparent,
-              ],
-              stops: const [0, 0.6],
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const ZEyebrow('Calories'),
-              const SizedBox(height: ZveltTokens.s3),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '$consumed',
-                    // Design parity: 30px stat (was 40 — oversized vs design).
-                    style: ZType.stat.copyWith(
-                      color: ZveltTokens.text,
-                      fontSize: 28,
-                      height: 1,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6, left: 6),
-                    child: Text(
-                      '/ $goal kcal',
-                      style: ZType.monoS.copyWith(
-                        color: ZveltTokens.text2,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: ZveltTokens.s3, vertical: ZveltTokens.s1),
-                    decoration: BoxDecoration(
-                      color: overGoal
-                          ? ZveltTokens.error.withValues(alpha: 0.12)
-                          : ZveltTokens.brandTint,
-                      borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                    ),
-                    child: Text(
-                      overGoal ? '+${consumed - goal} over' : '$remaining left',
-                      style: ZType.monoXS.copyWith(
-                        color: accent,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: ZveltTokens.s4),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: ZveltTokens.surface2,
-                  valueColor: AlwaysStoppedAnimation<Color>(accent),
-                  minHeight: 6,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MACROS ROW
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _MacrosRow extends StatelessWidget {
-  const _MacrosRow({required this.totals, required this.goals});
-  final _DiaryTotals totals;
-  final NutritionGoals goals;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-            child: _MacroCard(
-          label: 'Protein',
-          value: totals.protein,
-          goal: goals.proteinG.toDouble(),
-          color: ZveltTokens.strength,
-        )),
-        const SizedBox(width: ZveltTokens.s3),
-        Expanded(
-            child: _MacroCard(
-          label: 'Carbs',
-          value: totals.carbs,
-          goal: goals.carbsG.toDouble(),
-          color: ZveltTokens.brand,
-        )),
-        const SizedBox(width: ZveltTokens.s3),
-        Expanded(
-            child: _MacroCard(
-          label: 'Fat',
-          value: totals.fat,
-          goal: goals.fatG.toDouble(),
-          color: ZveltTokens.strain,
-        )),
-      ],
-    );
-  }
-}
-
-class _MacroCard extends StatelessWidget {
-  const _MacroCard(
-      {required this.label,
-      required this.value,
-      required this.goal,
-      required this.color});
-  final String label;
-  final double value;
-  final double goal;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    // ── Design parity: circular 56px progress ring (4px stroke) with the
-    // gram value centered inside and the label underneath — replaces the
-    // old horizontal bar layout.
-    final progress = goal > 0 ? (value / goal).clamp(0.0, 1.0) : 0.0;
-    return Semantics(
-      container: true,
-      label: '$label: ${value.round()} of ${goal.round()} grams',
-      excludeSemantics: true,
-      child: ZCard(
-        padding: const EdgeInsets.all(ZveltTokens.s4),
-        child: Column(
-          children: [
-            SizedBox(
-              width: 56,
-              height: 56,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 56,
-                    height: 56,
-                    child: CircularProgressIndicator(
-                      value: progress,
-                      strokeWidth: 4,
-                      strokeCap: StrokeCap.round,
-                      color: color,
-                      backgroundColor: ZveltTokens.surface3,
-                    ),
-                  ),
-                  Text(
-                    '${value.round()}',
-                    style: ZType.stat.copyWith(
-                        color: ZveltTokens.text, fontSize: 13, height: 1),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(label,
-                style: ZType.monoXS.copyWith(
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.6,
-                  height: 1.2,
-                )),
-            const SizedBox(height: 2),
-            Text('of ${goal.round()}g',
-                style: ZType.monoXS.copyWith(height: 1.2)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WATER CARD
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WEIGHT CARD
-// ─────────────────────────────────────────────────────────────────────────────
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MEAL SECTION
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _MealSection extends StatelessWidget {
-  const _MealSection({
-    required this.meal,
-    required this.entries,
-    required this.onAdd,
-    required this.onRemove,
-  });
-  final String meal;
-  final List<MealEntry> entries;
-  final VoidCallback onAdd;
-  final void Function(String) onRemove;
-
-  String get _label {
-    switch (meal) {
-      case 'breakfast':
-        return 'Breakfast';
-      case 'lunch':
-        return 'Lunch';
-      case 'dinner':
-        return 'Dinner';
-      default:
-        return 'Snacks';
-    }
-  }
-
-  /// Design parity: meals use emoji glyphs (🌅 🥗 🍝 🍿), not stroke icons.
-  String get _emoji {
-    switch (meal) {
-      case 'breakfast':
-        return '🌅';
-      case 'lunch':
-        return '🥗';
-      case 'dinner':
-        return '🍝';
-      default:
-        return '🍿';
-    }
-  }
-
-  double get _totalCalories => entries.fold(0, (s, e) => s + e.calories);
-
-  @override
-  Widget build(BuildContext context) {
-    // ── Design parity: uniform 16px card padding (was EdgeInsets.zero with
-    // ad-hoc insets), emoji meal glyph, brand-tinted 28px add tile (r9).
-    return Padding(
-      padding: const EdgeInsets.only(bottom: ZveltTokens.s3),
-      child: ZCard(
-        padding: const EdgeInsets.all(ZveltTokens.s4),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Text(_emoji, style: ZType.bodyM.copyWith(height: 1)),
-                const SizedBox(width: ZveltTokens.s3),
-                Text(_label,
-                    style: ZType.h4
-                        .copyWith(color: ZveltTokens.text, fontSize: 13)),
-                const Spacer(),
-                if (entries.isNotEmpty)
-                  Text('${_totalCalories.round()} kcal',
-                      style: ZType.monoS.copyWith(
-                        color: ZveltTokens.text2,
-                        fontWeight: FontWeight.w600,
-                      )),
-                const SizedBox(width: ZveltTokens.s3),
-                Semantics(
-                  button: true,
-                  label: 'Add $_label entry',
-                  excludeSemantics: true,
-                  child: GestureDetector(
-                    onTap: onAdd,
-                    // 28px visual tile per design, padded hit area ≥44.
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: ZveltTokens.brandTint,
-                          borderRadius: BorderRadius.circular(ZveltTokens.rSm),
-                        ),
-                        child: const Icon(AppIcons.plus,
-                            size: 16, color: ZveltTokens.brand),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (entries.isNotEmpty) ...[
-              const SizedBox(height: ZveltTokens.s2),
-              ...entries.map(
-                  (e) => _EntryRow(entry: e, onRemove: () => onRemove(e.id))),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EntryRow extends StatelessWidget {
-  const _EntryRow({required this.entry, required this.onRemove});
-  final MealEntry entry;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Dismissible(
-      key: Key(entry.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: ZveltTokens.s4),
-        color: ZveltTokens.error.withValues(alpha: 0.12),
-        child: const Icon(AppIcons.trash, color: ZveltTokens.error),
-      ),
-      onDismissed: (_) => onRemove(),
-      child: Padding(
-        // Card now carries the 16px inset — rows only space vertically.
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(entry.food.name,
-                      style: ZType.bodyS.copyWith(
-                        color: ZveltTokens.text,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  Text(_mealEntrySubtitle(entry),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ZType.bodyS.copyWith(
-                        color: ZveltTokens.text2,
-                        fontSize: 11,
-                      )),
-                ],
-              ),
-            ),
-            Text('${entry.calories.round()} kcal',
-                style: ZType.num_.copyWith(
-                    color: ZveltTokens.brand,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // ADD FOOD SHEET
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1781,6 +1941,13 @@ class _AddFoodSheet extends StatefulWidget {
 }
 
 class _AddFoodSheetState extends State<_AddFoodSheet> {
+  static String _mealTitle(String key) => switch (key) {
+        'breakfast' => 'Breakfast',
+        'lunch' => 'Lunch',
+        'dinner' => 'Dinner',
+        _ => 'Snacks',
+      };
+
   static const Duration _searchDebounce = Duration(milliseconds: 500);
 
   final _service = NutritionService.instance;
@@ -2231,10 +2398,11 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
       minChildSize: 0.5,
       builder: (_, controller) => Container(
         decoration: BoxDecoration(
+          gradient: ZveltTokens.sheetGrad,
           color: ZveltTokens.surface,
           borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(ZveltTokens.rXl)),
-          boxShadow: ZveltTokens.shadowHero,
+              top: Radius.circular(ZveltTokens.rSheet)),
+          border: Border.all(color: ZveltTokens.border),
         ),
         padding:
             EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -2245,8 +2413,46 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                  color: ZveltTokens.border,
+                  color: ZveltTokens.track,
                   borderRadius: BorderRadius.circular(ZveltTokens.rPill)),
+            ),
+            // Prototype sheetAddFood header (HTML 681–684).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Add to ${_mealTitle(widget.meal)}',
+                            style: ZType.h4.copyWith(
+                                fontSize: 19, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        Text('Tap a food to log it',
+                            style: ZType.bodyS.copyWith(
+                                fontSize: 12, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: ZveltTokens.chip,
+                        border: Border.all(color: ZveltTokens.border),
+                      ),
+                      child: Icon(AppIcons.cross_small,
+                          size: 16, color: ZveltTokens.text2),
+                    ),
+                  ),
+                ],
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -4334,97 +4540,173 @@ class _FastingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Prototype fasting card (HTML 300–312): header + window chip + pencil,
+    // 212px ring, center label/time/unit (+% when active), Started/Ends
+    // dotted rows, Start/End button.
     final rem = state.remaining;
     final remLabel =
         '${rem.inHours.toString().padLeft(2, '0')}:${(rem.inMinutes % 60).toString().padLeft(2, '0')}';
+    final elapsed = state.elapsed;
+    final elapsedLabel =
+        '${elapsed.inHours.toString().padLeft(2, '0')}:${(elapsed.inMinutes % 60).toString().padLeft(2, '0')}';
+    final done = state.active && rem <= Duration.zero;
+    final centerLabel = !state.active
+        ? 'Tap start below'
+        : (done ? 'Fast complete 🎉' : 'Ends in');
+    final centerTime =
+        !state.active ? state.protocolLabel : (done ? elapsedLabel : remLabel);
+    final centerUnit = state.active ? 'Hrs' : 'window';
+    final pct = (state.progress * 100).round();
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(ZveltTokens.rCardLg),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: ZveltTokens.surfaceGrad,
-          borderRadius: BorderRadius.circular(ZveltTokens.rCardLg),
-          border: Border.all(color: ZveltTokens.border),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 118,
-              height: 118,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+      decoration: BoxDecoration(
+        gradient: ZveltTokens.surfaceGrad,
+        borderRadius: BorderRadius.circular(ZveltTokens.rCardLg),
+        border: Border.all(color: ZveltTokens.border),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Text('Fasting',
+                  style: ZType.h3.copyWith(
+                      fontSize: 21, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0x24F58214),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0x66F58214)),
+                  ),
+                  child: Text(state.protocolLabel,
+                      style: ZType.bodyS.copyWith(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: ZveltTokens.brand)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: onTap,
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ZveltTokens.chip,
+                    border: Border.all(color: ZveltTokens.border),
+                  ),
+                  child: Icon(AppIcons.edit, size: 15, color: ZveltTokens.text2),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              width: 212,
+              height: 212,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  CustomPaint(
-                    size: const Size(118, 118),
-                    painter: _FastRingPainter(
-                      progress: state.active ? state.progress : 0,
-                      track: ZveltTokens.track,
+                  RepaintBoundary(
+                    child: CustomPaint(
+                      size: const Size(212, 212),
+                      painter: _FastRingPainter(
+                        progress: state.active ? state.progress : 0,
+                        track: ZveltTokens.track,
+                      ),
                     ),
                   ),
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(state.active ? 'ENDS IN' : 'FASTING',
-                          style: ZType.eyebrow.copyWith(fontSize: 9.5)),
-                      const SizedBox(height: 2),
-                      Text(state.active ? remLabel : state.protocolLabel,
-                          style: ZType.h3.copyWith(fontSize: 20)),
-                      if (state.active)
-                        Text('hrs', style: ZType.monoXS.copyWith(fontSize: 10)),
+                      Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: ZveltTokens.chip,
+                          border: Border.all(color: ZveltTokens.border),
+                        ),
+                        child: Icon(AppIcons.stopwatch,
+                            size: 19, color: ZveltTokens.text),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(centerLabel,
+                          style: ZType.bodyS.copyWith(
+                              fontSize: 13, fontWeight: FontWeight.w500)),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(centerTime,
+                              style: ZType.stat.copyWith(fontSize: 37)),
+                          const SizedBox(width: 4),
+                          Text(centerUnit,
+                              style: ZType.bodyS.copyWith(
+                                  fontSize: 13, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      if (state.active && !done) ...[
+                        const SizedBox(height: 3),
+                        Text('$pct% complete',
+                            style: ZType.bodyS.copyWith(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: ZveltTokens.brand)),
+                      ],
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Fasting', style: ZType.h3.copyWith(fontSize: 18)),
-                  const SizedBox(height: 4),
-                  Text('${state.protocolLabel} protocol',
-                      style: ZType.bodyS.copyWith(fontSize: 12.5)),
-                  const SizedBox(height: 10),
-                  _dottedRow('Started', _hm(state.startAt)),
-                  const SizedBox(height: 6),
-                  _dottedRow('Ends', _hm(state.endsAt)),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: onToggle,
-                      style: FilledButton.styleFrom(
-                        backgroundColor:
-                            state.active ? ZveltTokens.chip : ZveltTokens.brand,
-                        foregroundColor: state.active
-                            ? ZveltTokens.text
-                            : ZveltTokens.onBrand,
-                        padding: const EdgeInsets.symmetric(vertical: 11),
-                        minimumSize: Size.zero,
-                        side: state.active
-                            ? BorderSide(color: ZveltTokens.borderStrong)
-                            : BorderSide.none,
-                        shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(ZveltTokens.rChip)),
-                      ),
-                      child: Text(state.active ? 'End fast' : 'Start fast',
-                          style: ZType.bodyS.copyWith(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: state.active
-                                  ? ZveltTokens.text
-                                  : ZveltTokens.onBrand)),
-                    ),
-                  ),
-                ],
+          ),
+          const SizedBox(height: 16),
+          _dottedRow('Started:', _hm(state.startAt)),
+          const SizedBox(height: 11),
+          _dottedRow('Ends:', _hm(state.endsAt)),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: onToggle,
+              style: FilledButton.styleFrom(
+                backgroundColor:
+                    state.active ? ZveltTokens.chip : ZveltTokens.brand,
+                foregroundColor:
+                    state.active ? ZveltTokens.text : ZveltTokens.onBrand,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                minimumSize: Size.zero,
+                elevation: 0,
+                side: state.active
+                    ? BorderSide(color: ZveltTokens.borderStrong)
+                    : BorderSide.none,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ZveltTokens.rControl)),
               ),
+              child: Text(state.active ? 'End fast' : 'Start fast',
+                  style: ZType.bodyM.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: state.active
+                          ? ZveltTokens.text
+                          : ZveltTokens.onBrand)),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -4432,8 +4714,10 @@ class _FastingCard extends StatelessWidget {
   Widget _dottedRow(String label, String value) {
     return Row(
       children: [
-        Text(label, style: ZType.bodyS.copyWith(fontSize: 12)),
-        const SizedBox(width: 8),
+        Text(label,
+            style: ZType.bodyM.copyWith(
+                fontSize: 14, fontWeight: FontWeight.w500)),
+        const SizedBox(width: 10),
         Expanded(
           child: LayoutBuilder(
             builder: (context, c) => Text(
@@ -4444,10 +4728,10 @@ class _FastingCard extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Text(value,
-            style: ZType.bodyS.copyWith(
-                fontSize: 12,
+            style: ZType.bodyM.copyWith(
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: ZveltTokens.text)),
       ],
@@ -4455,6 +4739,7 @@ class _FastingCard extends StatelessWidget {
   }
 }
 
+/// Big fasting ring (prototype stroke 15 at 212px — scales with size).
 class _FastRingPainter extends CustomPainter {
   const _FastRingPainter({required this.progress, required this.track});
 
@@ -4463,31 +4748,108 @@ class _FastRingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final stroke = size.width * 15 / 212;
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 6;
+    final radius = size.width / 2 - stroke / 2 - 1;
     final trackPaint = Paint()
       ..color = track
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 9
-      ..strokeCap = StrokeCap.round;
+      ..strokeWidth = stroke;
     canvas.drawCircle(center, radius, trackPaint);
     if (progress <= 0) return;
     final rect = Rect.fromCircle(center: center, radius: radius);
     final arc = Paint()
-      ..shader = const SweepGradient(
-        startAngle: -1.5708,
-        endAngle: 4.7124,
-        colors: [ZveltTokens.ringStart, ZveltTokens.ringEnd],
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [ZveltTokens.brand3, ZveltTokens.brandDeep],
       ).createShader(rect)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 9
+      ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round;
-    canvas.drawArc(rect, -1.5708, 6.2832 * progress, false, arc);
+    canvas.drawArc(rect, -1.5708, 6.2832 * progress.clamp(0.0, 1.0), false, arc);
   }
 
   @override
   bool shouldRepaint(covariant _FastRingPainter old) =>
       old.progress != progress || old.track != track;
+}
+
+/// Calories ring (HTML 283): dotted 3px track + 7px gradient arc.
+class _CalorieRingPainter extends CustomPainter {
+  const _CalorieRingPainter({required this.progress, required this.track});
+
+  final double progress;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 8;
+    // Dotted track: dash 1.5 / gap 6.4 (prototype stroke-dasharray).
+    final trackPaint = Paint()
+      ..color = track
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    const dash = 1.5, gap = 6.4;
+    final circumference = 2 * math.pi * radius;
+    var d = 0.0;
+    while (d < circumference) {
+      final a0 = d / radius;
+      final a1 = (d + dash) / radius;
+      canvas.drawArc(Rect.fromCircle(center: center, radius: radius), a0,
+          a1 - a0, false, trackPaint);
+      d += dash + gap;
+    }
+    if (progress <= 0) return;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final arc = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [ZveltTokens.brand3, ZveltTokens.brandDeep],
+      ).createShader(rect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 7
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, -1.5708, 6.2832 * progress.clamp(0.0, 1.0), false, arc);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CalorieRingPainter old) =>
+      old.progress != progress || old.track != track;
+}
+
+/// Dashed rounded border (the prototype's dashed Add-food button).
+class _DashedRRectPainter extends CustomPainter {
+  const _DashedRRectPainter({required this.color, required this.radius});
+
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+          Offset.zero & size, Radius.circular(radius)));
+    const dash = 6.0, gap = 5.0;
+    for (final metric in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < metric.length) {
+        canvas.drawPath(
+            metric.extractPath(d, (d + dash).clamp(0, metric.length)), paint);
+        d += dash + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedRRectPainter old) =>
+      old.color != color || old.radius != radius;
 }
 
 /// sheetFast — protocol select (16:8 / 18:6 / 20:4), editable start time,
@@ -4552,7 +4914,8 @@ class _FastingSheetState extends State<_FastingSheet> {
             const SizedBox(height: 8),
             Row(
               children: [
-                for (final h in const [16, 18, 20]) ...[
+                // Prototype fastWindows: 14:10 / 16:8 / 18:6 / 20:4.
+                for (final h in const [14, 16, 18, 20]) ...[
                   Expanded(
                     child: InkWell(
                       onTap: () => setState(() => _hours = h),
@@ -4570,9 +4933,9 @@ class _FastingSheetState extends State<_FastingSheet> {
                               : Border.all(color: ZveltTokens.borderStrong),
                           boxShadow: _hours == h ? ZveltTokens.glowSm : null,
                         ),
-                        child: Text(
-                            h == 16 ? '16:8' : (h == 18 ? '18:6' : '20:4'),
+                        child: Text('$h:${24 - h}',
                             style: ZType.bodyM.copyWith(
+                                fontSize: 13.5,
                                 fontWeight: FontWeight.w800,
                                 color: _hours == h
                                     ? ZveltTokens.onBrand
@@ -4635,6 +4998,447 @@ class _FastingSheetState extends State<_FastingSheet> {
                 child: Text(active ? 'End fast' : 'Start fast'),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// sheetBasket — Shopping Basket (prototype HTML 660–676): check rows toggle,
+// "Add all to list" checks everything. Items derive from the selected day's
+// AI meal plan; checked state persists per day.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BasketSheet extends StatefulWidget {
+  const _BasketSheet({
+    required this.items,
+    required this.checked,
+    required this.onChanged,
+  });
+
+  final List<({String name, String qty})> items;
+  final Set<String> checked;
+  final ValueChanged<Set<String>> onChanged;
+
+  @override
+  State<_BasketSheet> createState() => _BasketSheetState();
+}
+
+class _BasketSheetState extends State<_BasketSheet> {
+  late Set<String> _checked = {...widget.checked};
+
+  void _toggle(String name) {
+    setState(() {
+      if (!_checked.add(name)) _checked.remove(name);
+    });
+    widget.onChanged(_checked);
+  }
+
+  void _addAll() {
+    setState(() => _checked = {for (final b in widget.items) b.name});
+    widget.onChanged(_checked);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ZveltTokens.rSm)),
+      content: const Text('Added to shopping list'),
+    ));
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.84),
+      decoration: BoxDecoration(
+        gradient: ZveltTokens.sheetGrad,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(ZveltTokens.rSheet)),
+        border: Border.all(color: ZveltTokens.border),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 34),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: ZveltTokens.track,
+                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Shopping Basket',
+                        style: ZType.h4.copyWith(
+                            fontSize: 19, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text('Ingredients for today’s meals',
+                        style: ZType.bodyS.copyWith(
+                            fontSize: 12, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+              InkWell(
+                onTap: () => Navigator.of(context).pop(),
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ZveltTokens.chip,
+                    border: Border.all(color: ZveltTokens.border),
+                  ),
+                  child: Icon(AppIcons.cross_small,
+                      size: 16, color: ZveltTokens.text2),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (widget.items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 22),
+              child: Center(
+                child: Text(
+                  'No ingredients yet — generate a meal plan first.',
+                  style: ZType.bodyS.copyWith(
+                      fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ),
+            )
+          else
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: widget.items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 9),
+                itemBuilder: (context, i) {
+                  final item = widget.items[i];
+                  final checked = _checked.contains(item.name);
+                  return InkWell(
+                    onTap: () => _toggle(item.name),
+                    borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: ZveltTokens.surface2Grad,
+                        borderRadius:
+                            BorderRadius.circular(ZveltTokens.rControl),
+                        border: Border.all(color: ZveltTokens.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 26,
+                            height: 26,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: checked ? ZveltTokens.brand : null,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: checked
+                                      ? ZveltTokens.brand
+                                      : ZveltTokens.borderStrong,
+                                  width: 1.5),
+                            ),
+                            child: checked
+                                ? const Icon(AppIcons.check,
+                                    size: 13, color: ZveltTokens.onBrand)
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: ZType.bodyM.copyWith(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    decoration: checked
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    color: checked
+                                        ? ZveltTokens.text3
+                                        : ZveltTokens.text,
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(item.qty,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: ZType.bodyS.copyWith(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          if (widget.items.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: _addAll,
+              borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brand,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                  boxShadow: ZveltTokens.glowMd,
+                ),
+                child: Center(
+                  child: Text('Add all to list',
+                      style: ZType.bodyM.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: ZveltTokens.onBrand)),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// sheetCal — Select date (prototype HTML 704–732): month grid with dots on
+// logged days, prev/next month, Today shortcut. Pops the picked date.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CalendarSheet extends StatefulWidget {
+  const _CalendarSheet({required this.selected, required this.loggedDayKeys});
+
+  final DateTime selected;
+  final Set<String> loggedDayKeys;
+
+  @override
+  State<_CalendarSheet> createState() => _CalendarSheetState();
+}
+
+class _CalendarSheetState extends State<_CalendarSheet> {
+  late DateTime _month =
+      DateTime(widget.selected.year, widget.selected.month, 1);
+
+  static String _ymd(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Widget _navBtn(IconData icon, VoidCallback onTap) => InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: ZveltTokens.chip,
+            border: Border.all(color: ZveltTokens.border),
+          ),
+          child: Icon(icon, size: 15, color: ZveltTokens.text2),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June', 'July',
+      'August', 'September', 'October', 'November', 'December',
+    ];
+    final today = DateUtils.dateOnly(DateTime.now());
+    final firstWd = DateTime(_month.year, _month.month, 1).weekday % 7;
+    final daysIn = DateUtils.getDaysInMonth(_month.year, _month.month);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: ZveltTokens.sheetGrad,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(ZveltTokens.rSheet)),
+        border: Border.all(color: ZveltTokens.border),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 34),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: ZveltTokens.track,
+              borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+            ),
+          ),
+          Row(
+            children: [
+              Text('Select date',
+                  style: ZType.h4.copyWith(
+                      fontSize: 19, fontWeight: FontWeight.w800)),
+              const Spacer(),
+              InkWell(
+                onTap: () => Navigator.of(context).pop(),
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ZveltTokens.chip,
+                    border: Border.all(color: ZveltTokens.border),
+                  ),
+                  child: Icon(AppIcons.cross_small,
+                      size: 16, color: ZveltTokens.text2),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _navBtn(
+                  AppIcons.angle_small_left,
+                  () => setState(() =>
+                      _month = DateTime(_month.year, _month.month - 1, 1))),
+              Text('${months[_month.month - 1]} ${_month.year}',
+                  style: ZType.bodyL.copyWith(
+                      fontSize: 16, fontWeight: FontWeight.w800)),
+              _navBtn(
+                  AppIcons.angle_small_right,
+                  () => setState(() =>
+                      _month = DateTime(_month.year, _month.month + 1, 1))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              for (final d in const ['S', 'M', 'T', 'W', 'T', 'F', 'S'])
+                Expanded(
+                  child: Text(d,
+                      textAlign: TextAlign.center,
+                      style: ZType.monoXS.copyWith(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: ZveltTokens.text3)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          GridView.count(
+            crossAxisCount: 7,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 5,
+            crossAxisSpacing: 5,
+            children: [
+              for (var i = 0; i < firstWd; i++) const SizedBox.shrink(),
+              for (var d = 1; d <= daysIn; d++)
+                _dayCell(DateTime(_month.year, _month.month, d), today),
+            ],
+          ),
+          const SizedBox(height: 18),
+          InkWell(
+            onTap: () => Navigator.of(context).pop(today),
+            borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: ZveltTokens.chip,
+                borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                border: Border.all(color: ZveltTokens.borderStrong),
+              ),
+              child: Center(
+                child: Text('Today',
+                    style: ZType.bodyM.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: ZveltTokens.text)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dayCell(DateTime date, DateTime today) {
+    final isSel = DateUtils.isSameDay(date, widget.selected);
+    final isToday = DateUtils.isSameDay(date, today);
+    final hasDot = widget.loggedDayKeys.contains(_ymd(date));
+
+    final BoxDecoration deco;
+    Color color = ZveltTokens.text2;
+    var weight = FontWeight.w600;
+    if (isSel) {
+      deco = const BoxDecoration(
+        shape: BoxShape.circle,
+        color: ZveltTokens.brand,
+        boxShadow: ZveltTokens.glowSm,
+      );
+      color = ZveltTokens.onBrand;
+      weight = FontWeight.w800;
+    } else if (isToday) {
+      deco = BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: ZveltTokens.brand, width: 2),
+      );
+      color = ZveltTokens.brand;
+      weight = FontWeight.w800;
+    } else {
+      deco = const BoxDecoration(shape: BoxShape.circle);
+    }
+
+    return InkWell(
+      onTap: () => Navigator.of(context).pop(date),
+      customBorder: const CircleBorder(),
+      child: Container(
+        alignment: Alignment.center,
+        decoration: deco,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('${date.day}',
+                style: ZType.bodyS.copyWith(
+                    fontSize: 13, color: color, fontWeight: weight)),
+            if (hasDot && !isSel)
+              Container(
+                width: 5,
+                height: 5,
+                margin: const EdgeInsets.only(top: 1),
+                decoration: const BoxDecoration(
+                    shape: BoxShape.circle, color: ZveltTokens.brand),
+              )
+            else
+              const SizedBox(height: 6),
           ],
         ),
       ),

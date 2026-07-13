@@ -11,10 +11,10 @@ import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/muscle_map_widget.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
-import '../analytics/progress_hub_screen.dart';
-import '../calendar/activity_calendar_screen.dart';
+import '../activity/cardio_history_screen.dart';
+import '../analytics/progress_screen.dart';
 import '../outdoor/outdoor_track_screen.dart';
-import 'streak_calendar_screen.dart';
+import 'consistency_screen.dart';
 
 /// HOME / TODAY — 1:1 with the ZVELT handoff prototype (`zvelt-home-ux`).
 ///
@@ -218,21 +218,26 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   // ─── navigation (cards-and-actions.md) ────────────────────────────────────
-  void _openStreakCalendar() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const StreakCalendarScreen()),
+  Future<void> _openStreakCalendar() async {
+    // Prototype `openStreak` → Consistency overlay (sheetStreak, HTML 1096).
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const ConsistencyScreen()),
     );
+    // Manual day marks / weekly goal may have changed.
+    if (mounted) await _load();
   }
 
   void _openProgress() {
+    // Prototype `goProg` → Progress (isProg, HTML 592).
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const ProgressHubScreen()),
+      MaterialPageRoute<void>(builder: (_) => const ProgressScreen()),
     );
   }
 
   void _openCardioHistory() {
+    // Prototype `openCardioHist` → Cardio history (screenCardioHist, HTML 908).
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const ActivityCalendarScreen()),
+      MaterialPageRoute<void>(builder: (_) => const CardioHistoryScreen()),
     );
   }
 
@@ -794,29 +799,25 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  // ⑨ Stat trio
+  // ⑨ Stat trio — display-only, no navigation (user QA: must open nothing).
   Widget _statTrio() {
-    Widget box(String label, Widget value, VoidCallback onTap) => Expanded(
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(ZveltTokens.rBox),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(14, 15, 14, 15),
-              decoration: BoxDecoration(
-                gradient: ZveltTokens.surface2Grad,
-                borderRadius: BorderRadius.circular(ZveltTokens.rBox),
-                border: Border.all(color: ZveltTokens.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: ZType.monoXS.copyWith(
-                          fontSize: 11.5, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  value,
-                ],
-              ),
+    Widget box(String label, Widget value) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 15, 14, 15),
+            decoration: BoxDecoration(
+              gradient: ZveltTokens.surface2Grad,
+              borderRadius: BorderRadius.circular(ZveltTokens.rBox),
+              border: Border.all(color: ZveltTokens.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: ZType.monoXS.copyWith(
+                        fontSize: 11.5, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                value,
+              ],
             ),
           ),
         );
@@ -833,13 +834,11 @@ class _HomeTabState extends State<HomeTab> {
               avg == null ? '—' : '${avg.inMinutes}m\n${avg.inSeconds % 60}s',
               style: ZType.h4.copyWith(fontSize: 19, height: 1.15),
             ),
-            _openProgress,
           ),
           const SizedBox(width: 10),
           box(
             'New PRs',
             Text('$_newPrs', style: ZType.h2.copyWith(fontSize: 24)),
-            _openProgress,
           ),
           const SizedBox(width: 10),
           box(
@@ -858,7 +857,6 @@ class _HomeTabState extends State<HomeTab> {
                 ],
               ],
             ),
-            _openProgress,
           ),
         ],
       ),

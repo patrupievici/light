@@ -423,6 +423,8 @@ class PlannedWorkoutEntry {
     required this.kind,
     this.completed = false,
     this.time,
+    this.sub,
+    this.agendaType = 'workout',
   });
 
   final String id;
@@ -435,6 +437,14 @@ class PlannedWorkoutEntry {
   /// older persisted entries simply have no time.
   final String? time;
 
+  /// Optional subtitle shown under the title (prototype agenda rows, e.g.
+  /// "10 min warm-up"). Backwards-compatible.
+  final String? sub;
+
+  /// Prototype agenda bucket: 'workout' | 'nutrition' (planMode). Older
+  /// persisted entries default to 'workout'.
+  final String agendaType;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'dayYmd': dayYmd,
@@ -442,6 +452,8 @@ class PlannedWorkoutEntry {
         'kind': kind.id,
         'completed': completed,
         if (time != null) 'time': time,
+        if (sub != null) 'sub': sub,
+        if (agendaType != 'workout') 'agendaType': agendaType,
       };
 
   static PlannedWorkoutEntry? fromJson(dynamic o) {
@@ -459,6 +471,10 @@ class PlannedWorkoutEntry {
       kind: kind,
       completed: m['completed'] == true,
       time: (m['time'] as String?)?.trim(),
+      sub: (m['sub'] as String?)?.trim(),
+      agendaType: (m['agendaType'] as String?) == 'nutrition'
+          ? 'nutrition'
+          : 'workout',
     );
   }
 
@@ -469,6 +485,8 @@ class PlannedWorkoutEntry {
     ActivityKind? kind,
     bool? completed,
     String? time,
+    String? sub,
+    String? agendaType,
   }) {
     return PlannedWorkoutEntry(
       id: id ?? this.id,
@@ -477,6 +495,8 @@ class PlannedWorkoutEntry {
       kind: kind ?? this.kind,
       completed: completed ?? this.completed,
       time: time ?? this.time,
+      sub: sub ?? this.sub,
+      agendaType: agendaType ?? this.agendaType,
     );
   }
 }

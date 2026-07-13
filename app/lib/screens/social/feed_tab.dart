@@ -51,17 +51,21 @@ class _FeedTabState extends State<FeedTab> {
   final _workouts = WorkoutService();
   final _auth = AuthService();
 
-  int _tab = 0; // 0 All · 1 Following · 2 PRs · 3 Fame
+  int _tab = 0; // 0 All · 1 Following · 2 PRs · 3 Fame · 4 Challenges
   bool _loading = true;
   String? _meId;
 
   List<SocialFeedPost> _posts = const [];
   List<StoryAuthorGroup> _storyGroups = const [];
   List<SocialChallenge> _active = const [];
+  List<SocialChallenge> _completed = const [];
   List<ChallengeInvite> _invites = const [];
   List<RecentPr> _prs = const [];
   List<SeasonLeaderboardEntry> _fame = const [];
   String _prCat = 'All';
+
+  /// Best-effort "You won · 1st of 6" lines per completed challenge.
+  Map<String, String> _completedResult = const {};
 
   // Hero challenge standings (best-effort).
   List<(String, num)> _standings = const [];
@@ -117,6 +121,7 @@ class _FeedTabState extends State<FeedTab> {
       _safe(_challenges.listInvites()),
       _safe(_stats.getRecentPrs(days: 30)),
       _safe(_workouts.getSeasonLeaderboard(limit: 8)),
+      _safe(_challenges.loadCompleted()),
     ]);
     if (!mounted) return;
     final meId = results[0] as String?;
@@ -133,9 +138,35 @@ class _FeedTabState extends State<FeedTab> {
       _fame = fameRes == null
           ? const []
           : ((fameRes as dynamic).entries as List<SeasonLeaderboardEntry>);
+      _completed = (results[7] as List<SocialChallenge>?) ?? const [];
       _loading = false;
     });
     _loadStandings();
+    _loadCompletedResults();
+  }
+
+  /// Placement lines for the newest completed challenges (real standings).
+  Future<void> _loadCompletedResults() async {
+    final out = <String, String>{};
+    for (final c in _completed.take(3)) {
+      final raw = await _safe(_challenges.getStandings(c.id));
+      if (raw == null) continue;
+      final rows =
+          (raw['data'] as List<dynamic>? ?? const []).whereType<Map>().toList();
+      for (var i = 0; i < rows.length; i++) {
+        final m = Map<String, dynamic>.from(rows[i]);
+        final uid = (m['userId'] ?? m['id'])?.toString();
+        if (uid != null && uid == _meId) {
+          final rank = (m['rank'] as num?)?.toInt() ?? i + 1;
+          out[c.id] = rank == 1
+              ? 'You won · 1st of ${rows.length}'
+              : 'You placed · #$rank of ${rows.length}';
+          break;
+        }
+      }
+    }
+    if (!mounted || out.isEmpty) return;
+    setState(() => _completedResult = out);
   }
 
   Future<void> _loadStandings() async {
@@ -256,7 +287,8 @@ class _FeedTabState extends State<FeedTab> {
               0 => _allBlocks(),
               1 => _followingBlocks(),
               2 => _prBlocks(),
-              _ => _fameBlocks(),
+              3 => _fameBlocks(),
+              _ => _challengesBlocks(),
             },
           ],
         ),
@@ -336,7 +368,8 @@ class _FeedTabState extends State<FeedTab> {
   }
 
   Widget _pills() {
-    const labels = ['All', 'Following', 'PRs', 'Fame'];
+    // Prototype feedTabs: All · Following · PRs · Fame · Challenges (11px).
+    const labels = ['All', 'Following', 'PRs', 'Fame', 'Challenges'];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: Container(
@@ -348,30 +381,36 @@ class _FeedTabState extends State<FeedTab> {
         ),
         child: Row(
           children: [
-            for (var i = 0; i < 4; i++) ...[
+            for (var i = 0; i < labels.length; i++) ...[
               Expanded(
                 child: InkWell(
                   onTap: () => setState(() => _tab = i),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   child: AnimatedContainer(
                     duration: ZMotion.quick,
-                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: _tab == i ? ZveltTokens.brand : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       boxShadow: _tab == i ? ZveltTokens.glowSm : null,
                     ),
                     child: Text(labels[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: ZType.bodyS.copyWith(
-                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                            fontWeight: _tab == i
+                                ? FontWeight.w700
+                                : FontWeight.w600,
                             color: _tab == i
                                 ? ZveltTokens.onBrand
                                 : ZveltTokens.text2)),
                   ),
                 ),
               ),
-              if (i < 3) const SizedBox(width: 3),
+              if (i < labels.length - 1) const SizedBox(width: 3),
             ],
           ],
         ),
@@ -666,12 +705,11 @@ class _FeedTabState extends State<FeedTab> {
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 42,
+                height: 42,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: ZveltTokens.gradAccentDeep),
+                decoration: BoxDecoration(
+                    shape: BoxShape.circle, color: _avatarColor(name)),
                 child: Text(name[0].toUpperCase(),
                     style: ZType.bodyM.copyWith(
                         fontWeight: FontWeight.w800,
@@ -962,8 +1000,8 @@ class _FeedTabState extends State<FeedTab> {
                   width: 40,
                   height: 40,
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                      shape: BoxShape.circle, color: Color(0xFF6C7BE0)),
+                  decoration: BoxDecoration(
+                      shape: BoxShape.circle, color: _avatarColor(from)),
                   child: Text(from[0].toUpperCase(),
                       style: ZType.bodyS.copyWith(
                           fontWeight: FontWeight.w800,
@@ -1245,7 +1283,7 @@ class _FeedTabState extends State<FeedTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('PR Leaderboard · ${mo[DateTime.now().month - 1]}',
+            Text('Friends PR Leaderboard · ${mo[DateTime.now().month - 1]}',
                 style:
                     ZType.bodyM.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
@@ -1464,4 +1502,294 @@ class _FeedTabState extends State<FeedTab> {
       ),
     );
   }
+
+  // ─── CHALLENGES (5th pill — prototype HTML 569–587) ───────────────────────
+  List<Widget> _challengesBlocks() {
+    final now = DateTime.now();
+    final active = _active.where((c) => c.endsAt.isAfter(now)).toList();
+    final nothing =
+        _invites.isEmpty && active.isEmpty && _completed.isEmpty && !_loading;
+
+    return [
+      _createChallengeBanner(),
+      if (_invites.isNotEmpty) ...[
+        _challengeSectionTitle('Pending invites'),
+        for (final inv in _invites.take(4)) _inviteCard(inv),
+      ],
+      if (active.isNotEmpty) ...[
+        _challengeSectionTitle('Active'),
+        for (final c in active.take(4)) _activeChallengeCard(c),
+      ],
+      if (_completed.isNotEmpty) ...[
+        _challengeSectionTitle('Completed'),
+        for (final c in _completed.take(4)) _completedChallengeRow(c),
+      ],
+      if (nothing)
+        Container(
+          margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(ZveltTokens.rBox),
+            border: Border.all(color: ZveltTokens.borderStrong),
+          ),
+          child: Text('No challenges yet — create one above.',
+              style: ZType.bodyS),
+        ),
+    ];
+  }
+
+  Widget _challengeSectionTitle(String t) => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+        child: Text(t,
+            style:
+                ZType.bodyL.copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
+      );
+
+  // Create-a-challenge banner (HTML 570): orange gradient, plus box, copy.
+  Widget _createChallengeBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: InkWell(
+        onTap: () => _openCreate(),
+        borderRadius: BorderRadius.circular(ZveltTokens.rCardSm),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment(-1, -0.4),
+              end: Alignment(1, 0.6),
+              stops: [0, 0.6, 1],
+              colors: [Color(0xFFF58A11), Color(0xFFEE6E08), Color(0xFFD85F04)],
+            ),
+            borderRadius: BorderRadius.circular(ZveltTokens.rCardSm),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x80EE6E08),
+                  blurRadius: 30,
+                  offset: Offset(0, 14),
+                  spreadRadius: -10),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0x38FFFFFF),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(AppIcons.plus,
+                    size: 22, color: ZveltTokens.onBrand),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Create a challenge',
+                        style: ZType.bodyL.copyWith(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: ZveltTokens.onBrand)),
+                    const SizedBox(height: 2),
+                    Text('Streak, volume, PR battle & more',
+                        style: ZType.bodyS.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xE6FFFFFF))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Active challenge card (HTML 577–581): violet→orange, compact stats.
+  Widget _activeChallengeCard(SocialChallenge c) {
+    final daysLeft = c.endsAt.difference(DateTime.now()).inDays;
+    final isHero = _hero?.id == c.id;
+    final stats = <String>[
+      '${c.participantsCount} players',
+      if (isHero && _myRank != null) 'Rank #$_myRank',
+      if (isHero && _myPts != null) '${_fmtNum(_myPts!.round())} pts',
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: InkWell(
+        onTap: () => Navigator.of(context)
+            .push<void>(MaterialPageRoute<void>(
+                builder: (_) => ChallengeDetailScreen(
+                    challengeId: c.id, title: c.title)))
+            .then((_) => _load()),
+        borderRadius: BorderRadius.circular(ZveltTokens.rCardSm),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              stops: [0, 0.55, 1],
+              colors: [Color(0xFF7C5CE0), Color(0xFF5B3FD1), Color(0xFFF0720A)],
+            ),
+            borderRadius: BorderRadius.circular(ZveltTokens.rCardSm),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -24,
+                top: -24,
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  decoration: const BoxDecoration(
+                      shape: BoxShape.circle, color: Color(0x24FFFFFF)),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(c.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ZType.bodyL.copyWith(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: ZveltTokens.onBrand)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0x38000000),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                              daysLeft <= 0 ? 'ends today' : '${daysLeft}d left',
+                              style: ZType.monoXS.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: ZveltTokens.onBrand)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        for (var i = 0; i < stats.length; i++) ...[
+                          Text(stats[i],
+                              style: ZType.bodyS.copyWith(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xE6FFFFFF))),
+                          if (i < stats.length - 1) const SizedBox(width: 14),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Completed row (HTML 583–586): result line + Rematch.
+  Widget _completedChallengeRow(SocialChallenge c) {
+    final result = _completedResult[c.id];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surface2Grad,
+          borderRadius: BorderRadius.circular(ZveltTokens.rBox),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(c.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ZType.bodyM.copyWith(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(
+                    result ??
+                        '${c.durationDays} days · ${c.participantsCount} players',
+                    style: ZType.bodyS.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: result != null
+                            ? ZveltTokens.brand
+                            : ZveltTokens.text2),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            InkWell(
+              onTap: () => _openCreate(),
+              borderRadius: BorderRadius.circular(13),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.chip,
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: ZveltTokens.borderStrong),
+                ),
+                child: Text('Rematch',
+                    style: ZType.bodyS.copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: ZveltTokens.text)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _fmtNum(int v) {
+    final s = '$v';
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return '$buf';
+  }
+
+  /// Prototype avatar palette — stable per-name color.
+  static const _avatarPalette = [
+    Color(0xFFF0720A),
+    Color(0xFFE8724E),
+    Color(0xFF3E8E7E),
+    Color(0xFF6C7BE0),
+    Color(0xFFC9822F),
+    Color(0xFFB060C0),
+  ];
+
+  static Color _avatarColor(String seed) =>
+      _avatarPalette[seed.codeUnits.fold<int>(0, (a, b) => a + b) %
+          _avatarPalette.length];
 }
