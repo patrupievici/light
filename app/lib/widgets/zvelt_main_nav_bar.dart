@@ -1,12 +1,16 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_icons.dart';
 import '../theme/zvelt_tokens.dart';
 import 'z/z_pressable.dart';
 
-/// Bottom pill: 4 destinations plus a center Quick-Start action.
+/// Bottom navigation — **liquid-glass floating pill** (Claude Design handoff
+/// §3). Five destinations laid out Home · Plan · (gap) · Feed · Nutrition with
+/// a **raised center AI button** that floats above the bar. Icon-only.
 ///
-/// The center action is not a tab. It launches the workout quick-start flow.
+/// The center action is not a tab: it opens the AI Coach.
 class ZveltMainNavBar extends StatelessWidget {
   const ZveltMainNavBar({
     super.key,
@@ -14,161 +18,174 @@ class ZveltMainNavBar extends StatelessWidget {
     required this.onTap,
     required this.items,
     required this.onCenterTap,
-    this.centerIcon = AppIcons.bolt,
-    this.centerLabel = 'Start',
+    this.centerIcon = AppIcons.sparkles,
+    this.centerLabel = 'AI Coach',
   });
 
-  static const double pillHeight = 72;
-  static const double navVerticalInset = 8;
-  static const double _fabSize = 54;
+  /// Floating pill height (handoff: 70).
+  static const double pillHeight = 70;
 
+  /// Inset from the screen bottom (handoff: 16).
+  static const double navVerticalInset = 16;
+
+  /// The center AI button lifts this far above the pill top.
+  static const double _aiLift = 14;
+  static const double _aiSize = 60;
+
+  /// Bottom scroll inset every scroll view reserves so content clears the nav.
   static double reservedBottomHeight(BuildContext context) =>
-      pillHeight + navVerticalInset * 2 + MediaQuery.paddingOf(context).bottom;
+      pillHeight + navVerticalInset + MediaQuery.paddingOf(context).bottom + 20;
 
-  /// Active tab, 0..3 (Home, Train, Feed, Nutrition).
+  /// Active tab, 0..3 (Home, Plan, Feed, Nutrition).
   final int currentIndex;
 
   /// Tab tapped, 0..3.
   final ValueChanged<int> onTap;
 
-  /// Exactly four destinations: Home, Train, Feed, Nutrition.
+  /// Exactly four destinations: Home, Plan, Feed, Nutrition.
   final List<ZveltNavItem> items;
 
-  /// Center Quick-Start action.
+  /// Center AI Coach action.
   final VoidCallback onCenterTap;
   final IconData centerIcon;
   final String centerLabel;
-
-  ShapeBorder _pillShape() => RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(pillHeight / 2),
-        side: BorderSide(color: ZveltTokens.border),
-      );
 
   @override
   Widget build(BuildContext context) {
     assert(
       items.length == 4,
-      'ZveltMainNavBar expects 4 destinations plus a center action.',
+      'ZveltMainNavBar expects 4 destinations plus a center AI action.',
     );
     final bottom = MediaQuery.paddingOf(context).bottom;
-    final stackHeight = pillHeight + navVerticalInset * 2 + bottom;
+    final stackHeight = pillHeight + _aiLift + navVerticalInset + bottom;
 
-    return Material(
-      color: Colors.transparent,
-      child: SizedBox(
-        height: stackHeight,
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            Positioned(
-              left: ZveltTokens.s4,
-              right: ZveltTokens.s4,
-              bottom: navVerticalInset + bottom,
-              height: pillHeight,
-              child: Material(
-                color: ZveltTokens.surface,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                surfaceTintColor: Colors.transparent,
-                shape: _pillShape(),
-                clipBehavior: Clip.antiAlias,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    boxShadow: ZveltTokens.shadowFloat,
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                  child: Row(
-                    children: [
-                      Expanded(child: _navCell(context, 0)),
-                      Expanded(child: _navCell(context, 1)),
-                      Expanded(child: _centerCell(context)),
-                      Expanded(child: _navCell(context, 2)),
-                      Expanded(child: _navCell(context, 3)),
+    return SizedBox(
+      height: stackHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomCenter,
+        children: [
+          // Warm orange glow blob behind the bar — reads as "lit from within".
+          Positioned(
+            left: ZveltTokens.s5 + ZveltTokens.s2,
+            right: ZveltTokens.s5 + ZveltTokens.s2,
+            bottom: navVerticalInset + bottom - 6,
+            height: pillHeight + 20,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, 0.9),
+                    radius: 0.9,
+                    colors: [
+                      ZveltTokens.glowBottom,
+                      ZveltTokens.glowBottom.withValues(alpha: 0),
                     ],
                   ),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _centerCell(BuildContext context) {
-    return Center(
-      child: ZPressable(
-        onTap: onCenterTap,
-        semanticLabel: '$centerLabel quick start',
-        pressedScale: 0.94,
-        child: Container(
-          width: _fabSize,
-          height: _fabSize,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: ZveltTokens.gradBrand,
-            boxShadow: ZveltTokens.shadowFloat,
           ),
-          child: Icon(centerIcon, color: ZveltTokens.onBrand, size: 24),
-        ),
+          // Glass pill.
+          Positioned(
+            left: ZveltTokens.s4,
+            right: ZveltTokens.s4,
+            bottom: navVerticalInset + bottom,
+            height: pillHeight,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(ZveltTokens.rNav),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(
+                    sigmaX: ZveltTokens.glassBlur, sigmaY: ZveltTokens.glassBlur),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: ZveltTokens.navBg,
+                    borderRadius: BorderRadius.circular(ZveltTokens.rNav),
+                    border: Border.all(color: ZveltTokens.border),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: Color(0x66000000),
+                          blurRadius: 30,
+                          offset: Offset(0, 12)),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _navCell(0),
+                      _navCell(1),
+                      const SizedBox(width: 56), // center AI gap
+                      _navCell(2),
+                      _navCell(3),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Raised center AI button.
+          Positioned(
+            bottom: navVerticalInset + bottom + pillHeight - _aiSize + _aiLift,
+            child: ZPressable(
+              onTap: onCenterTap,
+              semanticLabel: centerLabel,
+              pressedScale: 0.96,
+              child: Container(
+                width: _aiSize,
+                height: _aiSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: ZveltTokens.gradAccentDeep,
+                  border: Border.all(color: ZveltTokens.bg, width: 3),
+                  boxShadow: ZveltTokens.glowAi,
+                ),
+                child: const Icon(AppIcons.sparkles,
+                    color: ZveltTokens.onBrand, size: 26),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _navCell(BuildContext context, int i) {
+  Widget _navCell(int i) {
     final item = items[i];
     final selected = i == currentIndex;
     return ZPressable(
       onTap: () => onTap(i),
       selected: selected,
       semanticLabel: '${item.label} tab',
-      pressedScale: 0.96,
-      child: AnimatedContainer(
-        duration: ZMotion.standard,
-        curve: ZMotion.emphasized,
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        decoration: BoxDecoration(
-          color: selected ? ZveltTokens.brandTint : Colors.transparent,
-          borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
+      pressedScale: 0.94,
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            item.iconBuilder?.call(selected) ??
-                AnimatedScale(
-                  scale: selected ? 1.06 : 1,
-                  duration: ZMotion.standard,
-                  curve: ZMotion.emphasized,
-                  child: Icon(
-                    item.icon,
-                    size: 21,
-                    color: selected ? ZveltTokens.brand : ZveltTokens.text3,
-                  ),
-                ),
-            const SizedBox(height: 3),
-            SizedBox(
-              width: double.infinity,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  item.label,
-                  maxLines: 1,
-                  softWrap: false,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontPrimary,
-                    fontSize: 11,
-                    height: 1.05,
-                    letterSpacing: 0,
-                    color: selected ? ZveltTokens.brand : ZveltTokens.text3,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            // Radial orange glow disc behind the active icon.
+            if (selected)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        ZveltTokens.brand.withValues(alpha: 0.35),
+                        ZveltTokens.brand.withValues(alpha: 0),
+                      ],
+                      stops: const [0, 0.7],
+                    ),
                   ),
                 ),
               ),
-            ),
+            item.iconBuilder?.call(selected) ??
+                Icon(
+                  item.icon,
+                  size: 23,
+                  color: selected ? ZveltTokens.brand : ZveltTokens.text3,
+                ),
           ],
         ),
       ),

@@ -6,19 +6,19 @@ import '../services/social_notification_hub.dart';
 import '../services/settings_store.dart';
 import '../theme/zvelt_tokens.dart';
 import '../widgets/zvelt_main_nav_bar.dart';
+import 'ai/ai_chat_screen.dart';
 import 'home/home_tab.dart';
 import 'nutrition/nutrition_tab.dart';
 import 'settings/settings_screen.dart';
 import 'skeleton/skeleton_profile_tab.dart';
 import 'social/notifications_screen.dart';
 import 'social/social_plus_screen.dart';
-import 'workouts/quick_launch_sheet.dart';
 import 'workouts/workouts_tab.dart';
 
-/// Main shell — **4 destinations + a center Quick-Start action**:
-/// Home · Train · ⚡ · Feed · Nutrition.
+/// Main shell — **4 destinations + a center AI action** (Claude Design handoff):
+/// Home · Plan · ✦ AI · Feed · Nutrition.
 ///
-/// The ⚡ center button is not a tab — it opens the Quick-Start workout sheet.
+/// The ✦ center button is not a tab — it opens the AI Coach.
 /// Profile is no longer a bottom-nav destination: it opens from the Home avatar
 /// (top-left); Settings opens from the Home gear (top-right).
 class MainScreen extends StatefulWidget {
@@ -31,7 +31,7 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  // 0 Home · 1 Train · 2 Feed · 3 Nutrition. (The ⚡ center action is not a tab.)
+  // 0 Home · 1 Plan · 2 Feed · 3 Nutrition. (The ✦ AI center action is not a tab.)
   static const int _tabCount = 4;
   static const int _feedIndex = 2;
 
@@ -88,13 +88,12 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Center ⚡ action — the Quick-Start workout sheet, then refresh the Train tab
-  /// so a freshly-started/finished workout shows on return.
-  Future<void> _startQuickWorkout() async {
+  /// Center ✦ action — open the AI Coach (handoff: the center button is AI,
+  /// not the quick-workout launcher).
+  Future<void> _openAiCoach() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (_) => const QuickLaunchSheet(),
+        builder: (_) => const AiChatScreen(),
       ),
     );
   }
@@ -148,12 +147,14 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: ZveltMainNavBar(
         currentIndex: _currentIndex,
         onTap: _switchTo,
-        onCenterTap: _startQuickWorkout,
+        onCenterTap: _openAiCoach,
+        centerIcon: AppIcons.sparkles,
+        centerLabel: 'AI Coach',
         items: const [
           ZveltNavItem(label: 'Home', icon: AppIcons.home),
-          ZveltNavItem(label: 'Train', icon: AppIcons.gym),
+          ZveltNavItem(label: 'Plan', icon: AppIcons.calendar_check),
           ZveltNavItem(label: 'Feed', icon: AppIcons.globe),
-          ZveltNavItem(label: 'Nutrition', icon: AppIcons.restaurant),
+          ZveltNavItem(label: 'Nutrition', icon: AppIcons.leaf),
         ],
       ),
     );
