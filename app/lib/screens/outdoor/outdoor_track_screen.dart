@@ -30,7 +30,10 @@ import '../../services/weather_service.dart';
 
 /// Run or ride: live route on OSM + distance (foreground GPS only).
 class OutdoorTrackScreen extends StatefulWidget {
-  const OutdoorTrackScreen({super.key});
+  const OutdoorTrackScreen({super.key, this.initialMode = 'run'});
+
+  /// 'run' | 'bike' — which activity the screen opens on (Home Run/Ride tiles).
+  final String initialMode;
 
   @override
   State<OutdoorTrackScreen> createState() => _OutdoorTrackScreenState();
@@ -46,7 +49,7 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
   RouteTracker _tracker = RouteTracker();
   LatLng _center = const LatLng(44.4268, 26.1025); // București fallback
 
-  String _mode = 'run'; // run | bike
+  late String _mode = widget.initialMode == 'bike' ? 'bike' : 'run';
 
   DateTime? _trackStart;
   DateTime? _trackEnd;

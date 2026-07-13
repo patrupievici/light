@@ -1,38 +1,37 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../models/activity_kind.dart';
-import '../../models/social_feed_post.dart';
 import '../../services/activity_calendar_store.dart';
 import '../../services/feed_refresh_notifier.dart';
 import '../../services/nutrition_service.dart';
 import '../../services/profile_service.dart';
-import '../../services/social_feed_service.dart';
-import '../../services/muscle_recovery_service.dart';
 import '../../services/stats_charts_service.dart';
 import '../../services/workout_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
-import '../../widgets/zvelt_main_nav_bar.dart';
 import '../../widgets/muscle_map_widget.dart';
-import '../../widgets/z/z_card.dart';
-import '../../widgets/z/z_collapsible_chart_card.dart';
-import '../../widgets/z/z_pressable.dart';
-import '../../widgets/charts/recent_prs_card.dart';
+import '../../widgets/zvelt_main_nav_bar.dart';
+import '../analytics/progress_hub_screen.dart';
 import '../calendar/activity_calendar_screen.dart';
-import '../workouts/workout_tracker_screen.dart';
-import 'goals_screen.dart';
+import '../outdoor/outdoor_track_screen.dart';
 import 'streak_calendar_screen.dart';
 
-/// HOME — the "today dashboard" from Razvan's light redesign (brief §7, mockup
-/// screen 3). Greeting · Start-Workout hero · cardio · progress · latest friend activity.
-/// Deliberately lean: no
-/// biology / recovery / XP cards (those belong to the full app, not light).
+/// HOME / TODAY — 1:1 with the ZVELT handoff prototype (`zvelt-home-ux`).
 ///
-/// Reuses the existing data layer — ProfileService, WorkoutService,
-/// SocialFeedService — so it stays honest (real data or empty
-/// state, never fabricated numbers).
+/// Blocks, in order (nothing else):
+///  ① Header — "Today ▾" (day menu) · avatar (→ Profile) · streak badge
+///  ② Cardio resume banner — conditional (no persisted live-cardio state yet,
+///     so it stays absent — the prototype rule is "never show when inactive")
+///  ③ START A SESSION eyebrow + History › (→ Cardio history)
+///  ④ Run / Ride tiles (→ Cardio tracking)
+///  ⑤⑥ Consistency title + card (→ Streak Calendar)
+///  ⑦⑧ Last 14 Workouts title + Volume card (→ Progress)
+///  ⑨ Stat trio — Avg Session · New PRs · Avg Burn
+///  ⑩ Bodyweight card — value + add (real editor sheet)
+///  ⑪⑫ Muscles title + muscle-map card (Front/Back toggle)
+///
+/// All numbers are REAL app data (workouts, cardio store, PRs, nutrition
+/// history) — the prototype's demo values are replaced per its own logic.md.
 class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
@@ -56,35 +55,27 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   final _profile = ProfileService();
   final _workouts = WorkoutService();
-  final _feed = SocialFeedService();
-  final _recovery = MuscleRecoveryService();
   final _stats = StatsChartsService();
   final _nutrition = NutritionService.instance;
 
-  bool _loading = true;
-  Map<String, MuscleLevel> _muscleLevels = const {};
+  static const _kWeeklyGoalPref = 'zvelt_weekly_goal';
 
-  String _displayName = 'Athlete';
-  bool _workoutToday = false;
-  int _currentStreak = 0;
+  bool _loading = true;
+  bool _dayMenuOpen = false;
+
+  String _avatarInitial = 'A';
   Set<String> _trainedDayKeys = const {};
-  _Last14WorkoutStats _last14 = _Last14WorkoutStats.empty;
+  int _streakCur = 0;
+  int _streakLongest = 0;
+  int _weekGoal = 5;
+  _Last14 _last14 = _Last14.empty;
+  int _newPrs = 0;
   double? _bodyweightKg;
   List<double> _bodyweightTrend = const [];
-  // Weekly cardio (runs/rides/walks) — from ActivityCalendarStore.
-  int _cardioCount = 0;
-  double _cardioKm = 0;
-  int _cardioMin = 0;
-  String? _cardioLatestLine;
-  SocialFeedPost? _friendPost;
 
   @override
   void initState() {
     super.initState();
-    // Completion flows bump [RefreshScope.home] (WorkoutService.completeWorkout,
-    // ActivityCalendarStore.addManualSession) — reload so "logged today" /
-    // consistency / weekly cardio reflect sessions finished from ANY flow
-    // (center ⚡ quick-launch, Train tab, GPS run), not just Home's hero button.
     FeedRefreshNotifier.instance
         .notifier(RefreshScope.home)
         .addListener(_onHomeBump);
@@ -116,150 +107,140 @@ class _HomeTabState extends State<HomeTab> {
     if (!mounted) return;
     setState(() => _loading = true);
 
-    final now = DateTime.now();
-    final monday =
-        DateUtils.dateOnly(now).subtract(Duration(days: now.weekday - 1));
-    final sunday = monday.add(const Duration(days: 6));
-
     final results = await Future.wait([
       _safe(_profile.getMe()),
-      // Same source of truth History uses (GET /v1/workouts). The old
-      // getWorkoutCalendar hit a nonexistent endpoint and ALWAYS returned []
-      // — Home showed "Not logged yet" / 0-consistency while History was right.
+      // Same source of truth History uses (GET /v1/workouts; page-1 cached
+      // offline in WorkoutService).
       _safe(_workouts.getWorkouts(limit: 50)),
-      _safe(_feed.getFeed()),
-      _safe(_recovery.getMuscleLevels(windowDays: 90)),
-      // Weekly cardio summary (offline-first — written on every cardio save).
       _safe(ActivityCalendarStore().loadManualSessions()),
       _safe(_stats.getRecentPrs(days: 30)),
       _safe(_nutrition.loadNutritionHistory(days: 14)),
+      _safe(SharedPreferences.getInstance()),
     ]);
     if (!mounted) return;
 
     final me = results[0] as Map<String, dynamic>?;
     final workoutsRes = results[1] as WorkoutsResponse?;
-    final posts = (results[2] as List<SocialFeedPost>?) ?? const [];
-    final muscleLevels = (results[3] as Map<String, MuscleLevel>?) ?? const {};
     final cardioByDay =
-        (results[4] as Map<String, List<ManualCardioSession>>?) ?? const {};
-    final recentPrs = (results[5] as List<RecentPr>?) ?? const <RecentPr>[];
-    final nutritionHistory = (results[6] as List<NutritionDaySnapshot>?) ??
+        (results[2] as Map<String, List<ManualCardioSession>>?) ?? const {};
+    final recentPrs = (results[3] as List<RecentPr>?) ?? const <RecentPr>[];
+    final nutritionHistory = (results[4] as List<NutritionDaySnapshot>?) ??
         const <NutritionDaySnapshot>[];
+    final prefs = results[5] as SharedPreferences?;
 
-    // Completed gym sessions this week ('completed' or 'posted'; drafts out).
-    // Server timestamps are UTC — attribute to the LOCAL calendar day, same
-    // as the Activity calendar, or late-evening sessions land on the wrong
-    // day and "logged today" fails (Romania is UTC+2/+3).
-    final calendar = <DateTime>[
-      for (final w in workoutsRes?.data ?? const <WorkoutDto>[])
-        if (w.status != 'draft')
-          DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal()),
-    ];
-
-    final profile = me?['profile'] as Map<String, dynamic>?;
-    final name = profile?['displayName'] as String?;
-    final myId = me?['id'] as String?;
-    final today = DateUtils.dateOnly(now);
-    var workedOutToday = false;
-    for (final d in calendar) {
-      final dd = DateUtils.dateOnly(d);
-      if (dd == today) workedOutToday = true;
-    }
-
-    // Weekly cardio aggregates (Mon–Sun window, latest session for the line).
-    var cardioCount = 0;
-    var cardioKm = 0.0;
-    var cardioMin = 0;
-    ManualCardioSession? latestCardio;
-    DateTime? latestCardioDay;
-    cardioByDay.forEach((key, sessions) {
-      final d = DateTime.tryParse(key);
-      if (d == null) return;
-      final dd = DateUtils.dateOnly(d);
-      if (dd.isBefore(monday) || dd.isAfter(sunday)) return;
-      for (final s in sessions) {
-        cardioCount++;
-        cardioKm += s.distanceKm ?? 0;
-        cardioMin += s.durationMin ?? 0;
-        if (latestCardioDay == null || !dd.isBefore(latestCardioDay!)) {
-          latestCardioDay = dd;
-          latestCardio = s;
-        }
-      }
-    });
-    String? cardioLatestLine;
-    if (latestCardio != null) {
-      final kindLabel = switch (latestCardio!.kind) {
-        ActivityKind.cycle => 'Ride',
-        ActivityKind.walk => 'Walk',
-        ActivityKind.swim => 'Swim',
-        _ => 'Run',
-      };
-      cardioLatestLine = '$kindLabel · ${latestCardio!.subtitle}';
-    }
-
+    // Trained days = completed gym sessions (LOCAL day) + cardio days.
     final completedWorkouts = (workoutsRes?.data ?? const <WorkoutDto>[])
         .where((w) => w.status != 'draft')
         .toList()
-      ..sort((a, b) => _workoutDate(b).compareTo(_workoutDate(a)));
+      ..sort((a, b) => (b.endedAt ?? b.startedAt).compareTo(a.endedAt ?? a.startedAt));
     final trainedKeys = <String>{
-      for (final d in calendar) _homeYmd(d),
-      for (final entry in cardioByDay.entries)
-        if (entry.value.isNotEmpty) entry.key,
+      for (final w in completedWorkouts)
+        _ymd(DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal())),
+      for (final e in cardioByDay.entries)
+        if (e.value.isNotEmpty) e.key,
     };
-    final streak = _currentStreakFrom(trainedKeys, today);
+
+    final today = DateUtils.dateOnly(DateTime.now());
+    final profile = me?['profile'] as Map<String, dynamic>?;
+    final name = (profile?['displayName'] as String?)?.trim();
     final weightTrend = [
       for (final d in nutritionHistory)
         if (d.weightKg != null && d.weightKg! > 0) d.weightKg!,
     ];
     final profileBodyweight = _asDouble(profile?['bodyweightKg']);
-    final bodyweightKg =
-        weightTrend.isNotEmpty ? weightTrend.last : profileBodyweight;
-    final last14 = _Last14WorkoutStats.fromWorkouts(
-      completedWorkouts.take(14),
-    ).copyWith(records: recentPrs.length);
 
     setState(() {
       _loading = false;
-      _displayName =
-          (name != null && name.trim().isNotEmpty) ? name.trim() : 'Athlete';
-      _workoutToday = workedOutToday;
-      _currentStreak = streak;
+      _avatarInitial =
+          (name != null && name.isNotEmpty) ? name[0].toUpperCase() : 'A';
       _trainedDayKeys = trainedKeys;
-      _last14 = last14;
-      _bodyweightKg = bodyweightKg;
+      _streakCur = _currentStreakFrom(trainedKeys, today);
+      _streakLongest = _longestStreakFrom(trainedKeys, today, windowDays: 84);
+      _weekGoal = (prefs?.getInt(_kWeeklyGoalPref) ?? 5).clamp(1, 7);
+      _last14 = _Last14.fromWorkouts(completedWorkouts.take(14));
+      _newPrs = recentPrs.length;
+      _bodyweightKg =
+          weightTrend.isNotEmpty ? weightTrend.last : profileBodyweight;
       _bodyweightTrend = weightTrend;
-      _cardioCount = cardioCount;
-      _cardioKm = cardioKm;
-      _cardioMin = cardioMin;
-      _cardioLatestLine = cardioLatestLine;
-      _muscleLevels = muscleLevels;
-      // "Friend activity" must be a FRIEND's post — the friends feed includes
-      // the user's own posts, so drop those before taking the latest.
-      final friendPosts =
-          myId == null ? posts : posts.where((p) => p.userId != myId).toList();
-      _friendPost = friendPosts.isNotEmpty ? friendPosts.first : null;
     });
   }
 
-  Future<void> _startWorkout() async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final workout = await _workouts.createWorkout();
-      if (!mounted) return;
-      await Navigator.of(context).push<void>(MaterialPageRoute<void>(
-        builder: (_) => WorkoutTrackerScreen(
-          workoutId: workout.id,
-          onComplete: _load,
-        ),
-      ));
-      _load();
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(
-        content: Text(e.toString().replaceFirst('Exception: ', '')),
-        backgroundColor: ZveltTokens.error,
-      ));
+  // ─── streak math (logic.md §3) ────────────────────────────────────────────
+  static String _ymd(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  static int _currentStreakFrom(Set<String> trained, DateTime today) {
+    var day = today;
+    if (!trained.contains(_ymd(day))) day = day.subtract(const Duration(days: 1));
+    var streak = 0;
+    while (trained.contains(_ymd(day))) {
+      streak++;
+      day = day.subtract(const Duration(days: 1));
     }
+    return streak;
+  }
+
+  static int _longestStreakFrom(Set<String> trained, DateTime today,
+      {int windowDays = 84}) {
+    var longest = 0, run = 0;
+    for (var i = windowDays; i >= 0; i--) {
+      final d = today.subtract(Duration(days: i));
+      if (trained.contains(_ymd(d))) {
+        run++;
+        if (run > longest) longest = run;
+      } else {
+        run = 0;
+      }
+    }
+    return longest;
+  }
+
+  /// Current week Sunday→Saturday (prototype week dots order).
+  List<DateTime> get _weekDays {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final sunday = today.subtract(Duration(days: today.weekday % 7));
+    return [for (var i = 0; i < 7; i++) sunday.add(Duration(days: i))];
+  }
+
+  int get _weekCount {
+    final today = DateUtils.dateOnly(DateTime.now());
+    var n = 0;
+    for (final d in _weekDays) {
+      if (!d.isAfter(today) && _trainedDayKeys.contains(_ymd(d))) n++;
+    }
+    return n;
+  }
+
+  static double? _asDouble(Object? v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
+  }
+
+  // ─── navigation (cards-and-actions.md) ────────────────────────────────────
+  void _openStreakCalendar() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const StreakCalendarScreen()),
+    );
+  }
+
+  void _openProgress() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const ProgressHubScreen()),
+    );
+  }
+
+  void _openCardioHistory() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const ActivityCalendarScreen()),
+    );
+  }
+
+  void _startCardio(String mode) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+          builder: (_) => OutdoorTrackScreen(initialMode: mode)),
+    );
   }
 
   Future<void> _editBodyweight() async {
@@ -272,1126 +253,704 @@ class _HomeTabState extends State<HomeTab> {
       builder: (context) => _BodyweightEditorSheet(initialKg: _bodyweightKg),
     );
     if (nextKg == null) return;
-
     setState(() {
       _bodyweightKg = nextKg;
-      _bodyweightTrend = _replaceLatestWeight(_bodyweightTrend, nextKg);
+      _bodyweightTrend = [..._bodyweightTrend, nextKg];
     });
-
     try {
       await _nutrition.updateWeight(nextKg, DateTime.now());
       try {
         await _profile.updateProfile(bodyweightKg: nextKg);
-      } catch (_) {
-        // The nutrition log is offline-first and remains the local source of
-        // truth for this card. Profile sync can retry on the next successful
-        // profile edit / app sync.
-      }
+      } catch (_) {/* nutrition log stays the local source of truth */}
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Bodyweight updated'),
-          backgroundColor: ZveltTokens.success,
-        ),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('Bodyweight updated')));
       await _load();
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: ZveltTokens.error,
-        ),
-      );
+      messenger.showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: ZveltTokens.error,
+      ));
     }
   }
 
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 18) return 'Good afternoon';
-    return 'Good evening';
-  }
-
-  String get _todayLabel {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final n = DateTime.now();
-    return 'Today, ${n.day} ${months[n.month - 1]}';
-  }
-
-  DateTime _workoutDate(WorkoutDto w) =>
-      DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal());
-
-  static String _homeYmd(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-  static int _currentStreakFrom(Set<String> trainedDays, DateTime today) {
-    var day = DateUtils.dateOnly(today);
-    if (!trainedDays.contains(_homeYmd(day))) {
-      day = day.subtract(const Duration(days: 1));
-    }
-    var streak = 0;
-    while (trainedDays.contains(_homeYmd(day))) {
-      streak++;
-      day = day.subtract(const Duration(days: 1));
-    }
-    return streak;
-  }
-
-  static double? _asDouble(Object? value) {
-    if (value == null) return null;
-    if (value is num) return value.toDouble();
-    return double.tryParse(value.toString());
-  }
-
-  static List<double> _replaceLatestWeight(List<double> values, double kg) {
-    final next = List<double>.from(values);
-    if (next.isEmpty) return [kg];
-    next[next.length - 1] = kg;
-    return next;
-  }
-
+  // ─── build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final topPad = MediaQuery.paddingOf(context).top;
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
-      body: RefreshIndicator(
-        color: ZveltTokens.brand,
-        onRefresh: _load,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            ZveltTokens.screenPaddingH,
-            MediaQuery.paddingOf(context).top + ZveltTokens.s4,
-            ZveltTokens.screenPaddingH,
-            ZveltMainNavBar.reservedBottomHeight(context) + ZveltTokens.s4,
-          ),
-          children: [
-            _header(),
-            const SizedBox(height: ZveltTokens.s5),
-            _coachCard(),
-            const SizedBox(height: ZveltTokens.s6),
-            const _Eyebrow('This week'),
-            const SizedBox(height: ZveltTokens.s3),
-            _streakCalendarCard(),
-            const SizedBox(height: ZveltTokens.s3),
-            _consistencyGoalSection(),
-            const SizedBox(height: ZveltTokens.s5),
-            _last14WorkoutsSection(),
-            const SizedBox(height: ZveltTokens.s3),
-            _cardioWeekCard(),
-            const SizedBox(height: ZveltTokens.s6),
-            const _Eyebrow('Muscles'),
-            const SizedBox(height: ZveltTokens.s3),
-            _muscleSection(),
-            const SizedBox(height: ZveltTokens.s6),
-            const _Eyebrow('Progress'),
-            const SizedBox(height: ZveltTokens.s3),
-            _progressCharts(),
-            const SizedBox(height: ZveltTokens.s6),
-            const _Eyebrow('Friend activity'),
-            const SizedBox(height: ZveltTokens.s3),
-            _friendCard(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Header — avatar (→ profile) + settings, then greeting block ────────────
-  Widget _header() {
-    final initial = _displayName.trim().isNotEmpty
-        ? _displayName.trim()[0].toUpperCase()
-        : 'A';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            InkWell(
-              onTap: widget.onOpenProfile,
-              customBorder: const CircleBorder(),
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFC9CDF2), Color(0xFF9AA0E8)],
-                  ),
-                  boxShadow: ZveltTokens.shadowCard,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  initial,
-                  style: ZType.h4.copyWith(color: Colors.white),
-                ),
-              ),
-            ),
-            const Spacer(),
-            _CircleButton(
-              icon: AppIcons.settings,
-              onTap: widget.onOpenSettings,
-              semanticLabel: 'Settings',
-            ),
-          ],
-        ),
-        const SizedBox(height: ZveltTokens.s5),
-        Text('$_greeting,',
-            style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
-        Row(
-          children: [
-            Flexible(
-              child: Text(
-                _displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: ZType.h1,
-              ),
-            ),
-            const SizedBox(width: ZveltTokens.s2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: ZveltTokens.surface,
-                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                boxShadow: ZveltTokens.shadowCard,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(AppIcons.bolt, size: 13, color: ZveltTokens.brand),
-                  const SizedBox(width: 5),
-                  Text(
-                    _workoutToday ? 'Logged' : 'Ready',
-                    style: ZType.monoXS.copyWith(
-                      color: ZveltTokens.text,
-                      fontWeight: FontWeight.w700,
-                      height: 1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(_todayLabel,
-            style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
-      ],
-    );
-  }
-
-  // ── Coach card — premium first action + 3D rabbit mascot ───────────────────
-  Widget _coachCard() {
-    final msg = _workoutToday
-        ? 'Nice work today. Recovery is where the muscle is built.'
-        : "Ready to move? You're 1 workout away from keeping your streak.";
-    return ZPressable(
-      onTap: _startWorkout,
-      borderRadius: BorderRadius.circular(ZveltTokens.rXl),
-      child: ZCard(
-        padding: EdgeInsets.zero,
-        radius: ZveltTokens.rXl,
-        shadow: ZveltTokens.shadowHero,
-        child: SizedBox(
-          height: 176,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                right: -28,
-                top: -34,
-                child: Container(
-                  width: 150,
-                  height: 158,
-                  decoration: BoxDecoration(
-                    color: ZveltTokens.brandTint,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 2,
-                bottom: -6,
-                child: Image.asset(
-                  'assets/mascot/m-like.png',
-                  height: 166,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                ),
-              ),
-              Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 132, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Zvelt Coach',
-                        style: ZType.bodyS.copyWith(
-                          color: ZveltTokens.brandDeep,
-                          fontWeight: FontWeight.w800,
-                          height: 1,
-                        ),
-                      ),
-                      const SizedBox(height: ZveltTokens.s2),
-                      Expanded(
-                        child: Text(
-                          msg,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: ZType.h4.copyWith(
-                            color: ZveltTokens.text,
-                            fontWeight: FontWeight.w800,
-                            height: 1.22,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: ZveltTokens.s2),
-                      Container(
-                        height: 34,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: ZveltTokens.brand,
-                          borderRadius:
-                              BorderRadius.circular(ZveltTokens.rPill),
-                          boxShadow: ZveltTokens.glowBrand,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(AppIcons.play,
-                                size: 13, color: ZveltTokens.onBrand),
-                            const SizedBox(width: 7),
-                            Text(
-                              _workoutToday ? 'Open training' : 'Start workout',
-                              style: ZType.bodyS.copyWith(
-                                color: ZveltTokens.onBrand,
-                                fontWeight: FontWeight.w800,
-                                height: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Weekly cardio strip (count · km · min + latest session). Reads the same
-  /// per-user store every cardio save writes, so it survives restarts and
-  /// works offline. Tap → the Activity calendar with the full session list.
-  Widget _streakCalendarCard() {
-    final activeDays = _trainedDayKeys.length;
-    final streakLabel = _currentStreak == 1
-        ? '1 day'
-        : _currentStreak > 1
-            ? '$_currentStreak days'
-            : 'Start today';
-    final subtitle = activeDays == 0
-        ? 'No logged days yet'
-        : '$activeDays active day${activeDays == 1 ? '' : 's'} saved';
-    final progress = (_currentStreak / 7).clamp(0.0, 1.0);
-
-    return ZCard(
-      onTap: () => Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => const StreakCalendarScreen(),
-        ),
-      ),
-      padding: const EdgeInsets.all(ZveltTokens.s4),
-      child: Row(
+      body: Stack(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFFFFC23B), Color(0xFFFF6B00)],
+          RefreshIndicator(
+            color: ZveltTokens.brand,
+            onRefresh: _load,
+            child: ListView(
+              padding: EdgeInsets.only(
+                top: topPad + 8,
+                bottom: ZveltMainNavBar.reservedBottomHeight(context),
               ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFF7A00).withValues(alpha: 0.22),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const Icon(AppIcons.flame, color: Colors.white, size: 26),
-          ),
-          const SizedBox(width: ZveltTokens.s3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Streak Calendar',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: ZType.h4.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                _header(),
+                _sessionHeader(),
+                _cardioTiles(),
+                _sectionTitle('Consistency', topPad: 18),
+                _consistencyCard(),
+                _sectionTitle('Last 14 Workouts', topPad: 22),
+                _volumeCard(),
+                _statTrio(),
+                _bodyweightCard(),
+                _sectionTitle('Muscles', topPad: 22),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: MuscleMapCard(),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: ZveltTokens.s3),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                streakLabel,
-                style: ZType.bodyM.copyWith(
-                  color: ZveltTokens.text,
-                  fontWeight: FontWeight.w800,
-                ),
+          // Day-menu popover + outside-tap barrier (layout-map ①).
+          if (_dayMenuOpen) ...[
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _dayMenuOpen = false),
               ),
-              const SizedBox(height: 7),
-              SizedBox(
-                width: 56,
-                height: 5,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: ZveltTokens.surface3,
-                        borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                      ),
-                    ),
-                    FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: progress,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF6B00),
-                          borderRadius:
-                              BorderRadius.circular(ZveltTokens.rPill),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: ZveltTokens.s2),
-          Icon(AppIcons.arrow_small_right, size: 18, color: ZveltTokens.text3),
+            ),
+            Positioned(
+              top: topPad + 54,
+              left: 22,
+              child: _dayMenu(),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _consistencyGoalSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Consistency Goal',
-          style: ZType.h4.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: ZveltTokens.s3),
-        _ConsistencyGoalCard(
-          currentStreak: _currentStreak,
-          trainedDayKeys: _trainedDayKeys,
-          targetStreak: 7,
-          onTap: () => Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => GoalsScreen(
-                initialCurrentStreak: _currentStreak,
-                initialTrainedDayKeys: _trainedDayKeys,
-                targetStreak: 7,
-              ),
+  // ① Header — "Today ▾" · avatar · streak badge
+  Widget _header() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 8, 22, 0),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _dayMenuOpen = !_dayMenuOpen),
+            borderRadius: BorderRadius.circular(10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Today', style: ZType.h1),
+                const SizedBox(width: 4),
+                AnimatedRotation(
+                  turns: _dayMenuOpen ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 220),
+                  child: Icon(AppIcons.angle_small_down,
+                      size: 20, color: ZveltTokens.text2),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _last14WorkoutsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Last 14 Workouts',
-          style: ZType.h4.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: ZveltTokens.s3),
-        _Last14WorkoutsCard(
-          stats: _last14,
-          bodyweightKg: _bodyweightKg,
-          bodyweightTrend: _bodyweightTrend,
-          onEditBodyweight: _editBodyweight,
-        ),
-      ],
-    );
-  }
-
-  Widget _cardioWeekCard() {
-    final hasCardio = _cardioCount > 0;
-    final kmStr =
-        _cardioKm >= 0.05 ? ' · ${_cardioKm.toStringAsFixed(1)} km' : '';
-    final minStr = _cardioMin > 0 ? ' · $_cardioMin min' : '';
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(builder: (_) => const ActivityCalendarScreen()),
-      ),
-      child: _Card(
-        child: Row(
-          children: [
-            Container(
+          const Spacer(),
+          InkWell(
+            onTap: widget.onOpenProfile,
+            customBorder: const CircleBorder(),
+            child: Container(
               width: 40,
               height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: ZveltTokens.brandTint,
-                borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                shape: BoxShape.circle,
+                color: ZveltTokens.chip,
+                border: Border.all(color: ZveltTokens.border, width: 1.5),
               ),
-              child: const Icon(AppIcons.running,
-                  size: 20, color: ZveltTokens.brand),
+              child: Text(_avatarInitial,
+                  style: ZType.bodyL.copyWith(fontWeight: FontWeight.w800)),
             ),
-            const SizedBox(width: ZveltTokens.s3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          const SizedBox(width: 9),
+          InkWell(
+            onTap: _openStreakCalendar,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0x26F5820A),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0x6BF5820A)),
+              ),
+              child: Row(
                 children: [
-                  Text('Cardio', style: ZType.h4),
-                  const SizedBox(height: 2),
-                  Text(
-                    hasCardio
-                        ? (_cardioLatestLine ?? 'Latest session saved')
-                        : 'No runs or rides yet this week',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-                  ),
+                  const Icon(AppIcons.flame, size: 16, color: ZveltTokens.brand),
+                  const SizedBox(width: 5),
+                  Text('$_streakCur',
+                      style: ZType.bodyM.copyWith(
+                          color: ZveltTokens.brand, fontWeight: FontWeight.w800)),
                 ],
               ),
             ),
-            const SizedBox(width: ZveltTokens.s2),
-            Text(
-              hasCardio ? '$_cardioCount$kmStr$minStr' : '0',
-              style: ZType.bodyS.copyWith(
-                color: ZveltTokens.brandDeep,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // ── Muscle map + per-muscle levels ─────────────────────────────────────────
-  Widget _muscleSection() {
-    final levels = _muscleLevels.values.where((m) => m.level > 0).toList()
-      ..sort((a, b) => b.level.compareTo(a.level));
-    return Column(
-      children: [
-        const MuscleMapCard(),
-        if (levels.isNotEmpty) ...[
-          const SizedBox(height: ZveltTokens.cardGap),
-          SizedBox(
-            height: 66,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: levels.length > 8 ? 8 : levels.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(width: ZveltTokens.s2),
-              itemBuilder: (_, i) => _MuscleLevelChip(level: levels[i]),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
+  // ① Day-menu popover — weekday + date, Open calendar, Weekly progress.
+  Widget _dayMenu() {
+    final now = DateTime.now();
+    const wk = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const mo = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    final weekday = wk[now.weekday - 1];
+    final full = '${mo[now.month - 1]} ${now.day}, ${now.year}';
 
-  // ── Collapsible progress charts (open on tap) ──────────────────────────────
-  Widget _progressCharts() {
-    return const Column(
-      children: [
-        ZCollapsibleChartCard(
-          title: 'Recent records',
-          icon: AppIcons.trophy,
-          child: RecentPrsCard(),
-        ),
-      ],
-    );
-  }
-
-  // ── Latest friend activity ─────────────────────────────────────────────────
-  Widget _friendCard() {
-    final post = _friendPost;
-    if (_loading) {
-      return const _Card(
-        child: SizedBox(
-          height: 44,
-          child: Center(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: ZveltTokens.brand),
-            ),
-          ),
-        ),
-      );
-    }
-    if (post == null) {
-      return _Card(
-        child: Row(
-          children: [
-            Icon(AppIcons.users, size: 20, color: ZveltTokens.text3),
-            const SizedBox(width: ZveltTokens.s3),
-            Expanded(
-              child: Text(
-                'No friend activity yet — add friends to see their sessions here.',
-                style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    final author = (post.authorName?.trim().isNotEmpty ?? false)
-        ? post.authorName!.trim()
-        : 'A friend';
-    final summary = _friendSummary(post);
-    return _Card(
-      onTap: widget.onOpenFeed,
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: ZveltTokens.gradBrand,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              author[0].toUpperCase(),
-              style: ZType.bodyM.copyWith(
-                color: ZveltTokens.onBrand,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: ZveltTokens.s3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    Widget row(IconData icon, String label, VoidCallback onTap) => InkWell(
+          onTap: () {
+            setState(() => _dayMenuOpen = false);
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(13),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(author,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                Icon(icon, size: 19, color: ZveltTokens.brand),
+                const SizedBox(width: 12),
+                Text(label,
                     style: ZType.bodyM.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(summary,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: ZType.bodyS.copyWith(color: ZveltTokens.text2)),
               ],
             ),
           ),
-          const SizedBox(width: ZveltTokens.s2),
-          Text(_ago(post.createdAt),
-              style: ZType.monoXS.copyWith(color: ZveltTokens.text3)),
-        ],
-      ),
-    );
-  }
+        );
 
-  String _friendSummary(SocialFeedPost post) {
-    final cap = post.caption?.trim();
-    if (cap != null && cap.isNotEmpty) return cap;
-    if (post.exercises.isNotEmpty) {
-      final n = post.exercises.length;
-      return 'Completed a workout · $n exercise${n == 1 ? '' : 's'}';
-    }
-    return 'Shared an update';
-  }
-
-  String _ago(DateTime t) {
-    final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return 'now';
-    if (d.inMinutes < 60) return '${d.inMinutes}m';
-    if (d.inHours < 24) return '${d.inHours}h';
-    return '${d.inDays}d';
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared light-mode building blocks
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _Eyebrow extends StatelessWidget {
-  const _Eyebrow(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: ZType.h4.copyWith(
-          color: ZveltTokens.text,
-          fontWeight: FontWeight.w800,
-          height: 1.15,
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 240,
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surface2Grad,
+          color: ZveltTokens.surface2,
+          borderRadius: BorderRadius.circular(ZveltTokens.rBox),
+          border: Border.all(color: ZveltTokens.border),
+          boxShadow: const [
+            BoxShadow(color: Color(0x8C000000), blurRadius: 54, offset: Offset(0, 22)),
+          ],
         ),
-      );
-}
-
-class _MuscleLevelChip extends StatelessWidget {
-  const _MuscleLevelChip({required this.level});
-  final MuscleLevel level;
-
-  String get _label {
-    final s = level.slug.replaceAll('-', ' ').trim();
-    return s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(weekday.toUpperCase(),
+                      style: ZType.eyebrow.copyWith(color: ZveltTokens.brand)),
+                  const SizedBox(height: 3),
+                  Text(full,
+                      style: ZType.bodyL.copyWith(
+                          fontSize: 17, fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+            Container(height: 1, margin: const EdgeInsets.fromLTRB(6, 0, 6, 5), color: ZveltTokens.hairline),
+            row(AppIcons.calendar, 'Open calendar', _openStreakCalendar),
+            row(AppIcons.chart_line_up, 'Weekly progress', _openProgress),
+          ],
+        ),
+      ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return ZCard(
-      padding: const EdgeInsets.symmetric(
-          horizontal: ZveltTokens.s3, vertical: ZveltTokens.s2),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+  // ③ START A SESSION + History ›
+  Widget _sessionHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
+      child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-            decoration: BoxDecoration(
-                color: ZveltTokens.brandTint,
-                borderRadius: BorderRadius.circular(ZveltTokens.rPill)),
-            child: Text('Lvl ${level.level}',
-                style: ZType.monoXS.copyWith(color: ZveltTokens.brandDeep)),
+          Text('START A SESSION',
+              style: ZType.eyebrow.copyWith(fontSize: 12)),
+          const Spacer(),
+          InkWell(
+            onTap: _openCardioHistory,
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                Text('History',
+                    style: ZType.bodyS.copyWith(
+                        color: ZveltTokens.brand, fontWeight: FontWeight.w700)),
+                const Icon(AppIcons.angle_small_right,
+                    size: 16, color: ZveltTokens.brand),
+              ],
+            ),
           ),
-          const SizedBox(height: 3),
-          Text(_label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: ZType.bodyS.copyWith(
-                  color: ZveltTokens.text,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12)),
-          Text(level.tier,
-              style: ZType.monoXS.copyWith(color: ZveltTokens.text3)),
         ],
       ),
     );
   }
-}
 
-class _ConsistencyGoalCard extends StatelessWidget {
-  const _ConsistencyGoalCard({
-    required this.currentStreak,
-    required this.trainedDayKeys,
-    required this.targetStreak,
-    required this.onTap,
-  });
-
-  final int currentStreak;
-  final Set<String> trainedDayKeys;
-  final int targetStreak;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = targetStreak <= 0
-        ? 0.0
-        : (currentStreak / targetStreak).clamp(0.0, 1.0);
-    final now = DateUtils.dateOnly(DateTime.now());
-    final monday = now.subtract(Duration(days: now.weekday - 1));
-    final weekDays = List<DateTime>.generate(
-      7,
-      (index) => monday.add(Duration(days: index)),
-    );
-    final completedThisWeek = weekDays
-        .where((day) => trainedDayKeys.contains(_HomeTabState._homeYmd(day)))
-        .length;
-    final dayLabel = currentStreak == 1 ? 'day' : 'days';
-    return ZCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1DC),
-                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-                ),
-                child: const Icon(
-                  AppIcons.flame,
-                  color: Color(0xFFFF7A00),
-                  size: 24,
-                ),
+  // ④ Run / Ride tiles
+  Widget _cardioTiles() {
+    Widget tile({
+      required String label,
+      required IconData icon,
+      required Gradient gradient,
+      required List<BoxShadow> glow,
+      required Color iconColor,
+      required VoidCallback onTap,
+    }) =>
+        Expanded(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              decoration: BoxDecoration(
+                color: ZveltTokens.chip,
+                borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                border: Border.all(color: ZveltTokens.border),
               ),
-              const SizedBox(width: ZveltTokens.s3),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: gradient,
+                      borderRadius: BorderRadius.circular(11),
+                      boxShadow: glow,
+                    ),
+                    child: Icon(icon, size: 19, color: iconColor),
+                  ),
+                  const SizedBox(width: 11),
+                  Text(label,
+                      style: ZType.bodyL.copyWith(
+                          fontSize: 14.5, fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+          ),
+        );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 11, 20, 0),
+      child: Row(
+        children: [
+          tile(
+            label: 'Run',
+            icon: AppIcons.running,
+            gradient: ZveltTokens.gradAccentDeep,
+            glow: ZveltTokens.glowSm,
+            iconColor: ZveltTokens.onBrand,
+            onTap: () => _startCardio('run'),
+          ),
+          const SizedBox(width: 10),
+          tile(
+            label: 'Ride',
+            icon: AppIcons.bike,
+            gradient: ZveltTokens.gradCardio,
+            glow: const [
+              BoxShadow(color: Color(0x61C8963C), offset: Offset(0, 5), blurRadius: 12),
+            ],
+            iconColor: const Color(0xFF3A2A12),
+            onTap: () => _startCardio('bike'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String t, {required double topPad}) => Padding(
+        padding: EdgeInsets.fromLTRB(22, topPad, 22, 0),
+        child: Text(t, style: ZType.h3),
+      );
+
+  // ⑥ Consistency card
+  Widget _consistencyCard() {
+    final today = DateUtils.dateOnly(DateTime.now());
+    const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: InkWell(
+        onTap: _openStreakCalendar,
+        borderRadius: BorderRadius.circular(ZveltTokens.rCardLg),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: ZveltTokens.surfaceGrad,
+            borderRadius: BorderRadius.circular(ZveltTokens.rCardLg),
+            border: Border.all(color: ZveltTokens.border),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0x3DF5820A), Color(0x0FF5820A)],
+                      ),
+                      borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                      border: Border.all(color: const Color(0x52F5820A)),
+                    ),
+                    child: const Icon(AppIcons.flame,
+                        size: 26, color: ZveltTokens.brand),
+                  ),
+                  const SizedBox(width: 13),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('DAY STREAK', style: ZType.eyebrow),
+                      const SizedBox(height: 3),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text('$_streakCur',
+                              style: ZType.stat.copyWith(fontSize: 30)),
+                          const SizedBox(width: 6),
+                          Text('days', style: ZType.bodyS),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('$_weekCount/$_weekGoal',
+                          style: ZType.h4.copyWith(
+                              fontSize: 22, color: ZveltTokens.brand)),
+                      const SizedBox(height: 3),
+                      Text('this week',
+                          style: ZType.monoXS.copyWith(fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 17),
+              Row(
+                children: [
+                  for (var i = 0; i < 7; i++) ...[
+                    Expanded(child: _weekDot(_weekDays[i], labels[i], today)),
+                    if (i < 6) const SizedBox(width: 7),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(height: 1, color: ZveltTokens.hairline),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Icon(AppIcons.target, size: 17, color: ZveltTokens.text2),
+                  const SizedBox(width: 8),
+                  Text('Longest $_streakLongest days',
+                      style: ZType.bodyS.copyWith(fontSize: 12.5)),
+                  const Spacer(),
+                  Text('Open calendar ›',
+                      style: ZType.bodyS.copyWith(
+                          fontSize: 12.5,
+                          color: ZveltTokens.brand,
+                          fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _weekDot(DateTime day, String label, DateTime today) {
+    final trained = _trainedDayKeys.contains(_ymd(day));
+    final isToday = day == today;
+
+    final BoxDecoration deco;
+    if (trained) {
+      deco = BoxDecoration(
+        gradient: ZveltTokens.gradAccentDeep,
+        borderRadius: BorderRadius.circular(11),
+        boxShadow: ZveltTokens.glowSm,
+      );
+    } else if (isToday) {
+      deco = BoxDecoration(
+        color: ZveltTokens.chip,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: ZveltTokens.brand, width: 2),
+      );
+    } else {
+      deco = BoxDecoration(
+        color: ZveltTokens.chip,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: ZveltTokens.border),
+      );
+    }
+
+    return Column(
+      children: [
+        AspectRatio(
+          aspectRatio: 1,
+          child: DecoratedBox(
+            decoration: deco,
+            child: trained
+                ? const Icon(AppIcons.check, size: 13, color: ZveltTokens.onBrand)
+                : null,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(label,
+            style: ZType.monoXS.copyWith(
+                fontSize: 10.5,
+                color: isToday ? ZveltTokens.brand : ZveltTokens.text3,
+                fontWeight: FontWeight.w700)),
+      ],
+    );
+  }
+
+  // ⑧ Volume card
+  Widget _volumeCard() {
+    final s = _last14;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: InkWell(
+        onTap: _openProgress,
+        borderRadius: BorderRadius.circular(ZveltTokens.rCard),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            gradient: ZveltTokens.surfaceGrad,
+            borderRadius: BorderRadius.circular(ZveltTokens.rCard),
+            border: Border.all(color: ZveltTokens.border),
+          ),
+          child: Row(
+            children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Current streak',
-                      style: ZType.bodyS.copyWith(
-                        color: ZveltTokens.text2,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
+                    Text('Volume', style: ZType.bodyS),
+                    const SizedBox(height: 6),
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
                       children: [
-                        Text(
-                          '$currentStreak',
-                          style: ZType.stat.copyWith(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            height: 0.95,
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(_fmtVolume(s.volumeKg),
+                                style: ZType.stat.copyWith(fontSize: 28)),
                           ),
                         ),
-                        const SizedBox(width: 7),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 3),
-                          child: Text(
-                            dayLabel,
-                            style: ZType.bodyS.copyWith(
-                              color: ZveltTokens.text2,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
+                        const SizedBox(width: 5),
+                        Text('kg',
+                            style: ZType.bodyM.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: ZveltTokens.text2)),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      currentStreak == 0
-                          ? 'Log one workout to begin'
-                          : '$completedThisWeek active day${completedThisWeek == 1 ? '' : 's'} this week',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(s.trendLabel,
+                            style: ZType.bodyS.copyWith(fontSize: 12.5)),
+                        const SizedBox(width: 7),
+                        Container(
+                          width: 20,
+                          height: 20,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                              color: ZveltTokens.brand, shape: BoxShape.circle),
+                          child: Icon(s.trendIcon,
+                              size: 11, color: ZveltTokens.onBrand),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              _GoalRing(progress: progress),
-            ],
-          ),
-          const SizedBox(height: ZveltTokens.s5),
-          Row(
-            children: [
-              Text(
-                '$targetStreak-day target',
-                style: ZType.bodyS.copyWith(
-                  color: ZveltTokens.text2,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${(progress * 100).round()}%',
-                style: ZType.bodyS.copyWith(
-                  color: ZveltTokens.text,
-                  fontWeight: FontWeight.w800,
+              const SizedBox(width: 14),
+              SizedBox(
+                width: 110,
+                height: 62,
+                child: CustomPaint(
+                  painter: _VolumeBarsPainter(
+                    values: s.volumeBars,
+                    track: ZveltTokens.track,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: ZveltTokens.s2),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-            child: SizedBox(
-              height: 7,
-              child: Stack(
-                fit: StackFit.expand,
+        ),
+      ),
+    );
+  }
+
+  // ⑨ Stat trio
+  Widget _statTrio() {
+    Widget box(String label, Widget value, VoidCallback onTap) => Expanded(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(ZveltTokens.rBox),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 15, 14, 15),
+              decoration: BoxDecoration(
+                gradient: ZveltTokens.surface2Grad,
+                borderRadius: BorderRadius.circular(ZveltTokens.rBox),
+                border: Border.all(color: ZveltTokens.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(color: ZveltTokens.surface3),
-                  ),
-                  FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: progress,
-                    child: const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFFFFB43B), Color(0xFFFF6B00)],
-                        ),
-                      ),
-                    ),
-                  ),
+                  Text(label,
+                      style: ZType.monoXS.copyWith(
+                          fontSize: 11.5, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  value,
                 ],
               ),
             ),
           ),
-          const SizedBox(height: ZveltTokens.s4),
-          Row(
-            children: [
-              for (var i = 0; i < 7; i++) ...[
-                Expanded(
-                  child: _StreakSlot(
-                    label: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i],
-                    filled: trainedDayKeys
-                        .contains(_HomeTabState._homeYmd(weekDays[i])),
-                    isToday: weekDays[i] == now,
+        );
+
+    final s = _last14;
+    final avg = s.avgSession;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Row(
+        children: [
+          box(
+            'Avg Session',
+            Text(
+              avg == null ? '—' : '${avg.inMinutes}m\n${avg.inSeconds % 60}s',
+              style: ZType.h4.copyWith(fontSize: 19, height: 1.15),
+            ),
+            _openProgress,
+          ),
+          const SizedBox(width: 10),
+          box(
+            'New PRs',
+            Text('$_newPrs', style: ZType.h2.copyWith(fontSize: 24)),
+            _openProgress,
+          ),
+          const SizedBox(width: 10),
+          box(
+            'Avg Burn',
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(s.avgBurnCal == null ? '—' : '${s.avgBurnCal}',
+                    style: ZType.h2.copyWith(
+                        fontSize: 24, color: ZveltTokens.brand)),
+                if (s.avgBurnCal != null) ...[
+                  const SizedBox(width: 3),
+                  Text('cal',
+                      style: ZType.monoXS.copyWith(fontWeight: FontWeight.w700)),
+                ],
+              ],
+            ),
+            _openProgress,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ⑩ Bodyweight card
+  Widget _bodyweightCard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surfaceGrad,
+          borderRadius: BorderRadius.circular(ZveltTokens.rCard),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Bodyweight', style: ZType.bodyS),
+                const Spacer(),
+                InkWell(
+                  onTap: _editBodyweight,
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: ZveltTokens.chip,
+                      border: Border.all(color: ZveltTokens.border),
+                    ),
+                    child: Icon(AppIcons.plus, size: 16, color: ZveltTokens.text),
                   ),
                 ),
-                if (i < 6) const SizedBox(width: 8),
               ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StreakSlot extends StatelessWidget {
-  const _StreakSlot({
-    required this.label,
-    required this.filled,
-    required this.isToday,
-  });
-
-  final String label;
-  final bool filled;
-  final bool isToday;
-
-  @override
-  Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 1,
-      child: AnimatedContainer(
-        duration: ZMotion.standard,
-        curve: ZMotion.emphasized,
-        decoration: BoxDecoration(
-          color: filled ? const Color(0xFFFF7A00) : ZveltTokens.surface2,
-          border: Border.all(
-            color: isToday ? ZveltTokens.brand : Colors.transparent,
-            width: isToday ? 1.5 : 1,
-          ),
-          borderRadius: BorderRadius.circular(13),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: ZType.bodyS.copyWith(
-            color: filled ? Colors.white : ZveltTokens.text3,
-            fontWeight: FontWeight.w800,
-            height: 1,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GoalRing extends StatelessWidget {
-  const _GoalRing({required this.progress});
-
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 88,
-      height: 66,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CustomPaint(
-            size: const Size(88, 66),
-            painter: _GoalRingPainter(progress: progress),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text(
-              '${(progress * 100).round()}%',
-              style: ZType.h4.copyWith(
-                color: ZveltTokens.text,
-                fontWeight: FontWeight.w800,
-                fontSize: 17,
-              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GoalRingPainter extends CustomPainter {
-  const _GoalRingPainter({required this.progress});
-
-  final double progress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(8, 6, size.width - 16, size.height + 26);
-    final bg = Paint()
-      ..color = ZveltTokens.surface3.withValues(alpha: 0.85)
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 8;
-    final fg = Paint()
-      ..color = const Color(0xFFFF6B00)
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 8;
-    canvas.drawArc(rect, math.pi, math.pi, false, bg);
-    canvas.drawArc(rect, math.pi, math.pi * progress, false, fg);
-  }
-
-  @override
-  bool shouldRepaint(covariant _GoalRingPainter oldDelegate) =>
-      oldDelegate.progress != progress;
-}
-
-class _Last14WorkoutsCard extends StatelessWidget {
-  const _Last14WorkoutsCard({
-    required this.stats,
-    required this.bodyweightKg,
-    required this.bodyweightTrend,
-    required this.onEditBodyweight,
-  });
-
-  final _Last14WorkoutStats stats;
-  final double? bodyweightKg;
-  final List<double> bodyweightTrend;
-  final VoidCallback onEditBodyweight;
-
-  @override
-  Widget build(BuildContext context) {
-    return ZCard(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: ZveltTokens.brandTint,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  _bodyweightKg == null
+                      ? '—'
+                      : _bodyweightKg!.toStringAsFixed(1),
+                  style: ZType.display,
                 ),
-                child: const Icon(
-                  AppIcons.chart_line_up,
-                  color: ZveltTokens.brand,
-                  size: 22,
+                const SizedBox(width: 6),
+                Text('kg',
+                    style: ZType.bodyL.copyWith(
+                        fontWeight: FontWeight.w700, color: ZveltTokens.text2)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text(_bodyweightStatus(_bodyweightTrend),
+                    style: ZType.bodyS.copyWith(fontSize: 12.5)),
+                const SizedBox(width: 7),
+                Container(
+                  width: 20,
+                  height: 20,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                      color: ZveltTokens.brand, shape: BoxShape.circle),
+                  child: const Icon(AppIcons.angle_small_right,
+                      size: 11, color: ZveltTokens.onBrand),
                 ),
-              ),
-              const SizedBox(width: ZveltTokens.s3),
-              Expanded(
-                child: _MetricText(
-                  label: 'Volume',
-                  value: '${_fmtKg(stats.volumeKg)} kg',
-                  sublabel: stats.volumeTrendLabel,
-                  subIcon: stats.volumeTrendIcon,
-                ),
-              ),
-              const SizedBox(width: ZveltTokens.s3),
-              SizedBox(
-                width: 126,
-                height: 62,
-                child: _WorkoutBars(values: stats.volumeBars),
-              ),
-            ],
-          ),
-          const SizedBox(height: ZveltTokens.s4),
-          Divider(height: 1, thickness: 1, color: ZveltTokens.hairline),
-          const SizedBox(height: ZveltTokens.s3),
-          Row(
-            children: [
-              Expanded(
-                child: _CompactMetricTile(
-                  label: 'Duration',
-                  value: _formatDuration(stats.duration),
-                ),
-              ),
-              const _MetricDivider(),
-              Expanded(
-                child: _CompactMetricTile(
-                  label: 'Records',
-                  value: '${stats.records}',
-                ),
-              ),
-              const _MetricDivider(),
-              Expanded(
-                child: _CompactMetricTile(
-                  label: 'Burned',
-                  value: _formatCalories(stats.burnedCalories),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: ZveltTokens.s3),
-          _BodyweightSummaryRow(
-            bodyweightKg: bodyweightKg,
-            trend: bodyweightTrend,
-            onEdit: onEditBodyweight,
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  static String _fmtKg(double value) {
-    final rounded = value.roundToDouble();
-    if ((value - rounded).abs() < 0.05) return rounded.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+  static String _fmtVolume(double v) {
+    final s = v.toStringAsFixed(1);
+    final parts = s.split('.');
+    final intPart = parts[0];
+    final buf = StringBuffer();
+    for (var i = 0; i < intPart.length; i++) {
+      if (i > 0 && (intPart.length - i) % 3 == 0) buf.write(',');
+      buf.write(intPart[i]);
+    }
+    return '$buf.${parts[1]}';
   }
-
-  static String _formatDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60);
-    final s = d.inSeconds.remainder(60);
-    if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
-    if (m > 0) return '${m}m ${s.toString().padLeft(2, '0')}s';
-    return '${s}s';
-  }
-
-  static String _formatCalories(int? calories) =>
-      calories == null ? '-- cal' : '$calories cal';
 
   static String _bodyweightStatus(List<double> values) {
     if (values.length < 2) return 'Stable Weight';
@@ -1401,127 +960,150 @@ class _Last14WorkoutsCard extends StatelessWidget {
   }
 }
 
-class _MetricDivider extends StatelessWidget {
-  const _MetricDivider();
+// ─────────────────────────────────────────────────────────────────────────────
+// Last-14 aggregates (real data behind the Volume card + stat trio)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 48,
-      margin: const EdgeInsets.symmetric(horizontal: ZveltTokens.s2),
-      color: ZveltTokens.hairline,
-    );
-  }
-}
-
-class _CompactMetricTile extends StatelessWidget {
-  const _CompactMetricTile({
-    required this.label,
-    required this.value,
+class _Last14 {
+  const _Last14({
+    required this.volumeKg,
+    required this.volumeBars,
+    required this.sessionCount,
+    required this.totalDuration,
+    required this.trendLabel,
+    required this.trendIcon,
   });
 
-  final String label;
-  final String value;
+  final double volumeKg;
+  final List<double> volumeBars; // oldest → newest, up to 14
+  final int sessionCount;
+  final Duration totalDuration;
+  final String trendLabel;
+  final IconData trendIcon;
 
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 68),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: ZType.eyebrow,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: ZType.h4.copyWith(
-              color: ZveltTokens.text,
-              fontWeight: FontWeight.w800,
-              height: 1.1,
-            ),
-          ),
-        ],
-      ),
+  Duration? get avgSession =>
+      sessionCount == 0 || totalDuration == Duration.zero
+          ? null
+          : Duration(seconds: totalDuration.inSeconds ~/ sessionCount);
+
+  /// No calorie source for gym sessions yet — honest placeholder.
+  int? get avgBurnCal => null;
+
+  static const empty = _Last14(
+    volumeKg: 0,
+    volumeBars: [],
+    sessionCount: 0,
+    totalDuration: Duration.zero,
+    trendLabel: 'No workouts yet',
+    trendIcon: AppIcons.angle_small_right,
+  );
+
+  static _Last14 fromWorkouts(Iterable<WorkoutDto> workouts) {
+    final list = workouts.toList();
+    if (list.isEmpty) return empty;
+    final bars = list.reversed.map(_volumeOf).toList();
+    final volume = bars.fold<double>(0, (a, b) => a + b);
+    var dur = Duration.zero;
+    for (final w in list) {
+      final end = w.endedAt;
+      if (end == null) continue;
+      final d = end.difference(w.startedAt);
+      if (!d.isNegative && d <= const Duration(hours: 24)) dur += d;
+    }
+    final trend = _trendFor(bars);
+    return _Last14(
+      volumeKg: volume,
+      volumeBars: bars,
+      sessionCount: list.length,
+      totalDuration: dur,
+      trendLabel: trend.$1,
+      trendIcon: trend.$2,
     );
+  }
+
+  static double _volumeOf(WorkoutDto w) {
+    var sum = 0.0;
+    for (final ex in w.exercises) {
+      for (final set in ex.sets) {
+        if (!set.isCompleted || set.tag != 'WORK') continue;
+        sum += set.weightKg * set.reps;
+      }
+    }
+    return sum;
+  }
+
+  static (String, IconData) _trendFor(List<double> bars) {
+    final nonZero = bars.where((v) => v > 0).length;
+    if (nonZero < 4) return ('Training Stable', AppIcons.angle_small_right);
+    final mid = bars.length ~/ 2;
+    final prior = bars.take(mid).fold<double>(0, (a, b) => a + b);
+    final latest = bars.skip(mid).fold<double>(0, (a, b) => a + b);
+    if (prior <= 0) return ('Trending Up', AppIcons.arrow_small_up);
+    final pct = (latest - prior) / prior;
+    if (pct < -0.12) return ('Trending Down', AppIcons.arrow_small_down);
+    if (pct > 0.12) return ('Trending Up', AppIcons.arrow_small_up);
+    return ('Training Stable', AppIcons.angle_small_right);
   }
 }
 
-class _BodyweightSummaryRow extends StatelessWidget {
-  const _BodyweightSummaryRow({
-    required this.bodyweightKg,
-    required this.trend,
-    required this.onEdit,
-  });
+/// 14 mini bars — real sessions = orange gradient (peak bar glows), missing
+/// slots = muted track (layout-map ⑧).
+class _VolumeBarsPainter extends CustomPainter {
+  const _VolumeBarsPainter({required this.values, required this.track});
 
-  final double? bodyweightKg;
-  final List<double> trend;
-  final VoidCallback onEdit;
+  final List<double> values;
+  final Color track;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-      decoration: BoxDecoration(
-        color: ZveltTokens.surface,
-        border: Border.all(color: ZveltTokens.border),
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: _MetricText(
-              label: 'Bodyweight',
-              value: bodyweightKg == null
-                  ? '-- kg'
-                  : '${bodyweightKg!.toStringAsFixed(1)} kg',
-              sublabel: _Last14WorkoutsCard._bodyweightStatus(trend),
-              subIcon: AppIcons.arrow_small_right,
-            ),
-          ),
-          const SizedBox(width: ZveltTokens.s3),
-          SizedBox(
-            width: 108,
-            height: 44,
-            child: _BodyweightSparkline(values: trend),
-          ),
-          const SizedBox(width: ZveltTokens.s2),
-          Semantics(
-            button: true,
-            label: 'Edit bodyweight',
-            child: ZPressable(
-              onTap: onEdit,
-              pressedScale: 0.94,
-              borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: ZveltTokens.brandTint,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  AppIcons.plus,
-                  color: ZveltTokens.brandDeep,
-                  size: 18,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  void paint(Canvas canvas, Size size) {
+    const count = 14;
+    const gap = 3.0;
+    final barW = (size.width - gap * (count - 1)) / count;
+    final maxV = values.fold<double>(0, (m, v) => v > m ? v : m);
+    // Right-align real bars: missing history renders as muted leading slots.
+    final offset = count - values.length;
+
+    for (var i = 0; i < count; i++) {
+      final vi = i - offset;
+      final v = (vi >= 0 && vi < values.length) ? values[vi] : 0.0;
+      final isReal = vi >= 0 && vi < values.length && v > 0;
+      final pct = (maxV <= 0 || !isReal) ? 0.0 : (v / maxV).clamp(0.0, 1.0);
+      final h = isReal ? (10 + pct * (size.height - 10)) : size.height * 0.22;
+      final x = i * (barW + gap);
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, size.height - h, barW, h),
+        const Radius.circular(3),
+      );
+      if (isReal) {
+        final paint = Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFA630), Color(0xFFEE6E08)],
+          ).createShader(rect.outerRect);
+        if (v >= maxV && maxV > 0) {
+          canvas.drawRRect(
+              rect.shift(const Offset(0, 2)),
+              Paint()
+                ..color = const Color(0x66F0780C)
+                ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+        }
+        canvas.drawRRect(rect, paint);
+      } else {
+        canvas.drawRRect(rect, Paint()..color = track);
+      }
+    }
   }
+
+  @override
+  bool shouldRepaint(covariant _VolumeBarsPainter old) =>
+      old.values != values || old.track != track;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bodyweight editor sheet (real "+" wiring — prototype marks this TBD; the
+// app already has a working entry flow, which the docs say to wire in).
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _BodyweightEditorSheet extends StatefulWidget {
   const _BodyweightEditorSheet({required this.initialKg});
@@ -1572,403 +1154,52 @@ class _BodyweightEditorSheetState extends State<_BodyweightEditorSheet> {
       padding: EdgeInsets.only(bottom: bottom),
       child: Container(
         decoration: BoxDecoration(
-          color: ZveltTokens.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
-          boxShadow: ZveltTokens.shadowFloat,
+          gradient: ZveltTokens.sheetGrad,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(ZveltTokens.rSheet)),
+          border: Border.all(color: ZveltTokens.border),
         ),
-        padding: const EdgeInsets.fromLTRB(
-          ZveltTokens.s5,
-          ZveltTokens.s5,
-          ZveltTokens.s5,
-          ZveltTokens.s6,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: ZveltTokens.brandTint,
-                    borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-                  ),
-                  child: const Icon(
-                    AppIcons.balance_scale_left,
-                    color: ZveltTokens.brand,
-                    size: 20,
-                  ),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.track,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rPill),
                 ),
-                const SizedBox(width: ZveltTokens.s3),
-                Expanded(
-                  child: Text(
-                    'Update bodyweight',
-                    style: ZType.h4.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: ZveltTokens.s5),
+            Text('Log bodyweight', style: ZType.h4.copyWith(fontSize: 19)),
+            const SizedBox(height: 20),
             TextField(
               controller: _controller,
               autofocus: true,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _save(),
+              style: ZType.bodyL,
               decoration: InputDecoration(
                 labelText: 'Bodyweight',
                 suffixText: 'kg',
                 errorText: _error,
-                filled: true,
-                fillColor: ZveltTokens.surface2,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-                  borderSide: BorderSide.none,
-                ),
               ),
             ),
-            const SizedBox(height: ZveltTokens.s5),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               height: 50,
-              child: ElevatedButton(
+              child: FilledButton(
                 onPressed: _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ZveltTokens.brand,
-                  foregroundColor: ZveltTokens.onBrand,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                  ),
-                ),
-                child: Text(
-                  'Save',
-                  style: ZType.bodyM.copyWith(
-                    color: ZveltTokens.onBrand,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                child: const Text('Save'),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MetricText extends StatelessWidget {
-  const _MetricText({
-    required this.label,
-    required this.value,
-    this.sublabel,
-    this.subIcon,
-  });
-
-  final String label;
-  final String value;
-  final String? sublabel;
-  final IconData? subIcon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: ZType.bodyS.copyWith(
-            color: ZveltTokens.text2,
-            fontWeight: FontWeight.w700,
-            height: 1.15,
-          ),
-        ),
-        const SizedBox(height: ZveltTokens.s2),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: ZType.h3.copyWith(
-            color: ZveltTokens.text,
-            fontWeight: FontWeight.w800,
-            height: 1.05,
-          ),
-        ),
-        if (sublabel != null) ...[
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              Flexible(
-                child: Text(
-                  sublabel!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
-                ),
-              ),
-              if (subIcon != null) ...[
-                const SizedBox(width: 4),
-                Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: ZveltTokens.brandTint,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(subIcon, color: ZveltTokens.brandDeep, size: 12),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _WorkoutBars extends StatelessWidget {
-  const _WorkoutBars({required this.values});
-
-  final List<double> values;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _WorkoutBarsPainter(values: values),
-    );
-  }
-}
-
-class _WorkoutBarsPainter extends CustomPainter {
-  const _WorkoutBarsPainter({required this.values});
-
-  final List<double> values;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bars = values.isEmpty ? List<double>.filled(14, 0) : values;
-    final maxV = bars.fold<double>(0, (m, v) => v > m ? v : m);
-    final count = math.max(14, bars.length);
-    const gap = 5.0;
-    final barW = math.max(4.0, (size.width - gap * (count - 1)) / count);
-    final inactive = Paint()
-      ..color = ZveltTokens.surface3.withValues(alpha: 0.85);
-    final active = Paint()..color = ZveltTokens.brand;
-    for (var i = 0; i < count; i++) {
-      final v = i < bars.length ? bars[i] : 0.0;
-      final pct = maxV <= 0 ? 0.0 : (v / maxV).clamp(0.0, 1.0);
-      final h = 12 + pct * (size.height - 16);
-      final x = i * (barW + gap);
-      final y = size.height - h;
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(x, y, barW, h),
-        Radius.circular(barW),
-      );
-      canvas.drawRRect(rect, v > 0 ? active : inactive);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _WorkoutBarsPainter oldDelegate) =>
-      oldDelegate.values != values;
-}
-
-class _BodyweightSparkline extends StatelessWidget {
-  const _BodyweightSparkline({required this.values});
-
-  final List<double> values;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _BodyweightSparklinePainter(values: values),
-    );
-  }
-}
-
-class _BodyweightSparklinePainter extends CustomPainter {
-  const _BodyweightSparklinePainter({required this.values});
-
-  final List<double> values;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final line = Paint()
-      ..color = ZveltTokens.brand
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    final baseline = Paint()
-      ..color = ZveltTokens.brand.withValues(alpha: 0.28)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final midY = size.height * 0.62;
-    canvas.drawLine(Offset(0, midY), Offset(size.width, midY), baseline);
-    if (values.length < 2) {
-      canvas.drawLine(Offset(0, midY), Offset(size.width, midY), line);
-      return;
-    }
-    final minV = values.fold<double>(values.first, (m, v) => v < m ? v : m);
-    final maxV = values.fold<double>(values.first, (m, v) => v > m ? v : m);
-    final spread = (maxV - minV).abs() < 0.1 ? 1.0 : maxV - minV;
-    final path = Path();
-    for (var i = 0; i < values.length; i++) {
-      final x = values.length == 1 ? 0.0 : size.width * i / (values.length - 1);
-      final pct = ((values[i] - minV) / spread).clamp(0.0, 1.0);
-      final y = size.height - 8 - pct * (size.height - 16);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(path, line);
-  }
-
-  @override
-  bool shouldRepaint(covariant _BodyweightSparklinePainter oldDelegate) =>
-      oldDelegate.values != values;
-}
-
-class _Last14WorkoutStats {
-  const _Last14WorkoutStats({
-    required this.volumeKg,
-    required this.duration,
-    required this.records,
-    required this.burnedCalories,
-    required this.volumeBars,
-    required this.volumeTrendLabel,
-    required this.volumeTrendIcon,
-  });
-
-  final double volumeKg;
-  final Duration duration;
-  final int records;
-  final int? burnedCalories;
-  final List<double> volumeBars;
-  final String volumeTrendLabel;
-  final IconData volumeTrendIcon;
-
-  static const empty = _Last14WorkoutStats(
-    volumeKg: 0,
-    duration: Duration.zero,
-    records: 0,
-    burnedCalories: null,
-    volumeBars: [],
-    volumeTrendLabel: 'No training yet',
-    volumeTrendIcon: AppIcons.arrow_small_right,
-  );
-
-  static _Last14WorkoutStats fromWorkouts(Iterable<WorkoutDto> workouts) {
-    final list = workouts.toList();
-    final bars = list.reversed.map(_volumeOf).toList();
-    final volume = bars.fold<double>(0, (sum, v) => sum + v);
-    final duration = list.fold<Duration>(
-      Duration.zero,
-      (sum, w) => sum + _durationOf(w),
-    );
-    final trend = _trendFor(bars);
-    return _Last14WorkoutStats(
-      volumeKg: volume,
-      duration: duration,
-      records: 0,
-      burnedCalories: null,
-      volumeBars: bars,
-      volumeTrendLabel: trend.$1,
-      volumeTrendIcon: trend.$2,
-    );
-  }
-
-  _Last14WorkoutStats copyWith({int? records}) => _Last14WorkoutStats(
-        volumeKg: volumeKg,
-        duration: duration,
-        records: records ?? this.records,
-        burnedCalories: burnedCalories,
-        volumeBars: volumeBars,
-        volumeTrendLabel: volumeTrendLabel,
-        volumeTrendIcon: volumeTrendIcon,
-      );
-
-  static double _volumeOf(WorkoutDto workout) {
-    var sum = 0.0;
-    for (final exercise in workout.exercises) {
-      for (final set in exercise.sets) {
-        if (!set.isCompleted || set.tag != 'WORK') continue;
-        sum += set.weightKg * set.reps;
-      }
-    }
-    return sum;
-  }
-
-  static Duration _durationOf(WorkoutDto workout) {
-    final end = workout.endedAt;
-    if (end == null) return Duration.zero;
-    final d = end.difference(workout.startedAt);
-    if (d.isNegative || d > const Duration(hours: 24)) return Duration.zero;
-    return d;
-  }
-
-  static (String, IconData) _trendFor(List<double> bars) {
-    final nonZero = bars.where((v) => v > 0).toList();
-    if (nonZero.length < 4) {
-      return ('Training Stable', AppIcons.arrow_small_right);
-    }
-    final mid = (bars.length / 2).floor();
-    final prior = bars.take(mid).fold<double>(0, (sum, v) => sum + v);
-    final latest = bars.skip(mid).fold<double>(0, (sum, v) => sum + v);
-    if (prior <= 0) return ('Training Up', AppIcons.arrow_small_up);
-    final pct = (latest - prior) / prior;
-    if (pct < -0.12) return ('Training Regression', AppIcons.arrow_small_down);
-    if (pct > 0.12) return ('Training Up', AppIcons.arrow_small_up);
-    return ('Training Stable', AppIcons.arrow_small_right);
-  }
-}
-
-class _Card extends StatelessWidget {
-  const _Card({required this.child, this.onTap});
-  final Widget child;
-  final VoidCallback? onTap;
-  @override
-  Widget build(BuildContext context) {
-    return ZCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(ZveltTokens.s4),
-      child: SizedBox(width: double.infinity, child: child),
-    );
-  }
-}
-
-class _CircleButton extends StatelessWidget {
-  const _CircleButton(
-      {required this.icon, this.onTap, required this.semanticLabel});
-  final IconData icon;
-  final VoidCallback? onTap;
-  final String semanticLabel;
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      child: ZPressable(
-        onTap: onTap,
-        pressedScale: 0.94,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: ZveltTokens.surface,
-            shape: BoxShape.circle,
-            boxShadow: ZveltTokens.shadowCard,
-          ),
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Icon(icon, size: 20, color: ZveltTokens.text2),
-          ),
         ),
       ),
     );
