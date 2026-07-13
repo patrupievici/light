@@ -10,7 +10,7 @@ import 'ai/ai_chat_screen.dart';
 import 'home/home_tab.dart';
 import 'nutrition/nutrition_tab.dart';
 import 'settings/settings_screen.dart';
-import 'skeleton/skeleton_profile_tab.dart';
+import 'profile/profile_tab.dart';
 import 'social/notifications_screen.dart';
 import 'social/feed_tab.dart';
 import '../screens/plan/plan_tab.dart' show PlanTab;
@@ -83,7 +83,7 @@ class _MainScreenState extends State<MainScreen> {
   void _openProfile() {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => SkeletonProfileTab(onLogout: widget.onLogout),
+        builder: (_) => ProfileTab(onLogout: widget.onLogout),
       ),
     );
   }
