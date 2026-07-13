@@ -12,7 +12,7 @@ import 'nutrition/nutrition_tab.dart';
 import 'settings/settings_screen.dart';
 import 'skeleton/skeleton_profile_tab.dart';
 import 'social/notifications_screen.dart';
-import 'social/social_plus_screen.dart';
+import 'social/feed_tab.dart';
 import '../screens/plan/plan_tab.dart' show PlanTab;
 
 /// Main shell — **4 destinations + a center AI action** (Claude Design handoff):
@@ -62,7 +62,7 @@ class _MainScreenState extends State<MainScreen> {
       case 1:
         return const PlanTab();
       case 2:
-        return const SocialPlusScreen();
+        return const FeedTab();
       case 3:
         return const NutritionTab();
       default:

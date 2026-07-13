@@ -9,6 +9,7 @@ import '../../widgets/z/z_eyebrow.dart';
 import '../../widgets/z/z_loading.dart';
 import '../../services/_crash_reporter.dart' show reportError;
 import '../../services/auth_service.dart';
+import '../../services/fasting_service.dart';
 import '../../services/nutrition_service.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/profile_service.dart';
@@ -106,7 +107,6 @@ class _NutritionTabState extends State<NutritionTab> {
   _DiaryTotals _totals = _DiaryTotals.empty;
   NutritionGoals _goals = const NutritionGoals();
   List<NutritionPlanDay> _weekPlan = const [];
-  double? _profileBodyweightKg;
   bool _loading = true;
   // First-load failure: when the whole `_load` body throws before any usable
   // data is in place we surface the shared ZveltErrorState + retry instead of
@@ -125,6 +125,28 @@ class _NutritionTabState extends State<NutritionTab> {
   DateTime _today = _midnightOf(DateTime.now());
   static DateTime _midnightOf(DateTime d) => DateTime(d.year, d.month, d.day);
   final _auth = AuthService();
+
+  // Fasting (handoff §13d) — persisted protocol + start; ring ticks live
+  // from wall-clock only while a fast is active.
+  FastingState _fasting = const FastingState(active: false, protocolHours: 16);
+  Timer? _fastTick;
+
+  void _syncFastingTicker() {
+    if (_fasting.active && _fastTick == null) {
+      _fastTick = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else if (!_fasting.active) {
+      _fastTick?.cancel();
+      _fastTick = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _fastTick?.cancel();
+    super.dispose();
+  }
 
   static double? _bodyweightFromProfileMap(Map<String, dynamic>? profile) {
     if (profile == null) return null;
@@ -212,6 +234,9 @@ class _NutritionTabState extends State<NutritionTab> {
         } catch (_) {/* non-fatal */}
       }
       profileBw ??= await _onboardingService.getSavedWeightKg();
+      try {
+        _fasting = await FastingService().load();
+      } catch (_) {/* non-fatal — card renders inactive */}
     } catch (e, st) {
       // Each fetch above has its own catchError fallback, so reaching here
       // means something unexpected threw outside those guards. Flag the load
@@ -225,7 +250,6 @@ class _NutritionTabState extends State<NutritionTab> {
           _setDay(day);
           _goals = goals;
           _weekPlan = plan;
-          _profileBodyweightKg = profileBw;
           _signedIn = signedIn;
           // Only treat as a hard failure on the FIRST load (nothing usable on
           // screen yet). A background refresh that throws keeps the existing
@@ -233,6 +257,7 @@ class _NutritionTabState extends State<NutritionTab> {
           _loadFailed = failed && showSpinner;
           _loading = false;
         });
+        _syncFastingTicker();
       }
     }
     // Auto-generate the weekly meal plan the first time Nutrition opens with no
@@ -569,69 +594,31 @@ class _NutritionTabState extends State<NutritionTab> {
     }
   }
 
-  void _showWaterDialog() async {
-    // ── Design parity: bottom sheet (not AlertDialog) with the 3-column
-    // quick-add grid (+250ml / +500ml / +1L) plus custom input.
-    final result = await showModalBottomSheet<int>(
+  Future<void> _toggleFasting() async {
+    final svc = FastingService();
+    final next = _fasting.active
+        ? await svc.end()
+        : await svc.start(protocolHours: _fasting.protocolHours);
+    if (!mounted) return;
+    setState(() => _fasting = next);
+    _syncFastingTicker();
+  }
+
+  Future<void> _openFastingSheet() async {
+    final next = await showModalBottomSheet<FastingState>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _WaterSheet(currentMl: _day.waterMl),
+      builder: (_) => _FastingSheet(state: _fasting),
     );
-    if (result != null) {
-      await _service.updateWater(result, _today);
-      // Persisted locally (server push runs in the background) — apply the
-      // new water value directly instead of a full _load() (spinner +
-      // network re-fetch).
-      if (mounted) {
-        setState(() {
-          _setDay(DailyNutrition(
-            entries: _day.entries,
-            waterMl: result,
-            weightKg: _day.weightKg,
-          ));
-        });
-      }
+    if (next != null && mounted) {
+      setState(() => _fasting = next);
+      _syncFastingTicker();
     }
   }
 
-  void _showWeightDialog() async {
-    // ── Design parity: bottom sheet with ± stepper around the big value.
-    final result = await showModalBottomSheet<double>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _WeightSheet(
-        initialKg: _day.weightKg ?? _profileBodyweightKg ?? 75,
-      ),
-    );
-    if (result != null) {
-      // Spec mandates bodyweight 30-250 kg — this value feeds the SR
-      // strength-ranking math, so 0.5 or 9999 must not reach the server.
-      if (result < 30 || result > 250) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Enter a weight between 30 and 250 kg.')),
-          );
-        }
-        return;
-      }
-      await _service.updateWeight(result, _today);
-      // Persisted locally (server push runs in the background) — apply the
-      // new weight directly instead of a full _load() (spinner + network
-      // re-fetch).
-      if (mounted) {
-        setState(() {
-          _setDay(DailyNutrition(
-            entries: _day.entries,
-            waterMl: _day.waterMl,
-            weightKg: result,
-          ));
-        });
-      }
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -709,23 +696,14 @@ class _NutritionTabState extends State<NutritionTab> {
                               const SizedBox(height: ZveltTokens.s3),
                               _MacrosRow(totals: _totals, goals: _goals),
                               const SizedBox(height: ZveltTokens.s4),
-                              Row(
-                                children: [
-                                  Expanded(
-                                      child: _WaterCard(
-                                          waterMl: _day.waterMl,
-                                          goalMl: _goals.waterMl,
-                                          onTap: _showWaterDialog)),
-                                  const SizedBox(width: ZveltTokens.s3),
-                                  Expanded(
-                                    child: _WeightCard(
-                                      displayKg:
-                                          _day.weightKg ?? _profileBodyweightKg,
-                                      loggedToday: _day.weightKg != null,
-                                      onTap: _showWeightDialog,
-                                    ),
-                                  ),
-                                ],
+                              // Fasting card (prototype §13d) — replaces the
+                              // old Water/Weight row, which is NOT in the
+                              // approved design. Water logging stays available
+                              // through the service; weight lives on Home.
+                              _FastingCard(
+                                state: _fasting,
+                                onTap: _openFastingSheet,
+                                onToggle: _toggleFasting,
                               ),
                               const SizedBox(height: ZveltTokens.s5),
                               // NutritionXpClaimCard removed: claimDayXp() is a
@@ -892,7 +870,7 @@ class _NutritionTabState extends State<NutritionTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Food', style: ZType.h1),
+                Text('Nutrition', style: ZType.h1),
                 const SizedBox(height: 2),
                 Text(
                   _foodDateLabel(),
@@ -1623,159 +1601,10 @@ class _MacroCard extends StatelessWidget {
 // WATER CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _WaterCard extends StatelessWidget {
-  const _WaterCard(
-      {required this.waterMl, required this.goalMl, required this.onTap});
-  final int waterMl;
-  final int goalMl;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = goalMl > 0 ? (waterMl / goalMl).clamp(0.0, 1.0) : 0.0;
-    return Semantics(
-      button: true,
-      label: 'Water: $waterMl of $goalMl millilitres. Tap to log water.',
-      excludeSemantics: true,
-      child: ZCard(
-        onTap: onTap,
-        padding: const EdgeInsets.all(16), // design: 16
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: ZveltTokens.info.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(ZveltTokens.rSm),
-              ),
-              child: const Icon(AppIcons.water_bottle,
-                  color: ZveltTokens.recovery, size: 18), // design: 18
-            ),
-            const SizedBox(height: ZveltTokens.s3),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  '$waterMl',
-                  style: ZType.stat
-                      .copyWith(color: ZveltTokens.recovery, fontSize: 20),
-                ),
-                const SizedBox(width: 2),
-                Text('ml',
-                    style: ZType.monoXS.copyWith(
-                      color: ZveltTokens.recovery,
-                      fontWeight: FontWeight.w600,
-                    )),
-              ],
-            ),
-            Text('/ ${goalMl}ml goal',
-                style: ZType.monoXS.copyWith(
-                  color: ZveltTokens.text2,
-                )),
-            const SizedBox(height: ZveltTokens.s2),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-              child: LinearProgressIndicator(
-                value: progress,
-                backgroundColor: ZveltTokens.surface2,
-                valueColor:
-                    const AlwaysStoppedAnimation<Color>(ZveltTokens.recovery),
-                minHeight: 4,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // WEIGHT CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _WeightCard extends StatelessWidget {
-  const _WeightCard({
-    required this.displayKg,
-    required this.loggedToday,
-    required this.onTap,
-  });
-
-  /// Greutate afișată: log azi sau, dacă lipsește, bodyweight din profil (onboarding).
-  final double? displayKg;
-  final bool loggedToday;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final subtitle = loggedToday
-        ? 'logged today'
-        : (displayKg != null ? 'from profile · tap to log' : 'tap to log');
-    final hasValue = displayKg != null;
-    return Semantics(
-      button: true,
-      label: hasValue
-          ? 'Weight: ${displayKg!.toStringAsFixed(1)} kg, $subtitle'
-          : 'Weight not logged. Tap to log.',
-      excludeSemantics: true,
-      child: ZCard(
-        onTap: onTap,
-        padding: const EdgeInsets.all(16), // design: 16
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: ZveltTokens.brandTint,
-                borderRadius: BorderRadius.circular(ZveltTokens.rSm),
-              ),
-              child: const Icon(AppIcons.balance_scale_left,
-                  color: ZveltTokens.brand, size: 18), // design: 18
-            ),
-            const SizedBox(height: ZveltTokens.s3),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  hasValue ? displayKg!.toStringAsFixed(1) : '—',
-                  style: ZType.stat.copyWith(
-                    color: hasValue ? ZveltTokens.brand : ZveltTokens.text3,
-                    fontSize: 20,
-                  ),
-                ),
-                const SizedBox(width: 2),
-                Text('kg',
-                    style: ZType.monoXS.copyWith(
-                      color: hasValue ? ZveltTokens.brand : ZveltTokens.text3,
-                      fontWeight: FontWeight.w600,
-                    )),
-              ],
-            ),
-            Text(
-              subtitle,
-              style: ZType.bodyS.copyWith(
-                color: ZveltTokens.text2,
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(height: ZveltTokens.s2),
-            Container(
-              height: 4,
-              decoration: BoxDecoration(
-                color: ZveltTokens.surface2,
-                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MEAL SECTION
@@ -4478,6 +4307,337 @@ class _ServingsDialogState extends State<_ServingsDialog> {
           child: const Text('Add'),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fasting (handoff Nutrition §13d + sheetFast)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Hero-weight fasting card: live gradient ring ("Ends in HH:MM"), Started /
+/// Ends rows, Start/End control. Tap anywhere → the protocol editor sheet.
+class _FastingCard extends StatelessWidget {
+  const _FastingCard({
+    required this.state,
+    required this.onTap,
+    required this.onToggle,
+  });
+
+  final FastingState state;
+  final VoidCallback onTap;
+  final VoidCallback onToggle;
+
+  static String _hm(DateTime? t) => t == null
+      ? '—'
+      : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final rem = state.remaining;
+    final remLabel =
+        '${rem.inHours.toString().padLeft(2, '0')}:${(rem.inMinutes % 60).toString().padLeft(2, '0')}';
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(ZveltTokens.rCardLg),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surfaceGrad,
+          borderRadius: BorderRadius.circular(ZveltTokens.rCardLg),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 118,
+              height: 118,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(
+                    size: const Size(118, 118),
+                    painter: _FastRingPainter(
+                      progress: state.active ? state.progress : 0,
+                      track: ZveltTokens.track,
+                    ),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(state.active ? 'ENDS IN' : 'FASTING',
+                          style: ZType.eyebrow.copyWith(fontSize: 9.5)),
+                      const SizedBox(height: 2),
+                      Text(state.active ? remLabel : state.protocolLabel,
+                          style: ZType.h3.copyWith(fontSize: 20)),
+                      if (state.active)
+                        Text('hrs', style: ZType.monoXS.copyWith(fontSize: 10)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Fasting', style: ZType.h3.copyWith(fontSize: 18)),
+                  const SizedBox(height: 4),
+                  Text('${state.protocolLabel} protocol',
+                      style: ZType.bodyS.copyWith(fontSize: 12.5)),
+                  const SizedBox(height: 10),
+                  _dottedRow('Started', _hm(state.startAt)),
+                  const SizedBox(height: 6),
+                  _dottedRow('Ends', _hm(state.endsAt)),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: onToggle,
+                      style: FilledButton.styleFrom(
+                        backgroundColor:
+                            state.active ? ZveltTokens.chip : ZveltTokens.brand,
+                        foregroundColor: state.active
+                            ? ZveltTokens.text
+                            : ZveltTokens.onBrand,
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        minimumSize: Size.zero,
+                        side: state.active
+                            ? BorderSide(color: ZveltTokens.borderStrong)
+                            : BorderSide.none,
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(ZveltTokens.rChip)),
+                      ),
+                      child: Text(state.active ? 'End fast' : 'Start fast',
+                          style: ZType.bodyS.copyWith(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: state.active
+                                  ? ZveltTokens.text
+                                  : ZveltTokens.onBrand)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dottedRow(String label, String value) {
+    return Row(
+      children: [
+        Text(label, style: ZType.bodyS.copyWith(fontSize: 12)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, c) => Text(
+              '·' * (c.maxWidth ~/ 6),
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              style: ZType.monoXS.copyWith(color: ZveltTokens.text4),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(value,
+            style: ZType.bodyS.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: ZveltTokens.text)),
+      ],
+    );
+  }
+}
+
+class _FastRingPainter extends CustomPainter {
+  const _FastRingPainter({required this.progress, required this.track});
+
+  final double progress;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 6;
+    final trackPaint = Paint()
+      ..color = track
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius, trackPaint);
+    if (progress <= 0) return;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final arc = Paint()
+      ..shader = const SweepGradient(
+        startAngle: -1.5708,
+        endAngle: 4.7124,
+        colors: [ZveltTokens.ringStart, ZveltTokens.ringEnd],
+      ).createShader(rect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, -1.5708, 6.2832 * progress, false, arc);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FastRingPainter old) =>
+      old.progress != progress || old.track != track;
+}
+
+/// sheetFast — protocol select (16:8 / 18:6 / 20:4), editable start time,
+/// Start/End control. Returns the new [FastingState].
+class _FastingSheet extends StatefulWidget {
+  const _FastingSheet({required this.state});
+  final FastingState state;
+
+  @override
+  State<_FastingSheet> createState() => _FastingSheetState();
+}
+
+class _FastingSheetState extends State<_FastingSheet> {
+  late int _hours = widget.state.protocolHours;
+  late DateTime _start = widget.state.startAt ?? DateTime.now();
+
+  Future<void> _pickStart() async {
+    final t = await showTimePicker(
+        context: context, initialTime: TimeOfDay.fromDateTime(_start));
+    if (t == null || !mounted) return;
+    final now = DateTime.now();
+    var candidate = DateTime(now.year, now.month, now.day, t.hour, t.minute);
+    // Never allow a start in the future (end-before-start guard).
+    if (candidate.isAfter(now)) {
+      candidate = candidate.subtract(const Duration(days: 1));
+    }
+    setState(() => _start = candidate);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final active = widget.state.active;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.sheetGrad,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(ZveltTokens.rSheet)),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.track,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                ),
+              ),
+            ),
+            Text('Fasting', style: ZType.h4.copyWith(fontSize: 19)),
+            const SizedBox(height: 16),
+            Text('PROTOCOL', style: ZType.eyebrow),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                for (final h in const [16, 18, 20]) ...[
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => setState(() => _hours = h),
+                      borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color:
+                              _hours == h ? ZveltTokens.brand : ZveltTokens.chip,
+                          borderRadius:
+                              BorderRadius.circular(ZveltTokens.rControl),
+                          border: _hours == h
+                              ? null
+                              : Border.all(color: ZveltTokens.borderStrong),
+                          boxShadow: _hours == h ? ZveltTokens.glowSm : null,
+                        ),
+                        child: Text(
+                            h == 16 ? '16:8' : (h == 18 ? '18:6' : '20:4'),
+                            style: ZType.bodyM.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: _hours == h
+                                    ? ZveltTokens.onBrand
+                                    : ZveltTokens.text)),
+                      ),
+                    ),
+                  ),
+                  if (h != 20) const SizedBox(width: 8),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('START TIME', style: ZType.eyebrow),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: _pickStart,
+              borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.chip,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                  border: Border.all(color: ZveltTokens.borderStrong),
+                ),
+                child: Row(
+                  children: [
+                    Icon(AppIcons.clock, size: 18, color: ZveltTokens.text2),
+                    const SizedBox(width: 10),
+                    Text(
+                        '${_start.hour.toString().padLeft(2, '0')}:${_start.minute.toString().padLeft(2, '0')}',
+                        style: ZType.bodyM.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: ZveltTokens.text)),
+                    const Spacer(),
+                    Text('Change',
+                        style: ZType.bodyS.copyWith(
+                            color: ZveltTokens.brand,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: FilledButton(
+                onPressed: () async {
+                  final svc = FastingService();
+                  final next = active
+                      ? await svc.end()
+                      : await svc.start(protocolHours: _hours, startAt: _start);
+                  if (context.mounted) Navigator.of(context).pop(next);
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      active ? ZveltTokens.error : ZveltTokens.brand,
+                ),
+                child: Text(active ? 'End fast' : 'Start fast'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
