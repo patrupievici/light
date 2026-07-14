@@ -248,7 +248,11 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
           ],
         );
 
-    return Row(
+    // IntrinsicHeight: equal-height cards WITHOUT CrossAxisAlignment.stretch —
+    // stretch inside a ListView gets unbounded height and blanks the whole
+    // screen below it in release builds (see flutter-layout-release-blank).
+    return IntrinsicHeight(
+      child: Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
@@ -305,6 +309,7 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
           ),
         ),
       ],
+      ),
     );
   }
 

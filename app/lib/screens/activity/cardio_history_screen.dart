@@ -528,33 +528,39 @@ class _ActivityDetailScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                        child: _statTile('Distance', dist ?? '--',
-                            unit: dist == null ? null : 'km')),
-                    const SizedBox(width: 9),
-                    Expanded(child: _statTile('Duration', s.durLabel)),
-                  ],
+                // IntrinsicHeight bounds the stretch — a bare stretch Row in a
+                // ListView blanks release screens (flutter-layout-release-blank).
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                          child: _statTile('Distance', dist ?? '--',
+                              unit: dist == null ? null : 'km')),
+                      const SizedBox(width: 9),
+                      Expanded(child: _statTile('Duration', s.durLabel)),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 9),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                          child: _statTile(
+                              s.isRide ? 'Speed' : 'Pace', s.metric)),
+                      const SizedBox(width: 9),
+                      Expanded(
                         child: _statTile(
-                            s.isRide ? 'Speed' : 'Pace', s.metric)),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: _statTile(
-                        'Calories',
-                        s.kcalEstimate > 0 ? '${s.kcalEstimate}' : '--',
-                        unit: s.kcalEstimate > 0 ? 'kcal' : null,
-                        accent: true,
+                          'Calories',
+                          s.kcalEstimate > 0 ? '${s.kcalEstimate}' : '--',
+                          unit: s.kcalEstimate > 0 ? 'kcal' : null,
+                          accent: true,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),

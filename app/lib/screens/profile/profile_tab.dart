@@ -1435,26 +1435,30 @@ class _PremiumSheetState extends State<_PremiumSheet> {
               ),
             ),
           const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _priceCard(
-                selected: !_annual,
-                onTap: () => setState(() => _annual = false),
-                label: 'Monthly',
-                price: '\$9.99',
-                sub: 'per month',
-              ),
-              const SizedBox(width: 10),
-              _priceCard(
-                selected: _annual,
-                onTap: () => setState(() => _annual = true),
-                label: 'Annual',
-                price: '\$6.99',
-                sub: 'per month, billed yearly',
-                saveBadge: true,
-              ),
-            ],
+          // IntrinsicHeight bounds the stretch — a bare stretch Row inside a
+          // scrollable blanks release screens (flutter-layout-release-blank).
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _priceCard(
+                  selected: !_annual,
+                  onTap: () => setState(() => _annual = false),
+                  label: 'Monthly',
+                  price: '\$9.99',
+                  sub: 'per month',
+                ),
+                const SizedBox(width: 10),
+                _priceCard(
+                  selected: _annual,
+                  onTap: () => setState(() => _annual = true),
+                  label: 'Annual',
+                  price: '\$6.99',
+                  sub: 'per month, billed yearly',
+                  saveBadge: true,
+                ),
+              ],
+            ),
           ),
         ],
       ),

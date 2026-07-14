@@ -486,58 +486,66 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
         );
 
+    // IntrinsicHeight: equal-height tiles WITHOUT a bare stretch Row — stretch
+    // under a ListView's unbounded height blanks the screen in release builds
+    // (flutter-layout-release-blank).
     return Column(
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: tile(
-                icon: AppIcons.chart_line_up,
-                title: 'Weight',
-                value: _weightKg == null ? '—' : _weightKg!.toStringAsFixed(1),
-                unit: 'kg',
-                sub: deltaLabel,
-                subAccent: delta != null,
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: tile(
+                  icon: AppIcons.chart_line_up,
+                  title: 'Weight',
+                  value:
+                      _weightKg == null ? '—' : _weightKg!.toStringAsFixed(1),
+                  unit: 'kg',
+                  sub: deltaLabel,
+                  subAccent: delta != null,
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: tile(
-                icon: AppIcons.gym,
-                title: 'Workouts',
-                value: '$_workoutsThisWeek',
-                unit: '/ $_weekGoal planned',
-                sub: toGo == 0
-                    ? 'Goal reached'
-                    : '$toGo session${toGo == 1 ? '' : 's'} to go',
+              const SizedBox(width: 10),
+              Expanded(
+                child: tile(
+                  icon: AppIcons.gym,
+                  title: 'Workouts',
+                  value: '$_workoutsThisWeek',
+                  unit: '/ $_weekGoal planned',
+                  sub: toGo == 0
+                      ? 'Goal reached'
+                      : '$toGo session${toGo == 1 ? '' : 's'} to go',
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: tile(
-                icon: AppIcons.flame,
-                title: 'Streak',
-                value: '$_streakCur',
-                unit: 'days',
-                sub: 'Best: $_streakLongest days',
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: tile(
+                  icon: AppIcons.flame,
+                  title: 'Streak',
+                  value: '$_streakCur',
+                  unit: 'days',
+                  sub: 'Best: $_streakLongest days',
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: tile(
-                icon: AppIcons.bolt,
-                title: 'Avg intake',
-                value: _avgIntake == null ? '—' : _fmtInt(_avgIntake!),
-                sub: 'kcal / day',
+              const SizedBox(width: 10),
+              Expanded(
+                child: tile(
+                  icon: AppIcons.bolt,
+                  title: 'Avg intake',
+                  value: _avgIntake == null ? '—' : _fmtInt(_avgIntake!),
+                  sub: 'kcal / day',
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
