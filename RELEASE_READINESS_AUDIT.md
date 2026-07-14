@@ -1,19 +1,19 @@
 # ZVELT Release Readiness Audit
 
-Audit date: 2026-07-14
+Audit date: 2026-07-15
 
-Audited code revision: `e36f69c538ba0050cfbde4ac4dc87129d40a024b`
+Audited code revision: `08960ce3fd7ccf94353d5c98894d29cb31b9266b`
 
 Production API: `https://light-l6en.onrender.com`
 Scope: Flutter client, Fastify/Prisma backend, PostgreSQL migrations, Android release artifacts, Android emulator, production API, privacy, security, accessibility, UX, product and operational launch readiness.
 
 ## 1. Executive Summary
 
-ZVELT is now materially stronger than the first audit. The previously identified critical dependency vulnerability, private-media bypass, incomplete account erasure, nutrition target mismatch, theme navigation reset, red Flutter suite, misleading Premium action, hidden strength entry point, unlabeled controls and inaccessible guest-account flow have been repaired and retested.
+ZVELT is materially stronger than the first audit. The previously identified critical dependency vulnerability, private-media bypass, incomplete account erasure, nutrition target mismatch, theme navigation reset, red Flutter suite, misleading Premium action, unlabeled controls and inaccessible guest-account flow have been repaired and retested. This follow-up also removes the redundant Home settings/strength controls, consolidates every setting under Profile and replaces the colour-banded card material with stable neutral matte surfaces.
 
 The current Android/backend candidate is suitable for an internal or tightly monitored closed beta. It is not yet ready for a public cross-platform launch tomorrow. The remaining launch blockers are concentrated outside the now-stable core API: iOS Firebase configuration is placeholder-only, no iOS release was built or device-tested, RevenueCat billing is absent, store submission was not performed, and Health/Strava/Google/camera/background behavior has not been validated on representative physical devices.
 
-No Critical issue remains in the audited Android/backend path. Four High launch issues remain. The recommendation is intentionally strict because the stated product is cross-platform and the public-launch bar includes billing, hardware integrations and both stores.
+No Critical issue remains in the audited Android/backend path. Four unconditional High launch issues remain, plus RevenueCat as a fifth High if subscriptions are part of launch. The recommendation is intentionally strict because the stated product is cross-platform and the public-launch bar includes billing, hardware integrations and both stores.
 
 ### Release Fixes Completed
 
@@ -31,49 +31,54 @@ No Critical issue remains in the audited Android/backend path. Four High launch 
 - Fixed AI Coach so normal questions never create/open a workout as a side effect.
 - Removed navigator reset on theme change and removed the global text-scale cap.
 - Added meaningful semantics and 48dp targets to the audited icon controls.
-- Made strength workout entry prominent and made the unavailable Premium surface honest and non-interactive.
+- Kept strength workout creation in Plan while removing the redundant Home CTA requested by product ownership.
+- Removed the Home settings gear and routed both Profile settings entry points to the complete shared Settings hub.
+- Added `Delete account` directly below `Sign out` in Profile Settings while retaining the existing confirmed erasure flow.
+- Moved Legal, cache reload, diagnostic reporting, diagnostics consent, social links and version details into the Settings route reached from Profile.
+- Replaced transparent coloured card gradients with neutral, nearly opaque matte surfaces and shorter shadows; verified dark and light themes on the Android emulator.
+- Removed 280 lines of duplicated Profile settings implementation and added ordering, narrow-screen, golden and card-neutrality regression tests.
 - Removed unnecessary Android broad media permission; retained camera permission only where required.
 - Added production release identification and a repeatable production smoke suite.
 
 ## 2. Overall Application Score
 
-**78 / 100**
+**80 / 100**
 
 The core Android/backend product is functional, privacy-aware and extensively tested. The score is held below release-ready range by unvalidated iOS/store/hardware paths, incomplete billing, performance uncertainty on physical devices and remaining architectural debt.
 
 ## 3. UI Score
 
-**86 / 100**
+**90 / 100**
 
-The approved visual design is consistent across Home, Plan, Feed, AI, Nutrition, Profile and Settings. Manual portrait, landscape and 1.6x text checks found no overflow in the sampled release screens. Remaining deductions cover limited 2.0x coverage, a scroll-heavy login screen and incomplete cross-platform visual validation.
+The approved visual design is consistent across Home, Plan, Feed, AI, Nutrition, Profile and Settings. The diagonal colour bands reported on Home/Profile cards are gone in the installed release APK; dark and light surfaces are neutral, readable and stable. Manual portrait, landscape and 1.6x text checks found no overflow in sampled release screens. Remaining deductions cover limited 2.0x coverage, a scroll-heavy login screen and incomplete cross-platform visual validation.
 
 ## 4. UX Score
 
-**80 / 100**
+**82 / 100**
 
-Core activation is much clearer: strength is discoverable, guest users can save their progress, existing users can sign in from onboarding, account deletion is complete, and AI no longer redirects meal questions into workout tracking. Remaining friction includes no account-data merge into an existing account, incomplete integrations and several visible future-feature surfaces.
+Core activation is clear: strength remains discoverable in Plan, Home is less cluttered, all settings now have one predictable home under Profile, guest users can save progress, account deletion is complete, and AI no longer redirects meal questions into workout tracking. Remaining friction includes no account-data merge into an existing account, incomplete integrations and several visible future-feature surfaces.
 
 ## 5. Performance Score
 
-**72 / 100**
+**74 / 100**
 
-Release builds complete, scrolling was stable on the emulator, lazy screen construction and caches are present, and production smoke completed successfully. Risk remains around a 110.6 MB universal APK, a 73.8 MB AAB, first-launch frame skips observed on the emulator, Skia being forced instead of Impeller and no physical low/mid-tier device profiling.
+Release builds complete, scrolling was stable on the emulator, lazy screen construction and caches are present, and production smoke completed successfully. The matte-card fix deliberately avoids a `BackdropFilter` on every list row and reduces card shadow blur from 18 to 10. Risk remains around a 110.6 MB universal APK, a 73.8 MB AAB, first-launch frame skips observed on the emulator, Skia being forced instead of Impeller and no physical low/mid-tier device profiling.
 
 ## 6. Accessibility Score
 
-**78 / 100**
+**79 / 100**
 
 Automated accessibility tests pass, audited controls have labels and 48dp targets, system text scaling is no longer capped, and sampled screens survived 1.6x text and landscape. A complete TalkBack/VoiceOver pass and 2.0x full-screen test matrix are still missing.
 
 ## 7. Code Quality Score
 
-**80 / 100**
+**82 / 100**
 
-Static analysis is clean, backend tests are broad, migrations are versioned, release smoke is repeatable and high-risk auth/media logic has focused regression tests. Deductions remain for 28 direct HTTP client files, 12 `$queryRawUnsafe` call sites, 28 empty catches and some dead/incomplete feature code.
+Static analysis is clean, backend tests are broad, migrations are versioned, release smoke is repeatable and high-risk auth/media logic has focused regression tests. The duplicated Profile settings sheet was deleted and the visual regression contract now covers both card themes. Deductions remain for 28 direct HTTP client files, 12 `$queryRawUnsafe` call sites, 28 empty catches and some dead/incomplete feature code.
 
 ## 8. Product Score
 
-**72 / 100**
+**74 / 100**
 
 Workout, ranking, social, nutrition, AI and account-management journeys are coherent. Product completeness is reduced by unavailable subscriptions, partial wearable/integration surfaces, English-only UI and local-only journal data.
 
@@ -85,9 +90,9 @@ Dependency audit is clean; bearer sessions, CORS, private media, deletion, token
 
 ## 10. Stability Score
 
-**89 / 100**
+**90 / 100**
 
-Flutter tests pass `209/209`; backend tests pass `837/837`; Flutter analysis and TypeScript builds are clean; production smoke passes `113/113`; account cleanup succeeds. Residual risk is dominated by devices and platforms not exercised in this Windows/Android-emulator audit.
+Flutter tests pass `212/212`; backend tests pass `837/837`; Flutter analysis and TypeScript builds are clean; production smoke passes `113/113`; account cleanup succeeds. Reinstalling the current signed release over itself preserved the guest session. Residual risk is dominated by devices, platforms and upgrade paths not fully exercised in this Windows/Android-emulator audit.
 
 ## 11. Launch Readiness Score
 
@@ -97,24 +102,40 @@ Flutter tests pass `209/209`; backend tests pass `837/837`; Flutter analysis and
 - Public Android release: close, but physical-device/store checks remain.
 - Public iOS + Android release: blocked by iOS configuration/build validation, billing and operational store readiness.
 
+### UI Technical Health
+
+| Dimension | Score (0-4) | Key finding |
+| --- | ---: | --- |
+| Accessibility | 3 | Labels/targets and scaling are good; full TalkBack/VoiceOver remains |
+| Performance | 3 | No per-card blur; physical-device profiling remains |
+| Responsive design | 3 | Narrow-phone/golden checks pass; full 2.0x matrix remains |
+| Theming | 4 | Shared tokens, dark/light parity and neutral-card regression pass |
+| Anti-patterns | 3 | Colour bands are gone; the product still uses a card-heavy vocabulary |
+| **Total** | **16/20** | **Good** |
+
+Anti-pattern verdict: **Pass with restraint recommended**. The release no longer shows random diagonal colour bands or decorative blur on repeated cards. Orange is used for active/primary states, but future screens should avoid adding more glow or nested cards.
+
 ### Verification Evidence
 
 | Check | Result |
 | --- | --- |
 | `flutter analyze` | Pass, no issues |
-| Flutter test suite | Pass, 34 files, 209 tests |
+| Flutter test suite | Pass, 34 files, 212 tests |
 | Backend TypeScript build | Pass, including `prisma generate` |
 | Backend test suite | Pass, 67 files, 837 tests |
 | Prisma schema validation | Pass |
 | Production dependency audit | 0 vulnerabilities |
 | Full backend dependency audit | 0 vulnerabilities |
-| Production smoke, release `e36f69c538ba` | 113/113 pass, 0 fail, all accounts cleaned |
-| APK release build | Pass, 115,973,081 bytes |
-| AAB release build | Pass, 77,419,356 bytes |
-| APK SHA-256 | `48D78C48632E0F6D543D596069C792457F0B022115AD8FC6A1B21234DF21F1FB` |
-| AAB SHA-256 | `F0F6D8819BEFC58ACFB79360F321195CD7B8BDA62BF93D308D43AB1DE5C090FF` |
+| Production smoke, production API | 113/113 pass, 0 fail, owner/viewer/guest accounts cleaned |
+| APK release build | Pass, 115,956,697 bytes |
+| AAB release build | Pass, 77,401,699 bytes |
+| APK SHA-256 | `4F48E5582BF73440BB894CB4AE70A40F467CFC4150FF745B11C1CDD456832236` |
+| AAB SHA-256 | `375CE026022F6F035BFF204807F2D866A28AEA5F23CB23E1E5ED3A52758C1C03` |
 | Android signing | Pass, signer `CN=Zvelt, OU=Mobile, O=Zvelt, C=RO` |
-| Manual emulator screens | Home, Plan, Feed, AI, Nutrition, Profile, Account, Delete Account, onboarding/login |
+| Manual emulator screens | Home, Profile and Profile Settings in dark/light; account actions and support footer; prior full-route matrix retained |
+| UI hierarchy contract | Home exposes no Settings gear/strength CTA; Delete account follows Sign out; support/footer controls are reachable |
+| Release reinstall | Pass: signed release installed with `adb install -r`, guest session preserved on restart |
+| Card material regression | Pass: dark/light gradients constrained to neutral channels and alpha >= `0xED` |
 | Offline restart | Pass: authenticated cached Home remained usable; requests failed without crash |
 | Rotation | Pass on sampled landscape screen |
 | Text scale | Pass at 1.6x on sampled Home/onboarding screens |
@@ -128,6 +149,7 @@ Flutter tests pass `209/209`; backend tests pass `837/837`; Flutter analysis and
 - No macOS host was available, so iOS compilation/signing could not be performed.
 - No App Store Connect or Play Console publishing action was available in this workspace.
 - No representative physical iPhone or Android handset was tested.
+- The first transition from the previously installed legacy build to this release landed in onboarding once. A second release-over-release update preserved the guest session and the issue was not reproduced; a formal legacy-version upgrade matrix is still required before public rollout.
 - Google Sign-In, Strava, HealthKit, Health Connect, camera and push delivery require external accounts/hardware and were not completed end to end.
 - Load, soak, low-memory, thermal and long-duration background tests were not run.
 
@@ -175,12 +197,12 @@ Flutter tests pass `209/209`; backend tests pass `837/837`; Flutter analysis and
 
 ### A-05: Hardware and lifecycle integrations lack a representative device matrix
 
-- Screen: Camera, HealthKit, Health Connect, Strava, push, background/foreground and low-memory recovery.
-- Description: Emulator checks cannot validate OEM camera providers, health permissions, Bluetooth/wearable behavior, APNs/FCM delivery, process death or GPU-specific rendering.
+- Screen: Camera, HealthKit, Health Connect, Strava, push, background/foreground, app upgrades and low-memory recovery.
+- Description: Emulator checks cannot validate OEM camera providers, health permissions, Bluetooth/wearable behavior, APNs/FCM delivery, process death, GPU-specific rendering or every legacy-to-current data migration. One legacy-build update entered onboarding once; current-release reinstall preserved the guest session.
 - Why it matters: These failures commonly produce one-star reviews and can affect sensitive health data.
 - Severity: **High**.
 - Steps to reproduce: Run the named flows on a low-tier Android, modern Android and two iPhone versions; evidence is currently absent.
-- Suggested solution: Establish a release matrix with physical devices and scripted expected results, including permission denial/revocation and process death.
+- Suggested solution: Establish a release matrix with physical devices and scripted expected results, including permission denial/revocation, process death and upgrades from every publicly distributed version while preserving guest/authenticated sessions and local queues.
 - Estimated implementation complexity: High, 3-5 days for the first complete pass.
 
 ### A-06: No automated real-PostgreSQL plus device release gate
@@ -342,6 +364,7 @@ Flutter tests pass `209/209`; backend tests pass `837/837`; Flutter analysis and
 - Add 2.0x tests for login, workout tracker, nutrition sheets and Profile Account.
 - Replace the first simple `$queryRawUnsafe` queries with tagged Prisma SQL and establish the pattern.
 - Add a store-track install check using the signed AAB before each release.
+- Add a staged upgrade test from every previously distributed APK and assert that guest/authenticated sessions, onboarding state and offline queues survive.
 - Record artifact size and hashes automatically in release output.
 
 ## 14. Long-Term Improvements
@@ -401,6 +424,7 @@ Flutter tests pass `209/209`; backend tests pass `837/837`; Flutter analysis and
 - Missing subscriptions or restore purchases if marketing promises Premium at launch.
 - Large download/install size, especially on constrained devices or networks.
 - First-launch jank or GPU-specific issues on low/mid-tier Android phones.
+- A legacy-version update could return a guest to onboarding; same-release reinstall passed, but the complete upgrade matrix is not yet signed off.
 - Losing guest progress when deliberately switching to an existing account, despite the new warning.
 - English-only UX in markets where localized store listings imply broader support.
 - Noisy or delayed behavior on poor networks where direct HTTP paths differ.
