@@ -39,7 +39,7 @@ export async function storyRoutes(app: FastifyInstance) {
     if (imageBase64) {
       try {
         const buf = decodePostPhotoBase64(imageBase64)
-        const rel = await saveStoryPhoto(story.id, buf)
+        const rel = await saveStoryPhoto(story.id, userId, buf)
         await prisma.story.update({ where: { id: story.id }, data: { imageUrl: rel } })
         return reply.code(201).send({ data: { ...story, imageUrl: rel } })
       } catch (err) {

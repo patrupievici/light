@@ -195,7 +195,7 @@ export async function postRoutes(app: FastifyInstance) {
     let postOut: Post = post
     if (photoBuf) {
       try {
-        const rel = await savePostPhoto(post.id, photoBuf)
+        const rel = await savePostPhoto(post.id, userId, photoBuf)
         postOut = await prisma.post.update({
           where: { id: post.id },
           data: { imageUrl: rel },

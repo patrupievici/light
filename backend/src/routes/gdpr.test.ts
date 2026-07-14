@@ -65,6 +65,7 @@ const transaction = vi.fn(async (cb: (tx: typeof txSpies) => Promise<void>) => c
 // array-form $transaction([...]) just awaits the already-issued promises.
 const userUpdate = vi.fn().mockResolvedValue({})
 const refreshTokenDeleteMany = vi.fn().mockResolvedValue({ count: 0 })
+const storedMediaDeleteMany = vi.fn().mockResolvedValue({ count: 0 })
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
@@ -75,6 +76,7 @@ vi.mock('../lib/prisma', () => ({
         : Promise.all(arg as Promise<unknown>[]),
     user: { update: (...a: unknown[]) => userUpdate(...a) },
     refreshToken: { deleteMany: (...a: unknown[]) => refreshTokenDeleteMany(...a) },
+    storedMedia: { deleteMany: (...a: unknown[]) => storedMediaDeleteMany(...a) },
     // Pre-transaction reads that collect on-disk media URLs before erasure.
     userProfile: { findUnique: vi.fn().mockResolvedValue(null) },
     post: { findMany: vi.fn().mockResolvedValue([]) },
@@ -109,6 +111,7 @@ beforeEach(() => {
   transaction.mockClear()
   userUpdate.mockClear()
   refreshTokenDeleteMany.mockClear()
+  storedMediaDeleteMany.mockClear()
   // Default OFF so the immediate-erase tests reflect production default.
   delete process.env.ZVELT_SOFT_DELETE
   revokeAllProviderConnections.mockClear()
@@ -350,6 +353,7 @@ describe('erasure completeness vs User relations (schema guard)', () => {
     'UserCustomFood', // Cascade: custom foods vanish with the account
     'UserFavoriteFood', // Cascade: favorite foods vanish with the account
     'UserRecipe', // Cascade: recipes vanish with the account
+    'StoredMedia', // Cascade: uploaded image bytes vanish with the account
   ])
 
   function modelToAccessor(model: string): string {

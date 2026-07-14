@@ -72,6 +72,7 @@ export async function mediaRoutes(app: FastifyInstance) {
     const [, entityId, extension] = parsed
     const expectedUrl = relativeUrl(kind, filename)
     let authorized = false
+    let ownerUserId: string | null = null
 
     if (kind === 'posts') {
       const post = await prisma.post.findUnique({
@@ -79,6 +80,7 @@ export async function mediaRoutes(app: FastifyInstance) {
         select: { userId: true, visibility: true, imageUrl: true },
       })
       if (post?.imageUrl === expectedUrl) {
+        ownerUserId = post.userId
         authorized =
           (await ownerIsActive(post.userId)) &&
           (await canViewerSeePost(viewerId, post))
@@ -89,6 +91,7 @@ export async function mediaRoutes(app: FastifyInstance) {
         select: { userId: true, photoUrl: true, privacyDefault: true },
       })
       if (profile?.photoUrl === expectedUrl) {
+        ownerUserId = entityId
         authorized =
           (await ownerIsActive(entityId)) &&
           (await canViewerSeeAvatar(viewerId, entityId, profile.privacyDefault))
@@ -99,6 +102,7 @@ export async function mediaRoutes(app: FastifyInstance) {
         select: { userId: true, imageUrl: true, expiresAt: true },
       })
       if (story?.imageUrl === expectedUrl) {
+        ownerUserId = story.userId
         authorized =
           story.expiresAt > new Date() &&
           (await ownerIsActive(story.userId)) &&
@@ -110,6 +114,31 @@ export async function mediaRoutes(app: FastifyInstance) {
     // not disclose whether a guessed UUID belongs to a private asset.
     if (!authorized) return notFound(reply, request.id)
 
+    const expectedContentType = mimeByExtension[extension.toLowerCase()]
+    const stored = await prisma.storedMedia.findUnique({
+      where: { key: expectedUrl },
+      select: { ownerUserId: true, kind: true, contentType: true, data: true },
+    })
+
+    reply
+      .header('Cache-Control', 'private, no-store, max-age=0')
+      .header('Pragma', 'no-cache')
+      .header('Vary', 'Authorization')
+      .header('X-Content-Type-Options', 'nosniff')
+
+    if (stored) {
+      if (
+        stored.ownerUserId !== ownerUserId ||
+        stored.kind !== kind ||
+        stored.contentType !== expectedContentType
+      ) {
+        return notFound(reply, request.id)
+      }
+      return reply.type(stored.contentType).send(Buffer.from(stored.data))
+    }
+
+    // Read legacy files only when no durable row exists. New uploads are kept
+    // in PostgreSQL so they survive stateless Render deployments.
     const kindRoot = path.resolve(uploadsRoot(), kind)
     const filePath = path.resolve(kindRoot, filename)
     if (!filePath.startsWith(`${kindRoot}${path.sep}`)) return notFound(reply, request.id)
@@ -121,13 +150,6 @@ export async function mediaRoutes(app: FastifyInstance) {
       return notFound(reply, request.id)
     }
 
-    reply
-      .header('Cache-Control', 'private, no-store, max-age=0')
-      .header('Pragma', 'no-cache')
-      .header('Vary', 'Authorization')
-      .header('X-Content-Type-Options', 'nosniff')
-      .type(mimeByExtension[extension.toLowerCase()])
-
-    return reply.send(fs.createReadStream(filePath))
+    return reply.type(expectedContentType).send(fs.createReadStream(filePath))
   })
 }

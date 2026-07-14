@@ -102,7 +102,7 @@ describe('POST /v1/stories', () => {
     })
 
     expect(res.statusCode).toBe(201)
-    expect(photo.saveStoryPhoto).toHaveBeenCalledWith('st2', expect.any(Buffer))
+    expect(photo.saveStoryPhoto).toHaveBeenCalledWith('st2', 'u1', expect.any(Buffer))
     expect(res.json().data.imageUrl).toBe('/uploads/stories/st2.jpg')
     await app.close()
   })
