@@ -22,12 +22,15 @@ describe('parseCorsOrigins', () => {
 })
 
 describe('buildCorsOrigin', () => {
-  it('empty allowlist + production → false (reject all browser origins)', () => {
+  it('empty allowlist + production or unknown environment → false', () => {
     expect(buildCorsOrigin(undefined, 'production')).toBe(false)
+    expect(buildCorsOrigin(undefined, undefined)).toBe(false)
+    expect(buildCorsOrigin(undefined, 'staging')).toBe(false)
   })
 
-  it('empty allowlist + non-production → true (dev convenience)', () => {
+  it('empty allowlist + explicit development/test → true', () => {
     expect(buildCorsOrigin(undefined, 'development')).toBe(true)
+    expect(buildCorsOrigin(undefined, 'test')).toBe(true)
   })
 
   it('non-empty allowlist → callback that allows listed origins only', () => {

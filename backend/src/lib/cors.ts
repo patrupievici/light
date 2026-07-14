@@ -8,8 +8,9 @@
  * `CORS_ORIGINS` is a comma-separated list, e.g.
  *   CORS_ORIGINS=https://app.zvelt.com,https://zvelt.app
  *
- * In non-production, if `CORS_ORIGINS` is unset we allow all origins for local
- * developer tooling. Setting `CORS_ORIGINS` always wins, in any environment.
+ * Only explicit development/test environments allow all origins when
+ * `CORS_ORIGINS` is unset. Unknown environments fail closed because some hosts
+ * do not set NODE_ENV automatically.
  */
 
 export type CorsOriginOption =
@@ -32,8 +33,8 @@ export function parseCorsOrigins(raw: string | undefined | null): string[] {
  *
  * - allowlist non-empty  → callback that allows requests with no Origin header
  *   (native mobile, server-to-server) and any origin present in the allowlist.
- * - allowlist empty + production → `false` (reject all browser origins).
- * - allowlist empty + non-production → `true` (allow all, dev convenience).
+ * - allowlist empty + development/test → `true` (local tooling convenience).
+ * - allowlist empty + any other environment → `false` (fail closed).
  */
 export function buildCorsOrigin(
   rawOrigins: string | undefined | null,
@@ -42,7 +43,7 @@ export function buildCorsOrigin(
   const allowlist = parseCorsOrigins(rawOrigins)
 
   if (allowlist.length === 0) {
-    return nodeEnv === 'production' ? false : true
+    return !isProductionLike(nodeEnv)
   }
 
   return (origin, cb) => {
@@ -55,3 +56,4 @@ export function buildCorsOrigin(
     cb(null, allowlist.includes(normalized))
   }
 }
+import { isProductionLike } from './runtime-env'

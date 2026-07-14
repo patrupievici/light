@@ -3,6 +3,7 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import helmet from '@fastify/helmet'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import rawBody from 'fastify-raw-body'
@@ -50,10 +51,13 @@ import { startChallengeEndingNotificationCron } from './services/challenge-endin
 import { startNotificationLogCleanupCron } from './services/notification-log-cleanup.service'
 import { adminRoutes } from './routes/admin'
 import { mediaRoutes } from './routes/media'
+import { isProductionLike } from './lib/runtime-env'
+
+const productionLike = isProductionLike(process.env.NODE_ENV)
 
 const app = Fastify({
   logger: {
-    level: process.env.NODE_ENV === 'production' ? 'warn' : 'info',
+    level: productionLike ? 'warn' : 'info',
   },
   genReqId: () => crypto.randomUUID(),
   /** Implicit 1 MiB — prea mic pentru POST /v1/posts cu photoBase64 (~2.4M chars la 1.8MB binar). */
@@ -84,6 +88,11 @@ async function main() {
   // ─── Plugins ──────────────────────────────────────────────────────────────
 
   const jwtSecret = resolveJwtSecret()
+
+  await app.register(helmet, {
+    // This service returns JSON and authenticated image bytes, not HTML.
+    contentSecurityPolicy: false,
+  })
 
   await app.register(cors, {
     // Allowlist from CORS_ORIGINS (comma-separated). Native mobile / no-Origin
@@ -183,7 +192,7 @@ async function main() {
     reply.code(statusCode).send({
       error: errorCode,
       message:
-        process.env.NODE_ENV === 'production' ? 'Eroare interna' : message,
+        productionLike ? 'Eroare interna' : message,
       requestId: request.id,
     })
   })
