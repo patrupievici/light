@@ -5,7 +5,6 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
-import fastifyStatic from '@fastify/static'
 import rawBody from 'fastify-raw-body'
 import { authRoutes } from './routes/auth'
 import { profileRoutes } from './routes/profile'
@@ -50,6 +49,7 @@ import { startStreakRiskNotificationCron } from './services/streak-risk-notifica
 import { startChallengeEndingNotificationCron } from './services/challenge-ending-notification.service'
 import { startNotificationLogCleanupCron } from './services/notification-log-cleanup.service'
 import { adminRoutes } from './routes/admin'
+import { mediaRoutes } from './routes/media'
 
 const app = Fastify({
   logger: {
@@ -112,11 +112,7 @@ async function main() {
   await fs.mkdir(path.join(uploadRoot, 'posts'), { recursive: true })
   await fs.mkdir(path.join(uploadRoot, 'avatars'), { recursive: true })
   await fs.mkdir(path.join(uploadRoot, 'stories'), { recursive: true })
-  await app.register(fastifyStatic, {
-    root: uploadRoot,
-    prefix: '/uploads/',
-    decorateReply: false,
-  })
+  await app.register(mediaRoutes, { prefix: '/uploads' })
 
   // ─── Health check ─────────────────────────────────────────────────────────
 
@@ -173,10 +169,21 @@ async function main() {
 
   app.setErrorHandler((error, request, reply) => {
     app.log.error(error)
-    reply.code(error.statusCode ?? 500).send({
-      error: error.code ?? 'INTERNAL_ERROR',
+    const errorLike = error as {
+      statusCode?: unknown
+      code?: unknown
+      message?: unknown
+    }
+    const statusCode =
+      typeof errorLike.statusCode === 'number' ? errorLike.statusCode : 500
+    const errorCode =
+      typeof errorLike.code === 'string' ? errorLike.code : 'INTERNAL_ERROR'
+    const message =
+      typeof errorLike.message === 'string' ? errorLike.message : 'Internal error'
+    reply.code(statusCode).send({
+      error: errorCode,
       message:
-        process.env.NODE_ENV === 'production' ? 'Eroare interna' : error.message,
+        process.env.NODE_ENV === 'production' ? 'Eroare interna' : message,
       requestId: request.id,
     })
   })

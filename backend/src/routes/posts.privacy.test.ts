@@ -146,7 +146,9 @@ describe('GET /v1/posts/:id — privacy gate on a FRIENDS-ONLY post', () => {
     expect(res.json()).toMatchObject({ error: 'NOT_FOUND' })
     // The post body must NOT leak through the gate.
     expect(res.payload).not.toContain('private gainz')
-    expect(friendshipFindFirst).toHaveBeenCalledOnce()
+    // The gate checks a bilateral block first, then accepted friendship. This
+    // prevents a stale accepted row from bypassing a newer block.
+    expect(friendshipFindFirst).toHaveBeenCalledTimes(2)
     await app.close()
   })
 

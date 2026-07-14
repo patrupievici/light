@@ -1,11 +1,12 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:zvelt_app/theme/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../config/api_config.dart';
 import '../config/map_style.dart';
 import '../models/workout_result.dart';
 import '../theme/zvelt_tokens.dart';
+import 'zvelt_network_image.dart';
 
 /// A fixed-size widget designed to be captured via [screenshot] package.
 /// Caller wraps with RepaintBoundary + ScreenshotController.
@@ -60,7 +61,8 @@ class ActivityShareCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _TopBar(result: result),
-                if (result.activityType.isGps && result.routePoints.isNotEmpty) ...[
+                if (result.activityType.isGps &&
+                    result.routePoints.isNotEmpty) ...[
                   // GPS: metric cards overlaid on the map (like the run detail).
                   const SizedBox(height: 14),
                   _ShareMetricsOverlay(result: result),
@@ -95,7 +97,8 @@ class _MapBackground extends StatelessWidget {
           bounds: bounds,
           padding: const EdgeInsets.all(32),
         ),
-        interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+        interactionOptions:
+            const InteractionOptions(flags: InteractiveFlag.none),
       ),
       children: [
         TileLayer(
@@ -167,13 +170,22 @@ class _ShareMetricsOverlay extends StatelessWidget {
 
     final cards = <Widget>[];
     if (distVal.isNotEmpty) {
-      cards.add(_ShareMetricCard(label: 'Distance', value: distVal, unit: distUnit.isEmpty ? null : distUnit));
+      cards.add(_ShareMetricCard(
+          label: 'Distance',
+          value: distVal,
+          unit: distUnit.isEmpty ? null : distUnit));
     }
     if (r.activityType.hasPace) {
-      cards.add(_ShareMetricCard(label: 'Pace', value: r.paceLabel, unit: distUnit.isEmpty ? null : '/$distUnit'));
+      cards.add(_ShareMetricCard(
+          label: 'Pace',
+          value: r.paceLabel,
+          unit: distUnit.isEmpty ? null : '/$distUnit'));
     }
     if (r.activityType.hasElevation && r.elevGainM > 0) {
-      cards.add(_ShareMetricCard(label: 'Elev. Gain', value: r.elevGainM.toStringAsFixed(0), unit: 'm'));
+      cards.add(_ShareMetricCard(
+          label: 'Elev. Gain',
+          value: r.elevGainM.toStringAsFixed(0),
+          unit: 'm'));
     }
     cards.add(_ShareMetricCard(label: 'Duration', value: r.durationLabel));
 
@@ -200,7 +212,8 @@ class _ShareMetricCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 86,
-      padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s3, vertical: ZveltTokens.s2),
+      padding: const EdgeInsets.symmetric(
+          horizontal: ZveltTokens.s3, vertical: ZveltTokens.s2),
       decoration: BoxDecoration(
         color: ZveltTokens.surface,
         borderRadius: BorderRadius.circular(ZveltTokens.rMd),
@@ -305,13 +318,14 @@ class _TopBar extends StatelessWidget {
     return Row(
       children: [
         if (result.avatarUrl != null)
-          CircleAvatar(
-            radius: 18,
-            backgroundImage: CachedNetworkImageProvider(
-              result.avatarUrl!,
-              maxWidth: 144, // 48dp @ 3x
+          ClipOval(
+            child: ZveltNetworkImage(
+              url: mediaAbsoluteUrl(result.avatarUrl),
+              width: 36,
+              height: 36,
+              cacheWidth: 144,
+              cacheHeight: 144,
             ),
-            backgroundColor: ZveltTokens.surface2,
           )
         else
           CircleAvatar(
@@ -357,8 +371,18 @@ class _TopBar extends StatelessWidget {
 
   String _formatDate(DateTime dt) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
@@ -430,7 +454,8 @@ class _StatsBlock extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: primary
-                  .map((s) => Expanded(child: _StatCell(label: s.label, value: s.value)))
+                  .map((s) => Expanded(
+                      child: _StatCell(label: s.label, value: s.value)))
                   .toList(),
             ),
             if (secondary.isNotEmpty) ...[
@@ -439,7 +464,9 @@ class _StatsBlock extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: secondary
-                    .map((s) => Expanded(child: _StatCell(label: s.label, value: s.value, small: true)))
+                    .map((s) => Expanded(
+                        child: _StatCell(
+                            label: s.label, value: s.value, small: true)))
                     .toList(),
               ),
             ],
@@ -468,8 +495,13 @@ class _StatsBlock extends StatelessWidget {
 
   List<_Stat> _secondaryStats() {
     final list = <_Stat>[];
-    if (result.elevGainM > 0) list.add(_Stat(label: 'ELEV', value: '+${result.elevGainM.toStringAsFixed(0)}m'));
-    if (result.avgHeartRate != null) list.add(_Stat(label: 'HR', value: '${result.avgHeartRate} bpm'));
+    if (result.elevGainM > 0) {
+      list.add(_Stat(
+          label: 'ELEV', value: '+${result.elevGainM.toStringAsFixed(0)}m'));
+    }
+    if (result.avgHeartRate != null) {
+      list.add(_Stat(label: 'HR', value: '${result.avgHeartRate} bpm'));
+    }
     if (list.length < 2 && result.calories > 0 && result.activityType.isGps) {
       list.add(_Stat(label: 'CALORIES', value: '${result.calories} kcal'));
     }
@@ -489,7 +521,8 @@ class _StatCell extends StatelessWidget {
   final String value;
   final bool small;
 
-  const _StatCell({required this.label, required this.value, this.small = false});
+  const _StatCell(
+      {required this.label, required this.value, this.small = false});
 
   @override
   Widget build(BuildContext context) {
@@ -550,7 +583,8 @@ class _BottomBranding extends StatelessWidget {
             decoration: BoxDecoration(
               color: ZveltTokens.warn.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-              border: Border.all(color: ZveltTokens.warn.withValues(alpha: 0.4)),
+              border:
+                  Border.all(color: ZveltTokens.warn.withValues(alpha: 0.4)),
             ),
             child: Text(
               result.rankTierUnlocked!,

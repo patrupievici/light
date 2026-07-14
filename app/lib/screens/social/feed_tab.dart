@@ -175,9 +175,8 @@ class _FeedTabState extends State<FeedTab> {
     if (hero == null) return;
     final raw = await _safe(_challenges.getStandings(hero.id));
     if (raw == null || !mounted) return;
-    final rows = (raw['data'] as List<dynamic>? ?? const [])
-        .whereType<Map>()
-        .toList();
+    final rows =
+        (raw['data'] as List<dynamic>? ?? const []).whereType<Map>().toList();
     final parsed = <(String, num, String?)>[];
     int? myRank;
     num? myPts;
@@ -214,8 +213,8 @@ class _FeedTabState extends State<FeedTab> {
     if (hero == null) return;
     Navigator.of(context)
         .push<void>(MaterialPageRoute<void>(
-            builder: (_) => ChallengeDetailScreen(
-                challengeId: hero.id, title: hero.title)))
+            builder: (_) =>
+                ChallengeDetailScreen(challengeId: hero.id, title: hero.title)))
         .then((_) => _load());
   }
 
@@ -257,7 +256,8 @@ class _FeedTabState extends State<FeedTab> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await _challenges.joinChallenge(inv.id);
-      messenger.showSnackBar(const SnackBar(content: Text('Challenge accepted')));
+      messenger
+          .showSnackBar(const SnackBar(content: Text('Challenge accepted')));
     } catch (e) {
       messenger.showSnackBar(SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
@@ -407,9 +407,8 @@ class _FeedTabState extends State<FeedTab> {
                         overflow: TextOverflow.ellipsis,
                         style: ZType.bodyS.copyWith(
                             fontSize: 11,
-                            fontWeight: _tab == i
-                                ? FontWeight.w700
-                                : FontWeight.w600,
+                            fontWeight:
+                                _tab == i ? FontWeight.w700 : FontWeight.w600,
                             color: _tab == i
                                 ? ZveltTokens.onBrand
                                 : ZveltTokens.text2)),
@@ -460,8 +459,8 @@ class _FeedTabState extends State<FeedTab> {
                     fontWeight: FontWeight.w800,
                     color: ZveltTokens.onBrand)),
             Text(l,
-                style: ZType.monoXS.copyWith(
-                    fontSize: 10.5, color: const Color(0xCCFFFFFF))),
+                style: ZType.monoXS
+                    .copyWith(fontSize: 10.5, color: const Color(0xCCFFFFFF))),
           ],
         );
 
@@ -519,7 +518,9 @@ class _FeedTabState extends State<FeedTab> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
-                              daysLeft <= 0 ? 'ends today' : '$daysLeft days left',
+                              daysLeft <= 0
+                                  ? 'ends today'
+                                  : '$daysLeft days left',
                               style: ZType.monoXS.copyWith(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -590,8 +591,8 @@ class _FeedTabState extends State<FeedTab> {
       child: Row(
         children: [
           Text(title,
-              style: ZType.bodyL.copyWith(
-                  fontSize: 16, fontWeight: FontWeight.w700)),
+              style: ZType.bodyL
+                  .copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
           const Spacer(),
           InkWell(
             onTap: onTap,
@@ -623,9 +624,8 @@ class _FeedTabState extends State<FeedTab> {
                   color: isMe ? const Color(0x24F5820A) : ZveltTokens.chip,
                   borderRadius: BorderRadius.circular(ZveltTokens.rChip),
                   border: Border.all(
-                      color: isMe
-                          ? const Color(0x66F5820A)
-                          : ZveltTokens.border),
+                      color:
+                          isMe ? const Color(0x66F5820A) : ZveltTokens.border),
                 ),
                 child: Row(
                   children: [
@@ -644,8 +644,8 @@ class _FeedTabState extends State<FeedTab> {
                               .copyWith(fontWeight: FontWeight.w700)),
                     ),
                     Text('${_fmtNum(_standings[i].$2.round())} pts',
-                        style: ZType.bodyS.copyWith(
-                            fontWeight: FontWeight.w700)),
+                        style:
+                            ZType.bodyS.copyWith(fontWeight: FontWeight.w700)),
                   ],
                 ),
               );
@@ -761,8 +761,7 @@ class _FeedTabState extends State<FeedTab> {
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               decoration: BoxDecoration(
                 color: ZveltTokens.chip,
                 borderRadius: BorderRadius.circular(ZveltTokens.rChip),
@@ -771,8 +770,8 @@ class _FeedTabState extends State<FeedTab> {
               child: Text(detail,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: ZType.bodyM.copyWith(
-                      fontSize: 13.5, fontWeight: FontWeight.w700)),
+                  style: ZType.bodyM
+                      .copyWith(fontSize: 13.5, fontWeight: FontWeight.w700)),
             ),
           ],
           const SizedBox(height: 12),
@@ -802,7 +801,8 @@ class _FeedTabState extends State<FeedTab> {
                   borderRadius: BorderRadius.circular(8),
                   child: Row(
                     children: [
-                      Icon(AppIcons.comment_alt, size: 18, color: ZveltTokens.text2),
+                      Icon(AppIcons.comment_alt,
+                          size: 18, color: ZveltTokens.text2),
                       const SizedBox(width: 6),
                       Text('${p.commentCount}',
                           style: ZType.bodyS.copyWith(
@@ -827,8 +827,8 @@ class _FeedTabState extends State<FeedTab> {
                 onTap: () => _openCreate(),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: const Color(0x24F5820A),
                     borderRadius: BorderRadius.circular(12),
@@ -883,7 +883,7 @@ class _FeedTabState extends State<FeedTab> {
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
       child: Row(
         children: [
-          tile('Post workout', _postWorkout),
+          tile('Create post', _postWorkout),
           const SizedBox(width: 8),
           tile('Find friends', _findFriends),
           const SizedBox(width: 8),
@@ -1102,9 +1102,8 @@ class _FeedTabState extends State<FeedTab> {
     // strength PRs, so All/Strength show the real list; the other
     // categories show the honest empty card until data exists.
     const cats = ['All', 'Strength', 'Volume', 'Reps', 'Streaks', 'Body'];
-    final shown = _prCat == 'All' || _prCat == 'Strength'
-        ? _prs
-        : const <RecentPr>[];
+    final shown =
+        _prCat == 'All' || _prCat == 'Strength' ? _prs : const <RecentPr>[];
 
     return [
       SizedBox(
@@ -1120,8 +1119,8 @@ class _FeedTabState extends State<FeedTab> {
                   onTap: () => setState(() => _prCat = c),
                   borderRadius: BorderRadius.circular(ZveltTokens.rChip),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: _prCat == c ? ZveltTokens.brand : ZveltTokens.chip,
                       borderRadius: BorderRadius.circular(ZveltTokens.rChip),
@@ -1192,8 +1191,8 @@ class _FeedTabState extends State<FeedTab> {
                 child: Text(pr.exerciseName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: ZType.bodyL.copyWith(
-                        fontSize: 16, fontWeight: FontWeight.w800)),
+                    style: ZType.bodyL
+                        .copyWith(fontSize: 16, fontWeight: FontWeight.w800)),
               ),
               Container(
                 padding:
@@ -1221,12 +1220,12 @@ class _FeedTabState extends State<FeedTab> {
                   pr.previousBestKg > 0
                       ? 'Previous ${pr.previousBestKg.toStringAsFixed(1)} kg'
                       : 'First recorded set',
-                  style: ZType.bodyS.copyWith(
-                      fontSize: 12, fontWeight: FontWeight.w600)),
+                  style: ZType.bodyS
+                      .copyWith(fontSize: 12, fontWeight: FontWeight.w600)),
               const SizedBox(width: 14),
               Text('e1RM ${e1rm.toStringAsFixed(1)} kg',
-                  style: ZType.bodyS.copyWith(
-                      fontSize: 12, fontWeight: FontWeight.w600)),
+                  style: ZType.bodyS
+                      .copyWith(fontSize: 12, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 13),
@@ -1257,8 +1256,8 @@ class _FeedTabState extends State<FeedTab> {
               const SizedBox(width: 9),
               Expanded(
                 child: InkWell(
-                  onTap: () => _openCreate(
-                      scoringType: 'pr', exerciseId: pr.exerciseId),
+                  onTap: () =>
+                      _openCreate(scoringType: 'pr', exerciseId: pr.exerciseId),
                   borderRadius: BorderRadius.circular(13),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 11),
@@ -1292,7 +1291,20 @@ class _FeedTabState extends State<FeedTab> {
     }
     final top = best.values.toList()
       ..sort((a, b) => b.weightKg.compareTo(a.weightKg));
-    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const mo = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
@@ -1307,8 +1319,7 @@ class _FeedTabState extends State<FeedTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Friends PR Leaderboard · ${mo[DateTime.now().month - 1]}',
-                style:
-                    ZType.bodyM.copyWith(fontWeight: FontWeight.w700)),
+                style: ZType.bodyM.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             for (final pr in top.take(3)) ...[
               Padding(
@@ -1324,8 +1335,7 @@ class _FeedTabState extends State<FeedTab> {
                               fontSize: 12, fontWeight: FontWeight.w600)),
                     ),
                     Expanded(
-                      child: Text(
-                          'You · ${pr.weightKg.toStringAsFixed(0)} kg',
+                      child: Text('You · ${pr.weightKg.toStringAsFixed(0)} kg',
                           style: ZType.bodyS.copyWith(
                               fontWeight: FontWeight.w700,
                               color: ZveltTokens.text)),
@@ -1347,8 +1357,8 @@ class _FeedTabState extends State<FeedTab> {
       Padding(
         padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
         child: Text('Hall of Fame',
-            style:
-                ZType.bodyL.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
+            style: ZType.bodyL
+                .copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
       ),
       if (_fame.isEmpty && !_loading)
         Container(
@@ -1444,12 +1454,12 @@ class _FeedTabState extends State<FeedTab> {
             child: Text(isMe ? '${e.label} (you)' : e.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: ZType.bodyM.copyWith(
-                    fontSize: 14.5, fontWeight: FontWeight.w700)),
+                style: ZType.bodyM
+                    .copyWith(fontSize: 14.5, fontWeight: FontWeight.w700)),
           ),
           Text('${_fmtNum(e.lpSeason)} pts',
-              style: ZType.bodyS.copyWith(
-                  fontSize: 12.5, fontWeight: FontWeight.w700)),
+              style: ZType.bodyS
+                  .copyWith(fontSize: 12.5, fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -1476,8 +1486,7 @@ class _FeedTabState extends State<FeedTab> {
         children: [
           for (final pr in top.take(4))
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               decoration: BoxDecoration(
                 gradient: ZveltTokens.surface2Grad,
                 borderRadius: BorderRadius.circular(ZveltTokens.rControl),
@@ -1493,8 +1502,8 @@ class _FeedTabState extends State<FeedTab> {
                       style: ZType.monoXS.copyWith(fontSize: 11.5)),
                   const SizedBox(height: 4),
                   Text('${pr.weightKg.toStringAsFixed(0)} kg',
-                      style: ZType.bodyL.copyWith(
-                          fontSize: 15, fontWeight: FontWeight.w800)),
+                      style: ZType.bodyL
+                          .copyWith(fontSize: 15, fontWeight: FontWeight.w800)),
                   Text('You',
                       style: ZType.bodyS.copyWith(
                           fontSize: 12,
@@ -1558,8 +1567,8 @@ class _FeedTabState extends State<FeedTab> {
             borderRadius: BorderRadius.circular(ZveltTokens.rBox),
             border: Border.all(color: ZveltTokens.borderStrong),
           ),
-          child: Text('No challenges yet — create one above.',
-              style: ZType.bodyS),
+          child:
+              Text('No challenges yet — create one above.', style: ZType.bodyS),
         ),
     ];
   }
@@ -1567,8 +1576,8 @@ class _FeedTabState extends State<FeedTab> {
   Widget _challengeSectionTitle(String t) => Padding(
         padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
         child: Text(t,
-            style:
-                ZType.bodyL.copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
+            style: ZType.bodyL
+                .copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
       );
 
   // Create-a-challenge banner (HTML 570): orange gradient, plus box, copy.
@@ -1650,8 +1659,8 @@ class _FeedTabState extends State<FeedTab> {
       child: InkWell(
         onTap: () => Navigator.of(context)
             .push<void>(MaterialPageRoute<void>(
-                builder: (_) => ChallengeDetailScreen(
-                    challengeId: c.id, title: c.title)))
+                builder: (_) =>
+                    ChallengeDetailScreen(challengeId: c.id, title: c.title)))
             .then((_) => _load()),
         borderRadius: BorderRadius.circular(ZveltTokens.rCardSm),
         child: Container(
@@ -1701,7 +1710,9 @@ class _FeedTabState extends State<FeedTab> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
-                              daysLeft <= 0 ? 'ends today' : '${daysLeft}d left',
+                              daysLeft <= 0
+                                  ? 'ends today'
+                                  : '${daysLeft}d left',
                               style: ZType.monoXS.copyWith(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -1753,8 +1764,8 @@ class _FeedTabState extends State<FeedTab> {
                   Text(c.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: ZType.bodyM.copyWith(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
+                      style: ZType.bodyM
+                          .copyWith(fontSize: 14, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 2),
                   Text(
                     result ??
@@ -1824,7 +1835,6 @@ class _FeedTabState extends State<FeedTab> {
     Color(0xFFB060C0),
   ];
 
-  static Color _avatarColor(String seed) =>
-      _avatarPalette[seed.codeUnits.fold<int>(0, (a, b) => a + b) %
-          _avatarPalette.length];
+  static Color _avatarColor(String seed) => _avatarPalette[
+      seed.codeUnits.fold<int>(0, (a, b) => a + b) % _avatarPalette.length];
 }

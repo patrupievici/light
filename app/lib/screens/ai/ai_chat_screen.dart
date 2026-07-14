@@ -94,18 +94,20 @@ class _AiChatScreenState extends State<AiChatScreen> {
       String reply;
       if (trainer is Map) {
         final answer = (trainer['answer'] as String? ?? '').trim();
-        final nextSessionFocus = ((trainer['nextSessionFocus'] as List?) ?? const [])
-            .map((e) => e.toString())
-            .where((e) => e.isNotEmpty)
-            .toList();
+        final nextSessionFocus =
+            ((trainer['nextSessionFocus'] as List?) ?? const [])
+                .map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .toList();
         final risksToWatch = ((trainer['risksToWatch'] as List?) ?? const [])
             .map((e) => e.toString())
             .where((e) => e.isNotEmpty)
             .toList();
-        final microPlan7Days = ((trainer['microPlan7Days'] as List?) ?? const [])
-            .map((e) => e.toString())
-            .where((e) => e.isNotEmpty)
-            .toList();
+        final microPlan7Days =
+            ((trainer['microPlan7Days'] as List?) ?? const [])
+                .map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .toList();
 
         final buffer = StringBuffer();
         buffer.writeln(answer.isEmpty ? '(no reply)' : answer);
@@ -145,7 +147,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('New workout created from AI plan. Opening tracker...'),
+            content:
+                Text('New workout created from AI plan. Opening tracker...'),
           ),
         );
         await Navigator.of(context).push<void>(
@@ -162,11 +165,13 @@ class _AiChatScreenState extends State<AiChatScreen> {
       final msg = e.isTimeout
           ? 'Zvelt is taking a moment to think. Try again.'
           : "Couldn't reach the coach right now.";
-      setState(() => _msgs.add(_Msg(role: 'error', text: msg, isTimeout: e.isTimeout)));
+      setState(() =>
+          _msgs.add(_Msg(role: 'error', text: msg, isTimeout: e.isTimeout)));
     } catch (e, st) {
       reportError(e, st, reason: 'ai_chat:send');
       if (!mounted) return;
-      setState(() => _msgs.add(_Msg(role: 'error', text: "Couldn't reach the coach right now.")));
+      setState(() => _msgs.add(
+          _Msg(role: 'error', text: "Couldn't reach the coach right now.")));
     } finally {
       if (mounted) setState(() => _busy = false);
       _scrollBottom();
@@ -278,9 +283,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
               Text('ZVELT Coach', style: ZType.h4),
               const SizedBox(height: 1),
               Text(
-                '● Online · AI-assisted',
-                style: ZType.monoS
-                    .copyWith(color: ZveltTokens.brand, height: 1.2),
+                'AI-assisted coaching',
+                style:
+                    ZType.monoS.copyWith(color: ZveltTokens.brand, height: 1.2),
               ),
             ],
           ),
@@ -363,20 +368,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 GestureDetector(
                   onTap: _busy ? null : () => _send(preset: preset),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 9),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                     decoration: BoxDecoration(
                       color: ZveltTokens.chip,
-                      borderRadius:
-                          BorderRadius.circular(ZveltTokens.rControl),
+                      borderRadius: BorderRadius.circular(ZveltTokens.rControl),
                       border: Border.all(color: ZveltTokens.border),
                     ),
                     child: Text(
                       label,
                       style: ZType.monoS.copyWith(
-                          fontSize: 12.5,
-                          color: ZveltTokens.text,
-                          height: 1.2),
+                          fontSize: 12.5, color: ZveltTokens.text, height: 1.2),
                     ),
                   ),
                 ),
@@ -512,10 +514,11 @@ class _TypingDots extends StatefulWidget {
   State<_TypingDots> createState() => _TypingDotsState();
 }
 
-class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-        ..repeat();
+class _TypingDotsState extends State<_TypingDots>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 900))
+    ..repeat();
 
   @override
   void dispose() {
@@ -544,7 +547,8 @@ class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderState
             mainAxisSize: MainAxisSize.min,
             children: List.generate(3, (i) {
               final t = ((_c.value + i * 0.2) % 1.0);
-              final opacity = 0.3 + 0.7 * (1 - (2 * t - 1).abs()).clamp(0.0, 1.0);
+              final opacity =
+                  0.3 + 0.7 * (1 - (2 * t - 1).abs()).clamp(0.0, 1.0);
               return Padding(
                 padding: EdgeInsets.only(right: i < 2 ? 6 : 0),
                 child: Opacity(
@@ -569,7 +573,8 @@ class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderState
 
 /// Slim inline card with a Retry button shown when an AI call fails.
 class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message, required this.isTimeout, this.onRetry});
+  const _ErrorCard(
+      {required this.message, required this.isTimeout, this.onRetry});
   final String message;
   final bool isTimeout;
   final VoidCallback? onRetry;
@@ -586,13 +591,13 @@ class _ErrorCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(isTimeout ? AppIcons.clock : AppIcons.cloud_disabled, color: accent, size: 18),
+          Icon(isTimeout ? AppIcons.clock : AppIcons.cloud_disabled,
+              color: accent, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: ZType.bodyS
-                  .copyWith(color: ZveltTokens.text, height: 1.4),
+              style: ZType.bodyS.copyWith(color: ZveltTokens.text, height: 1.4),
             ),
           ),
           TextButton(

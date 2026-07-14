@@ -18,6 +18,7 @@ import '../../widgets/zvelt_main_nav_bar.dart';
 import '../activity/cardio_history_screen.dart';
 import '../analytics/progress_screen.dart';
 import '../outdoor/outdoor_track_screen.dart';
+import '../workouts/workout_tracker_screen.dart';
 import 'consistency_screen.dart';
 
 /// HOME / TODAY — 1:1 with the ZVELT handoff prototype (`zvelt-home-ux`).
@@ -67,6 +68,7 @@ class _HomeTabState extends State<HomeTab> {
 
   bool _loading = true;
   bool _dayMenuOpen = false;
+  bool _startingStrengthWorkout = false;
 
   String _avatarInitial = 'A';
   Set<String> _trainedDayKeys = const {};
@@ -154,7 +156,8 @@ class _HomeTabState extends State<HomeTab> {
     final completedWorkouts = (workoutsRes?.data ?? const <WorkoutDto>[])
         .where((w) => w.status != 'draft')
         .toList()
-      ..sort((a, b) => (b.endedAt ?? b.startedAt).compareTo(a.endedAt ?? a.startedAt));
+      ..sort((a, b) =>
+          (b.endedAt ?? b.startedAt).compareTo(a.endedAt ?? a.startedAt));
     final trainedKeys = <String>{
       for (final w in completedWorkouts)
         _ymd(DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal())),
@@ -176,9 +179,8 @@ class _HomeTabState extends State<HomeTab> {
     // Avg Burn — MET estimate per cardio session (last 14 sessions), same
     // formula as ProgressScreen's "Calories burned" chart, with the user's
     // real bodyweight (fallback 70 kg only when no weight exists).
-    final burnBodyweight = weightTrend.isNotEmpty
-        ? weightTrend.last
-        : (profileBodyweight ?? 70.0);
+    final burnBodyweight =
+        weightTrend.isNotEmpty ? weightTrend.last : (profileBodyweight ?? 70.0);
     final cardioSessions = <(String, ManualCardioSession)>[
       for (final e in cardioByDay.entries)
         for (final s in e.value) (e.key, s),
@@ -222,7 +224,9 @@ class _HomeTabState extends State<HomeTab> {
 
   static int _currentStreakFrom(Set<String> trained, DateTime today) {
     var day = today;
-    if (!trained.contains(_ymd(day))) day = day.subtract(const Duration(days: 1));
+    if (!trained.contains(_ymd(day))) {
+      day = day.subtract(const Duration(days: 1));
+    }
     var streak = 0;
     while (trained.contains(_ymd(day))) {
       streak++;
@@ -299,6 +303,34 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
+  Future<void> _startStrengthWorkout() async {
+    if (_startingStrengthWorkout) return;
+    setState(() => _startingStrengthWorkout = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final workout = await _workouts.createWorkout(label: 'Strength workout');
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => WorkoutTrackerScreen(
+            workoutId: workout.id,
+            onComplete: _load,
+          ),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: ZveltTokens.error,
+      ));
+    } finally {
+      if (mounted) {
+        setState(() => _startingStrengthWorkout = false);
+        await _load();
+      }
+    }
+  }
+
   Future<void> _editBodyweight() async {
     final messenger = ScaffoldMessenger.of(context);
     final nextKg = await showModalBottomSheet<double>(
@@ -319,7 +351,8 @@ class _HomeTabState extends State<HomeTab> {
         await _profile.updateProfile(bodyweightKg: nextKg);
       } catch (_) {/* nutrition log stays the local source of truth */}
       if (!mounted) return;
-      messenger.showSnackBar(const SnackBar(content: Text('Bodyweight updated')));
+      messenger
+          .showSnackBar(const SnackBar(content: Text('Bodyweight updated')));
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -348,9 +381,9 @@ class _HomeTabState extends State<HomeTab> {
               ),
               children: [
                 _header(),
-                if (_liveStats?.isTracking ?? false)
-                  _resumeBanner(_liveStats!),
+                if (_liveStats?.isTracking ?? false) _resumeBanner(_liveStats!),
                 _sessionHeader(),
+                _strengthWorkoutCta(),
                 _cardioTiles(),
                 _sectionTitle('Consistency', topPad: 18),
                 _consistencyCard(),
@@ -409,20 +442,26 @@ class _HomeTabState extends State<HomeTab> {
             ),
           ),
           const Spacer(),
-          InkWell(
-            onTap: widget.onOpenProfile,
-            customBorder: const CircleBorder(),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: ZveltTokens.chip,
-                border: Border.all(color: ZveltTokens.border, width: 1.5),
+          Semantics(
+            button: true,
+            label: 'Open profile',
+            child: ExcludeSemantics(
+              child: InkWell(
+                onTap: widget.onOpenProfile,
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ZveltTokens.chip,
+                    border: Border.all(color: ZveltTokens.border, width: 1.5),
+                  ),
+                  child: Text(_avatarInitial,
+                      style: ZType.bodyL.copyWith(fontWeight: FontWeight.w800)),
+                ),
               ),
-              child: Text(_avatarInitial,
-                  style: ZType.bodyL.copyWith(fontWeight: FontWeight.w800)),
             ),
           ),
           const SizedBox(width: 9),
@@ -443,6 +482,13 @@ class _HomeTabState extends State<HomeTab> {
                     style: ZType.bodyM.copyWith(
                         color: ZveltTokens.brand, fontWeight: FontWeight.w800)),
               ],
+            ),
+          ),
+          Tooltip(
+            message: 'Settings',
+            child: IconButton(
+              onPressed: widget.onOpenSettings,
+              icon: Icon(AppIcons.settings, color: ZveltTokens.text2),
             ),
           ),
         ],
@@ -516,8 +562,29 @@ class _HomeTabState extends State<HomeTab> {
   // ① Day-menu popover — weekday + date, Open calendar, Weekly progress.
   Widget _dayMenu() {
     final now = DateTime.now();
-    const wk = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-    const mo = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const wk = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    const mo = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
     final weekday = wk[now.weekday - 1];
     final full = '${mo[now.month - 1]} ${now.day}, ${now.year}';
 
@@ -552,7 +619,10 @@ class _HomeTabState extends State<HomeTab> {
           borderRadius: BorderRadius.circular(ZveltTokens.rBox),
           border: Border.all(color: ZveltTokens.border),
           boxShadow: const [
-            BoxShadow(color: Color(0x8C000000), blurRadius: 54, offset: Offset(0, 22)),
+            BoxShadow(
+                color: Color(0x8C000000),
+                blurRadius: 54,
+                offset: Offset(0, 22)),
           ],
         ),
         child: Column(
@@ -568,12 +638,15 @@ class _HomeTabState extends State<HomeTab> {
                       style: ZType.eyebrow.copyWith(color: ZveltTokens.brand)),
                   const SizedBox(height: 3),
                   Text(full,
-                      style: ZType.bodyL.copyWith(
-                          fontSize: 17, fontWeight: FontWeight.w800)),
+                      style: ZType.bodyL
+                          .copyWith(fontSize: 17, fontWeight: FontWeight.w800)),
                 ],
               ),
             ),
-            Container(height: 1, margin: const EdgeInsets.fromLTRB(6, 0, 6, 5), color: ZveltTokens.hairline),
+            Container(
+                height: 1,
+                margin: const EdgeInsets.fromLTRB(6, 0, 6, 5),
+                color: ZveltTokens.hairline),
             row(AppIcons.calendar, 'Open calendar', _openStreakCalendar),
             row(AppIcons.chart_line_up, 'Weekly progress', _openProgress),
           ],
@@ -588,15 +661,14 @@ class _HomeTabState extends State<HomeTab> {
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
       child: Row(
         children: [
-          Text('START A SESSION',
-              style: ZType.eyebrow.copyWith(fontSize: 12)),
+          Text('START A SESSION', style: ZType.eyebrow.copyWith(fontSize: 12)),
           const Spacer(),
           InkWell(
             onTap: _openCardioHistory,
             borderRadius: BorderRadius.circular(8),
             child: Row(
               children: [
-                Text('History',
+                Text('Cardio history',
                     style: ZType.bodyS.copyWith(
                         color: ZveltTokens.brand, fontWeight: FontWeight.w700)),
                 const Icon(AppIcons.angle_small_right,
@@ -610,6 +682,39 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   // ④ Run / Ride tiles
+  Widget _strengthWorkoutCta() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 11, 20, 0),
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: FilledButton.icon(
+          onPressed: _startingStrengthWorkout ? null : _startStrengthWorkout,
+          icon: _startingStrengthWorkout
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: ZveltTokens.onBrand,
+                  ),
+                )
+              : const Icon(AppIcons.gym),
+          label: Text(
+            _startingStrengthWorkout
+                ? 'Starting strength workout...'
+                : 'Start strength workout',
+          ),
+          style: FilledButton.styleFrom(
+            backgroundColor: ZveltTokens.brand,
+            foregroundColor: ZveltTokens.onBrand,
+            textStyle: ZType.bodyM.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _cardioTiles() {
     Widget tile({
       required String label,
@@ -671,7 +776,10 @@ class _HomeTabState extends State<HomeTab> {
             icon: AppIcons.bike,
             gradient: ZveltTokens.gradCardio,
             glow: const [
-              BoxShadow(color: Color(0x61C8963C), offset: Offset(0, 5), blurRadius: 12),
+              BoxShadow(
+                  color: Color(0x61C8963C),
+                  offset: Offset(0, 5),
+                  blurRadius: 12),
             ],
             iconColor: const Color(0xFF3A2A12),
             onTap: () => _startCardio('bike'),
@@ -820,7 +928,8 @@ class _HomeTabState extends State<HomeTab> {
           child: DecoratedBox(
             decoration: deco,
             child: trained
-                ? const Icon(AppIcons.check, size: 13, color: ZveltTokens.onBrand)
+                ? const Icon(AppIcons.check,
+                    size: 13, color: ZveltTokens.onBrand)
                 : null,
           ),
         ),
@@ -929,8 +1038,8 @@ class _HomeTabState extends State<HomeTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label,
-                    style: ZType.monoXS.copyWith(
-                        fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    style: ZType.monoXS
+                        .copyWith(fontSize: 11.5, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 value,
               ],
@@ -964,12 +1073,13 @@ class _HomeTabState extends State<HomeTab> {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Text(_avgBurnCal == null ? '—' : '$_avgBurnCal',
-                    style: ZType.h2.copyWith(
-                        fontSize: 24, color: ZveltTokens.brand)),
+                    style: ZType.h2
+                        .copyWith(fontSize: 24, color: ZveltTokens.brand)),
                 if (_avgBurnCal != null) ...[
                   const SizedBox(width: 3),
                   Text('cal',
-                      style: ZType.monoXS.copyWith(fontWeight: FontWeight.w700)),
+                      style:
+                          ZType.monoXS.copyWith(fontWeight: FontWeight.w700)),
                 ],
               ],
             ),
@@ -1009,7 +1119,8 @@ class _HomeTabState extends State<HomeTab> {
                       color: ZveltTokens.chip,
                       border: Border.all(color: ZveltTokens.border),
                     ),
-                    child: Icon(AppIcons.plus, size: 16, color: ZveltTokens.text),
+                    child:
+                        Icon(AppIcons.plus, size: 16, color: ZveltTokens.text),
                   ),
                 ),
               ],
@@ -1303,8 +1414,8 @@ class _BodyweightEditorSheetState extends State<_BodyweightEditorSheet> {
       child: Container(
         decoration: BoxDecoration(
           gradient: ZveltTokens.sheetGrad,
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(ZveltTokens.rSheet)),
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(ZveltTokens.rSheet)),
           border: Border.all(color: ZveltTokens.border),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -1328,7 +1439,8 @@ class _BodyweightEditorSheetState extends State<_BodyweightEditorSheet> {
             TextField(
               controller: _controller,
               autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _save(),
               style: ZType.bodyL,

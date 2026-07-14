@@ -216,7 +216,8 @@ class SecureDb {
             try {
               await side.delete();
             } catch (e) {
-              debugPrint('[secure-db] sidecar delete (retry) best-effort skip: $e');
+              debugPrint(
+                  '[secure-db] sidecar delete (retry) best-effort skip: $e');
             }
           }
         }
@@ -234,6 +235,43 @@ class SecureDb {
   }
 
   /// Test-only — close cached handles and drop the in-memory passphrase.
+  /// Permanently remove every encrypted user-data database and SQLite sidecar.
+  /// This runs only after a confirmed account erasure.
+  Future<void> eraseAllLocalData() async {
+    final failures = <Object>[];
+    for (final db in _openDbs.values) {
+      try {
+        if (db.isOpen) await db.close();
+      } catch (e, st) {
+        failures.add(e);
+        _reportCrash(e, st, 'secure-db-account-erasure-close');
+      }
+    }
+    _openDbs.clear();
+
+    try {
+      final base = await getDatabasesPath();
+      for (final name in kKnownDbNames) {
+        final dbPath = p.join(base, name);
+        for (final suffix in const ['', '-journal', '-wal', '-shm']) {
+          final file = File('$dbPath$suffix');
+          if (await file.exists()) await file.delete();
+        }
+      }
+    } catch (e, st) {
+      failures.add(e);
+      _reportCrash(e, st, 'secure-db-account-erasure-files');
+    } finally {
+      _cachedPassphrase = null;
+      _wipeRan = false;
+    }
+
+    if (failures.isNotEmpty) {
+      throw StateError(
+          'Could not erase ${failures.length} local database resource(s).');
+    }
+  }
+
   @visibleForTesting
   Future<void> resetForTest() async {
     for (final db in _openDbs.values) {

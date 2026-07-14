@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../config/api_config.dart';
 import '_crash_reporter.dart';
+import 'local_account_data_wiper.dart';
 
 // User-facing copy — this string lands verbatim in LoginScreen's error box.
 // It used to be a Romanian developer hint (with a literal `flutter run`
@@ -144,7 +145,11 @@ class AuthService {
     await prefs.remove(legacyRefresh);
   }
 
-  Future<void> _saveTokens(String accessToken, String refreshToken) async {
+  Future<void> _saveTokens(
+    String accessToken,
+    String refreshToken, {
+    bool preserveMediaCache = false,
+  }) async {
     try {
       await _secureStorage.write(key: _keyAccessToken, value: accessToken);
       await _secureStorage.write(key: _keyRefreshToken, value: refreshToken);
@@ -159,6 +164,18 @@ class AuthService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyAccessToken, accessToken);
       await prefs.setString(_keyRefreshToken, refreshToken);
+    }
+
+    // A new login can replace an account without first calling logout (for
+    // example after a stale login screen is resumed). Protected images must
+    // not remain visible from the previous session in Flutter's memory cache
+    // or the disk cache. Token refreshes keep the same identity and skip this.
+    if (!preserveMediaCache) {
+      try {
+        await LocalAccountDataWiper.clearMediaCaches();
+      } catch (e, st) {
+        reportError(e, st, reason: 'auth:clear-media-cache-on-login');
+      }
     }
   }
 
@@ -184,7 +201,8 @@ class AuthService {
     if (parts.length != 3) return true;
     try {
       final payloadBytes = base64Url.decode(base64Url.normalize(parts[1]));
-      final payload = jsonDecode(utf8.decode(payloadBytes)) as Map<String, dynamic>;
+      final payload =
+          jsonDecode(utf8.decode(payloadBytes)) as Map<String, dynamic>;
       final exp = payload['exp'];
       // A JWT with no `exp` claim is malformed for our purposes — we treat
       // it as expired so the caller refreshes. The old behavior (returning
@@ -193,9 +211,11 @@ class AuthService {
       if (exp == null) return true;
       final expSec = exp is num ? exp.toInt() : int.tryParse(exp.toString());
       if (expSec == null) return true;
-      final expiry = DateTime.fromMillisecondsSinceEpoch(expSec * 1000, isUtc: true);
+      final expiry =
+          DateTime.fromMillisecondsSinceEpoch(expSec * 1000, isUtc: true);
       final now = DateTime.now().toUtc();
-      return !now.isBefore(expiry.subtract(const Duration(seconds: _expirySkewSeconds)));
+      return !now.isBefore(
+          expiry.subtract(const Duration(seconds: _expirySkewSeconds)));
     } catch (e) {
       debugPrint('[AuthService] _isAccessTokenExpiredOrSoon parse failed: $e');
       return true;
@@ -214,7 +234,8 @@ class AuthService {
     if (parts.length != 3) return null;
     try {
       final payloadBytes = base64Url.decode(base64Url.normalize(parts[1]));
-      final payload = jsonDecode(utf8.decode(payloadBytes)) as Map<String, dynamic>;
+      final payload =
+          jsonDecode(utf8.decode(payloadBytes)) as Map<String, dynamic>;
       return payload['userId'] as String?;
     } catch (e) {
       debugPrint('[AuthService] _decodeUserIdFromJwt parse failed: $e');
@@ -250,7 +271,11 @@ class AuthService {
       final accessToken = data['accessToken'] as String?;
       final newRefresh = data['refreshToken'] as String?;
       if (accessToken != null && newRefresh != null) {
-        await _saveTokens(accessToken, newRefresh);
+        await _saveTokens(
+          accessToken,
+          newRefresh,
+          preserveMediaCache: true,
+        );
         return accessToken;
       }
       // Malformed 200 — a server bug, not a revoked session. Keep tokens.
@@ -291,7 +316,9 @@ class AuthService {
   /// so "refresh token still present after a failed refresh" == transient.
   Future<bool> hasValidToken() async {
     final access = await _getAccessToken();
-    if (access != null && access.isNotEmpty && !_isAccessTokenExpiredOrSoon(access)) {
+    if (access != null &&
+        access.isNotEmpty &&
+        !_isAccessTokenExpiredOrSoon(access)) {
       return true;
     }
     // Access expired or missing — try refresh to verify session is still active
@@ -363,7 +390,8 @@ class AuthService {
           .timeout(httpTimeout);
       if (res.statusCode != okStatus) {
         final decoded = _tryDecodeJsonObject(res.body);
-        throw Exception(decoded?['message'] ?? '$failLabel (${res.statusCode})');
+        throw Exception(
+            decoded?['message'] ?? '$failLabel (${res.statusCode})');
       }
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final accessToken = data['accessToken'] as String?;
@@ -398,7 +426,8 @@ class AuthService {
     final body = <String, dynamic>{
       'email': email,
       'password': password,
-      if (displayName != null && displayName.isNotEmpty) 'displayName': displayName,
+      if (displayName != null && displayName.isNotEmpty)
+        'displayName': displayName,
     };
     return _authPost(
       '/auth/signup',
@@ -433,7 +462,8 @@ class AuthService {
   /// server rejects the code (wrong or expired) so the UI can show an inline
   /// field error, and with `invalidCode == false` for every other failure
   /// (network → retry, rate limit, server error).
-  Future<void> resetPassword(String email, String code, String newPassword) async {
+  Future<void> resetPassword(
+      String email, String code, String newPassword) async {
     final uri = Uri.parse('$v1Base/auth/password/reset');
     http.Response res;
     try {
@@ -482,7 +512,8 @@ class AuthService {
     final email = 'guest_$id@guest.zvelt.app';
     // Backend only enforces length 8–128; this is ~34 chars with letters+digits.
     final password = 'Gx${id}9';
-    final res = await signup(email: email, password: password, displayName: displayName);
+    final res = await signup(
+        email: email, password: password, displayName: displayName);
     if (res == null) return false;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -508,6 +539,11 @@ class AuthService {
     // Previously this awaited the server POST first, so on a slow network
     // the first "Log out" tap looked like it did nothing (up to httpTimeout).
     await _clearTokens();
+    try {
+      await LocalAccountDataWiper.clearMediaCaches();
+    } catch (e, st) {
+      reportError(e, st, reason: 'auth:logout-media-cache');
+    }
     // Best-effort server-side revoke — fire-and-forget, off the critical path.
     final uri = Uri.parse('$v1Base/auth/logout');
     http
@@ -515,23 +551,23 @@ class AuthService {
           uri,
           headers: {
             'Content-Type': 'application/json',
-            if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+            if (token != null && token.isNotEmpty)
+              'Authorization': 'Bearer $token',
           },
         )
         .timeout(httpTimeout)
         .then<void>((_) {})
         .catchError((Object e, StackTrace st) {
-      reportError(e, st, reason: 'auth:logout-server');
-    }).ignore();
+          reportError(e, st, reason: 'auth:logout-server');
+        })
+        .ignore();
   }
 
   /// GDPR / Play Store policy: user-initiated permanent account deletion.
   ///
   /// Calls `DELETE /v1/me/account` with a confirmation token. Server is
-  /// expected to:
-  ///   1. Soft-delete immediately (revoke tokens, anonymize PII).
-  ///   2. Hard-delete within 30 days per CLAUDE.md privacy section.
-  ///   3. Return 204 No Content on success, 4xx with `{error,message}` on failure.
+  /// expected to hard-delete the account and return 204 No Content on success
+  /// (or a structured 4xx/5xx error on failure).
   ///
   /// On success, ALL local credentials, SharedPreferences and cached DBs
   /// are cleared client-side regardless of network outcome — the user wants out.
@@ -569,12 +605,14 @@ class AuthService {
     }
 
     // Accept 200, 202 (accepted, deletion queued), 204 (no content).
-    final ok = resp.statusCode == 200 || resp.statusCode == 202 || resp.statusCode == 204;
+    final ok = resp.statusCode == 200 ||
+        resp.statusCode == 202 ||
+        resp.statusCode == 204;
     if (!ok) {
       final body = _tryDecodeJsonObject(resp.body);
-      final msg = body?['message']?.toString()
-          ?? body?['error']?.toString()
-          ?? 'Server returned HTTP ${resp.statusCode}.';
+      final msg = body?['message']?.toString() ??
+          body?['error']?.toString() ??
+          'Server returned HTTP ${resp.statusCode}.';
       throw AccountDeletionException(msg);
     }
 
@@ -587,10 +625,16 @@ class AuthService {
     } catch (e, st) {
       _reportTokenIoError(e, st);
     }
+    final wipeResult = await LocalAccountDataWiper.instance.wipe();
+    if (!wipeResult.completed) {
+      debugPrint(
+        '[AuthService] account erasure local cleanup incomplete: '
+        '${wipeResult.failedSteps.join(', ')}',
+      );
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }
-
 }
 
 class AccountDeletionException implements Exception {
@@ -610,4 +654,3 @@ class PasswordResetException implements Exception {
   @override
   String toString() => message;
 }
-

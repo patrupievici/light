@@ -6,11 +6,11 @@ import { authenticate } from '../middleware/auth'
 import { computeRanks } from '../services/ranking.service'
 import { updateStreak } from '../services/streak.service'
 import { createNotificationSafe, NotificationType } from '../services/notification.service'
-import { decodePostPhotoBase64, savePostPhoto } from '../lib/post-photo'
-import { areFriends, getFriendIdsAndHidden } from '../lib/friendships'
+import { decodePostPhotoBase64, deleteUploadByUrl, savePostPhoto } from '../lib/post-photo'
+import { getFriendIdsAndHidden } from '../lib/friendships'
 import { stripControlChars } from '../lib/sanitize'
 import { evaluateEditLimit } from '../services/anti-cheat.service'
-import { canViewerSeePostPure } from '../lib/post-visibility'
+import { canViewerSeePost } from '../lib/post-visibility'
 
 const CreatePostSchema = z
   .object({
@@ -73,30 +73,6 @@ async function likedPostIdsFor(viewerId: string, postIds: string[]): Promise<Set
     select: { postId: true },
   })
   return new Set(likes.map((l) => l.postId))
-}
-
-async function canViewerSeePost(
-  viewerId: string,
-  post: { userId: string; visibility: string },
-): Promise<boolean> {
-  if (post.userId === viewerId) return true
-  // Extra privacy overlay on top of the core visibility rule: an owner who hid
-  // their activity feed is invisible to others even for 'public' posts.
-  const sharing = await prisma.userProfile.findUnique({
-    where: { userId: post.userId },
-    select: { showActivityFeed: true },
-  })
-  if (sharing?.showActivityFeed === false) return false
-  // Resolve friendship only when the decision actually depends on it, then defer
-  // to the pure, unit-tested rule (single source of truth).
-  const needsFriendCheck = post.visibility !== 'public' && post.visibility !== 'private'
-  const friends = needsFriendCheck ? await areFriends(viewerId, post.userId) : false
-  return canViewerSeePostPure({
-    viewerId,
-    ownerId: post.userId,
-    visibility: post.visibility,
-    areFriends: friends,
-  })
 }
 
 export async function postRoutes(app: FastifyInstance) {
@@ -578,6 +554,9 @@ export async function postRoutes(app: FastifyInstance) {
     if (post.userId !== me) return reply.code(403).send({ error: 'FORBIDDEN', message: 'Nu poți șterge această postare', requestId: request.id })
 
     await prisma.post.delete({ where: { id: postId } })
+    // The media route independently rejects a missing post, but remove the
+    // bytes as well so deletion does not leave private material on disk.
+    await deleteUploadByUrl(post.imageUrl)
     return reply.code(204).send()
   })
 

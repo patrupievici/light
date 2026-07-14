@@ -33,7 +33,17 @@ const AiWeekSchema = z.object({
 })
 
 /** Require metric portions + macros so we reject flaky first-pass JSON and retry. */
-function rawDayHasPortionMacros(day: z.infer<typeof DaySchema>): boolean {
+function rawDayHasPortionMacros(
+  day: z.infer<typeof DaySchema>,
+  expectedMealKeys: readonly string[],
+): boolean {
+  const keys = day.meals.map((meal) => meal.meal)
+  if (
+    keys.length !== expectedMealKeys.length ||
+    expectedMealKeys.some((key) => keys.filter((candidate) => candidate === key).length !== 1)
+  ) {
+    return false
+  }
   for (const m of day.meals) {
     for (const it of m.items) {
       const portionOk = typeof it.portion === 'string' && it.portion.trim().length >= 3
@@ -142,6 +152,8 @@ export async function generateWeeklyMealPlanWithDeepSeek(params: {
     waterMl: number
   }>
   goal: string
+  diet: string
+  mealsPerDay: number
 }): Promise<Map<string, NormalizedMealPlan> | null> {
   if (!process.env.DEEPSEEK_API_KEY) return null
 
@@ -153,6 +165,9 @@ export async function generateWeeklyMealPlanWithDeepSeek(params: {
     fatG: r.fatG,
     waterMl: r.waterMl,
   }))
+  const mealKeys = params.mealsPerDay === 4
+    ? ['breakfast', 'lunch', 'dinner', 'snack']
+    : ['breakfast', 'lunch', 'dinner']
 
   const system = `CRITICAL: Every human-readable string you output inside the JSON (food lines, protein names) must be ENGLISH ONLY — no Romanian, no other languages.
 
@@ -163,7 +178,7 @@ The JSON must match this shape (every item should include portion + macros):
 
 Hard rules:
 - There must be exactly one entry per date in DAYS, same dates and order as given.
-- Each day has exactly 4 meals with meal names: breakfast, lunch, dinner, snack (once each).
+- Each day has exactly the meal names in MEAL_KEYS, once each.
 - "items" is an array of 2–8 realistic foods per meal.
 - EVERY item MUST include:
   - "text": short English food name (no vague "some rice" — name the food).
@@ -172,12 +187,15 @@ Hard rules:
 - Across all items in a day, sum of item calories/macros should approximate that day's TARGETS row (within ~15%); adjust portions until close.
 - For lunch and dinner, include ONE item that lists the lean protein serving and also include "proteinChoices": array of 6–8 interchangeable lean proteins as strings (first choice = matches the protein in "text"); each protein choice in proteinChoices should imply a similar portion size when swapped.
 - For breakfast / snack include "proteinChoices" when the protein is swappable (eggs vs yogurt vs shake); otherwise omit proteinChoices.
+- DIET is mandatory: for "vegan", use no animal-derived ingredients; for "vegetarian", use no meat or fish; for "omnivore", use normal varied foods.
 - Language: every string in "text", "portion", and every entry in "proteinChoices" MUST be English only. Do not use Romanian or any non-English language, even when GOAL_LABEL is not English.
 - Keep "text" and "portion" concise but unambiguous.
 
 DAYS=${JSON.stringify(params.weekDays)}
 TARGETS=${JSON.stringify(targets)}
-GOAL_LABEL=${JSON.stringify(params.goal)}`
+GOAL_LABEL=${JSON.stringify(params.goal)}
+DIET=${JSON.stringify(params.diet)}
+MEAL_KEYS=${JSON.stringify(mealKeys)}`
 
   const userBase = `Generate the JSON now for all days in DAYS. Targets per day are in TARGETS matched by day.
 
@@ -214,7 +232,7 @@ Retry: previous JSON was rejected. EVERY item must include non-empty "portion" (
       const byDayRaw = new Map(validated.data.days.map((d) => [d.day, d]))
       for (const ymd of params.weekDays) {
         const d = byDayRaw.get(ymd)
-        if (!d || !rawDayHasPortionMacros(d)) continue attemptLoop
+        if (!d || !rawDayHasPortionMacros(d, mealKeys)) continue attemptLoop
       }
 
       const byDay = new Map<string, NormalizedMealPlan>()

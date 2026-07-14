@@ -220,6 +220,36 @@ class PhotoProgressService {
 
   // ── helpers ────────────────────────────────────────────────────────
 
+  /// Removes image bytes as well as the SQLCipher index. This is deliberately
+  /// resilient to a corrupt index so raw progress photos cannot survive a
+  /// confirmed account deletion.
+  Future<void> eraseAllLocalData() async {
+    final failures = <Object>[];
+    final db = _db;
+    _db = null;
+    if (db != null && db.isOpen) {
+      try {
+        await db.close();
+      } catch (e) {
+        failures.add(e);
+        debugPrint('[photo-progress] account erase could not close DB: $e');
+      }
+    }
+    _photoDir = null;
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      final dir = Directory(p.join(docs.path, _kPhotoDir));
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } catch (e) {
+      failures.add(e);
+      debugPrint('[photo-progress] account erase could not delete photos: $e');
+    }
+    if (failures.isNotEmpty) {
+      throw StateError(
+          'Could not erase ${failures.length} progress-photo resource(s).');
+    }
+  }
+
   static String _formatFilename(DateTime dt) {
     String two(int v) => v.toString().padLeft(2, '0');
     final ymd = '${dt.year}${two(dt.month)}${two(dt.day)}';

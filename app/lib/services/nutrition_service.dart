@@ -216,6 +216,10 @@ class NutritionGoals {
     this.fatG = 65,
     this.carbsG = 250,
     this.waterMl = 2500,
+    this.goal = 'maintain',
+    this.activityLevel = 'moderate',
+    this.diet = 'omnivore',
+    this.mealsPerDay = 3,
   });
 
   final int calories;
@@ -223,6 +227,34 @@ class NutritionGoals {
   final int fatG;
   final int carbsG;
   final int waterMl;
+  final String goal;
+  final String activityLevel;
+  final String diet;
+  final int mealsPerDay;
+
+  NutritionGoals copyWith({
+    int? calories,
+    int? proteinG,
+    int? fatG,
+    int? carbsG,
+    int? waterMl,
+    String? goal,
+    String? activityLevel,
+    String? diet,
+    int? mealsPerDay,
+  }) {
+    return NutritionGoals(
+      calories: calories ?? this.calories,
+      proteinG: proteinG ?? this.proteinG,
+      fatG: fatG ?? this.fatG,
+      carbsG: carbsG ?? this.carbsG,
+      waterMl: waterMl ?? this.waterMl,
+      goal: goal ?? this.goal,
+      activityLevel: activityLevel ?? this.activityLevel,
+      diet: diet ?? this.diet,
+      mealsPerDay: mealsPerDay ?? this.mealsPerDay,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'calories': calories,
@@ -230,7 +262,28 @@ class NutritionGoals {
         'fatG': fatG,
         'carbsG': carbsG,
         'waterMl': waterMl,
+        'goal': goal,
+        'activityLevel': activityLevel,
+        'diet': diet,
+        'mealsPerDay': mealsPerDay,
       };
+
+  static String _choice(
+    dynamic value,
+    Set<String> allowed,
+    String fallback,
+  ) {
+    final candidate = value?.toString();
+    return candidate != null && allowed.contains(candidate)
+        ? candidate
+        : fallback;
+  }
+
+  static int _mealCount(dynamic value) {
+    final count =
+        value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
+    return count == 4 ? 4 : 3;
+  }
 
   static NutritionGoals fromJson(Map<String, dynamic> j) => NutritionGoals(
         calories: (j['calories'] as num?)?.toInt() ?? 2000,
@@ -238,13 +291,28 @@ class NutritionGoals {
         fatG: (j['fatG'] as num?)?.toInt() ?? 65,
         carbsG: (j['carbsG'] as num?)?.toInt() ?? 250,
         waterMl: (j['waterMl'] as num?)?.toInt() ?? 2500,
+        goal: _choice(
+          j['goal'],
+          const {'lose', 'maintain', 'gain'},
+          'maintain',
+        ),
+        activityLevel: _choice(
+          j['activityLevel'],
+          const {'sedentary', 'light', 'moderate', 'active', 'very_active'},
+          'moderate',
+        ),
+        diet: _choice(
+          j['diet'],
+          const {'omnivore', 'vegetarian', 'vegan'},
+          'omnivore',
+        ),
+        mealsPerDay: _mealCount(j['mealsPerDay']),
       );
 
   /// Maps `GET /v1/me` → `profile` fields (`dailyCalories`, `dailyProtein`, …).
   static NutritionGoals? fromServerProfile(Map<String, dynamic>? profile) {
     if (profile == null) return null;
     final dc = profile['dailyCalories'];
-    if (dc == null) return null;
     int n(String key, int fallback) {
       final v = profile[key];
       if (v == null) return fallback;
@@ -258,6 +326,22 @@ class NutritionGoals {
       fatG: n('dailyFat', 65),
       carbsG: n('dailyCarbs', 250),
       waterMl: n('dailyWaterMl', 2500),
+      goal: _choice(
+        profile['nutritionGoal'],
+        const {'lose', 'maintain', 'gain'},
+        'maintain',
+      ),
+      activityLevel: _choice(
+        profile['nutritionActivityLevel'],
+        const {'sedentary', 'light', 'moderate', 'active', 'very_active'},
+        'moderate',
+      ),
+      diet: _choice(
+        profile['nutritionDiet'],
+        const {'omnivore', 'vegetarian', 'vegan'},
+        'omnivore',
+      ),
+      mealsPerDay: _mealCount(profile['nutritionMealsPerDay']),
     );
   }
 }
@@ -295,6 +379,26 @@ class NutritionPlanDay {
       mealPlan: NutritionDayMealPlan.tryParse(rawMeal),
     );
   }
+}
+
+/// A weekly plan is derived data. Never render it alongside a different
+/// profile target: that would make the tracker say one calorie/macro goal
+/// while the plan instructs another. A partial response is stale as well.
+bool nutritionPlanMatchesGoals(
+  NutritionGoals goals,
+  List<NutritionPlanDay> plan,
+) {
+  if (plan.isEmpty) return true;
+  if (plan.length != 7) return false;
+  return plan.every(
+    (day) =>
+        day.goal == goals.goal &&
+        day.calories == goals.calories &&
+        day.proteinG == goals.proteinG &&
+        day.carbsG == goals.carbsG &&
+        day.fatG == goals.fatG &&
+        day.waterMl == goals.waterMl,
+  );
 }
 
 class MealItemMacros {
@@ -862,6 +966,23 @@ class NutritionService {
 
   Future<String> _goalsKey() async => _prefsKey('nutrition_goals');
 
+  Future<String> _goalsDirtyKey() async => _prefsKey('nutrition_goals_dirty');
+
+  Future<bool> _areGoalsDirty() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(await _goalsDirtyKey()) ?? false;
+  }
+
+  Future<void> _markGoalsDirty(bool dirty) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = await _goalsDirtyKey();
+    if (dirty) {
+      await prefs.setBool(key, true);
+    } else {
+      await prefs.remove(key);
+    }
+  }
+
   /// YYYY-MM-DD în calendarul local (aceeași convenție ca backend-ul).
   String formatLocalDate(DateTime date) {
     final d = DateTime(date.year, date.month, date.day);
@@ -1246,6 +1367,13 @@ class NutritionService {
   }
 
   Future<NutritionGoals> getGoals() async {
+    final wasDirty = await _areGoalsDirty();
+    if (wasDirty) await _syncGoalsIfNeeded();
+    final cached = await _readCachedGoals();
+    // A local edit stays visible for this launch even if the server response
+    // races it. Otherwise a reconnect could briefly roll the UI back to stale
+    // macros/preferences before the next profile refresh.
+    if (wasDirty || await _areGoalsDirty()) return cached;
     final fromServer = await _fetchGoalsFromProfile();
     return _goalsFromServerOrPrefs(fromServer);
   }
@@ -1256,6 +1384,12 @@ class NutritionService {
   /// callers that already hold the `/me` body (e.g. the nutrition tab loading
   /// goals + bodyweight together) avoid a duplicate GET.
   Future<NutritionGoals> goalsFromMeResponse(Map<String, dynamic>? me) async {
+    final wasDirty = await _areGoalsDirty();
+    final cached = await _readCachedGoals();
+    if (wasDirty) {
+      await _syncGoalsIfNeeded();
+      return cached;
+    }
     final profile = me?['profile'] as Map<String, dynamic>?;
     return _goalsFromServerOrPrefs(NutritionGoals.fromServerProfile(profile));
   }
@@ -1263,11 +1397,14 @@ class NutritionService {
   Future<NutritionGoals> _goalsFromServerOrPrefs(
       NutritionGoals? fromServer) async {
     if (fromServer != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(await _goalsKey(), jsonEncode(fromServer.toJson()));
+      await _cacheGoals(fromServer);
       return fromServer;
     }
 
+    return _readCachedGoals();
+  }
+
+  Future<NutritionGoals> _readCachedGoals() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(await _goalsKey());
     if (raw == null) return const NutritionGoals();
@@ -1278,6 +1415,11 @@ class NutritionService {
           '[NutritionService.getGoals] prefs decode best-effort skip: $e');
       return const NutritionGoals();
     }
+  }
+
+  Future<void> _cacheGoals(NutritionGoals goals) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(await _goalsKey(), jsonEncode(goals.toJson()));
   }
 
   Future<NutritionGoals?> _fetchGoalsFromProfile() async {
@@ -1330,12 +1472,21 @@ class NutritionService {
   }
 
   Future<void> saveGoals(NutritionGoals goals) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(await _goalsKey(), jsonEncode(goals.toJson()));
+    await _cacheGoals(goals);
+    await _markGoalsDirty(true);
+    await _syncGoalsIfNeeded();
+  }
+
+  /// Push the one canonical nutrition configuration when the device reconnects.
+  /// The local value remains authoritative until this returns true, which keeps
+  /// an offline edit from being overwritten by an older `GET /me` response.
+  Future<bool> _syncGoalsIfNeeded() async {
+    if (!await _areGoalsDirty()) return true;
     final token = await _auth.getAccessToken();
-    if (token == null) return;
+    if (token == null) return false;
+    final goals = await _readCachedGoals();
     try {
-      await http
+      final response = await http
           .patch(
             Uri.parse('$v1Base/me/profile'),
             headers: {
@@ -1348,11 +1499,24 @@ class NutritionService {
               'dailyCarbs': goals.carbsG,
               'dailyFat': goals.fatG,
               'dailyWaterMl': goals.waterMl,
+              'nutritionGoal': goals.goal,
+              'nutritionActivityLevel': goals.activityLevel,
+              'nutritionDiet': goals.diet,
+              'nutritionMealsPerDay': goals.mealsPerDay,
             }),
           )
           .withTimeout();
+      if (response.statusCode == 200) {
+        await _markGoalsDirty(false);
+        return true;
+      }
+      debugPrint(
+        '[NutritionService.syncGoals] HTTP ${response.statusCode}; keeping local edit queued',
+      );
+      return false;
     } catch (e, st) {
       reportError(e, st, reason: 'nutrition:save-goals-patch');
+      return false;
     }
   }
 
@@ -1362,6 +1526,11 @@ class NutritionService {
   }) async {
     final token = await _auth.getAccessToken();
     if (token == null) throw Exception('Not signed in');
+    if (!await _syncGoalsIfNeeded()) {
+      throw const NutritionPlanException(
+        'Your nutrition changes are saved on this device. Reconnect before generating a plan.',
+      );
+    }
     final res = await http
         .post(
           Uri.parse('$v1Base/nutrition/plan/generate-weekly'),

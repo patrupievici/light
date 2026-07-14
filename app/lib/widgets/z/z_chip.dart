@@ -6,8 +6,10 @@ import '../../theme/zvelt_tokens.dart';
 enum ZChipVariant {
   /// Default — soft surface, secondary text. Background: surface2.
   neutral,
+
   /// Brand — orange-tinted background, deep brand text. Used for active state.
   brand,
+
   /// Solid — full brand fill, white text. Strongest emphasis.
   solid,
 }
@@ -81,18 +83,26 @@ class ZChip extends StatelessWidget {
     );
 
     final pill = Container(
-      decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(ZveltTokens.rPill)),
+      decoration: BoxDecoration(
+          color: _bg, borderRadius: BorderRadius.circular(ZveltTokens.rPill)),
       child: content,
     );
 
     if (onTap == null) return pill;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-        onTap: onTap,
-        child: pill,
+    return Semantics(
+      button: true,
+      label: label,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+            onTap: onTap,
+            child: Center(child: pill),
+          ),
+        ),
       ),
     );
   }

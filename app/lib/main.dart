@@ -93,8 +93,7 @@ Future<void> _initializeFirebaseCrashReporting() async {
     }
     await FirebaseCrashlytics.instance
         .setCrashlyticsCollectionEnabled(!kDebugMode);
-    FlutterError.onError =
-        FirebaseCrashlytics.instance.recordFlutterFatalError;
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
     PlatformDispatcher.instance.onError = (error, stack) {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
       return true;
@@ -281,75 +280,68 @@ class ZveltApp extends StatelessWidget {
         // Drive the runtime token brightness from the resolved theme mode
         // (system → current platform brightness). Every ZveltTokens neutral +
         // ZType style reads this flag; the rebuild below repaints the tree.
-        final platformDark = WidgetsBinding.instance.platformDispatcher
-                .platformBrightness ==
-            Brightness.dark;
+        final platformDark =
+            WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+                Brightness.dark;
         ZveltTokens.isDark = switch (themeMode) {
           ThemeMode.dark => true,
           ThemeMode.light => false,
           ThemeMode.system => platformDark,
         };
         return ValueListenableBuilder<int>(
-        valueListenable: AppPreferencesNotifier.accent,
-        builder: (context, accentValue, _) => ValueListenableBuilder<bool>(
-          valueListenable: AppPreferencesNotifier.reduceMotion,
-          builder: (context, reduceMotion, _) =>
-              ValueListenableBuilder<Locale?>(
-            valueListenable: LocaleNotifier.locale,
-            builder: (context, appLocale, _) {
-              final accent = Color(accentValue);
-              return MaterialApp(
-                navigatorKey: AppNavigator.key,
-                title: AppStrings.appName,
-                debugShowCheckedModeBanner: false,
-                // UI-language picker wiring (P2). `locale` follows the user's
-                // saved choice (null = follow system); resolution always lands
-                // on a locale the app can render, with English as the fallback.
-                locale: appLocale,
-                // English-only UI for this release. Keep the generated delegates
-                // for Material widgets, but expose only English so the system
-                // locale cannot partially localize app screens.
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: LocaleNotifier.supportedLocales,
-                localeResolutionCallback: LocaleNotifier.localeResolution,
-                theme: AppTheme.lightThemeData.copyWith(
-                  colorScheme: AppTheme.lightThemeData.colorScheme
-                      .copyWith(primary: accent, secondary: accent),
-                ),
-                darkTheme: AppTheme.themeData.copyWith(
-                  colorScheme: AppTheme.themeData.colorScheme
-                      .copyWith(primary: accent, secondary: accent),
-                ),
-                themeMode: themeMode,
-                // Safety net: cap the system font scale so an extra-large device font
-                // (common on Samsung) can't blow up dense layouts. Moderate scaling is
-                // still respected for accessibility.
-                builder: (context, child) {
-                  // Resolve the ACTIVE brightness (light/dark/system, incl. live
-                  // OS changes) and drive the runtime tokens from it. ZveltTokens
-                  // widgets read static getters, not Theme.of, so they don't
-                  // rebuild on a theme flip on their own — keying the subtree by
-                  // brightness forces a full repaint when the mode actually
-                  // changes (a rare action; cost is the nav stack resetting).
-                  ZveltTokens.isDark =
-                      Theme.of(context).brightness == Brightness.dark;
-                  final mq = MediaQuery.of(context);
-                  return KeyedSubtree(
-                    key: ValueKey<bool>(ZveltTokens.isDark),
-                    child: MediaQuery(
+          valueListenable: AppPreferencesNotifier.accent,
+          builder: (context, accentValue, _) => ValueListenableBuilder<bool>(
+            valueListenable: AppPreferencesNotifier.reduceMotion,
+            builder: (context, reduceMotion, _) =>
+                ValueListenableBuilder<Locale?>(
+              valueListenable: LocaleNotifier.locale,
+              builder: (context, appLocale, _) {
+                final accent = Color(accentValue);
+                return MaterialApp(
+                  navigatorKey: AppNavigator.key,
+                  title: AppStrings.appName,
+                  debugShowCheckedModeBanner: false,
+                  // UI-language picker wiring (P2). `locale` follows the user's
+                  // saved choice (null = follow system); resolution always lands
+                  // on a locale the app can render, with English as the fallback.
+                  locale: appLocale,
+                  // English-only UI for this release. Keep the generated delegates
+                  // for Material widgets, but expose only English so the system
+                  // locale cannot partially localize app screens.
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  supportedLocales: LocaleNotifier.supportedLocales,
+                  localeResolutionCallback: LocaleNotifier.localeResolution,
+                  theme: AppTheme.lightThemeData.copyWith(
+                    colorScheme: AppTheme.lightThemeData.colorScheme
+                        .copyWith(primary: accent, secondary: accent),
+                  ),
+                  darkTheme: AppTheme.themeData.copyWith(
+                    colorScheme: AppTheme.themeData.colorScheme
+                        .copyWith(primary: accent, secondary: accent),
+                  ),
+                  themeMode: themeMode,
+                  // Respect the user's selected text size. Dense screens provide
+                  // their own responsive layouts instead of reducing accessibility.
+                  builder: (context, child) {
+                    // Resolve the active brightness before descendants build.
+                    // Keeping the existing Navigator element intact preserves an
+                    // in-progress workout or form when appearance changes.
+                    ZveltTokens.isDark =
+                        Theme.of(context).brightness == Brightness.dark;
+                    final mq = MediaQuery.of(context);
+                    return MediaQuery(
                       data: mq.copyWith(
-                        textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3),
                         disableAnimations: mq.disableAnimations || reduceMotion,
                       ),
                       child: child ?? const SizedBox.shrink(),
-                    ),
-                  );
-                },
-                home: const AuthGate(),
-              );
-            },
+                    );
+                  },
+                  home: const AuthGate(),
+                );
+              },
+            ),
           ),
-        ),
         );
       },
     );

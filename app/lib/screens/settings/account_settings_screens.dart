@@ -12,6 +12,7 @@ import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/settings_store.dart';
 import '../../theme/zvelt_tokens.dart';
+import '../../widgets/zvelt_network_image.dart';
 import 'delete_account_screen.dart';
 import 'settings_kit.dart';
 
@@ -34,6 +35,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   bool _loading = true;
   bool _saving = false;
+  bool _isGuest = false;
   String? _photoUrl;
 
   @override
@@ -58,9 +60,13 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     _name.text = p?['displayName']?.toString() ?? '';
     _username.text = p?['username']?.toString() ?? '';
     _bio.text = p?['bio']?.toString() ?? '';
-    _emailController.text = me?['email']?.toString() ?? '';
+    final email = me?['email']?.toString().trim() ?? '';
+    final isGuest =
+        email.startsWith('guest_') && email.endsWith('@guest.zvelt.app');
+    _emailController.text = isGuest ? 'Guest account' : email;
     setState(() {
       _photoUrl = p?['photoUrl']?.toString();
+      _isGuest = isGuest;
       _loading = false;
     });
   }
@@ -176,7 +182,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     try {
       final res = await http
           .post(
-            Uri.parse('$v1Base/auth/change-password'),
+            Uri.parse('$v1Base/me/change-password'),
             headers: {
               'Authorization': 'Bearer $token',
               'Content-Type': 'application/json',
@@ -259,12 +265,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         gradient: ZveltTokens.gradBrand,
                       ),
                       child: (_photoUrl ?? '').isNotEmpty
-                          ? Image.network(
-                              mediaAbsoluteUrl(_photoUrl),
+                          ? ZveltNetworkImage(
+                              url: mediaAbsoluteUrl(_photoUrl),
                               width: 86,
                               height: 86,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Text(
+                              errorWidget: (_) => Text(
                                 _initials,
                                 style: ZType.h1.copyWith(color: Colors.white),
                               ),
@@ -300,7 +306,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                         const SizedBox(height: ZveltTokens.s3),
                         _SettingsField(
                           controller: _emailController,
-                          label: 'Email',
+                          label: _isGuest ? 'Account' : 'Email',
                           enabled: false,
                         ),
                       ],
@@ -344,10 +350,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 onTap: _logout,
               ),
               const SizedBox(height: ZveltTokens.cardGap),
-              TextButton(
-                onPressed: _deleteAccount,
-                child: const Text('Delete account',
-                    style: TextStyle(color: ZveltTokens.error)),
+              SettingsActionButton(
+                label: 'Delete account',
+                icon: AppIcons.trash,
+                destructive: true,
+                onTap: _deleteAccount,
               ),
             ],
     );

@@ -209,34 +209,15 @@ describe('DELETE /v1/me/account — soft-delete flag gating', () => {
     await app.close()
   })
 
-  it('flag ON: soft-deletes (sets status/timestamps, revokes tokens) without erasing', async () => {
+  it('still hard-deletes when an obsolete soft-delete environment flag is present', async () => {
     process.env.ZVELT_SOFT_DELETE = 'on'
     const app = await buildApp()
-    const before = Date.now()
     const res = await app.inject({ method: 'DELETE', url: '/v1/me/account', payload: { confirm: 'DELETE' } })
 
     expect(res.statusCode).toBe(204)
-    // No cascade erase ran on the soft path.
-    expect(transaction).not.toHaveBeenCalled()
-    expect(txSpies.user.delete).not.toHaveBeenCalled()
-
-    // The user row is marked deleted with both grace-window timestamps.
-    expect(userUpdate).toHaveBeenCalledOnce()
-    const arg = userUpdate.mock.calls[0][0] as {
-      where: { id: string }
-      data: { status: string; softDeletedAt: Date; scheduledHardEraseAt: Date }
-    }
-    expect(arg.where).toEqual({ id: 'u1' })
-    expect(arg.data.status).toBe('deleted')
-    expect(arg.data.softDeletedAt).toBeInstanceOf(Date)
-    expect(arg.data.scheduledHardEraseAt).toBeInstanceOf(Date)
-    // Hard-erase is scheduled ~30 days out.
-    const graceMs = arg.data.scheduledHardEraseAt.getTime() - arg.data.softDeletedAt.getTime()
-    expect(graceMs).toBe(30 * 24 * 60 * 60 * 1000)
-    expect(arg.data.scheduledHardEraseAt.getTime()).toBeGreaterThan(before)
-
-    // Sessions are revoked so the deleted account stops working immediately.
-    expect(refreshTokenDeleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
+    expect(transaction).toHaveBeenCalledOnce()
+    expect(txSpies.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } })
+    expect(userUpdate).not.toHaveBeenCalled()
     await app.close()
   })
 

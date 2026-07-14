@@ -120,7 +120,8 @@ class _PlanTabState extends State<PlanTab> {
   // ─── actions ──────────────────────────────────────────────────────────────
   Future<void> _openTracker(String workoutId) async {
     await Navigator.of(context).push<void>(MaterialPageRoute<void>(
-      builder: (_) => WorkoutTrackerScreen(workoutId: workoutId, onComplete: _load),
+      builder: (_) =>
+          WorkoutTrackerScreen(workoutId: workoutId, onComplete: _load),
     ));
     _load();
   }
@@ -185,11 +186,9 @@ class _PlanTabState extends State<PlanTab> {
     }
   }
 
-  /// Auto-Plan — plans the FULL day, both agenda buckets, like the prototype
-  /// autoPlan (JS 1656–1671): 4 workout blocks (Mobility · today's program
-  /// session · Walk · Stretch) + 4 nutrition meals. The program block is the
-  /// only real-data-dependent one and is skipped when no program is active.
-  /// Blocks already planned are skipped instead of duplicated.
+  /// Auto-plan only creates a workout agenda when a real program is active.
+  /// It must never add generic Mobility/Walk/Stretch blocks under "No program
+  /// yet", because that implies a plan the user did not choose.
   Future<void> _autoPlan() async {
     final day = _ymd(_selectedDay);
     final existing = _planned[day] ?? const <PlannedWorkoutEntry>[];
@@ -201,9 +200,15 @@ class _PlanTabState extends State<PlanTab> {
         (_active?.program != null && today != null && today.title.isNotEmpty)
             ? today
             : null;
+    if (session == null) {
+      if (mounted) {
+        setState(() => _tab = 1);
+        _toast('Choose a program to auto-plan workouts.');
+      }
+      return;
+    }
 
-    final blocks = <
-        ({
+    final blocks = <({
       String bucket,
       String time,
       String title,
@@ -217,14 +222,13 @@ class _PlanTabState extends State<PlanTab> {
         sub: '10 min warm-up',
         kind: ActivityKind.gym
       ),
-      if (session != null)
-        (
-          bucket: 'workout',
-          time: '08:00',
-          title: session.title,
-          sub: 'Week ${session.week}${session.isDeload ? ' · Deload' : ''}',
-          kind: ActivityKind.gym
-        ),
+      (
+        bucket: 'workout',
+        time: '08:00',
+        title: session.title,
+        sub: 'Week ${session.week}${session.isDeload ? ' · Deload' : ''}',
+        kind: ActivityKind.gym
+      ),
       (
         bucket: 'workout',
         time: '12:30',
@@ -373,8 +377,8 @@ class _PlanTabState extends State<PlanTab> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-              child: Text('Plan Your Day',
-                  style: ZType.h2.copyWith(fontSize: 23)),
+              child:
+                  Text('Plan Your Day', style: ZType.h2.copyWith(fontSize: 23)),
             ),
             _segment(),
             if (_tab == 0) ..._todayBlocks() else ..._programBlocks(),
@@ -419,7 +423,11 @@ class _PlanTabState extends State<PlanTab> {
           borderRadius: BorderRadius.circular(ZveltTokens.rControl),
           border: Border.all(color: ZveltTokens.border),
         ),
-        child: Row(children: [item('Today', 0), const SizedBox(width: 4), item('Programs', 1)]),
+        child: Row(children: [
+          item('Today', 0),
+          const SizedBox(width: 4),
+          item('Programs', 1)
+        ]),
       ),
     );
   }
@@ -461,7 +469,8 @@ class _PlanTabState extends State<PlanTab> {
                 height: 150,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [Color(0x47F58214), Color(0x00F58214)]),
+                  gradient: RadialGradient(
+                      colors: [Color(0x47F58214), Color(0x00F58214)]),
                 ),
               ),
             ),
@@ -478,7 +487,9 @@ class _PlanTabState extends State<PlanTab> {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    hasProgram ? (today?.title ?? 'Rest day') : 'No program yet',
+                    hasProgram
+                        ? (today?.title ?? 'Rest day')
+                        : 'No program yet',
                     style: ZType.h2.copyWith(fontSize: 25),
                   ),
                   const SizedBox(height: 12),
@@ -487,7 +498,8 @@ class _PlanTabState extends State<PlanTab> {
                   // week/deload chip is the honest real-data substitution.
                   if (hasProgram && today != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 11, vertical: 6),
                       decoration: BoxDecoration(
                         color: const Color(0x14FFFFFF),
                         borderRadius: BorderRadius.circular(12),
@@ -536,7 +548,8 @@ class _PlanTabState extends State<PlanTab> {
                               height: 18,
                               child: CircularProgressIndicator(
                                   strokeWidth: 2.2, color: ZveltTokens.onBrand))
-                          : Text(hasProgram ? 'Start Workout' : 'Choose a program',
+                          : Text(
+                              hasProgram ? 'Start Workout' : 'Choose a program',
                               style: ZType.bodyM.copyWith(
                                   fontWeight: FontWeight.w800,
                                   color: ZveltTokens.onBrand)),
@@ -580,7 +593,7 @@ class _PlanTabState extends State<PlanTab> {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Row(
         children: [
-          tile('Empty', _startEmpty),
+          tile('Start empty workout', _startEmpty),
           const SizedBox(width: 8),
           tile('Repeat last', _lastCompleted == null ? null : _repeatLast),
         ],
@@ -669,7 +682,20 @@ class _PlanTabState extends State<PlanTab> {
 
   Widget _dateRow() {
     final sel = _selectedDay;
-    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const mo = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     // Prototype planDateLabel (JS 1969–1971): '23 May, 2026'.
     final label = '${sel.day} ${mo[sel.month - 1]}, ${sel.year}';
 
@@ -695,11 +721,15 @@ class _PlanTabState extends State<PlanTab> {
         children: [
           Text(label, style: ZType.h4.copyWith(fontSize: 19)),
           const Spacer(),
-          navBtn(AppIcons.angle_small_left,
-              () => setState(() => _selectedDay = sel.subtract(const Duration(days: 1)))),
+          navBtn(
+              AppIcons.angle_small_left,
+              () => setState(
+                  () => _selectedDay = sel.subtract(const Duration(days: 1)))),
           const SizedBox(width: 8),
-          navBtn(AppIcons.angle_small_right,
-              () => setState(() => _selectedDay = sel.add(const Duration(days: 1)))),
+          navBtn(
+              AppIcons.angle_small_right,
+              () => setState(
+                  () => _selectedDay = sel.add(const Duration(days: 1)))),
         ],
       ),
     );
@@ -716,7 +746,9 @@ class _PlanTabState extends State<PlanTab> {
       child: Row(
         children: [
           for (var i = 0; i < 7; i++) ...[
-            Expanded(child: _stripCell(sunday.add(Duration(days: i)), labels[i], today)),
+            Expanded(
+                child: _stripCell(
+                    sunday.add(Duration(days: i)), labels[i], today)),
             if (i < 6) const SizedBox(width: 7),
           ],
         ],
@@ -744,7 +776,9 @@ class _PlanTabState extends State<PlanTab> {
           border: Border.all(
               color: selected
                   ? ZveltTokens.brand
-                  : (day == today ? ZveltTokens.borderStrong : ZveltTokens.border),
+                  : (day == today
+                      ? ZveltTokens.borderStrong
+                      : ZveltTokens.border),
               width: selected ? 1.5 : 1),
         ),
         child: Column(
@@ -754,8 +788,7 @@ class _PlanTabState extends State<PlanTab> {
                     fontWeight: FontWeight.w800,
                     color: selected ? ZveltTokens.brand : ZveltTokens.text)),
             const SizedBox(height: 2),
-            Text(label,
-                style: ZType.monoXS.copyWith(fontSize: 11)),
+            Text(label, style: ZType.monoXS.copyWith(fontSize: 11)),
             const SizedBox(height: 2),
             SizedBox(
               height: 29, // 12 + 5 gap + 12 — keeps all cells equal height.
@@ -797,7 +830,8 @@ class _PlanTabState extends State<PlanTab> {
                   const SizedBox(width: 6),
                   Text('Add',
                       style: ZType.bodyS.copyWith(
-                          fontWeight: FontWeight.w600, color: ZveltTokens.text)),
+                          fontWeight: FontWeight.w600,
+                          color: ZveltTokens.text)),
                 ],
               ),
             ),
@@ -827,12 +861,11 @@ class _PlanTabState extends State<PlanTab> {
               radius: ZveltTokens.rBox,
             ),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
               alignment: Alignment.center,
               child: Text('Nothing planned yet — use Auto-Plan or Add.',
-                  style: ZType.bodyS.copyWith(
-                      fontSize: 13, fontWeight: FontWeight.w500)),
+                  style: ZType.bodyS
+                      .copyWith(fontSize: 13, fontWeight: FontWeight.w500)),
             ),
           ),
         ),
@@ -867,7 +900,8 @@ class _PlanTabState extends State<PlanTab> {
       _aiProgramCard(),
       Padding(
         padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
-        child: Text('Choose your split', style: ZType.h4.copyWith(fontSize: 20)),
+        child:
+            Text('Choose your split', style: ZType.h4.copyWith(fontSize: 20)),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -910,8 +944,8 @@ class _PlanTabState extends State<PlanTab> {
                       style: ZType.eyebrow.copyWith(color: ZveltTokens.brand)),
                   const SizedBox(height: 3),
                   Text(program.title,
-                      style: ZType.bodyL.copyWith(
-                          fontSize: 16, fontWeight: FontWeight.w800)),
+                      style: ZType.bodyL
+                          .copyWith(fontSize: 16, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 3),
                   Text(
                       'Week ${program.currentWeek}/${program.totalWeeks} · ${program.daysPerWeek}×/week',
@@ -1029,8 +1063,8 @@ class _PlanTabState extends State<PlanTab> {
             border: Border.all(color: ZveltTokens.border),
           ),
           child: Text(label,
-              style: ZType.monoXS.copyWith(
-                  fontSize: 11, fontWeight: FontWeight.w600)),
+              style: ZType.monoXS
+                  .copyWith(fontSize: 11, fontWeight: FontWeight.w600)),
         );
 
     return InkWell(
@@ -1053,8 +1087,8 @@ class _PlanTabState extends State<PlanTab> {
                   child: Text(t.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: ZType.bodyL.copyWith(
-                          fontSize: 15, fontWeight: FontWeight.w700)),
+                      style: ZType.bodyL
+                          .copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
                 if (active) ...[
                   const SizedBox(width: 8),
@@ -1172,8 +1206,7 @@ class _AgendaRowState extends State<_AgendaRow> {
                   style: ZType.bodyL.copyWith(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    decoration:
-                        e.completed ? TextDecoration.lineThrough : null,
+                    decoration: e.completed ? TextDecoration.lineThrough : null,
                     color: e.completed ? ZveltTokens.text2 : ZveltTokens.text,
                   ),
                 ),
@@ -1251,9 +1284,8 @@ class _AgendaRowState extends State<_AgendaRow> {
             ),
           ),
           AnimatedContainer(
-            duration: _dragging
-                ? Duration.zero
-                : const Duration(milliseconds: 220),
+            duration:
+                _dragging ? Duration.zero : const Duration(milliseconds: 220),
             curve: Curves.easeOut,
             transform: Matrix4.translationValues(_dx, 0, 0),
             child: GestureDetector(
@@ -1518,8 +1550,8 @@ class _PlanAddSheetState extends State<_PlanAddSheet> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                    color: ZveltTokens.brand),
+                                borderSide:
+                                    const BorderSide(color: ZveltTokens.brand),
                               ),
                             ),
                           ),
@@ -1635,8 +1667,8 @@ class _PlanAddSheetState extends State<_PlanAddSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(p.title,
-                      style: ZType.bodyM.copyWith(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
+                      style: ZType.bodyM
+                          .copyWith(fontSize: 14, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 1),
                   Text(p.sub,
                       style: ZType.bodyS.copyWith(

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
@@ -16,6 +15,7 @@ import '../ai/ai_chat_screen.dart';
 import '../analytics/progress_screen.dart';
 import '../onboarding/light_onboarding_flow.dart';
 import '../onboarding/onboarding_keys.dart';
+import '../settings/delete_account_screen.dart';
 
 /// PROFILE — 1:1 with the ZVELT handoff prototype (screen A7).
 ///
@@ -42,6 +42,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
   String _name = 'Athlete';
   String _email = '';
+  bool _isGuest = false;
   DateTime? _memberSince;
   bool _loading = true;
 
@@ -57,11 +58,15 @@ class _ProfileTabState extends State<ProfileTab> {
       if (!mounted) return;
       final profile = me?['profile'] as Map<String, dynamic>?;
       final createdRaw = me?['createdAt'] ?? profile?['createdAt'];
+      final email = (me?['email'] as String?)?.trim() ?? '';
+      final isGuest =
+          email.startsWith('guest_') && email.endsWith('@guest.zvelt.app');
       setState(() {
         _name = (profile?['displayName'] as String?)?.trim().isNotEmpty == true
             ? (profile!['displayName'] as String).trim()
             : 'Athlete';
-        _email = (me?['email'] as String?)?.trim() ?? '';
+        _email = isGuest ? 'Guest account' : email;
+        _isGuest = isGuest;
         _memberSince =
             createdRaw is String ? DateTime.tryParse(createdRaw) : null;
         _loading = false;
@@ -89,14 +94,38 @@ class _ProfileTabState extends State<ProfileTab> {
     ));
   }
 
-  void _openAccountSheet() {
-    _sheet(_AccountSheet(
-      name: _name,
-      email: _email,
-      memberSince: _memberSince,
-      onEditProfile: _openEditSheet,
-      onLogout: _confirmLogout,
-    ));
+  Future<void> _openAccountSheet() async {
+    final action = await showModalBottomSheet<_AccountSheetAction>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AccountSheet(
+        name: _name,
+        email: _email,
+        isGuest: _isGuest,
+        memberSince: _memberSince,
+        onEditProfile: _openEditSheet,
+        onLogout: _confirmLogout,
+      ),
+    );
+    if (action != _AccountSheetAction.delete || !mounted) return;
+    await _openDeleteAccount();
+  }
+
+  Future<void> _openDeleteAccount() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => DeleteAccountScreen(
+          onAccountDeleted: () async {
+            if (!mounted) return;
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            await widget.onLogout();
+          },
+        ),
+      ),
+    );
+    if (mounted) await _load();
   }
 
   Future<void> _confirmLogout() async {
@@ -182,8 +211,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   decoration: BoxDecoration(
                     gradient: ZveltTokens.gradAccentDeep,
                     borderRadius: BorderRadius.circular(ZveltTokens.rCardSm),
-                    border:
-                        Border.all(color: ZveltTokens.border, width: 1.5),
+                    border: Border.all(color: ZveltTokens.border, width: 1.5),
                     boxShadow: const [
                       BoxShadow(
                           color: Color(0x40000000),
@@ -218,7 +246,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         const SizedBox(height: 5),
                         Row(
                           children: [
-                            Icon(AppIcons.envelope,
+                            Icon(_isGuest ? AppIcons.user : AppIcons.envelope,
                                 size: 15, color: ZveltTokens.text2),
                             const SizedBox(width: 6),
                             Flexible(
@@ -269,76 +297,60 @@ class _ProfileTabState extends State<ProfileTab> {
           // Premium banner
           Padding(
             padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
-            child: InkWell(
-              onTap: () => _sheet(const _PremiumSheet()),
-              borderRadius: BorderRadius.circular(ZveltTokens.rCard),
-              child: Container(
-                clipBehavior: Clip.antiAlias,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment(-1, -0.3),
-                    end: Alignment(1, 0.6),
-                    stops: [0, 0.55, 1],
-                    colors: [
-                      Color(0xFFF58A11),
-                      Color(0xFFEE6E08),
-                      Color(0xFFD85F04)
-                    ],
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment(-1, -0.3),
+                  end: Alignment(1, 0.6),
+                  stops: [0, 0.55, 1],
+                  colors: [
+                    Color(0xFFF58A11),
+                    Color(0xFFEE6E08),
+                    Color(0xFFD85F04)
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(ZveltTokens.rCard),
+                boxShadow: const [
+                  BoxShadow(
+                      color: Color(0x8CEE6E08),
+                      blurRadius: 34,
+                      offset: Offset(0, 16),
+                      spreadRadius: -8),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0x33FFFFFF),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(AppIcons.crown,
+                        size: 24, color: ZveltTokens.onBrand),
                   ),
-                  borderRadius: BorderRadius.circular(ZveltTokens.rCard),
-                  boxShadow: const [
-                    BoxShadow(
-                        color: Color(0x8CEE6E08),
-                        blurRadius: 34,
-                        offset: Offset(0, 16),
-                        spreadRadius: -8),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0x33FFFFFF),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Icon(AppIcons.crown,
-                          size: 24, color: ZveltTokens.onBrand),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('ZVELT Premium',
+                            style: ZType.bodyL.copyWith(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: ZveltTokens.onBrand)),
+                        const SizedBox(height: 3),
+                        Text('Purchases are unavailable in this build.',
+                            style: ZType.bodyS.copyWith(
+                                fontSize: 12, color: const Color(0xE6FFFFFF))),
+                      ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Upgrade To ZVELT Premium',
-                              style: ZType.bodyL.copyWith(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  color: ZveltTokens.onBrand)),
-                          const SizedBox(height: 3),
-                          Text(
-                              'Unlock smarter training, nutrition and AI coaching.',
-                              style: ZType.bodyS.copyWith(
-                                  fontSize: 12,
-                                  color: const Color(0xE6FFFFFF))),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                          shape: BoxShape.circle, color: Color(0x38FFFFFF)),
-                      child: const Icon(AppIcons.angle_small_right,
-                          size: 18, color: ZveltTokens.onBrand),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -346,8 +358,7 @@ class _ProfileTabState extends State<ProfileTab> {
           Padding(
             padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
               decoration: BoxDecoration(
                 gradient: ZveltTokens.surfaceGrad,
                 borderRadius: BorderRadius.circular(18),
@@ -366,41 +377,67 @@ class _ProfileTabState extends State<ProfileTab> {
                     valueListenable: ZveltThemeNotifier.mode,
                     builder: (context, mode, _) {
                       final dark = mode != ThemeMode.light;
-                      Widget item(IconData icon, bool selected,
-                              VoidCallback onTap) =>
-                          InkWell(
-                            onTap: onTap,
-                            borderRadius: BorderRadius.circular(11),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 11, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? ZveltTokens.brand
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(11),
+                      Widget item({
+                        required IconData icon,
+                        required String label,
+                        required bool selected,
+                        required VoidCallback onTap,
+                      }) =>
+                          Semantics(
+                            button: true,
+                            selected: selected,
+                            label: label,
+                            child: Tooltip(
+                              message: label,
+                              child: SizedBox(
+                                width: 48,
+                                height: 44,
+                                child: InkWell(
+                                  onTap: onTap,
+                                  borderRadius: BorderRadius.circular(11),
+                                  child: Container(
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? ZveltTokens.brand
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(11),
+                                    ),
+                                    child: Icon(icon,
+                                        size: 15,
+                                        color: selected
+                                            ? ZveltTokens.onBrand
+                                            : ZveltTokens.text3),
+                                  ),
+                                ),
                               ),
-                              child: Icon(icon,
-                                  size: 15,
-                                  color: selected
-                                      ? ZveltTokens.onBrand
-                                      : ZveltTokens.text3),
                             ),
                           );
                       return Container(
                         padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
                           color: ZveltTokens.chip,
-                          borderRadius: BorderRadius.circular(ZveltTokens.rChip),
+                          borderRadius:
+                              BorderRadius.circular(ZveltTokens.rChip),
                           border: Border.all(color: ZveltTokens.border),
                         ),
                         child: Row(
                           children: [
-                            item(AppIcons.moon, dark,
-                                () => ZveltThemeNotifier.set(ThemeMode.dark)),
+                            item(
+                              icon: AppIcons.moon,
+                              label: 'Use dark appearance',
+                              selected: dark,
+                              onTap: () =>
+                                  ZveltThemeNotifier.set(ThemeMode.dark),
+                            ),
                             const SizedBox(width: 3),
-                            item(AppIcons.sun, !dark,
-                                () => ZveltThemeNotifier.set(ThemeMode.light)),
+                            item(
+                              icon: AppIcons.sun,
+                              label: 'Use light appearance',
+                              selected: !dark,
+                              onTap: () =>
+                                  ZveltThemeNotifier.set(ThemeMode.light),
+                            ),
                           ],
                         ),
                       );
@@ -495,8 +532,8 @@ class _ProfileTabState extends State<ProfileTab> {
               const SizedBox(width: 13),
               Expanded(
                 child: Text(label,
-                    style: ZType.bodyM.copyWith(
-                        fontSize: 14.5, fontWeight: FontWeight.w600)),
+                    style: ZType.bodyM
+                        .copyWith(fontSize: 14.5, fontWeight: FontWeight.w600)),
               ),
               Icon(AppIcons.angle_small_right,
                   size: 17, color: ZveltTokens.text3),
@@ -657,8 +694,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             borderRadius: BorderRadius.circular(ZveltTokens.rControl),
             child: Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
               decoration: BoxDecoration(
                 gradient: ZveltTokens.surface2Grad,
                 borderRadius: BorderRadius.circular(ZveltTokens.rControl),
@@ -681,8 +717,8 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   ),
                   const SizedBox(width: 12),
                   Text('Replay intro tour',
-                      style: ZType.bodyM.copyWith(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
+                      style: ZType.bodyM
+                          .copyWith(fontSize: 14, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
@@ -702,8 +738,8 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               style: FilledButton.styleFrom(
                 backgroundColor: ZveltTokens.error.withValues(alpha: 0.12),
                 foregroundColor: ZveltTokens.error,
-                side: BorderSide(
-                    color: ZveltTokens.error.withValues(alpha: 0.4)),
+                side:
+                    BorderSide(color: ZveltTokens.error.withValues(alpha: 0.4)),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(ZveltTokens.rControl),
                 ),
@@ -730,8 +766,8 @@ class _SettingsSheetState extends State<_SettingsSheet> {
           children: [
             Expanded(
               child: Text(label,
-                  style: ZType.bodyM.copyWith(
-                      fontSize: 14.5, fontWeight: FontWeight.w600)),
+                  style: ZType.bodyM
+                      .copyWith(fontSize: 14.5, fontWeight: FontWeight.w600)),
             ),
             _BrandSwitch(value: value, onChanged: _ready ? onChanged : null),
           ],
@@ -908,23 +944,37 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 // sheetAccount — Account (HTML 1267-1283)
 // ─────────────────────────────────────────────────────────────────────────────
 
+enum _AccountSheetAction { delete }
+
 class _AccountSheet extends StatelessWidget {
   const _AccountSheet({
     required this.name,
     required this.email,
+    required this.isGuest,
     required this.memberSince,
     required this.onEditProfile,
     required this.onLogout,
   });
   final String name;
   final String email;
+  final bool isGuest;
   final DateTime? memberSince;
   final VoidCallback onEditProfile;
   final Future<void> Function() onLogout;
 
   static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   Widget _infoRow(String label, String value, {bool accent = false}) {
@@ -953,8 +1003,8 @@ class _AccountSheet extends StatelessWidget {
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
                           color: ZveltTokens.brand)
-                      : ZType.bodyM.copyWith(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
+                      : ZType.bodyM
+                          .copyWith(fontSize: 14, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -972,7 +1022,10 @@ class _AccountSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _infoRow('Name', name),
-          if (email.isNotEmpty) _infoRow('Email', email),
+          if (isGuest)
+            _infoRow('Account', 'Guest account')
+          else if (email.isNotEmpty)
+            _infoRow('Email', email),
           // 'Member since' only when the backend exposes a creation date —
           // never fabricate one.
           if (since != null)
@@ -1020,6 +1073,21 @@ class _AccountSheet extends StatelessWidget {
                     fontSize: 13.5, fontWeight: FontWeight.w800),
               ),
               child: const Text('Sign out'),
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 48,
+            child: TextButton.icon(
+              onPressed: () =>
+                  Navigator.of(context).pop(_AccountSheetAction.delete),
+              icon: const Icon(AppIcons.trash, size: 18),
+              label: const Text('Delete account'),
+              style: TextButton.styleFrom(
+                foregroundColor: ZveltTokens.error,
+                textStyle: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w800),
+              ),
             ),
           ),
         ],
@@ -1085,8 +1153,7 @@ class _PremiumSheetState extends State<_PremiumSheet> {
                         color: ZveltTokens.success.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(9),
                         border: Border.all(
-                            color:
-                                ZveltTokens.success.withValues(alpha: 0.3)),
+                            color: ZveltTokens.success.withValues(alpha: 0.3)),
                       ),
                       child: Text('SAVE 30%',
                           style: ZType.bodyS.copyWith(
@@ -1098,8 +1165,7 @@ class _PremiumSheetState extends State<_PremiumSheet> {
                 ],
               ),
               const SizedBox(height: 3),
-              Text(price,
-                  style: ZType.h3.copyWith(fontSize: 22)),
+              Text(price, style: ZType.h3.copyWith(fontSize: 22)),
               const SizedBox(height: 1),
               Text(sub,
                   style: ZType.bodyS.copyWith(
@@ -1126,8 +1192,7 @@ class _PremiumSheetState extends State<_PremiumSheet> {
           borderRadius: BorderRadius.circular(13),
           boxShadow: ZveltTokens.glowSm,
         ),
-        child:
-            const Icon(AppIcons.crown, size: 21, color: ZveltTokens.onBrand),
+        child: const Icon(AppIcons.crown, size: 21, color: ZveltTokens.onBrand),
       ),
       maxHeightFactor: 0.92,
       footer: SizedBox(
@@ -1251,8 +1316,8 @@ class _HelpSheetState extends State<_HelpSheet> {
     await SharePlus.instance.share(ShareParams(text: text));
   }
 
-  Widget _eyebrow(String text) => Text(text,
-      style: ZType.eyebrow.copyWith(color: ZveltTokens.text3));
+  Widget _eyebrow(String text) =>
+      Text(text, style: ZType.eyebrow.copyWith(color: ZveltTokens.text3));
 
   Widget _faqCard(int index) {
     final (q, a) = _faqs[index];
@@ -1410,8 +1475,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
           if (widget.showVersionChip) ...[
             const SizedBox(height: 12),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
               decoration: BoxDecoration(
                 gradient: ZveltTokens.surface2Grad,
                 borderRadius: BorderRadius.circular(13),
@@ -1492,8 +1556,8 @@ class _AboutSheetState extends State<_AboutSheet> {
             children: [
               Expanded(
                 child: Text(label,
-                    style: ZType.bodyM.copyWith(
-                        fontSize: 13.5, fontWeight: FontWeight.w700)),
+                    style: ZType.bodyM
+                        .copyWith(fontSize: 13.5, fontWeight: FontWeight.w700)),
               ),
               Icon(AppIcons.angle_small_right,
                   size: 17, color: ZveltTokens.text3),
@@ -1528,12 +1592,11 @@ class _AboutSheetState extends State<_AboutSheet> {
               ),
               const SizedBox(height: 14),
               Text('ZVELT',
-                  style: ZType.h3
-                      .copyWith(fontSize: 21, letterSpacing: 3.4)),
+                  style: ZType.h3.copyWith(fontSize: 21, letterSpacing: 3.4)),
               const SizedBox(height: 4),
               Text(_version.isEmpty ? '…' : 'Version $_version',
-                  style: ZType.bodyS.copyWith(
-                      fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  style: ZType.bodyS
+                      .copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)),
               const SizedBox(height: 14),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1613,8 +1676,7 @@ class _SheetShell extends StatelessWidget {
                   Text(title, style: ZType.h4.copyWith(fontSize: 19)),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
-                    Text(subtitle!,
-                        style: ZType.bodyS.copyWith(fontSize: 12)),
+                    Text(subtitle!, style: ZType.bodyS.copyWith(fontSize: 12)),
                   ],
                 ],
               ),

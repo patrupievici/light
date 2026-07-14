@@ -21,7 +21,7 @@ enum ZveltPrimaryVariant { gradient, darkInverse, lightInverse }
 /// Defaults to a 56-tall gradient pill. Two opt-in inversions
 /// ([ZveltPrimaryVariant.darkInverse], [ZveltPrimaryVariant.lightInverse])
 /// exist for documented edge cases where the gradient would clash with the
-/// surrounding card. Set [small] for a 40-tall compact variant.
+/// surrounding card. Set [small] for a compact-text 48-tall variant.
 class ZveltPrimaryButton extends StatelessWidget {
   const ZveltPrimaryButton({
     super.key,
@@ -40,7 +40,7 @@ class ZveltPrimaryButton extends StatelessWidget {
   final bool enabled;
   final ZveltPrimaryVariant variant;
 
-  /// When true, render at h=40 with smaller text/icon. Default h=56.
+  /// When true, keep compact text/icon while retaining a 48dp tap target.
   final bool small;
 
   /// Optional trailing icon shown after the label.
@@ -55,7 +55,7 @@ class ZveltPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double height = small ? 40 : 56;
+    final double height = small ? 48 : 56;
     final double radius = height / 2;
     final double fontSize = small ? 13 : 16;
     final double iconSize = small ? 14 : 18;

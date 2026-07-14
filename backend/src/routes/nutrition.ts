@@ -267,10 +267,26 @@ const SuggestionQuerySchema = z.object({
   sex: z.enum(['male', 'female', 'other']).optional(),
   activity: z
     .enum(['sedentary', 'light', 'moderate', 'active', 'very_active'])
-    .optional()
-    .default('moderate'),
+    .optional(),
   goal: z.enum(VALID_GOALS as unknown as [GoalKey, ...GoalKey[]]).optional(),
 })
+
+function isActivityKey(value: unknown): value is ActivityKey {
+  return typeof value === 'string' && value in ACTIVITY_MULTIPLIERS
+}
+
+function nutritionGoalToGoalKey(value: unknown): GoalKey | null {
+  switch (value) {
+    case 'lose':
+      return 'fat_loss'
+    case 'gain':
+      return 'hypertrophy'
+    case 'maintain':
+      return 'maintenance'
+    default:
+      return null
+  }
+}
 
 // ── Saved meal templates ─────────────────────────────────────────────────────
 const TemplateItemSchema = z.object({
@@ -441,40 +457,24 @@ export async function nutritionRoutes(app: FastifyInstance) {
         return reply.send({ weekStart, generated: false, plan: existing })
       }
 
-      const [profile, tp] = await Promise.all([
-        prisma.userProfile.findUnique({ where: { userId } }),
-        prisma.userTrainingProfile.findUnique({ where: { userId } }),
-      ])
-      const goal = tp?.primaryGoal ?? 'maintenance'
-      const trainingDays = Math.min(6, Math.max(1, tp?.daysPerWeek ?? 4))
-      const baseCalories = profile?.dailyCalories ?? 2200
+      const profile = await prisma.userProfile.findUnique({ where: { userId } })
+      const goal = profile?.nutritionGoal ?? 'maintain'
+      // The profile target is canonical for the diary AND the meal plan. Do
+      // not add training/rest deltas here: that was the source of two calorie
+      // targets appearing on the same Nutrition screen.
+      const baseCalories = profile?.dailyCalories ?? 2000
       const baseProtein = Number(profile?.dailyProtein ?? 150)
       const baseCarbs = Number(profile?.dailyCarbs ?? 250)
-      const baseFat = Number(profile?.dailyFat ?? 70)
+      const baseFat = Number(profile?.dailyFat ?? 65)
       const water = profile?.dailyWaterMl ?? 2500
 
-      const trainCalAdj =
-        goal === 'fat_loss'
-          ? -50
-          : goal === 'hypertrophy'
-            ? 150
-            : goal === 'strength'
-              ? 120
-              : 80
-      const restCalAdj = goal === 'fat_loss' ? -180 : -100
-
-      const weekPlan = weekDays.map((day, idx) => {
-        const isTraining = idx < trainingDays
-        const calories = Math.max(1200, baseCalories + (isTraining ? trainCalAdj : restCalAdj))
-        const protein = Math.max(60, Math.round(baseProtein))
-        const fat = Math.max(30, Math.round(baseFat + (isTraining ? 0 : -5)))
-        const carbs = Math.max(60, Math.round((calories - protein * 4 - fat * 9) / 4))
+      const weekPlan = weekDays.map((day) => {
         return {
           day,
-          calories,
-          protein,
-          carbs,
-          fat,
+          calories: baseCalories,
+          protein: Math.round(baseProtein),
+          carbs: Math.round(baseCarbs),
+          fat: Math.round(baseFat),
           water,
         }
       })
@@ -492,6 +492,8 @@ export async function nutritionRoutes(app: FastifyInstance) {
             waterMl: d.water,
           })),
           goal,
+          diet: profile?.nutritionDiet ?? 'omnivore',
+          mealsPerDay: profile?.nutritionMealsPerDay ?? 3,
         })
       } catch {
         aiMealsByDay = null
@@ -1009,16 +1011,24 @@ export async function nutritionRoutes(app: FastifyInstance) {
       })
     }
 
-    const rawGoal = parsed.data.goal ?? (tp?.primaryGoal as GoalKey | undefined)
+    const rawGoal =
+      parsed.data.goal ??
+      nutritionGoalToGoalKey(profile?.nutritionGoal) ??
+      (tp?.primaryGoal as GoalKey | undefined)
     const goal: GoalKey =
       rawGoal && VALID_GOALS.includes(rawGoal) ? rawGoal : 'maintenance'
+    const activity: ActivityKey =
+      parsed.data.activity ??
+      (isActivityKey(profile?.nutritionActivityLevel)
+        ? profile.nutritionActivityLevel
+        : 'moderate')
 
     const s = computeNutritionSuggestion({
       weightKg: weightKg as number,
       heightCm: heightCm as number,
       ageYears: ageYears as number,
       sex,
-      activity: parsed.data.activity,
+      activity,
       goal,
     })
 
@@ -1036,7 +1046,7 @@ export async function nutritionRoutes(app: FastifyInstance) {
         heightCm,
         ageYears,
         sex,
-        activity: parsed.data.activity,
+        activity,
         goal,
       },
       explain: {

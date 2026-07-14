@@ -3,11 +3,11 @@ import path from 'node:path'
 
 const MAX_BYTES = 1_800_000 // ~1.8 MB
 
-function extFromMagic(buf: Buffer): 'jpg' | 'png' | 'webp' {
+function extFromMagic(buf: Buffer): 'jpg' | 'png' | 'webp' | null {
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg'
   if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png'
   if (buf.length >= 12 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'webp'
-  return 'jpg'
+  return null
 }
 
 /** Acceptă data URL sau base64 brut; returnează buffer sau aruncă. */
@@ -25,6 +25,7 @@ export function decodePostPhotoBase64(input: string): Buffer {
 
   if (buf.length < 32) throw new Error('PHOTO_TOO_SMALL')
   if (buf.length > MAX_BYTES) throw new Error('PHOTO_TOO_LARGE')
+  if (extFromMagic(buf) == null) throw new Error('PHOTO_UNSUPPORTED_FORMAT')
 
   return buf
 }
@@ -35,6 +36,7 @@ export function uploadsRoot(): string {
 
 export async function savePostPhoto(postId: string, buf: Buffer): Promise<string> {
   const ext = extFromMagic(buf)
+  if (ext == null) throw new Error('PHOTO_UNSUPPORTED_FORMAT')
   const dir = path.join(uploadsRoot(), 'posts')
   await fs.mkdir(dir, { recursive: true })
   const filename = `${postId}.${ext}`
@@ -49,6 +51,7 @@ export async function savePostPhoto(postId: string, buf: Buffer): Promise<string
  */
 export async function saveStoryPhoto(storyId: string, buf: Buffer): Promise<string> {
   const ext = extFromMagic(buf)
+  if (ext == null) throw new Error('PHOTO_UNSUPPORTED_FORMAT')
   const dir = path.join(uploadsRoot(), 'stories')
   await fs.mkdir(dir, { recursive: true })
   const filename = `${storyId}.${ext}`
@@ -83,11 +86,28 @@ export async function deleteUploadByUrl(url: string | null | undefined): Promise
 /** Same size/format constraints as posts; one file per user (overwrites). */
 export async function saveAvatarPhoto(userId: string, buf: Buffer): Promise<string> {
   const ext = extFromMagic(buf)
+  if (ext == null) throw new Error('PHOTO_UNSUPPORTED_FORMAT')
   const dir = path.join(uploadsRoot(), 'avatars')
   await fs.mkdir(dir, { recursive: true })
-  // Bust browser/image caches when the user re-uploads by appending a v=now
-  // query at the URL level (frontend), but the file itself stays at `<id>.<ext>`.
+  // There is one current avatar per account. Removing all old extensions keeps
+  // a JPG -> PNG replacement from leaving a private orphan on disk.
+  await Promise.all(
+    ['jpg', 'png', 'webp'].map(async (candidate) => {
+      if (candidate === ext) return
+      await fs.unlink(path.join(dir, `${userId}.${candidate}`)).catch(() => undefined)
+    }),
+  )
   const filename = `${userId}.${ext}`
   await fs.writeFile(path.join(dir, filename), buf)
   return `/uploads/avatars/${filename}`
+}
+
+/** Remove every possible avatar variant for an erased account. */
+export async function deleteAvatarPhotos(userId: string): Promise<void> {
+  const dir = path.join(uploadsRoot(), 'avatars')
+  await Promise.all(
+    ['jpg', 'png', 'webp'].map((ext) =>
+      fs.unlink(path.join(dir, `${userId}.${ext}`)).catch(() => undefined),
+    ),
+  )
 }

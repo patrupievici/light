@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth'
 import { getStreakStatus } from '../services/streak.service'
 import { gameXpPayload } from '../services/gym-xp.service'
 import { loadDailyQuoteForApi } from '../services/global-daily-quote'
-import { decodePostPhotoBase64, saveAvatarPhoto } from '../lib/post-photo'
+import { decodePostPhotoBase64, deleteUploadByUrl, saveAvatarPhoto } from '../lib/post-photo'
 
 const UpdateProfileSchema = z.object({
   displayName: z.string().min(1).max(50).optional(),
@@ -22,6 +22,12 @@ const UpdateProfileSchema = z.object({
   dailyCarbs: z.number().min(0).max(2000).optional(),
   dailyFat: z.number().min(0).max(1000).optional(),
   dailyWaterMl: z.number().int().min(0).max(20000).optional(),
+  nutritionGoal: z.enum(['lose', 'maintain', 'gain']).optional(),
+  nutritionActivityLevel: z
+    .enum(['sedentary', 'light', 'moderate', 'active', 'very_active'])
+    .optional(),
+  nutritionDiet: z.enum(['omnivore', 'vegetarian', 'vegan']).optional(),
+  nutritionMealsPerDay: z.number().int().min(3).max(4).optional(),
   /// Direct URL override (e.g. user pastes a URL or migrating from another
   /// provider). For in-app uploads use POST /v1/me/avatar instead.
   photoUrl: z.string().url().max(512).nullable().optional(),
@@ -214,19 +220,53 @@ export async function profileRoutes(app: FastifyInstance) {
       }
     }
 
-    const { dailyCalories, dailyProtein, dailyCarbs, dailyFat, dailyWaterMl, ...rest } =
-      parsed.data
+    const {
+      dailyCalories,
+      dailyProtein,
+      dailyCarbs,
+      dailyFat,
+      dailyWaterMl,
+      nutritionGoal,
+      nutritionActivityLevel,
+      nutritionDiet,
+      nutritionMealsPerDay,
+      ...rest
+    } = parsed.data
+    const nutritionInputsChanged = [
+      dailyCalories,
+      dailyProtein,
+      dailyCarbs,
+      dailyFat,
+      dailyWaterMl,
+      nutritionGoal,
+      nutritionActivityLevel,
+      nutritionDiet,
+      nutritionMealsPerDay,
+    ].some((value) => value !== undefined)
 
-    const profile = await prisma.userProfile.update({
-      where: { userId },
-      data: {
-        ...rest,
-        ...(dailyCalories !== undefined && { dailyCalories }),
-        ...(dailyProtein !== undefined && { dailyProtein }),
-        ...(dailyCarbs !== undefined && { dailyCarbs }),
-        ...(dailyFat !== undefined && { dailyFat }),
-        ...(dailyWaterMl !== undefined && { dailyWaterMl }),
-      },
+    // Targets and preferences are one canonical profile record. Existing meal
+    // plans are derived output, so invalidate them atomically whenever any
+    // source input changes rather than letting the diary and plan diverge.
+    const profile = await prisma.$transaction(async (tx) => {
+      const updated = await tx.userProfile.update({
+        where: { userId },
+        data: {
+          ...rest,
+          ...(dailyCalories !== undefined && { dailyCalories }),
+          ...(dailyProtein !== undefined && { dailyProtein }),
+          ...(dailyCarbs !== undefined && { dailyCarbs }),
+          ...(dailyFat !== undefined && { dailyFat }),
+          ...(dailyWaterMl !== undefined && { dailyWaterMl }),
+          ...(nutritionGoal !== undefined && { nutritionGoal }),
+          ...(nutritionActivityLevel !== undefined && { nutritionActivityLevel }),
+          ...(nutritionDiet !== undefined && { nutritionDiet }),
+          ...(nutritionMealsPerDay !== undefined && { nutritionMealsPerDay }),
+        },
+      })
+      if (nutritionInputsChanged) {
+        await tx.nutritionPlanDay.deleteMany({ where: { userId } })
+      }
+      return updated
     })
 
     // Daca s-a setat bodyweight, emite eveniment analytics
@@ -373,10 +413,15 @@ export async function profileRoutes(app: FastifyInstance) {
   // re-upload anyway since the filename is stable per user).
   app.delete('/me/avatar', { preHandler: authenticate }, async (request, reply) => {
     const { userId } = request.user
+    const profile = await prisma.userProfile.findUnique({
+      where: { userId },
+      select: { photoUrl: true },
+    })
     await prisma.userProfile.update({
       where: { userId },
       data: { photoUrl: null },
     })
+    await deleteUploadByUrl(profile?.photoUrl)
     return reply.code(204).send()
   })
 

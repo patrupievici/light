@@ -276,6 +276,14 @@ class _NutritionTabState extends State<NutritionTab> {
               .goalsFromMeResponse(me)
               .catchError((_) => const NutritionGoals())
           : await _service.getGoals().catchError((_) => const NutritionGoals());
+      if (!nutritionPlanMatchesGoals(goals, plan)) {
+        // A plan is server-derived output. Ignore stale/cross-version rows
+        // instead of letting a previous target leak into today's tracker.
+        debugPrint(
+          '[NutritionTab] ignoring weekly plan that differs from profile targets',
+        );
+        plan = const [];
+      }
       profileBw = signedIn
           ? _bodyweightFromProfileMap(me?['profile'] as Map<String, dynamic>?)
           : null;
@@ -301,8 +309,7 @@ class _NutritionTabState extends State<NutritionTab> {
       } catch (_) {/* non-fatal — calendar renders without dots */}
       try {
         final p = await SharedPreferences.getInstance();
-        _basketChecked =
-            (p.getStringList(_basketPrefsKey) ?? const []).toSet();
+        _basketChecked = (p.getStringList(_basketPrefsKey) ?? const []).toSet();
       } catch (_) {/* non-fatal */}
     } catch (e, st) {
       // Each fetch above has its own catchError fallback, so reaching here
@@ -690,8 +697,6 @@ class _NutritionTabState extends State<NutritionTab> {
     _syncFastingTicker();
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     // Day rollover: the tab State survives across midnight inside the nav
@@ -816,8 +821,7 @@ class _NutritionTabState extends State<NutritionTab> {
                         decoration: BoxDecoration(
                           color: ZveltTokens.brand,
                           borderRadius: BorderRadius.circular(9),
-                          border:
-                              Border.all(color: ZveltTokens.bg, width: 2),
+                          border: Border.all(color: ZveltTokens.bg, width: 2),
                         ),
                         child: Text('$_basketCount',
                             style: ZType.monoXS.copyWith(
@@ -880,8 +884,18 @@ class _NutritionTabState extends State<NutritionTab> {
   // Date row — '{Month Year}' + chevron · calendar button (HTML 224–227).
   Widget _dateRow() {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June', 'July',
-      'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
@@ -895,8 +909,8 @@ class _NutritionTabState extends State<NutritionTab> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('${months[_selDate.month - 1]} ${_selDate.year}',
-                    style: ZType.bodyL.copyWith(
-                        fontSize: 15, fontWeight: FontWeight.w700)),
+                    style: ZType.bodyL
+                        .copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
                 const SizedBox(width: 6),
                 Icon(AppIcons.angle_small_down,
                     size: 16, color: ZveltTokens.text2),
@@ -904,19 +918,29 @@ class _NutritionTabState extends State<NutritionTab> {
             ),
           ),
           const Spacer(),
-          InkWell(
-            onTap: _openCalendarSheet,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: ZveltTokens.chip,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: ZveltTokens.border),
+          Semantics(
+            button: true,
+            label: 'Choose nutrition date',
+            child: Tooltip(
+              message: 'Choose date',
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: InkWell(
+                  onTap: _openCalendarSheet,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: ZveltTokens.chip,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: ZveltTokens.border),
+                    ),
+                    child: Icon(AppIcons.calendar,
+                        size: 18, color: ZveltTokens.text),
+                  ),
+                ),
               ),
-              child: Icon(AppIcons.calendar, size: 18, color: ZveltTokens.text),
             ),
           ),
         ],
@@ -970,8 +994,8 @@ class _NutritionTabState extends State<NutritionTab> {
                     color: sel ? ZveltTokens.brand : ZveltTokens.text3)),
             const SizedBox(height: 6),
             Text('${day.day}',
-                style: ZType.bodyL.copyWith(
-                    fontSize: 17, fontWeight: FontWeight.w700)),
+                style: ZType.bodyL
+                    .copyWith(fontSize: 17, fontWeight: FontWeight.w700)),
           ],
         ),
       ),
@@ -1023,8 +1047,7 @@ class _NutritionTabState extends State<NutritionTab> {
                   style: ZType.bodyS.copyWith(
                       fontSize: 12,
                       fontWeight: active ? FontWeight.w700 : FontWeight.w600,
-                      color:
-                          active ? ZveltTokens.onBrand : ZveltTokens.text2)),
+                      color: active ? ZveltTokens.onBrand : ZveltTokens.text2)),
             ),
             if (active) ...[
               const SizedBox(width: 5),
@@ -1042,8 +1065,8 @@ class _NutritionTabState extends State<NutritionTab> {
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Text('$count',
-                    style: ZType.monoXS.copyWith(
-                        fontSize: 10.5, fontWeight: FontWeight.w800)),
+                    style: ZType.monoXS
+                        .copyWith(fontSize: 10.5, fontWeight: FontWeight.w800)),
               ),
             ],
           ],
@@ -1061,8 +1084,7 @@ class _NutritionTabState extends State<NutritionTab> {
       'snack': 'Snacks',
     };
     final entries = _totals.byMeal[_activeMeal] ?? const <MealEntry>[];
-    final kcal =
-        entries.fold<double>(0, (a, e) => a + e.calories).round();
+    final kcal = entries.fold<double>(0, (a, e) => a + e.calories).round();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -1079,8 +1101,8 @@ class _NutritionTabState extends State<NutritionTab> {
             Row(
               children: [
                 Text('${mealLabels[_activeMeal]} log',
-                    style: ZType.bodyL.copyWith(
-                        fontSize: 15, fontWeight: FontWeight.w700)),
+                    style: ZType.bodyL
+                        .copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
                 const Spacer(),
                 Text('$kcal kcal',
                     style: ZType.bodyS.copyWith(
@@ -1163,21 +1185,21 @@ class _NutritionTabState extends State<NutritionTab> {
               Text(e.food.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: ZType.bodyM.copyWith(
-                      fontSize: 13.5, fontWeight: FontWeight.w700)),
+                  style: ZType.bodyM
+                      .copyWith(fontSize: 13.5, fontWeight: FontWeight.w700)),
               const SizedBox(height: 1),
               Text(_mealEntrySubtitle(e),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: ZType.bodyS.copyWith(
-                      fontSize: 11, fontWeight: FontWeight.w500)),
+                  style: ZType.bodyS
+                      .copyWith(fontSize: 11, fontWeight: FontWeight.w500)),
             ],
           ),
         ),
         const SizedBox(width: 8),
         Text('${e.calories.round()} kcal',
-            style: ZType.bodyS.copyWith(
-                fontSize: 12.5, fontWeight: FontWeight.w700)),
+            style: ZType.bodyS
+                .copyWith(fontSize: 12.5, fontWeight: FontWeight.w700)),
         const SizedBox(width: 8),
         InkWell(
           onTap: () async {
@@ -1301,9 +1323,8 @@ class _NutritionTabState extends State<NutritionTab> {
   Widget _weekPlanRow() {
     final day = _selPlanDay;
     final goal = day?.goal.trim() ?? '';
-    final goalLabel = goal.isEmpty
-        ? 'Plan'
-        : '${goal[0].toUpperCase()}${goal.substring(1)}';
+    final goalLabel =
+        goal.isEmpty ? 'Plan' : '${goal[0].toUpperCase()}${goal.substring(1)}';
     final summary =
         '$goalLabel · ${_fmtInt(day?.calories ?? _goals.calories)} kcal/day';
 
@@ -1362,41 +1383,39 @@ class _NutritionTabState extends State<NutritionTab> {
     );
   }
 
-  /// AI Meal Plan quiz (prototype sheetPlan quiz step, HTML 743–758):
-  /// diet / goal / meals-per-day segmented rows, then 'Generate plan'.
-  /// generateWeeklyPlan has no preference parameters yet, so the answers are
-  /// persisted locally (best-effort) and generation runs as before.
+  /// AI Meal Plan quiz (prototype sheetPlan quiz step, HTML 743–758).
+  /// Answers are persisted in the canonical profile before generation.
   Future<void> _openPlanQuizSheet() async {
-    final picked =
-        await showModalBottomSheet<({String diet, String goal, int meals})>(
+    final picked = await showModalBottomSheet<
+        ({String diet, String goal, String activity, int meals})>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _PlanQuizSheet(),
+      builder: (_) => _PlanQuizSheet(goals: _goals),
     );
     if (picked == null || !mounted) return;
-    try {
-      final p = await SharedPreferences.getInstance();
-      await p.setString(_PlanQuizSheet.kDietPref, picked.diet);
-      await p.setString(_PlanQuizSheet.kGoalPref, picked.goal);
-      await p.setInt(_PlanQuizSheet.kMealsPref, picked.meals);
-    } catch (_) {/* non-fatal */}
+    final nextGoals = _goals.copyWith(
+      diet: picked.diet,
+      goal: picked.goal,
+      activityLevel: picked.activity,
+      mealsPerDay: picked.meals,
+    );
+    await _service.saveGoals(nextGoals);
     if (!mounted) return;
-    if (_weekPlan.isEmpty) {
-      await _bootstrapWeekPlan();
-    } else {
-      await _regenerateWeeklyPlanWithAi();
-    }
+    setState(() {
+      _goals = nextGoals;
+      _weekPlan = const [];
+    });
+    await _bootstrapWeekPlan(userInitiated: true);
   }
 
   /// 'Active plan' summary, same shape as the week-plan row (goal · kcal/day).
   String _planSummary() {
     final day = _selPlanDay;
     final goal = day?.goal.trim() ?? '';
-    final goalLabel = goal.isEmpty
-        ? 'Plan'
-        : '${goal[0].toUpperCase()}${goal.substring(1)}';
+    final goalLabel =
+        goal.isEmpty ? 'Plan' : '${goal[0].toUpperCase()}${goal.substring(1)}';
     return '$goalLabel · ${_fmtInt(day?.calories ?? _goals.calories)} kcal/day';
   }
 
@@ -1483,8 +1502,7 @@ class _NutritionTabState extends State<NutritionTab> {
                                 style: ZType.stat.copyWith(fontSize: 28)),
                             Text('filled',
                                 style: ZType.bodyS.copyWith(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500)),
+                                    fontSize: 11, fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ],
@@ -1516,8 +1534,7 @@ class _NutritionTabState extends State<NutritionTab> {
                             const SizedBox(width: 6),
                             Text('/ ${_fmtInt(goal)} cal',
                                 style: ZType.bodyS.copyWith(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
+                                    fontSize: 13, fontWeight: FontWeight.w600)),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -1571,8 +1588,8 @@ class _NutritionTabState extends State<NutritionTab> {
               ),
               const SizedBox(height: 9),
               Text(label,
-                  style: ZType.bodyS.copyWith(
-                      fontSize: 12, fontWeight: FontWeight.w500)),
+                  style: ZType.bodyS
+                      .copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
               const SizedBox(height: 9),
               SizedBox(
                 height: 10,
@@ -1606,8 +1623,8 @@ class _NutritionTabState extends State<NutritionTab> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: color,
-                              border: Border.all(
-                                  color: ZveltTokens.bg, width: 2.5),
+                              border:
+                                  Border.all(color: ZveltTokens.bg, width: 2.5),
                             ),
                           ),
                         ),
@@ -1702,21 +1719,36 @@ Widget _planSheetHeader(BuildContext context) {
       const SizedBox(width: 9),
       Expanded(
         child: Text('AI Meal Plan',
-            style: ZType.h4.copyWith(fontSize: 19, fontWeight: FontWeight.w800)),
+            style:
+                ZType.h4.copyWith(fontSize: 19, fontWeight: FontWeight.w800)),
       ),
-      InkWell(
-        onTap: () => Navigator.of(context).pop(),
-        customBorder: const CircleBorder(),
-        child: Container(
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: ZveltTokens.chip,
-            border: Border.all(color: ZveltTokens.border),
+      Semantics(
+        button: true,
+        label: 'Close meal plan',
+        child: Tooltip(
+          message: 'Close',
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: InkWell(
+              onTap: () => Navigator.of(context).pop(),
+              customBorder: const CircleBorder(),
+              child: Center(
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ZveltTokens.chip,
+                    border: Border.all(color: ZveltTokens.border),
+                  ),
+                  child: Icon(AppIcons.cross_small,
+                      size: 16, color: ZveltTokens.text2),
+                ),
+              ),
+            ),
           ),
-          child: Icon(AppIcons.cross_small, size: 16, color: ZveltTokens.text2),
         ),
       ),
     ],
@@ -1724,38 +1756,27 @@ Widget _planSheetHeader(BuildContext context) {
 }
 
 class _PlanQuizSheet extends StatefulWidget {
-  const _PlanQuizSheet();
+  const _PlanQuizSheet({required this.goals});
 
-  static const kDietPref = 'zvelt_plan_quiz_diet';
-  static const kGoalPref = 'zvelt_plan_quiz_goal';
-  static const kMealsPref = 'zvelt_plan_quiz_meals';
+  final NutritionGoals goals;
 
   @override
   State<_PlanQuizSheet> createState() => _PlanQuizSheetState();
 }
 
 class _PlanQuizSheetState extends State<_PlanQuizSheet> {
-  String _diet = 'omnivore';
-  String _goal = 'maintain';
-  int _meals = 3;
+  late String _diet;
+  late String _goal;
+  late String _activity;
+  late int _meals;
 
   @override
   void initState() {
     super.initState();
-    _restore();
-  }
-
-  /// Preseed with the previously chosen answers (best-effort).
-  Future<void> _restore() async {
-    try {
-      final p = await SharedPreferences.getInstance();
-      if (!mounted) return;
-      setState(() {
-        _diet = p.getString(_PlanQuizSheet.kDietPref) ?? _diet;
-        _goal = p.getString(_PlanQuizSheet.kGoalPref) ?? _goal;
-        _meals = p.getInt(_PlanQuizSheet.kMealsPref) ?? _meals;
-      });
-    } catch (_) {/* non-fatal — defaults stand */}
+    _diet = widget.goals.diet;
+    _goal = widget.goals.goal;
+    _activity = widget.goals.activityLevel;
+    _meals = widget.goals.mealsPerDay;
   }
 
   /// Segmented row (prototype HTML 746–756): chip container radius 16,
@@ -1785,17 +1806,23 @@ class _PlanQuizSheetState extends State<_PlanQuizSheet> {
                     color: current == opts[i].$1 ? ZveltTokens.brand : null,
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: Text(opts[i].$2,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ZType.bodyS.copyWith(
-                          fontSize: 13,
-                          fontWeight: current == opts[i].$1
-                              ? FontWeight.w700
-                              : FontWeight.w600,
-                          color: current == opts[i].$1
-                              ? ZveltTokens.onBrand
-                              : ZveltTokens.text2)),
+                  // Five activity options share one row. Scale only when a
+                  // user's text setting or a long label needs the space; the
+                  // value must remain readable rather than becoming "Modera…".
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(opts[i].$2,
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
+                        style: ZType.bodyS.copyWith(
+                            fontSize: 13,
+                            fontWeight: current == opts[i].$1
+                                ? FontWeight.w700
+                                : FontWeight.w600,
+                            color: current == opts[i].$1
+                                ? ZveltTokens.onBrand
+                                : ZveltTokens.text2)),
+                  ),
                 ),
               ),
             ),
@@ -1806,7 +1833,8 @@ class _PlanQuizSheetState extends State<_PlanQuizSheet> {
   }
 
   Widget _question(String text) => Text(text,
-      style: ZType.bodyS.copyWith(fontSize: 13, fontWeight: FontWeight.w700, color: ZveltTokens.text));
+      style: ZType.bodyS.copyWith(
+          fontSize: 13, fontWeight: FontWeight.w700, color: ZveltTokens.text));
 
   @override
   Widget build(BuildContext context) {
@@ -1866,6 +1894,20 @@ class _PlanQuizSheetState extends State<_PlanQuizSheet> {
                     (v) => setState(() => _goal = v),
                   ),
                   const SizedBox(height: 20),
+                  _question('Daily activity?'),
+                  const SizedBox(height: 10),
+                  _segRow<String>(
+                    const [
+                      ('sedentary', 'Low'),
+                      ('light', 'Light'),
+                      ('moderate', 'Moderate'),
+                      ('active', 'Active'),
+                      ('very_active', 'High'),
+                    ],
+                    _activity,
+                    (v) => setState(() => _activity = v),
+                  ),
+                  const SizedBox(height: 20),
                   _question('Meals per day?'),
                   const SizedBox(height: 10),
                   _segRow<int>(
@@ -1879,8 +1921,12 @@ class _PlanQuizSheetState extends State<_PlanQuizSheet> {
           ),
           const SizedBox(height: 20),
           InkWell(
-            onTap: () => Navigator.of(context)
-                .pop((diet: _diet, goal: _goal, meals: _meals)),
+            onTap: () => Navigator.of(context).pop((
+              diet: _diet,
+              goal: _goal,
+              activity: _activity,
+              meals: _meals,
+            )),
             borderRadius: BorderRadius.circular(16),
             child: Container(
               width: double.infinity,
@@ -1934,7 +1980,8 @@ class _PlanResultSheet extends StatelessWidget {
         _ => const Color(0xFF5F5346),
       };
 
-  static String _mealTypeLabel(String mealKey) => switch (mealKey.toLowerCase()) {
+  static String _mealTypeLabel(String mealKey) =>
+      switch (mealKey.toLowerCase()) {
         'breakfast' => 'Breakfast',
         'lunch' => 'Lunch',
         'dinner' => 'Dinner',
@@ -1949,7 +1996,10 @@ class _PlanResultSheet extends StatelessWidget {
   }
 
   Widget _mealRow(NutritionPlannedMeal meal) {
-    final name = meal.items.map((i) => i.text.trim()).where((t) => t.isNotEmpty).join(', ');
+    final name = meal.items
+        .map((i) => i.text.trim())
+        .where((t) => t.isNotEmpty)
+        .join(', ');
     var kcal = 0;
     for (final item in meal.items) {
       kcal += item.macros?.calories ?? 0;
@@ -1984,8 +2034,8 @@ class _PlanResultSheet extends StatelessWidget {
         if (kcal > 0) ...[
           const SizedBox(width: 10),
           Text('$kcal',
-              style: ZType.bodyS.copyWith(
-                  fontSize: 12, fontWeight: FontWeight.w600)),
+              style: ZType.bodyS
+                  .copyWith(fontSize: 12, fontWeight: FontWeight.w600)),
         ],
       ],
     );
@@ -2008,15 +2058,15 @@ class _PlanResultSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(_dow(day.day),
-                style: ZType.bodyM.copyWith(
-                    fontSize: 14, fontWeight: FontWeight.w800)),
+                style: ZType.bodyM
+                    .copyWith(fontSize: 14, fontWeight: FontWeight.w800)),
             if (meals.isEmpty) ...[
               const SizedBox(height: 11),
               // Macros-only day (no AI meal lines stored) — honest targets.
               Text(
                 '${day.calories} kcal · P${day.proteinG} C${day.carbsG} F${day.fatG}',
-                style: ZType.bodyS.copyWith(
-                    fontSize: 12, fontWeight: FontWeight.w600),
+                style: ZType.bodyS
+                    .copyWith(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ] else ...[
               const SizedBox(height: 11),
@@ -2072,12 +2122,12 @@ class _PlanResultSheet extends StatelessWidget {
             child: Column(
               children: [
                 Text('Active plan',
-                    style: ZType.bodyS.copyWith(
-                        fontSize: 11, fontWeight: FontWeight.w600)),
+                    style: ZType.bodyS
+                        .copyWith(fontSize: 11, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 3),
                 Text(summary,
-                    style: ZType.bodyM.copyWith(
-                        fontSize: 13.5, fontWeight: FontWeight.w800)),
+                    style: ZType.bodyM
+                        .copyWith(fontSize: 13.5, fontWeight: FontWeight.w800)),
               ],
             ),
           ),
@@ -2180,6 +2230,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
   final _searchCtrl = TextEditingController();
   List<FoodItem> _results = [];
   bool _loading = false;
+  bool _hasSearched = false;
   String? _searchError;
   Timer? _debounce;
   int _searchGeneration = 0;
@@ -2195,6 +2246,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
         setState(() {
           _results = [];
           _loading = false;
+          _hasSearched = false;
           _searchError = null;
         });
       }
@@ -2204,6 +2256,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
     if (mounted) {
       setState(() {
         _loading = true;
+        _hasSearched = true;
         _searchError = null;
       });
     }
@@ -2655,20 +2708,33 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                       ],
                     ),
                   ),
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(),
-                    customBorder: const CircleBorder(),
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: ZveltTokens.chip,
-                        border: Border.all(color: ZveltTokens.border),
+                  Semantics(
+                    button: true,
+                    label: 'Close food search',
+                    child: Tooltip(
+                      message: 'Close',
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: InkWell(
+                          onTap: () => Navigator.of(context).pop(),
+                          customBorder: const CircleBorder(),
+                          child: Center(
+                            child: Container(
+                              width: 34,
+                              height: 34,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: ZveltTokens.chip,
+                                border: Border.all(color: ZveltTokens.border),
+                              ),
+                              child: Icon(AppIcons.cross_small,
+                                  size: 16, color: ZveltTokens.text2),
+                            ),
+                          ),
+                        ),
                       ),
-                      child: Icon(AppIcons.cross_small,
-                          size: 16, color: ZveltTokens.text2),
                     ),
                   ),
                 ],
@@ -2698,6 +2764,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                             setState(() {
                               _results = [];
                               _loading = false;
+                              _hasSearched = false;
                               _searchError = null;
                             });
                           }
@@ -2848,30 +2915,47 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                       ? const Center(
                           child: CircularProgressIndicator(
                               color: ZveltTokens.brand))
-                      : _results.isEmpty
-                          // Prototype addFoodEmpty (HTML 690) — single copy.
+                      : _searchError != null
                           ? Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 22),
+                              padding: const EdgeInsets.symmetric(vertical: 22),
                               child: Center(
                                 child: Text(
-                                  'No foods match your search.',
+                                  _searchError!,
+                                  textAlign: TextAlign.center,
                                   style: ZType.bodyS.copyWith(
                                       fontSize: 13,
-                                      fontWeight: FontWeight.w500),
+                                      fontWeight: FontWeight.w500,
+                                      color: ZveltTokens.error),
                                 ),
                               ),
                             )
-                          : ListView.separated(
-                              controller: controller,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20),
-                              itemCount: _results.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 9),
-                              itemBuilder: (_, i) =>
-                                  _resultRow(_results[i]),
-                            ),
+                          : _results.isEmpty
+                              // Prototype addFoodEmpty (HTML 690) — single copy.
+                              ? Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 22),
+                                  child: Center(
+                                    child: Text(
+                                      _hasSearched
+                                          ? 'No foods match your search.'
+                                          : 'Search 3+ letters, scan a barcode, or choose a recent food.',
+                                      textAlign: TextAlign.center,
+                                      style: ZType.bodyS.copyWith(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  controller: controller,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20),
+                                  itemCount: _results.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 9),
+                                  itemBuilder: (_, i) =>
+                                      _resultRow(_results[i]),
+                                ),
             ),
             // Prototype 'Done' footer (HTML 700): full-width chip button.
             Padding(
@@ -2959,15 +3043,15 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                   Text(portion,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: ZType.bodyS.copyWith(
-                          fontSize: 11, fontWeight: FontWeight.w500)),
+                      style: ZType.bodyS
+                          .copyWith(fontSize: 11, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
             const SizedBox(width: 10),
             Text('$kcal kcal',
-                style: ZType.bodyS.copyWith(
-                    fontSize: 12.5, fontWeight: FontWeight.w700)),
+                style: ZType.bodyS
+                    .copyWith(fontSize: 12.5, fontWeight: FontWeight.w700)),
             const SizedBox(width: 10),
             Container(
               width: 28,
@@ -2976,10 +3060,11 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: ZveltTokens.brandTint,
-                border: Border.all(color: ZveltTokens.brand.withValues(alpha: 0.4)),
+                border:
+                    Border.all(color: ZveltTokens.brand.withValues(alpha: 0.4)),
               ),
-              child: const Icon(AppIcons.plus,
-                  size: 14, color: ZveltTokens.brand),
+              child:
+                  const Icon(AppIcons.plus, size: 14, color: ZveltTokens.brand),
             ),
           ],
         ),
@@ -4325,7 +4410,7 @@ class _GoalsSheetState extends State<_GoalsSheet> {
                     );
                     return;
                   }
-                  final goals = NutritionGoals(
+                  final goals = widget.goals.copyWith(
                     calories: cal,
                     proteinG: prot,
                     fatG: fat,
@@ -4834,8 +4919,8 @@ class _FastingCard extends StatelessWidget {
           Row(
             children: [
               Text('Fasting',
-                  style: ZType.h3.copyWith(
-                      fontSize: 21, fontWeight: FontWeight.w700)),
+                  style: ZType.h3
+                      .copyWith(fontSize: 21, fontWeight: FontWeight.w700)),
               const Spacer(),
               InkWell(
                 onTap: onTap,
@@ -4868,7 +4953,8 @@ class _FastingCard extends StatelessWidget {
                     color: ZveltTokens.chip,
                     border: Border.all(color: ZveltTokens.border),
                   ),
-                  child: Icon(AppIcons.edit, size: 15, color: ZveltTokens.text2),
+                  child:
+                      Icon(AppIcons.edit, size: 15, color: ZveltTokens.text2),
                 ),
               ),
             ],
@@ -4979,8 +5065,8 @@ class _FastingCard extends StatelessWidget {
     return Row(
       children: [
         Text(label,
-            style: ZType.bodyM.copyWith(
-                fontSize: 14, fontWeight: FontWeight.w500)),
+            style: ZType.bodyM
+                .copyWith(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(width: 10),
         Expanded(
           child: LayoutBuilder(
@@ -5031,7 +5117,8 @@ class _FastRingPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round;
-    canvas.drawArc(rect, -1.5708, 6.2832 * progress.clamp(0.0, 1.0), false, arc);
+    canvas.drawArc(
+        rect, -1.5708, 6.2832 * progress.clamp(0.0, 1.0), false, arc);
   }
 
   @override
@@ -5076,7 +5163,8 @@ class _CalorieRingPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 7
       ..strokeCap = StrokeCap.round;
-    canvas.drawArc(rect, -1.5708, 6.2832 * progress.clamp(0.0, 1.0), false, arc);
+    canvas.drawArc(
+        rect, -1.5708, 6.2832 * progress.clamp(0.0, 1.0), false, arc);
   }
 
   @override
@@ -5098,8 +5186,8 @@ class _DashedRRectPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     final path = Path()
-      ..addRRect(RRect.fromRectAndRadius(
-          Offset.zero & size, Radius.circular(radius)));
+      ..addRRect(
+          RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)));
     const dash = 6.0, gap = 5.0;
     for (final metric in path.computeMetrics()) {
       var d = 0.0;
@@ -5237,8 +5325,9 @@ class _FastingSheetState extends State<_FastingSheet> {
                         padding: const EdgeInsets.symmetric(vertical: 11),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color:
-                              _hours == h ? ZveltTokens.brand : ZveltTokens.chip,
+                          color: _hours == h
+                              ? ZveltTokens.brand
+                              : ZveltTokens.chip,
                           borderRadius: BorderRadius.circular(ZveltTokens.rSm),
                           border: _hours == h
                               ? null
@@ -5443,8 +5532,8 @@ class _BasketSheetState extends State<_BasketSheet> {
               child: Center(
                 child: Text(
                   'No ingredients yet — generate a meal plan first.',
-                  style: ZType.bodyS.copyWith(
-                      fontSize: 13, fontWeight: FontWeight.w500),
+                  style: ZType.bodyS
+                      .copyWith(fontSize: 13, fontWeight: FontWeight.w500),
                 ),
               ),
             )
@@ -5596,8 +5685,18 @@ class _CalendarSheetState extends State<_CalendarSheet> {
   @override
   Widget build(BuildContext context) {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June', 'July',
-      'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     final today = DateUtils.dateOnly(DateTime.now());
     final firstWd = DateTime(_month.year, _month.month, 1).weekday % 7;
@@ -5626,8 +5725,8 @@ class _CalendarSheetState extends State<_CalendarSheet> {
           Row(
             children: [
               Text('Select date',
-                  style: ZType.h4.copyWith(
-                      fontSize: 19, fontWeight: FontWeight.w800)),
+                  style: ZType.h4
+                      .copyWith(fontSize: 19, fontWeight: FontWeight.w800)),
               const Spacer(),
               InkWell(
                 onTap: () => Navigator.of(context).pop(),
@@ -5656,8 +5755,8 @@ class _CalendarSheetState extends State<_CalendarSheet> {
                   () => setState(() =>
                       _month = DateTime(_month.year, _month.month - 1, 1))),
               Text('${months[_month.month - 1]} ${_month.year}',
-                  style: ZType.bodyL.copyWith(
-                      fontSize: 16, fontWeight: FontWeight.w800)),
+                  style: ZType.bodyL
+                      .copyWith(fontSize: 16, fontWeight: FontWeight.w800)),
               _navBtn(
                   AppIcons.angle_small_right,
                   () => setState(() =>

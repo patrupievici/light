@@ -4,7 +4,7 @@ import * as crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
-import { deleteUploadByUrl } from '../lib/post-photo'
+import { deleteAvatarPhotos, deleteUploadByUrl } from '../lib/post-photo'
 import { revokeAllProviderConnections } from './integrations'
 import type { FastifyBaseLogger } from 'fastify'
 
@@ -42,7 +42,10 @@ const SALT_ROUNDS = 12
  * EXACTLY, so live behavior is unchanged by default.
  */
 function softDeleteEnabled(): boolean {
-  return process.env.ZVELT_SOFT_DELETE === 'on'
+  // Release deletion is an immediate erasure. Keeping account rows for a
+  // recovery window conflicts with the in-app promise and leaves media/data
+  // present after a user explicitly confirms DELETE.
+  return false
 }
 
 /** Grace window length before a soft-deleted account is hard-erased. */
@@ -267,7 +270,10 @@ async function eraseUser(userId: string, log: ErasureLogger = noopLogger): Promi
 
   // DB erasure committed — remove the on-disk media (best-effort; orphan files
   // are harmless and must never block/raise after a successful erasure).
-  await Promise.all(fileUrls.map((u) => deleteUploadByUrl(u)))
+  await Promise.all([
+    ...fileUrls.map((u) => deleteUploadByUrl(u)),
+    deleteAvatarPhotos(userId),
+  ])
 }
 
 export async function gdprRoutes(app: FastifyInstance) {

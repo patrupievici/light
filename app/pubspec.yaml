@@ -63,6 +63,7 @@ dependencies:
   # network. Killer for retention on cellular. cached_network_image stores
   # decoded bytes on disk keyed by URL hash; survives app restarts.
   cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
   # Flaticon UIcons (bold rounded) — app-wide icon system. Bundles the fonts;
   # icons remain under Flaticon's license (attribution shown in Settings).
   uicons: ^1.0.1

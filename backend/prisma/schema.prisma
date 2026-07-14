@@ -238,6 +238,12 @@ model UserProfile {
   dailyCarbs       Decimal? @db.Decimal(8, 2) @map("daily_carbs")
   dailyFat         Decimal? @db.Decimal(8, 2) @map("daily_fat")
   dailyWaterMl     Int?     @map("daily_water_ml")
+  /// Canonical nutrition-plan preferences. Daily macro targets above are the
+  /// source of truth for both the diary and generated meal plans.
+  nutritionGoal          String @default("maintain") @map("nutrition_goal") @db.VarChar(16)
+  nutritionActivityLevel String @default("moderate") @map("nutrition_activity_level") @db.VarChar(16)
+  nutritionDiet          String @default("omnivore") @map("nutrition_diet") @db.VarChar(16)
+  nutritionMealsPerDay   Int    @default(3) @map("nutrition_meals_per_day")
   /// Profile photo URL — Google OAuth `picture` at signup; users can upload
   /// via settings (saved to same field). Nullable → UI falls back to initials.
   photoUrl       String?  @map("photo_url")

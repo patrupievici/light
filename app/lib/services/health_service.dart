@@ -159,7 +159,7 @@ class HealthImportedRecord {
         value: (r['value'] as num?)?.toDouble(),
         unit: (r['unit'] as String?) ?? '',
         sourceApp: (r['source_app'] as String?) ?? '',
-        sourcePath: (r['source_path'] as String?) ?? 'manual_entry',
+        sourcePath: (r['source_path'] as String?) ?? 'health_connect',
         provider: (r['provider'] as String?) ?? '',
         externalId: (r['external_id'] as String?) ?? (r['uuid'] as String),
         payloadJson: (r['payload_json'] as String?) ?? '{}',

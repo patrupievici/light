@@ -385,10 +385,12 @@ class SocialFeedService {
       body['photoBase64'] = encoded;
     }
 
-    final res = await http.post(
+    final res = await _send(
+      'POST',
       Uri.parse('$v1Base/posts'),
       headers: headers,
       body: jsonEncode(body),
+      timeout: AuthService.httpTimeout,
     );
 
     if (res.statusCode != 201) {
@@ -408,9 +410,12 @@ class SocialFeedService {
         }
       }
       if (code != null && code.isNotEmpty) {
-        throw Exception('$msg ($code)');
+        throw SocialFeedException(
+          '$msg ($code)',
+          statusCode: res.statusCode,
+        );
       }
-      throw Exception(msg);
+      throw SocialFeedException(msg, statusCode: res.statusCode);
     }
   }
 

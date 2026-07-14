@@ -27,6 +27,25 @@ export async function areFriends(userA: string, userB: string): Promise<boolean>
   return !!f
 }
 
+/**
+ * A block is directional in the row but bilateral in its effect: neither side
+ * should be able to use a direct URL to inspect the other person's content.
+ * Keep this in the shared relationship helper so every privacy gate applies
+ * the same rule.
+ */
+export async function areUsersBlocked(userA: string, userB: string): Promise<boolean> {
+  const block = await prisma.friendship.findFirst({
+    where: {
+      status: 'blocked',
+      OR: [
+        { userId: userA, friendUserId: userB },
+        { userId: userB, friendUserId: userA },
+      ],
+    },
+  })
+  return block?.status === 'blocked'
+}
+
 /// Accepted-friend IDs plus the viewer's hidden post IDs — both needed by the
 /// feed/gallery post listings. Returns plain arrays ready for `in`/`notIn`.
 export async function getFriendIdsAndHidden(

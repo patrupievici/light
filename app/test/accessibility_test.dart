@@ -100,8 +100,7 @@ void main() {
     try {
       final materialIcons = _findMaterialIcons();
       await (FontLoader('MaterialIcons')
-            ..addFont(
-                materialIcons.readAsBytes().then(ByteData.sublistView)))
+            ..addFont(materialIcons.readAsBytes().then(ByteData.sublistView)))
           .load();
     } on StateError {
       // Icon font is optional for these checks; semantics/size assertions do not
@@ -161,20 +160,14 @@ void main() {
     });
 
     testWidgets(
-      'ZveltPrimaryButton(small) is BELOW the 48dp target — documented case',
+      'ZveltPrimaryButton(small) retains the 48dp target',
       (tester) async {
-        // The compact 40-tall variant is intentionally below the Android target.
-        // It is only used inside dense rows/cards where the surrounding tap area
-        // compensates. We assert the *current* height so a change here is
-        // deliberate, and flag the gap.
         await tester.pumpWidget(
           _host(ZveltPrimaryButton(label: 'Go', small: true, onTap: () {})),
         );
         final size = _sizeOf(tester, find.byType(ZveltPrimaryButton));
-        expect(size.height, closeTo(40, 0.5),
-            reason: 'small variant is documented at h=40');
-        // TODO(a11y): small primary button is 40dp < 48dp Android target. Only
-        // safe where wrapped in a larger hit area. Revisit if used standalone.
+        expect(size.height, greaterThanOrEqualTo(kAndroidMinTarget),
+            reason: 'small primary CTA must retain the Android tap target');
       },
     );
   });
@@ -288,16 +281,8 @@ void main() {
     });
 
     testWidgets(
-      'ZveltPrimaryButton with a LONG label overflows at 1.6x — KNOWN GAP',
+      'ZveltPrimaryButton with a LONG label survives 1.6x text',
       (tester) async {
-        // KNOWN GAP: ZveltPrimaryButton lays its label out in a
-        // Row(mainAxisSize.min) with a single-line Text and no Flexible/ellipsis,
-        // so a long label in a constrained width overflows (RenderFlex 39px) at
-        // a large textScaleFactor instead of wrapping or ellipsizing. The fix is
-        // to wrap the Text in Flexible with softWrap/ellipsis — production-widget
-        // edit, out of scope for this guard suite.
-        // TODO(a11y): make the primary button label reflow at large text;
-        // then promote this to a passing no-overflow assertion.
         await tester.pumpWidget(
           _host(
             SizedBox(
@@ -312,8 +297,9 @@ void main() {
           ),
         );
         await tester.pump();
+        expect(tester.takeException(), isNull,
+            reason: 'long primary CTA must not overflow at 1.6x');
       },
-      skip: true,
     );
 
     testWidgets('ZveltTertiaryButton does not overflow at 1.6x text',
@@ -375,26 +361,19 @@ void main() {
     });
   });
 
-  group('Interactive chip — documented sub-target case', () {
+  group('Interactive chip tap target', () {
     testWidgets(
-      'tappable ZChip is below the 48dp target (documented)',
+      'tappable ZChip retains a 48dp hit target',
       (tester) async {
-        // ZChip is a compact pill (font 11, 5px vertical padding). When given an
-        // onTap it becomes interactive but stays well under 48dp tall. This is
-        // acceptable for secondary filter chips but is recorded so a regression
-        // (e.g. promoting a chip to a primary action) is caught in review.
         await tester.pumpWidget(
           _host(ZChip(label: 'Filter', onTap: () {})),
         );
         final size = _sizeOf(tester, find.byType(ZChip));
         expect(
           size.height,
-          lessThan(kAndroidMinTarget),
-          reason:
-              'documenting that the chip is intentionally a sub-target control',
+          greaterThanOrEqualTo(kAndroidMinTarget),
+          reason: 'interactive chip must expose a 48dp tap target',
         );
-        // TODO(a11y): if a tappable ZChip ever becomes a primary control, wrap
-        // it so its hit area reaches 48dp.
       },
     );
   });

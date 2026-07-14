@@ -320,6 +320,63 @@ describe('GET /v1/nutrition/plan/week — per-user scoping', () => {
 
 // ── PATCH /plan/day — meal plan edit ─────────────────────────────────────────
 describe('PATCH /v1/nutrition/plan/day — meal plan edits', () => {
+  it('uses persisted profile targets when generating a weekly plan', async () => {
+    nutritionPlanDay.findMany.mockResolvedValue([])
+    nutritionPlanDay.upsert.mockResolvedValue({})
+    userProfile.findUnique.mockResolvedValue({
+      dailyCalories: 2780,
+      dailyProtein: 190,
+      dailyCarbs: 330,
+      dailyFat: 82,
+      dailyWaterMl: 3100,
+      nutritionGoal: 'gain',
+      nutritionDiet: 'vegan',
+      nutritionMealsPerDay: 4,
+    })
+    transaction.mockImplementation(async (callback: (tx: {
+      nutritionPlanDay: typeof nutritionPlanDay
+    }) => Promise<unknown>) => callback({ nutritionPlanDay }))
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/nutrition/plan/generate-weekly',
+      payload: { force: true, tzOffset: 0 },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(nutritionPlanDay.upsert).toHaveBeenCalledTimes(7)
+    for (const [args] of nutritionPlanDay.upsert.mock.calls) {
+      expect(args.create).toMatchObject({
+        userId: 'u1',
+        goal: 'gain',
+        calories: 2780,
+        proteinG: 190,
+        carbsG: 330,
+        fatG: 82,
+        waterMl: 3100,
+      })
+      expect(args.update).toMatchObject(args.create)
+    }
+    expect(generateWeeklyMealPlanWithDeepSeek).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goal: 'gain',
+        diet: 'vegan',
+        mealsPerDay: 4,
+        macroRows: expect.arrayContaining([
+          expect.objectContaining({
+            calories: 2780,
+            proteinG: 190,
+            carbsG: 330,
+            fatG: 82,
+            waterMl: 3100,
+          }),
+        ]),
+      }),
+    )
+    await app.close()
+  })
+
   it('404 NOT_FOUND when no plan day exists for the date', async () => {
     nutritionPlanDay.findUnique.mockResolvedValue(null)
     const app = await buildApp()
