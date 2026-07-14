@@ -1,6 +1,4 @@
-import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
@@ -8,8 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/auth_service.dart';
-import '../../services/health_service.dart';
-import '../../services/integrations_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/settings_store.dart';
 import '../../theme/app_icons.dart';
@@ -17,22 +13,22 @@ import '../../theme/zvelt_tokens.dart';
 import '../../theme/zvelt_theme_notifier.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
 import '../ai/ai_chat_screen.dart';
-import '../analytics/progress_hub_screen.dart';
+import '../analytics/progress_screen.dart';
 import '../onboarding/light_onboarding_flow.dart';
 import '../onboarding/onboarding_keys.dart';
-import 'integrations_screen.dart';
 
 /// PROFILE — 1:1 with the ZVELT handoff prototype (screen A7).
 ///
 /// Header ("Profile" + settings gear + logout) · profile block (76px rounded
-/// avatar, name + premium crown, email) · Edit Profile + Add Device buttons ·
-/// Premium banner · Appearance row (Dark/Light) · rows: Progress, Preferences,
-/// Account, Help & Feedback, AI Companion, About ZVELT, Request a Feature,
-/// Report a Bug. Nothing else.
+/// avatar, name + premium crown, email) · Edit Profile button (Add Device cut
+/// for V1 — user call 2026-07-14) · Premium banner · Appearance row
+/// (Dark/Light) · rows: Progress (→ the 1:1 ProgressScreen, prototype goProg),
+/// Preferences, Account, Help & Feedback, AI Companion, About ZVELT,
+/// Request a Feature, Report a Bug. Nothing else.
 ///
 /// Sheets (all prototype 1:1): sheetSettings (Units · Notifications · Haptics ·
-/// Rest timer sound · Replay intro tour · Sign out), sheetEdit, sheetDevice,
-/// sheetPremium, sheetAccount, sheetHelp, sheetAbout, sheetFeature, sheetBug.
+/// Rest timer sound · Replay intro tour · Sign out), sheetEdit, sheetPremium,
+/// sheetAccount, sheetHelp, sheetAbout, sheetFeature, sheetBug.
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key, required this.onLogout});
   final Future<void> Function() onLogout;
@@ -240,67 +236,34 @@ class _ProfileTabState extends State<ProfileTab> {
               ],
             ),
           ),
-          // Edit Profile + Add Device
+          // Edit Profile (Add Device removed for V1 — user call 2026-07-14;
+          // the device/integrations flow returns post-V1).
           Padding(
             padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: _openEditSheet,
-                    borderRadius: BorderRadius.circular(18),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: ZveltTokens.chip,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: ZveltTokens.borderStrong),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(AppIcons.edit,
-                              size: 16, color: ZveltTokens.text),
-                          const SizedBox(width: 7),
-                          Text('Edit Profile',
-                              style: ZType.bodyM.copyWith(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: ZveltTokens.text)),
-                        ],
-                      ),
-                    ),
-                  ),
+            child: InkWell(
+              onTap: _openEditSheet,
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.chip,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: ZveltTokens.borderStrong),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _sheet(const _DeviceSheet()),
-                    borderRadius: BorderRadius.circular(18),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: ZveltTokens.brand,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: ZveltTokens.glowMd,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(AppIcons.plus,
-                              size: 16, color: ZveltTokens.onBrand),
-                          const SizedBox(width: 7),
-                          Text('Add Device',
-                              style: ZType.bodyM.copyWith(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: ZveltTokens.onBrand)),
-                        ],
-                      ),
-                    ),
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(AppIcons.edit, size: 16, color: ZveltTokens.text),
+                    const SizedBox(width: 7),
+                    Text('Edit Profile',
+                        style: ZType.bodyM.copyWith(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: ZveltTokens.text)),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           // Premium banner
@@ -452,8 +415,10 @@ class _ProfileTabState extends State<ProfileTab> {
             padding: const EdgeInsets.fromLTRB(22, 12, 22, 0),
             child: Column(
               children: [
+                // Prototype goProg (HTML 634): the Progress row opens the SAME
+                // 1:1 Progress screen as Home's Volume card — nothing else.
                 _row(AppIcons.chart_line_up, 'Progress',
-                    accent: true, onTap: () => _push(const ProgressHubScreen())),
+                    accent: true, onTap: () => _push(const ProgressScreen())),
                 _row(AppIcons.settings_sliders, 'Preferences',
                     onTap: _openSettingsSheet),
                 _row(AppIcons.user, 'Account', onTap: _openAccountSheet),
@@ -1062,230 +1027,6 @@ class _AccountSheet extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// sheetDevice — Connect a device (HTML 1227-1244), fed by real data:
-// native health permission state + GET /v1/integrations provider list.
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ProviderRow {
-  const _ProviderRow(this.id, this.name, this.sub);
-  final String id;
-  final String name;
-  final String sub;
-}
-
-class _DeviceSheet extends StatefulWidget {
-  const _DeviceSheet();
-
-  @override
-  State<_DeviceSheet> createState() => _DeviceSheetState();
-}
-
-class _DeviceSheetState extends State<_DeviceSheet> {
-  // Same provider set the Integrations screen renders (Terra wearable cloud).
-  static const _cloudProviders = [
-    _ProviderRow('strava', 'Strava', 'Import runs and rides from Strava'),
-    _ProviderRow('garmin', 'Garmin Connect', 'Forerunner / Fenix'),
-    _ProviderRow('fitbit', 'Fitbit / Pixel Watch', 'Activity, sleep & vitals'),
-    _ProviderRow('whoop', 'WHOOP', 'Strain, recovery & sleep'),
-    _ProviderRow('oura', 'Oura', 'Sleep, readiness & activity'),
-    _ProviderRow('polar', 'Polar Flow', 'Workouts & heart-rate data'),
-    _ProviderRow('coros', 'COROS', 'Activities & training data'),
-    _ProviderRow('suunto', 'Suunto', 'Endurance workouts'),
-    _ProviderRow('withings', 'Withings', 'Scale, sleep & heart health'),
-    _ProviderRow('amazfit', 'Amazfit / Zepp', 'Health data from Zepp'),
-    _ProviderRow('huawei', 'Huawei Health', 'Cloud sync & bridge'),
-    _ProviderRow('wahoo', 'Wahoo ELEMNT', 'Rides & workouts'),
-  ];
-
-  Set<String> _connected = {};
-  bool _aggregatorConfigured = false;
-  bool? _nativeHealthConnected;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final result = await IntegrationsService().listIntegrations();
-      if (!mounted) return;
-      setState(() {
-        _connected = result.connected;
-        _aggregatorConfigured = result.aggregatorConfigured;
-      });
-    } catch (_) {/* offline — pills default to Connect */}
-    if (!kIsWeb) {
-      try {
-        _nativeHealthConnected =
-            await HealthService.instance.hasPermissions();
-      } catch (_) {
-        _nativeHealthConnected = false;
-      }
-    }
-    if (mounted) setState(() => _loading = false);
-  }
-
-  Future<void> _connectNativeHealth() async {
-    final granted = await HealthService.instance.requestPermissions();
-    if (granted) {
-      await HealthService.instance.backfillRecentOnFirstGrant();
-    }
-    if (!mounted) return;
-    setState(() => _nativeHealthConnected = granted);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      behavior: SnackBarBehavior.floating,
-      content: Text(granted
-          ? 'Connected — recent health data is ready.'
-          : 'Permission denied. You can re-try anytime in Settings.'),
-    ));
-  }
-
-  /// Cloud providers use backend OAuth — the full flow (auth-url, sync,
-  /// disconnect) lives on the Integrations screen, so deep actions push it.
-  void _openIntegrations() {
-    final nav = Navigator.of(context);
-    nav.pop();
-    nav.push<void>(
-        MaterialPageRoute<void>(builder: (_) => const IntegrationsScreen()));
-  }
-
-  void _onCloudTap(String provider) {
-    if (!_aggregatorConfigured && provider != 'strava') {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text('Coming soon — wearable cloud linking is on the way'),
-      ));
-      return;
-    }
-    _openIntegrations();
-  }
-
-  Widget _pill({required bool connected, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(13),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-        decoration: BoxDecoration(
-          color: connected
-              ? ZveltTokens.success.withValues(alpha: 0.15)
-              : ZveltTokens.brand,
-          borderRadius: BorderRadius.circular(13),
-          border: connected
-              ? Border.all(color: ZveltTokens.success.withValues(alpha: 0.4))
-              : null,
-        ),
-        child: Text(connected ? 'Connected' : 'Connect',
-            style: ZType.bodyS.copyWith(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color:
-                    connected ? ZveltTokens.success : ZveltTokens.onBrand)),
-      ),
-    );
-  }
-
-  Widget _deviceRow({
-    required String name,
-    required String sub,
-    required bool connected,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          gradient: ZveltTokens.surface2Grad,
-          borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-          border: Border.all(color: ZveltTokens.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: ZveltTokens.chip,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(AppIcons.stopwatch,
-                  size: 20, color: ZveltTokens.brand),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ZType.bodyM.copyWith(
-                          fontSize: 14.5, fontWeight: FontWeight.w700)),
-                  Text(sub,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ZType.bodyS.copyWith(fontSize: 11.5)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            _pill(connected: connected, onTap: onTap),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isApple = !kIsWeb && Platform.isIOS;
-    const showNative = !kIsWeb;
-    return _SheetShell(
-      title: 'Connect a device',
-      subtitle: 'Sync workouts, heart rate & recovery',
-      maxHeightFactor: 0.88,
-      child: _loading
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(
-                  child: CircularProgressIndicator(color: ZveltTokens.brand)),
-            )
-          : Column(
-              children: [
-                if (showNative)
-                  _deviceRow(
-                    name: isApple ? 'Apple Health' : 'Health Connect',
-                    sub: 'Steps, heart rate, sleep & workouts',
-                    connected: _nativeHealthConnected == true,
-                    onTap: _nativeHealthConnected == true
-                        ? _openIntegrations
-                        : _connectNativeHealth,
-                  ),
-                for (final p in _cloudProviders)
-                  _deviceRow(
-                    name: p.name,
-                    sub: p.sub,
-                    connected: _connected.contains(p.id),
-                    onTap: _connected.contains(p.id)
-                        ? _openIntegrations
-                        : () => _onCloudTap(p.id),
-                  ),
-              ],
-            ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// sheetPremium — benefits-first + Monthly/Annual price cards (HTML 1245-1266)
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _PremiumSheet extends StatefulWidget {
   const _PremiumSheet();
