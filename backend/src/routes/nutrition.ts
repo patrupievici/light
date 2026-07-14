@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
-import { isProductionLike } from '../lib/runtime-env'
 import {
   generateWeeklyMealPlanWithDeepSeek,
   PatchMealPlanSchema,
@@ -537,16 +536,13 @@ export async function nutritionRoutes(app: FastifyInstance) {
       })
       return reply.send({ weekStart, generated: true, plan: saved })
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
       // Full detail (message + stack) stays server-side only. NEVER echo the
       // raw error to the client — it previously leaked the compiled file path,
       // source lines and Prisma internals into a red box shown to end users.
       app.log.error({ err: e }, 'nutrition plan generate-weekly failed')
       return reply.code(500).send({
         error: 'NUTRITION_PLAN_FAILED',
-        message: isProductionLike(process.env.NODE_ENV)
-          ? 'Nu am putut genera planul tău acum. Încearcă din nou în câteva momente.'
-          : msg,
+        message: 'Nu am putut genera planul tău acum. Încearcă din nou în câteva momente.',
         requestId: request.id,
       })
     }

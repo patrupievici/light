@@ -51,13 +51,10 @@ import { startChallengeEndingNotificationCron } from './services/challenge-endin
 import { startNotificationLogCleanupCron } from './services/notification-log-cleanup.service'
 import { adminRoutes } from './routes/admin'
 import { mediaRoutes } from './routes/media'
-import { isProductionLike } from './lib/runtime-env'
-
-const productionLike = isProductionLike(process.env.NODE_ENV)
 
 const app = Fastify({
   logger: {
-    level: productionLike ? 'warn' : 'info',
+    level: process.env.NODE_ENV === 'development' ? 'info' : 'warn',
   },
   genReqId: () => crypto.randomUUID(),
   /** Implicit 1 MiB — prea mic pentru POST /v1/posts cu photoBase64 (~2.4M chars la 1.8MB binar). */
@@ -98,7 +95,7 @@ async function main() {
     // Allowlist from CORS_ORIGINS (comma-separated). Native mobile / no-Origin
     // requests always pass; in production an empty allowlist rejects browser
     // cross-origin instead of the old blanket `false`.
-    origin: buildCorsOrigin(process.env.CORS_ORIGINS, process.env.NODE_ENV),
+    origin: buildCorsOrigin(process.env.CORS_ORIGINS),
   })
 
   await app.register(jwt, {
@@ -191,8 +188,7 @@ async function main() {
       typeof errorLike.message === 'string' ? errorLike.message : 'Internal error'
     reply.code(statusCode).send({
       error: errorCode,
-      message:
-        productionLike ? 'Eroare interna' : message,
+      message: statusCode >= 500 ? 'Eroare interna' : message,
       requestId: request.id,
     })
   })

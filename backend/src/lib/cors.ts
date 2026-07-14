@@ -8,9 +8,8 @@
  * `CORS_ORIGINS` is a comma-separated list, e.g.
  *   CORS_ORIGINS=https://app.zvelt.com,https://zvelt.app
  *
- * Only explicit development/test environments allow all origins when
- * `CORS_ORIGINS` is unset. Unknown environments fail closed because some hosts
- * do not set NODE_ENV automatically.
+ * An empty allowlist always fails closed. Native mobile and server-to-server
+ * requests have no Origin header and are unaffected by browser CORS policy.
  */
 
 export type CorsOriginOption =
@@ -33,17 +32,15 @@ export function parseCorsOrigins(raw: string | undefined | null): string[] {
  *
  * - allowlist non-empty  → callback that allows requests with no Origin header
  *   (native mobile, server-to-server) and any origin present in the allowlist.
- * - allowlist empty + development/test → `true` (local tooling convenience).
- * - allowlist empty + any other environment → `false` (fail closed).
+ * - allowlist empty → `false` (fail closed in every environment).
  */
 export function buildCorsOrigin(
   rawOrigins: string | undefined | null,
-  nodeEnv: string | undefined,
 ): CorsOriginOption {
   const allowlist = parseCorsOrigins(rawOrigins)
 
   if (allowlist.length === 0) {
-    return !isProductionLike(nodeEnv)
+    return false
   }
 
   return (origin, cb) => {
@@ -56,4 +53,3 @@ export function buildCorsOrigin(
     cb(null, allowlist.includes(normalized))
   }
 }
-import { isProductionLike } from './runtime-env'
