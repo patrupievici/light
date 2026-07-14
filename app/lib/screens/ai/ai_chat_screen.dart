@@ -7,21 +7,26 @@ import '../../theme/zvelt_tokens.dart';
 import '../../services/_crash_reporter.dart';
 import '../../services/ai_chat_service.dart';
 import '../../services/profile_service.dart';
-import '../../services/workout_service.dart';
-import '../workouts/workout_tracker_screen.dart';
 
 /// AI Coach screen — prototype "AI Coach" (HTML 417–434, composer 648–654).
 /// Pushed as a full route (allowed deviation); visuals match the prototype:
 /// gradient sparkles header tile, Suggested chips, floating glass composer.
 class AiChatScreen extends StatefulWidget {
-  const AiChatScreen({super.key});
+  const AiChatScreen({
+    super.key,
+    this.aiService,
+    this.profileLoader,
+  });
+
+  final AiChatService? aiService;
+  final Future<Map<String, dynamic>?> Function()? profileLoader;
 
   @override
   State<AiChatScreen> createState() => _AiChatScreenState();
 }
 
 class _AiChatScreenState extends State<AiChatScreen> {
-  final _svc = AiChatService();
+  late final AiChatService _svc;
   final _ctrl = TextEditingController();
   final _scroll = ScrollController();
   final List<_Msg> _msgs = [];
@@ -42,6 +47,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   void initState() {
     super.initState();
+    _svc = widget.aiService ?? AiChatService();
     // Seed greeting (JS 1431). Name-less fallback first; upgraded with the
     // real first name from ProfileService as soon as /me resolves.
     _msgs.add(_Msg(role: 'assistant', text: 'Hey! $_greetingTail'));
@@ -51,7 +57,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Future<void> _loadGreetingName() async {
     Map<String, dynamic>? me;
     try {
-      me = await ProfileService().getMe();
+      final loader = widget.profileLoader;
+      me = loader != null ? await loader() : await ProfileService().getMe();
     } catch (_) {
       me = null;
     }
@@ -88,9 +95,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _scrollBottom();
 
     try {
-      final data = await _svc.askTrainer(text, createWorkout: true);
+      // Coach chat is side-effect free. Workout creation belongs to an
+      // explicit action in Plan/Home, never to a meal or fasting question.
+      final data = await _svc.askTrainer(text);
       final trainer = data['trainer'];
-      final createdWorkout = data['workout'];
       String reply;
       if (trainer is Map) {
         final answer = (trainer['answer'] as String? ?? '').trim();
@@ -135,31 +143,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
       }
       if (!mounted) return;
       setState(() => _msgs.add(_Msg(role: 'assistant', text: reply)));
-      if (createdWorkout is Map && createdWorkout['id'] is String) {
-        final workoutId = createdWorkout['id'] as String;
-        final rawStartedAt = createdWorkout['startedAt'];
-        await WorkoutService.saveActiveWorkoutPointerById(
-          workoutId: workoutId,
-          startedAt:
-              rawStartedAt is String ? DateTime.tryParse(rawStartedAt) : null,
-          label: 'AI workout',
-        );
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('New workout created from AI plan. Opening tracker...'),
-          ),
-        );
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) => WorkoutTrackerScreen(
-              workoutId: workoutId,
-              onComplete: () {},
-            ),
-          ),
-        );
-      }
     } on AiChatException catch (e) {
       if (!mounted) return;
       final msg = e.isTimeout
@@ -365,20 +348,29 @@ class _AiChatScreenState extends State<AiChatScreen> {
             runSpacing: 8,
             children: [
               for (final (label, preset) in _suggested)
-                GestureDetector(
-                  onTap: _busy ? null : () => _send(preset: preset),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: ZveltTokens.chip,
-                      borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-                      border: Border.all(color: ZveltTokens.border),
-                    ),
-                    child: Text(
-                      label,
-                      style: ZType.monoS.copyWith(
-                          fontSize: 12.5, color: ZveltTokens.text, height: 1.2),
+                Semantics(
+                  button: true,
+                  enabled: !_busy,
+                  label: label,
+                  child: GestureDetector(
+                    onTap: _busy ? null : () => _send(preset: preset),
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: ZveltTokens.chip,
+                        borderRadius:
+                            BorderRadius.circular(ZveltTokens.rControl),
+                        border: Border.all(color: ZveltTokens.border),
+                      ),
+                      child: Text(
+                        label,
+                        style: ZType.monoS.copyWith(
+                            fontSize: 12.5,
+                            color: ZveltTokens.text,
+                            height: 1.2),
+                      ),
                     ),
                   ),
                 ),
@@ -412,45 +404,65 @@ class _AiChatScreenState extends State<AiChatScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _ctrl,
-                    maxLength: 300, // cap enforced silently (no counter)
-                    maxLines: 1,
-                    textInputAction: TextInputAction.send,
-                    cursorColor: ZveltTokens.brand,
-                    style: ZType.bodyM
-                        .copyWith(color: ZveltTokens.text, height: 1.3),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      filled: false,
-                      counterText: '',
-                      hintText: 'Ask your coach…',
-                      hintStyle: ZType.bodyM
-                          .copyWith(color: ZveltTokens.text3, height: 1.3),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
+                  child: Semantics(
+                    textField: true,
+                    label: 'Ask your coach',
+                    child: SizedBox(
+                      height: 48,
+                      child: Center(
+                        child: TextField(
+                          controller: _ctrl,
+                          maxLength: 300,
+                          maxLines: 1,
+                          textInputAction: TextInputAction.send,
+                          cursorColor: ZveltTokens.brand,
+                          style: ZType.bodyM
+                              .copyWith(color: ZveltTokens.text, height: 1.3),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            filled: false,
+                            counterText: '',
+                            hintText: 'Ask your coach…',
+                            hintStyle: ZType.bodyM.copyWith(
+                                color: ZveltTokens.text3, height: 1.3),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          onSubmitted: (_) => _busy ? null : _send(),
+                        ),
+                      ),
                     ),
-                    onSubmitted: (_) => _busy ? null : _send(),
                   ),
                 ),
                 const SizedBox(width: 9),
-                GestureDetector(
-                  onTap: _busy ? null : _send,
-                  child: Opacity(
-                    opacity: _busy ? 0.6 : 1,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: ZveltTokens.gradAccentDeep,
-                        boxShadow: ZveltTokens.glowMd,
+                Semantics(
+                  button: true,
+                  enabled: !_busy,
+                  label: _busy ? 'Coach is responding' : 'Send message',
+                  child: GestureDetector(
+                    onTap: _busy ? null : _send,
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Center(
+                        child: Opacity(
+                          opacity: _busy ? 0.6 : 1,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: ZveltTokens.gradAccentDeep,
+                              boxShadow: ZveltTokens.glowMd,
+                            ),
+                            child: const Icon(AppIcons.paper_plane,
+                                color: ZveltTokens.onBrand, size: 18),
+                          ),
+                        ),
                       ),
-                      child: const Icon(AppIcons.paper_plane,
-                          color: ZveltTokens.onBrand, size: 18),
                     ),
                   ),
                 ),
@@ -478,26 +490,34 @@ class _CircleBack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: ZveltTokens.surface,
-      shape: const CircleBorder(),
-      shadowColor: Colors.transparent,
-      child: Ink(
-        decoration: BoxDecoration(
-          color: ZveltTokens.surface,
-          shape: BoxShape.circle,
-          boxShadow: ZveltTokens.shadowCard,
-        ),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: Icon(
-              AppIcons.angle_small_left,
-              color: ZveltTokens.text2,
-              size: 22,
+    return Semantics(
+      button: true,
+      label: 'Back',
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          shadowColor: Colors.transparent,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: Center(
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.surface,
+                  shape: BoxShape.circle,
+                  boxShadow: ZveltTokens.shadowCard,
+                ),
+                child: Icon(
+                  AppIcons.angle_small_left,
+                  color: ZveltTokens.text2,
+                  size: 22,
+                ),
+              ),
             ),
           ),
         ),

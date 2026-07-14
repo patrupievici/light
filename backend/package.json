@@ -16,7 +16,8 @@
     "db:check-gifs": "tsx prisma/scripts/check-exercise-gifs.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "smoke:production": "node scripts/production-smoke.mjs"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

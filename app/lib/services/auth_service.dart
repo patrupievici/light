@@ -83,37 +83,42 @@ class AuthService {
   /// Reads from SecureStorage first; on miss, falls back to SharedPreferences
   /// (legacy storage). Found legacy values are promoted to SecureStorage and
   /// removed from SharedPreferences — one-time migration on first access.
-  /// On SecureStorage I/O failure: falls back to SharedPreferences for this
-  /// session so the user isn't locked out, but next call will retry secure.
+  /// SecureStorage failures fail closed. Authentication tokens must never be
+  /// kept in plain SharedPreferences, even as a temporary fallback.
   Future<String?> _readSecureWithMigration(String key) async {
     final prefs = await SharedPreferences.getInstance();
-    // Always run the forge_* → zvelt_* migration first so even very old
-    // tokens get a chance to land in SharedPreferences before we promote
-    // them into SecureStorage below.
-    await _migrateForgeAuthKeys(prefs);
+    final legacyKey =
+        key == _keyAccessToken ? 'forge_access_token' : 'forge_refresh_token';
 
     try {
       final secure = await _secureStorage.read(key: key);
-      if (secure != null && secure.isNotEmpty) return secure;
+      if (secure != null && secure.isNotEmpty) {
+        await prefs.remove(key);
+        await prefs.remove(legacyKey);
+        return secure;
+      }
 
-      final legacy = prefs.getString(key);
+      final legacy = prefs.getString(key) ?? prefs.getString(legacyKey);
       if (legacy != null && legacy.isNotEmpty) {
-        // Promote legacy plain-text token into SecureStorage and wipe the
-        // plain copy. Best-effort: if the write fails we keep the legacy
-        // value around so the user stays signed in.
+        // Promote the legacy plain-text token once, then remove the old copy.
         try {
           await _secureStorage.write(key: key, value: legacy);
           await prefs.remove(key);
+          await prefs.remove(legacyKey);
         } catch (e, st) {
           _reportTokenIoError(e, st);
+          await prefs.remove(key);
+          await prefs.remove(legacyKey);
+          return null;
         }
         return legacy;
       }
       return null;
     } catch (e, st) {
       _reportTokenIoError(e, st);
-      // Fallback so the current session keeps working.
-      return prefs.getString(key);
+      await prefs.remove(key);
+      await prefs.remove(legacyKey);
+      return null;
     }
   }
 
@@ -123,26 +128,6 @@ class AuthService {
 
   Future<String?> _getRefreshToken() async {
     return _readSecureWithMigration(_keyRefreshToken);
-  }
-
-  /// Renaming app prefs `forge_*` → `zvelt_*`; keeps login on dev devices.
-  /// Runs against SharedPreferences only — secure migration happens after.
-  Future<void> _migrateForgeAuthKeys(SharedPreferences prefs) async {
-    const legacyAccess = 'forge_access_token';
-    const legacyRefresh = 'forge_refresh_token';
-    final curA = prefs.getString(_keyAccessToken);
-    final curR = prefs.getString(_keyRefreshToken);
-    final legA = prefs.getString(legacyAccess);
-    final legR = prefs.getString(legacyRefresh);
-
-    if ((curA == null || curA.isEmpty) && legA != null && legA.isNotEmpty) {
-      await prefs.setString(_keyAccessToken, legA);
-    }
-    if ((curR == null || curR.isEmpty) && legR != null && legR.isNotEmpty) {
-      await prefs.setString(_keyRefreshToken, legR);
-    }
-    await prefs.remove(legacyAccess);
-    await prefs.remove(legacyRefresh);
   }
 
   Future<void> _saveTokens(
@@ -159,11 +144,17 @@ class AuthService {
       await prefs.remove(_keyRefreshToken);
     } catch (e, st) {
       _reportTokenIoError(e, st);
-      // SecureStorage unavailable — degrade to SharedPreferences so login
-      // still completes. Next read will retry the secure promotion.
+      // A partial write must not leave a half-valid session behind.
+      try {
+        await _secureStorage.delete(key: _keyAccessToken);
+        await _secureStorage.delete(key: _keyRefreshToken);
+      } catch (cleanupError, cleanupStack) {
+        _reportTokenIoError(cleanupError, cleanupStack);
+      }
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyAccessToken, accessToken);
-      await prefs.setString(_keyRefreshToken, refreshToken);
+      await prefs.remove(_keyAccessToken);
+      await prefs.remove(_keyRefreshToken);
+      throw StateError('Secure sign-in storage is unavailable on this device.');
     }
 
     // A new login can replace an account without first calling logout (for
@@ -193,6 +184,7 @@ class AuthService {
     await prefs.remove(_keyRefreshToken);
     await prefs.remove('forge_access_token');
     await prefs.remove('forge_refresh_token');
+    await prefs.remove(_keyIsGuest);
   }
 
   /// True if JWT is missing `exp` or already past (with skew).
@@ -240,6 +232,41 @@ class AuthService {
     } catch (e) {
       debugPrint('[AuthService] _decodeUserIdFromJwt parse failed: $e');
       return null;
+    }
+  }
+
+  String? _decodeEmailFromJwt(String token) {
+    final parts = token.split('.');
+    if (parts.length != 3) return null;
+    try {
+      final payloadBytes = base64Url.decode(base64Url.normalize(parts[1]));
+      final payload =
+          jsonDecode(utf8.decode(payloadBytes)) as Map<String, dynamic>;
+      return payload['email'] as String?;
+    } catch (e) {
+      debugPrint('[AuthService] _decodeEmailFromJwt parse failed: $e');
+      return null;
+    }
+  }
+
+  bool _isGuestToken(String? token) {
+    if (token == null || token.isEmpty) return false;
+    final email = _decodeEmailFromJwt(token)?.toLowerCase();
+    return email != null &&
+        email.startsWith('guest_') &&
+        email.endsWith('@guest.zvelt.app');
+  }
+
+  Future<void> _setGuestFlag(bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (value) {
+        await prefs.setBool(_keyIsGuest, true);
+      } else {
+        await prefs.remove(_keyIsGuest);
+      }
+    } catch (e, st) {
+      reportError(e, st, reason: 'auth:guest-flag');
     }
   }
 
@@ -398,6 +425,7 @@ class AuthService {
       final refreshToken = data['refreshToken'] as String?;
       if (accessToken != null && refreshToken != null) {
         await _saveTokens(accessToken, refreshToken);
+        await _setGuestFlag(false);
       }
       return data;
     } on FormatException {
@@ -443,6 +471,129 @@ class AuthService {
       {'idToken': idToken},
       failLabel: 'Google login failed',
     );
+  }
+
+  /// Replaces the anonymous credentials with an email/password identity while
+  /// preserving the same backend user, profile, workouts and social data.
+  Future<Map<String, dynamic>?> convertGuestAccount({
+    required String email,
+    required String password,
+  }) async {
+    final token = await getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Your guest session has expired. Please sign in again.');
+    }
+
+    final uri = Uri.parse('$v1Base/auth/guest/convert');
+    try {
+      final res = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({'email': email, 'password': password}),
+          )
+          .timeout(httpTimeout);
+      if (res.statusCode != 200) {
+        final decoded = _tryDecodeJsonObject(res.body);
+        throw Exception(decoded?['message'] ??
+            'Could not save the account (${res.statusCode}).');
+      }
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final accessToken = data['accessToken'] as String?;
+      final refreshToken = data['refreshToken'] as String?;
+      if (accessToken == null || refreshToken == null) {
+        throw Exception('The server returned an incomplete sign-in session.');
+      }
+      await _saveTokens(accessToken, refreshToken);
+      await _setGuestFlag(false);
+      return data;
+    } on FormatException {
+      throw Exception(_authNetworkHint());
+    } catch (e) {
+      if (_looksLikeNetworkFailure(e)) {
+        throw Exception(_authNetworkHint());
+      }
+      rethrow;
+    }
+  }
+
+  /// Signs in to an existing account and removes the temporary guest user only
+  /// after the new session is safely stored. A failed login leaves the guest
+  /// session untouched.
+  Future<Map<String, dynamic>?> loginReplacingGuest(
+    String email,
+    String password,
+  ) async {
+    final oldToken = await getAccessToken();
+    final oldUserId = oldToken == null ? null : _decodeUserIdFromJwt(oldToken);
+    final wasGuest = await isGuest() || _isGuestToken(oldToken);
+    final result = await login(email, password);
+    await _cleanupReplacedGuest(
+      wasGuest: wasGuest,
+      oldToken: oldToken,
+      oldUserId: oldUserId,
+      newUserId: _responseUserId(result),
+    );
+    return result;
+  }
+
+  Future<Map<String, dynamic>?> loginWithGoogleReplacingGuest(
+      String idToken) async {
+    final oldToken = await getAccessToken();
+    final oldUserId = oldToken == null ? null : _decodeUserIdFromJwt(oldToken);
+    final wasGuest = await isGuest() || _isGuestToken(oldToken);
+    final result = await loginWithGoogle(idToken);
+    await _cleanupReplacedGuest(
+      wasGuest: wasGuest,
+      oldToken: oldToken,
+      oldUserId: oldUserId,
+      newUserId: _responseUserId(result),
+    );
+    return result;
+  }
+
+  String? _responseUserId(Map<String, dynamic>? response) {
+    final user = response?['user'];
+    return user is Map<String, dynamic> ? user['id'] as String? : null;
+  }
+
+  Future<void> _cleanupReplacedGuest({
+    required bool wasGuest,
+    required String? oldToken,
+    required String? oldUserId,
+    required String? newUserId,
+  }) async {
+    if (!wasGuest ||
+        oldToken == null ||
+        oldToken.isEmpty ||
+        oldUserId == null ||
+        newUserId == null ||
+        oldUserId == newUserId) {
+      return;
+    }
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('$v1Base/me/account'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $oldToken',
+            },
+            body: jsonEncode({'confirm': 'DELETE'}),
+          )
+          .timeout(httpTimeout);
+      if (response.statusCode != 200 &&
+          response.statusCode != 202 &&
+          response.statusCode != 204 &&
+          response.statusCode != 401) {
+        throw StateError('Guest cleanup returned HTTP ${response.statusCode}.');
+      }
+    } catch (e, st) {
+      reportError(e, st, reason: 'auth:cleanup-replaced-guest');
+    }
   }
 
   /// POST /v1/auth/password/forgot — asks the server to email a 6-digit reset
@@ -515,10 +666,7 @@ class AuthService {
     final res = await signup(
         email: email, password: password, displayName: displayName);
     if (res == null) return false;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_keyIsGuest, true);
-    } catch (_) {/* flag is best-effort */}
+    await _setGuestFlag(true);
     return true;
   }
 
@@ -526,10 +674,11 @@ class AuthService {
   Future<bool> isGuest() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getBool(_keyIsGuest) ?? false;
-    } catch (_) {
-      return false;
+      if (prefs.getBool(_keyIsGuest) ?? false) return true;
+    } catch (e, st) {
+      reportError(e, st, reason: 'auth:read-guest-flag');
     }
+    return _isGuestToken(await _getAccessToken());
   }
 
   Future<void> logout() async {

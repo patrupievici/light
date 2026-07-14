@@ -12,9 +12,21 @@ import '../widgets/zvelt_secondary_button.dart';
 import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.onLoggedIn});
+  const LoginScreen({
+    super.key,
+    required this.onLoggedIn,
+    this.replaceGuest = false,
+    this.initialLogin = true,
+    this.confirmGuestReplacement = false,
+    this.authService,
+  });
 
-  final VoidCallback onLoggedIn;
+  /// Receives `true` for sign-in and `false` when a new account was created.
+  final ValueChanged<bool> onLoggedIn;
+  final bool replaceGuest;
+  final bool initialLogin;
+  final bool confirmGuestReplacement;
+  final AuthService? authService;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -24,13 +36,20 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _auth = AuthService();
+  late final AuthService _auth;
   final _googleSignIn = GoogleSignIn();
 
-  bool _isLogin = true;
+  late bool _isLogin;
   bool _loading = false;
   bool _obscurePassword = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _auth = widget.authService ?? AuthService();
+    _isLogin = widget.initialLogin;
+  }
 
   @override
   void dispose() {
@@ -40,24 +59,39 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isLogin && !await _confirmAccountSwitch()) return;
     setState(() {
       _error = null;
       _loading = true;
     });
     try {
       if (_isLogin) {
-        await _auth.login(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
+        if (widget.replaceGuest) {
+          await _auth.loginReplacingGuest(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
+        } else {
+          await _auth.login(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
+        }
       } else {
-        await _auth.signup(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+        if (widget.replaceGuest) {
+          await _auth.convertGuestAccount(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+        } else {
+          await _auth.signup(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+        }
       }
       if (!mounted) return;
-      widget.onLoggedIn();
+      widget.onLoggedIn(_isLogin);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -85,6 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signInWithGoogle() async {
+    if (!await _confirmAccountSwitch()) return;
     setState(() {
       _error = null;
       _loading = true;
@@ -98,9 +133,13 @@ class _LoginScreenState extends State<LoginScreen> {
       final auth = await account.authentication;
       final idToken = auth.idToken;
       if (idToken == null) throw Exception(AppStrings.googleTokenError);
-      await _auth.loginWithGoogle(idToken);
+      if (widget.replaceGuest) {
+        await _auth.loginWithGoogleReplacingGuest(idToken);
+      } else {
+        await _auth.loginWithGoogle(idToken);
+      }
       if (!mounted) return;
-      widget.onLoggedIn();
+      widget.onLoggedIn(true);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -109,6 +148,32 @@ class _LoginScreenState extends State<LoginScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<bool> _confirmAccountSwitch() async {
+    if (!widget.replaceGuest || !widget.confirmGuestReplacement) return true;
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Switch accounts?'),
+            content: const Text(
+              'Signing in to an existing account permanently deletes the '
+              'current guest account and its data. Go back and create an '
+              'account instead if you want to keep this progress.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Switch account'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   @override
@@ -307,12 +372,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               busy: _loading,
                             ),
                             const SizedBox(height: ZveltTokens.s3),
-                            ZveltSecondaryButton(
-                              label: AppStrings.continueWithGoogle,
-                              icon: Icons.g_mobiledata,
-                              onTap: _signInWithGoogle,
-                              enabled: !_loading,
-                            ),
+                            if (!widget.replaceGuest || _isLogin)
+                              ZveltSecondaryButton(
+                                label: AppStrings.continueWithGoogle,
+                                icon: Icons.g_mobiledata,
+                                onTap: _signInWithGoogle,
+                                enabled: !_loading,
+                              ),
                           ],
                         ),
                       ),

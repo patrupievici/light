@@ -699,19 +699,29 @@ class _PlanTabState extends State<PlanTab> {
     // Prototype planDateLabel (JS 1969–1971): '23 May, 2026'.
     final label = '${sel.day} ${mo[sel.month - 1]}, ${sel.year}';
 
-    Widget navBtn(IconData icon, VoidCallback onTap) => InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
-          child: Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: ZveltTokens.chip,
-              border: Border.all(color: ZveltTokens.borderStrong),
+    Widget navBtn(String label, IconData icon, VoidCallback onTap) => Semantics(
+          button: true,
+          label: label,
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Center(
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ZveltTokens.chip,
+                    border: Border.all(color: ZveltTokens.borderStrong),
+                  ),
+                  child: Icon(icon, size: 15, color: ZveltTokens.text2),
+                ),
+              ),
             ),
-            child: Icon(icon, size: 15, color: ZveltTokens.text2),
           ),
         );
 
@@ -722,11 +732,13 @@ class _PlanTabState extends State<PlanTab> {
           Text(label, style: ZType.h4.copyWith(fontSize: 19)),
           const Spacer(),
           navBtn(
+              'Previous day',
               AppIcons.angle_small_left,
               () => setState(
                   () => _selectedDay = sel.subtract(const Duration(days: 1)))),
           const SizedBox(width: 8),
           navBtn(
+              'Next day',
               AppIcons.angle_small_right,
               () => setState(
                   () => _selectedDay = sel.add(const Duration(days: 1)))),

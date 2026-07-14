@@ -401,6 +401,15 @@ bool nutritionPlanMatchesGoals(
   );
 }
 
+/// A non-empty plan that cannot be rendered safely must be overwritten on the
+/// next generation request. Sending `force: false` would make the backend
+/// return those same cached rows and leave the client in a reject/reload loop.
+bool nutritionPlanRequiresForcedRegeneration(
+  NutritionGoals goals,
+  List<NutritionPlanDay> plan,
+) =>
+    plan.isNotEmpty && !nutritionPlanMatchesGoals(goals, plan);
+
 class MealItemMacros {
   const MealItemMacros({
     required this.calories,

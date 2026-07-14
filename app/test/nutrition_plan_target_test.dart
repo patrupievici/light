@@ -60,4 +60,27 @@ void main() {
     expect(nutritionPlanMatchesGoals(goals, matchingPlan().take(6).toList()),
         isFalse);
   });
+
+  test('forces regeneration only for non-empty stale or partial plans', () {
+    expect(nutritionPlanRequiresForcedRegeneration(goals, const []), isFalse);
+    expect(nutritionPlanRequiresForcedRegeneration(goals, matchingPlan()),
+        isFalse);
+
+    final stale = matchingPlan();
+    stale[0] = NutritionPlanDay(
+      day: stale[0].day,
+      calories: 1800,
+      proteinG: goals.proteinG,
+      carbsG: goals.carbsG,
+      fatG: goals.fatG,
+      waterMl: goals.waterMl,
+      goal: goals.goal,
+    );
+    expect(nutritionPlanRequiresForcedRegeneration(goals, stale), isTrue);
+    expect(
+      nutritionPlanRequiresForcedRegeneration(
+          goals, matchingPlan().take(6).toList()),
+      isTrue,
+    );
+  });
 }

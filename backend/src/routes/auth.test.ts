@@ -204,6 +204,111 @@ describe('POST /v1/auth/login — credential check', () => {
 
 // ── Password reset (stateless HMAC codes) ───────────────────────────────────
 
+describe('POST /v1/auth/guest/convert', () => {
+  async function guestToken(app: Awaited<ReturnType<typeof buildApp>>) {
+    return app.jwt.sign({
+      userId: 'guest-u1',
+      email: 'guest_abc123@guest.zvelt.app',
+    })
+  }
+
+  function guestIdentity() {
+    return {
+      id: 'guest-identity-1',
+      userId: 'guest-u1',
+      provider: 'email',
+      providerSubject: 'guest_abc123@guest.zvelt.app',
+      email: 'guest_abc123@guest.zvelt.app',
+      passwordHash: 'old-random-password-hash',
+    }
+  }
+
+  it('converts the current guest in place and returns a fresh session', async () => {
+    authIdentityFindFirst
+      .mockResolvedValueOnce(guestIdentity())
+      .mockResolvedValueOnce(null)
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/guest/convert',
+      headers: { authorization: `Bearer ${await guestToken(app)}` },
+      payload: { email: ' New.User@Example.COM ', password: 'new-secure-password' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toMatchObject({
+      user: { id: 'guest-u1', email: 'new.user@example.com' },
+    })
+    expect(res.json().accessToken).toEqual(expect.any(String))
+    expect(res.json().refreshToken).toEqual(expect.any(String))
+    expect(authIdentityUpdate).toHaveBeenCalledTimes(1)
+    const update = authIdentityUpdate.mock.calls[0][0] as {
+      where: { id: string }
+      data: { providerSubject: string; email: string; passwordHash: string }
+    }
+    expect(update.where).toEqual({ id: 'guest-identity-1' })
+    expect(update.data.providerSubject).toBe('new.user@example.com')
+    expect(update.data.email).toBe('new.user@example.com')
+    const bcrypt = (await import('bcryptjs')).default
+    expect(await bcrypt.compare('new-secure-password', update.data.passwordHash)).toBe(true)
+    expect(refreshTokenDeleteMany).toHaveBeenCalledWith({ where: { userId: 'guest-u1' } })
+    expect(prismaTransaction).toHaveBeenCalledTimes(1)
+    await app.close()
+  })
+
+  it('rejects conversion when the authenticated identity is not a guest', async () => {
+    authIdentityFindFirst.mockResolvedValue({
+      ...guestIdentity(),
+      providerSubject: 'real@example.com',
+      email: 'real@example.com',
+    })
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/guest/convert',
+      headers: { authorization: `Bearer ${await guestToken(app)}` },
+      payload: { email: 'new@example.com', password: 'new-secure-password' },
+    })
+
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: 'NOT_GUEST_ACCOUNT' })
+    expect(authIdentityUpdate).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('rejects an email already attached to another account', async () => {
+    authIdentityFindFirst
+      .mockResolvedValueOnce(guestIdentity())
+      .mockResolvedValueOnce({ id: 'existing-identity' })
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/guest/convert',
+      headers: { authorization: `Bearer ${await guestToken(app)}` },
+      payload: { email: 'existing@example.com', password: 'new-secure-password' },
+    })
+
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ error: 'EMAIL_TAKEN' })
+    expect(authIdentityUpdate).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('requires authentication before reading or changing an identity', async () => {
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/guest/convert',
+      payload: { email: 'new@example.com', password: 'new-secure-password' },
+    })
+
+    expect(res.statusCode).toBe(401)
+    expect(authIdentityFindFirst).not.toHaveBeenCalled()
+    expect(authIdentityUpdate).not.toHaveBeenCalled()
+    await app.close()
+  })
+})
+
 const RESET_HASH = '$2a$04$fixedfakehashforresetcodesxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 
 function activeEmailIdentity() {

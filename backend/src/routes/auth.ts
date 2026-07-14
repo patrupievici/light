@@ -8,14 +8,19 @@ import { authenticate } from '../middleware/auth'
 import { sendPasswordResetEmail } from '../services/mail.service'
 
 const SignupSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   password: z.string().min(8).max(128),
   displayName: z.string().min(1).max(50).optional(),
 })
 
 const LoginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   password: z.string(),
+})
+
+const ConvertGuestSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(8).max(128),
 })
 
 const GoogleAuthSchema = z.object({
@@ -32,11 +37,11 @@ const ChangePasswordSchema = z.object({
 })
 
 const ForgotPasswordSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
 })
 
 const ResetPasswordSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   code: z.string().regex(/^\d{6}$/),
   new_password: z.string().min(8).max(128),
 })
@@ -349,6 +354,92 @@ export async function authRoutes(app: FastifyInstance) {
       refreshToken,
       user: { id: identity.userId, email },
     })
+    },
+  )
+
+  // POST /v1/auth/guest/convert - attach recoverable credentials to the
+  // current anonymous account without creating a second user or losing data.
+  app.post(
+    '/guest/convert',
+    {
+      preHandler: authenticate,
+      config: { rateLimit: { ...AUTH_RATE_LIMIT, keyGenerator: emailIpKeyGenerator } },
+    },
+    async (request, reply) => {
+      const parsed = ConvertGuestSchema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_ERROR',
+          message: 'Enter a valid email and a password of 8-128 characters.',
+          requestId: request.id,
+          details: parsed.error.flatten(),
+        })
+      }
+
+      const { userId } = request.user
+      const { email, password } = parsed.data
+      const identity = await prisma.authIdentity.findFirst({
+        where: { userId, provider: 'email' },
+      })
+      const guestSuffix = '@guest.zvelt.app'
+      const isGuestIdentity =
+        identity?.email?.startsWith('guest_') === true &&
+        identity.email.endsWith(guestSuffix) &&
+        identity.providerSubject === identity.email
+
+      if (!identity || !isGuestIdentity) {
+        return reply.code(409).send({
+          error: 'NOT_GUEST_ACCOUNT',
+          message: 'This account is already linked to a sign-in method.',
+          requestId: request.id,
+        })
+      }
+
+      const existing = await prisma.authIdentity.findFirst({
+        where: { provider: 'email', email },
+      })
+      if (existing) {
+        return reply.code(409).send({
+          error: 'EMAIL_TAKEN',
+          message: 'This email is already in use. Sign in instead.',
+          requestId: request.id,
+        })
+      }
+
+      try {
+        await prisma.$transaction([
+          prisma.authIdentity.update({
+            where: { id: identity.id },
+            data: {
+              providerSubject: email,
+              email,
+              passwordHash: await hashPassword(password),
+            },
+          }),
+          prisma.refreshToken.deleteMany({ where: { userId } }),
+        ])
+      } catch (error) {
+        if (
+          error != null &&
+          typeof error === 'object' &&
+          'code' in error &&
+          error.code === 'P2002'
+        ) {
+          return reply.code(409).send({
+            error: 'EMAIL_TAKEN',
+            message: 'This email is already in use. Sign in instead.',
+            requestId: request.id,
+          })
+        }
+        throw error
+      }
+
+      const { accessToken, refreshToken } = await issueSession(app, userId, email)
+      return reply.send({
+        accessToken,
+        refreshToken,
+        user: { id: userId, email },
+      })
     },
   )
 

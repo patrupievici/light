@@ -12,9 +12,9 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <!-- Camera: nutrition barcode scanning + workout photos. -->
+    <!-- Camera: nutrition barcode scanning + workout photos. Image selection
+         uses the Android system picker and does not need gallery-wide access. -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <!-- Health Connect permissions removed for v1 — Health integrations are
          not shipping (v2). Restore the android.permission.health.* block +
          the HC rationale intent-filter/alias/queries when Health returns. -->

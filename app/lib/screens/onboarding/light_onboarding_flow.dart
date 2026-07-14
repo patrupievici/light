@@ -5,13 +5,13 @@ import '../../services/auth_service.dart';
 import '../../services/training_profile_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
+import '../login_screen.dart';
 import '../splash_screen.dart';
 import 'onboarding_keys.dart';
 
-/// Light onboarding: Splash → (silent guest sign-in, no login screen) → 3 short
-/// questions (Goal · Experience · Days/week, skippable) → into the app. The user
-/// can later save their account from Settings; until then they run as an
-/// anonymous guest so backend calls still have a session.
+/// Light onboarding: Splash -> silent guest session -> 3 short questions ->
+/// app. Existing users can sign in from the first question, while new users can
+/// save the same guest account here or later from Profile > Account.
 class LightOnboardingFlow extends StatefulWidget {
   const LightOnboardingFlow({
     super.key,
@@ -34,28 +34,52 @@ enum _Phase { splash, settingUp, goal, experience, days, finishing }
 
 class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
   _Phase _phase = _Phase.splash;
+  bool _accountSaved = false;
 
   String? _goal; // backend primaryGoal enum
   String? _level; // beginner | intermediate | advanced
   int? _days;
 
-  void _afterSplash() {
+  Future<void> _afterSplash() async {
     if (widget.startAuthenticated) {
-      setState(() => _phase = _Phase.goal);
+      final guest = await AuthService().isGuest();
+      if (mounted) {
+        setState(() {
+          _accountSaved = !guest;
+          _phase = _Phase.goal;
+        });
+      }
     } else {
       _createGuestThenContinue();
     }
   }
 
-  /// No login screen: silently spin up an anonymous guest account so the user
-  /// has a backend session, then drop into the questions. If it fails (offline)
-  /// we still continue — the questions + app degrade gracefully without a token.
+  /// Silently spin up an anonymous account so backend calls work immediately.
+  /// If it fails offline, the questions and app still degrade gracefully.
   Future<void> _createGuestThenContinue() async {
     setState(() => _phase = _Phase.settingUp);
     try {
       await AuthService().continueAsGuest();
     } catch (_) {/* offline — let them in anyway */}
     if (mounted) setState(() => _phase = _Phase.goal);
+  }
+
+  Future<void> _openAccountAccess() async {
+    final signedIntoExisting = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (loginContext) => LoginScreen(
+          replaceGuest: true,
+          initialLogin: true,
+          onLoggedIn: (wasLogin) => Navigator.of(loginContext).pop(wasLogin),
+        ),
+      ),
+    );
+    if (signedIntoExisting == null || !mounted) return;
+    if (signedIntoExisting) {
+      await _finish();
+    } else {
+      setState(() => _accountSaved = true);
+    }
   }
 
   Future<void> _finish() async {
@@ -65,7 +89,8 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
     try {
       await TrainingProfileService().patch({
         if (_goal != null) 'primaryGoal': _goal,
-        if (_level != null) 'trainingLevel': _level, // backend field is trainingLevel
+        if (_level != null)
+          'trainingLevel': _level, // backend field is trainingLevel
         if (_days != null) 'daysPerWeek': _days,
         'onboardingCompleted': true,
       });
@@ -77,7 +102,8 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final uid = await AuthService().getStoredUserId() ?? '';
-      final realKey = '${kOnboarding2CompletedKey}_${uid.isEmpty ? 'guest' : uid}';
+      final realKey =
+          '${kOnboarding2CompletedKey}_${uid.isEmpty ? 'guest' : uid}';
       await prefs.setBool(realKey, true);
       await prefs.setBool(widget.completionKey, true);
     } catch (_) {}
@@ -93,7 +119,8 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
       case _Phase.settingUp:
         return Scaffold(
           backgroundColor: ZveltTokens.bg,
-          body: const Center(child: CircularProgressIndicator(color: ZveltTokens.brand)),
+          body: const Center(
+              child: CircularProgressIndicator(color: ZveltTokens.brand)),
         );
       case _Phase.goal:
         return _QuestionScreen(
@@ -109,9 +136,14 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
           selected: _goal,
           onSelect: (v) => setState(() => _goal = v),
           ctaLabel: 'Next',
-          onCta: _goal == null ? null : () => setState(() => _phase = _Phase.experience),
+          onCta: _goal == null
+              ? null
+              : () => setState(() => _phase = _Phase.experience),
           onBack: null,
           onSkip: _finish,
+          footerActionLabel:
+              _accountSaved ? null : 'Already have an account? Sign in',
+          onFooterAction: _accountSaved ? null : _openAccountAccess,
         );
       case _Phase.experience:
         return _QuestionScreen(
@@ -126,7 +158,9 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
           selected: _level,
           onSelect: (v) => setState(() => _level = v),
           ctaLabel: 'Next',
-          onCta: _level == null ? null : () => setState(() => _phase = _Phase.days),
+          onCta: _level == null
+              ? null
+              : () => setState(() => _phase = _Phase.days),
           onBack: () => setState(() => _phase = _Phase.goal),
           onSkip: _finish,
         );
@@ -152,7 +186,8 @@ class _LightOnboardingFlowState extends State<LightOnboardingFlow> {
       case _Phase.finishing:
         return Scaffold(
           backgroundColor: ZveltTokens.bg,
-          body: const Center(child: CircularProgressIndicator(color: ZveltTokens.brand)),
+          body: const Center(
+              child: CircularProgressIndicator(color: ZveltTokens.brand)),
         );
     }
   }
@@ -177,6 +212,8 @@ class _QuestionScreen extends StatelessWidget {
     required this.onCta,
     this.onBack,
     this.onSkip,
+    this.footerActionLabel,
+    this.onFooterAction,
   });
 
   final int step; // 0..2
@@ -189,6 +226,8 @@ class _QuestionScreen extends StatelessWidget {
   final VoidCallback? onCta;
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
+  final String? footerActionLabel;
+  final VoidCallback? onFooterAction;
 
   @override
   Widget build(BuildContext context) {
@@ -226,7 +265,9 @@ class _QuestionScreen extends StatelessWidget {
                       width: i == step ? 22 : 7,
                       height: 7,
                       decoration: BoxDecoration(
-                        color: i <= step ? ZveltTokens.brand : ZveltTokens.surface3,
+                        color: i <= step
+                            ? ZveltTokens.brand
+                            : ZveltTokens.surface3,
                         borderRadius: BorderRadius.circular(ZveltTokens.rPill),
                       ),
                     ),
@@ -243,10 +284,12 @@ class _QuestionScreen extends StatelessWidget {
                             child: TextButton(
                               onPressed: onSkip,
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: ZveltTokens.s2),
                               ),
                               child: Text('Skip',
-                                  style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
+                                  style: ZType.bodyM
+                                      .copyWith(color: ZveltTokens.text2)),
                             ),
                           ),
                   ),
@@ -255,12 +298,14 @@ class _QuestionScreen extends StatelessWidget {
               const SizedBox(height: ZveltTokens.s8),
               Text(title, style: ZType.displayM),
               const SizedBox(height: ZveltTokens.s2),
-              Text(subtitle, style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
+              Text(subtitle,
+                  style: ZType.bodyM.copyWith(color: ZveltTokens.text2)),
               const SizedBox(height: ZveltTokens.s6),
               Expanded(
                 child: ListView.separated(
                   itemCount: options.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: ZveltTokens.s3),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: ZveltTokens.s3),
                   itemBuilder: (_, i) {
                     final opt = options[i];
                     final sel = opt.value == selected;
@@ -273,6 +318,21 @@ class _QuestionScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: ZveltTokens.s4),
+              if (footerActionLabel != null && onFooterAction != null)
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: TextButton(
+                    onPressed: onFooterAction,
+                    child: Text(
+                      footerActionLabel!,
+                      style: ZType.bodyM.copyWith(
+                        color: ZveltTokens.brand,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -299,7 +359,8 @@ class _QuestionScreen extends StatelessWidget {
 }
 
 class _OptionCard extends StatelessWidget {
-  const _OptionCard({required this.opt, required this.selected, required this.onTap});
+  const _OptionCard(
+      {required this.opt, required this.selected, required this.onTap});
 
   final _Opt opt;
   final bool selected;
@@ -335,7 +396,8 @@ class _OptionCard extends StatelessWidget {
                   ),
                   child: Icon(opt.icon,
                       size: 18,
-                      color: selected ? ZveltTokens.onBrand : ZveltTokens.text2),
+                      color:
+                          selected ? ZveltTokens.onBrand : ZveltTokens.text2),
                 ),
                 const SizedBox(width: ZveltTokens.s3),
               ],

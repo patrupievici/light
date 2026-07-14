@@ -117,6 +117,9 @@ class _NutritionTabState extends State<NutritionTab> {
   // One-shot guard so we auto-generate the weekly meal plan only once per
   // session when the tab opens empty (e.g. right after onboarding).
   bool _autoBootstrapTried = false;
+  // Set when the server returned a non-empty plan that conflicts with the
+  // canonical profile targets. The next generation must replace those rows.
+  bool _forcePlanRegeneration = false;
   // NOT final: the tab State lives in the nav shell across midnight, so the
   // day must roll over (see build) — otherwise food logged after 00:00 was
   // written to yesterday.
@@ -239,6 +242,7 @@ class _NutritionTabState extends State<NutritionTab> {
     DailyNutrition day = DailyNutrition.empty;
     NutritionGoals goals = const NutritionGoals();
     List<NutritionPlanDay> plan = const [];
+    bool forcePlanRegeneration = false;
     double? profileBw;
     bool failed = false;
     try {
@@ -276,7 +280,9 @@ class _NutritionTabState extends State<NutritionTab> {
               .goalsFromMeResponse(me)
               .catchError((_) => const NutritionGoals())
           : await _service.getGoals().catchError((_) => const NutritionGoals());
-      if (!nutritionPlanMatchesGoals(goals, plan)) {
+      forcePlanRegeneration =
+          nutritionPlanRequiresForcedRegeneration(goals, plan);
+      if (forcePlanRegeneration) {
         // A plan is server-derived output. Ignore stale/cross-version rows
         // instead of letting a previous target leak into today's tracker.
         debugPrint(
@@ -324,6 +330,7 @@ class _NutritionTabState extends State<NutritionTab> {
           _setDay(day);
           _goals = goals;
           _weekPlan = plan;
+          _forcePlanRegeneration = forcePlanRegeneration;
           _signedIn = signedIn;
           // Only treat as a hard failure on the FIRST load (nothing usable on
           // screen yet). A background refresh that throws keeps the existing
@@ -371,7 +378,7 @@ class _NutritionTabState extends State<NutritionTab> {
     // time (the user's FIRST impression of the tab, right after onboarding).
     if (mounted) setState(() => _planGenerating = true);
     try {
-      await _service.generateWeeklyPlan(force: false);
+      await _service.generateWeeklyPlan(force: _forcePlanRegeneration);
       await _load(showSpinner: false);
       if (!mounted) return;
       if (_weekPlan.isEmpty && !userInitiated) {
@@ -793,44 +800,50 @@ class _NutritionTabState extends State<NutritionTab> {
         children: [
           Text('Nutrition', style: ZType.h1.copyWith(fontSize: 24)),
           const Spacer(),
-          InkWell(
-            onTap: _openBasket,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: ZveltTokens.chip,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: ZveltTokens.border),
-              ),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(AppIcons.apps, size: 20, color: ZveltTokens.text),
-                  if (_basketCount > 0)
-                    Positioned(
-                      top: -8,
-                      right: -10,
-                      child: Container(
-                        constraints: const BoxConstraints(minWidth: 18),
-                        height: 18,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: ZveltTokens.brand,
-                          borderRadius: BorderRadius.circular(9),
-                          border: Border.all(color: ZveltTokens.bg, width: 2),
+          Semantics(
+            button: true,
+            label: _basketCount == 0
+                ? 'Shopping basket, empty'
+                : 'Shopping basket, $_basketCount items',
+            child: InkWell(
+              onTap: _openBasket,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: 48,
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: ZveltTokens.chip,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: ZveltTokens.border),
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(AppIcons.apps, size: 20, color: ZveltTokens.text),
+                    if (_basketCount > 0)
+                      Positioned(
+                        top: -8,
+                        right: -10,
+                        child: Container(
+                          constraints: const BoxConstraints(minWidth: 18),
+                          height: 18,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: ZveltTokens.brand,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(color: ZveltTokens.bg, width: 2),
+                          ),
+                          child: Text('$_basketCount',
+                              style: ZType.monoXS.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: ZveltTokens.onBrand)),
                         ),
-                        child: Text('$_basketCount',
-                            style: ZType.monoXS.copyWith(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: ZveltTokens.onBrand)),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1406,6 +1419,7 @@ class _NutritionTabState extends State<NutritionTab> {
     setState(() {
       _goals = nextGoals;
       _weekPlan = const [];
+      _forcePlanRegeneration = true;
     });
     await _bootstrapWeekPlan(userInitiated: true);
   }

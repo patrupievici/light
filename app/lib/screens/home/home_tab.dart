@@ -484,12 +484,10 @@ class _HomeTabState extends State<HomeTab> {
               ],
             ),
           ),
-          Tooltip(
-            message: 'Settings',
-            child: IconButton(
-              onPressed: widget.onOpenSettings,
-              icon: Icon(AppIcons.settings, color: ZveltTokens.text2),
-            ),
+          IconButton(
+            tooltip: 'Settings',
+            onPressed: widget.onOpenSettings,
+            icon: Icon(AppIcons.settings, color: ZveltTokens.text2),
           ),
         ],
       ),

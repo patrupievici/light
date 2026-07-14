@@ -122,6 +122,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         backgroundColor: ZveltTokens.bg,
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: Icon(AppIcons.angle_small_left,
               color: ZveltTokens.text, size: 28),
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
@@ -276,36 +277,40 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                   letterSpacing: 0.4),
             ),
             const SizedBox(height: ZveltTokens.s2),
-            TextField(
-              controller: _confirmCtrl,
-              autocorrect: false,
-              enableSuggestions: false,
-              textCapitalization: TextCapitalization.characters,
-              onChanged: (_) => setState(() {}),
-              style: TextStyle(
-                  color: ZveltTokens.text,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                  letterSpacing: 2),
-              decoration: InputDecoration(
-                hintText: 'DELETE',
-                hintStyle: TextStyle(
-                    color: ZveltTokens.text2.withValues(alpha: 0.4),
+            Semantics(
+              textField: true,
+              label: 'Type DELETE to confirm',
+              child: TextField(
+                controller: _confirmCtrl,
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (_) => setState(() {}),
+                style: TextStyle(
+                    color: ZveltTokens.text,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
                     letterSpacing: 2),
-                filled: true,
-                fillColor: ZveltTokens.surface,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: ZveltTokens.s4, vertical: ZveltTokens.s4),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(ZveltTokens.rSm),
-                    borderSide: BorderSide(color: ZveltTokens.border)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(ZveltTokens.rSm),
-                    borderSide: BorderSide(color: ZveltTokens.border)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(ZveltTokens.rSm),
-                    borderSide:
-                        const BorderSide(color: ZveltTokens.error, width: 1.5)),
+                decoration: InputDecoration(
+                  hintText: 'DELETE',
+                  hintStyle: TextStyle(
+                      color: ZveltTokens.text2.withValues(alpha: 0.4),
+                      letterSpacing: 2),
+                  filled: true,
+                  fillColor: ZveltTokens.surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: ZveltTokens.s4, vertical: ZveltTokens.s4),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(ZveltTokens.rSm),
+                      borderSide: BorderSide(color: ZveltTokens.border)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(ZveltTokens.rSm),
+                      borderSide: BorderSide(color: ZveltTokens.border)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(ZveltTokens.rSm),
+                      borderSide: const BorderSide(
+                          color: ZveltTokens.error, width: 1.5)),
+                ),
               ),
             ),
             if (_error != null) ...[
@@ -333,45 +338,50 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
             ],
             const SizedBox(height: ZveltTokens.s6),
             // Destructive CTA
-            GestureDetector(
-              onTap: _confirmValid && !_busy ? _doDelete : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 54,
-                decoration: BoxDecoration(
-                  color: _confirmValid && !_busy
-                      ? ZveltTokens.error
-                      : ZveltTokens.error.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(ZveltTokens.rMd),
-                  boxShadow: _confirmValid && !_busy
-                      ? [
-                          BoxShadow(
-                              color: ZveltTokens.error.withValues(alpha: 0.4),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8))
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: _busy
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2.5, color: ZveltTokens.onBrand))
-                      : const Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(AppIcons.trash,
-                              color: ZveltTokens.onBrand, size: 18),
-                          SizedBox(width: ZveltTokens.s2),
-                          Text(
-                            'DELETE MY ACCOUNT',
-                            style: TextStyle(
-                                color: ZveltTokens.onBrand,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13,
-                                letterSpacing: 1.8),
-                          ),
-                        ]),
+            Semantics(
+              button: true,
+              enabled: _confirmValid && !_busy,
+              label: _busy ? 'Deleting account' : 'Delete my account',
+              child: GestureDetector(
+                onTap: _confirmValid && !_busy ? _doDelete : null,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: _confirmValid && !_busy
+                        ? ZveltTokens.error
+                        : ZveltTokens.error.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(ZveltTokens.rMd),
+                    boxShadow: _confirmValid && !_busy
+                        ? [
+                            BoxShadow(
+                                color: ZveltTokens.error.withValues(alpha: 0.4),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8))
+                          ]
+                        : null,
+                  ),
+                  child: Center(
+                    child: _busy
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.5, color: ZveltTokens.onBrand))
+                        : const Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(AppIcons.trash,
+                                color: ZveltTokens.onBrand, size: 18),
+                            SizedBox(width: ZveltTokens.s2),
+                            Text(
+                              'DELETE MY ACCOUNT',
+                              style: TextStyle(
+                                  color: ZveltTokens.onBrand,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                  letterSpacing: 1.8),
+                            ),
+                          ]),
+                  ),
                 ),
               ),
             ),

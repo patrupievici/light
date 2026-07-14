@@ -13,6 +13,7 @@ import '../../theme/zvelt_theme_notifier.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
 import '../ai/ai_chat_screen.dart';
 import '../analytics/progress_screen.dart';
+import '../login_screen.dart';
 import '../onboarding/light_onboarding_flow.dart';
 import '../onboarding/onboarding_keys.dart';
 import '../settings/delete_account_screen.dart';
@@ -109,8 +110,31 @@ class _ProfileTabState extends State<ProfileTab> {
         onLogout: _confirmLogout,
       ),
     );
-    if (action != _AccountSheetAction.delete || !mounted) return;
-    await _openDeleteAccount();
+    if (!mounted) return;
+    if (action == _AccountSheetAction.save) {
+      await _openSaveGuestAccount();
+    } else if (action == _AccountSheetAction.delete) {
+      await _openDeleteAccount();
+    }
+  }
+
+  Future<void> _openSaveGuestAccount() async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (loginContext) => LoginScreen(
+          replaceGuest: true,
+          initialLogin: false,
+          confirmGuestReplacement: true,
+          onLoggedIn: (_) => Navigator.of(loginContext).pop(true),
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account saved')),
+    );
   }
 
   Future<void> _openDeleteAccount() async {
@@ -182,13 +206,18 @@ class _ProfileTabState extends State<ProfileTab> {
             child: Row(
               children: [
                 if (canPop)
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(),
-                    customBorder: const CircleBorder(),
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: Icon(AppIcons.arrow_small_left,
-                          size: 22, color: ZveltTokens.text2),
+                  Semantics(
+                    button: true,
+                    label: 'Back',
+                    child: InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      customBorder: const CircleBorder(),
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Icon(AppIcons.arrow_small_left,
+                            size: 22, color: ZveltTokens.text2),
+                      ),
                     ),
                   ),
                 Text('Profile', style: ZType.h2),
@@ -944,7 +973,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 // sheetAccount — Account (HTML 1267-1283)
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum _AccountSheetAction { delete }
+enum _AccountSheetAction { save, delete }
 
 class _AccountSheet extends StatelessWidget {
   const _AccountSheet({
@@ -1033,6 +1062,28 @@ class _AccountSheet extends StatelessWidget {
                 'Member since', '${_months[since.month - 1]} ${since.year}'),
           _infoRow('Current plan', 'Free', accent: true),
           const SizedBox(height: 6),
+          if (isGuest) ...[
+            SizedBox(
+              height: 48,
+              child: FilledButton(
+                onPressed: () =>
+                    Navigator.of(context).pop(_AccountSheetAction.save),
+                style: FilledButton.styleFrom(
+                  backgroundColor: ZveltTokens.brand,
+                  foregroundColor: ZveltTokens.onBrand,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                child: const Text('Save account'),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           SizedBox(
             height: 48,
             child: FilledButton(
@@ -1681,11 +1732,19 @@ class _SheetShell extends StatelessWidget {
                 ],
               ),
             ),
-            InkWell(
-              onTap: () => Navigator.of(context).pop(),
-              customBorder: const CircleBorder(),
-              child: Icon(AppIcons.cross_small,
-                  size: 22, color: ZveltTokens.text2),
+            Semantics(
+              button: true,
+              label: 'Close',
+              child: InkWell(
+                onTap: () => Navigator.of(context).pop(),
+                customBorder: const CircleBorder(),
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(AppIcons.cross_small,
+                      size: 22, color: ZveltTokens.text2),
+                ),
+              ),
             ),
           ],
         ),

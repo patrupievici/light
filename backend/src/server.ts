@@ -122,7 +122,11 @@ async function main() {
 
   // ─── Health check ─────────────────────────────────────────────────────────
 
-  app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }))
+  app.get('/health', async () => ({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    release: (process.env.RENDER_GIT_COMMIT ?? process.env.GIT_COMMIT ?? 'local').slice(0, 12),
+  }))
 
   // ─── Routes ───────────────────────────────────────────────────────────────
 
