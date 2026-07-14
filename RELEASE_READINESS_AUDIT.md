@@ -1,8 +1,10 @@
 # ZVELT Release Readiness Audit
 
-Audit date: 2026-07-14  
-Audited code revision: `e36f69c538ba0050cfbde4ac4dc87129d40a024b`  
-Production API: `https://light-l6en.onrender.com`  
+Audit date: 2026-07-14
+
+Audited code revision: `e36f69c538ba0050cfbde4ac4dc87129d40a024b`
+
+Production API: `https://light-l6en.onrender.com`
 Scope: Flutter client, Fastify/Prisma backend, PostgreSQL migrations, Android release artifacts, Android emulator, production API, privacy, security, accessibility, UX, product and operational launch readiness.
 
 ## 1. Executive Summary
@@ -91,9 +93,9 @@ Flutter tests pass `209/209`; backend tests pass `837/837`; Flutter analysis and
 
 **68 / 100**
 
-Android closed beta: acceptable with monitoring.  
-Public Android release: close, but physical-device/store checks remain.  
-Public iOS + Android release: blocked by iOS configuration/build validation, billing and operational store readiness.
+- Android closed beta: acceptable with monitoring.
+- Public Android release: close, but physical-device/store checks remain.
+- Public iOS + Android release: blocked by iOS configuration/build validation, billing and operational store readiness.
 
 ### Verification Evidence
 
@@ -119,7 +121,7 @@ Public iOS + Android release: blocked by iOS configuration/build validation, bil
 | Private media without authorization | Rejected |
 | Deleted access/refresh sessions | Rejected |
 | Guest conversion | Same user id, data preserved, old credentials revoked |
-| Durable media across Render deployment | `PENDING_DURABLE_MEDIA_REDEPLOY_CHECK` |
+| Durable media across Render deployment | Pass: `200`, 68 bytes, `e36f69c538ba` -> `76e6e2e536ce`; probe cleanup `204` |
 
 ### Audit Limits
 
