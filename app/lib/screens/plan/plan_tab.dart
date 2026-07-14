@@ -9,7 +9,6 @@ import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
 import '../workouts/program_builder_screen.dart';
-import '../workouts/program_detail_screen.dart';
 import '../workouts/workout_tracker_screen.dart';
 
 /// PLAN ("Plan Your Day") — 1:1 with the ZVELT handoff prototype (screen A2).
@@ -107,6 +106,17 @@ class _PlanTabState extends State<PlanTab> {
   static String _ymd(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  /// Prototype-style floating toast (matches the sheet/agenda snackbars).
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ZveltTokens.rSm)),
+      content: Text(msg),
+    ));
+  }
+
   // ─── actions ──────────────────────────────────────────────────────────────
   Future<void> _openTracker(String workoutId) async {
     await Navigator.of(context).push<void>(MaterialPageRoute<void>(
@@ -143,6 +153,8 @@ class _PlanTabState extends State<PlanTab> {
     try {
       final w = await _workouts.createWorkout(label: 'Empty Workout');
       if (!mounted) return;
+      // Prototype quickEmptyStart (JS 1737) toast.
+      _toast('Empty workout — add exercises');
       await _openTracker(w.id);
     } catch (e) {
       messenger.showSnackBar(SnackBar(
@@ -162,6 +174,8 @@ class _PlanTabState extends State<PlanTab> {
         await _workouts.addExercise(w.id, ex.exerciseId);
       }
       if (!mounted) return;
+      // Prototype quickRepeatStart (JS 1740) toast: 'Repeating <name>'.
+      _toast('Repeating ${last.sessionTitle ?? 'last workout'}');
       await _openTracker(w.id);
     } catch (e) {
       messenger.showSnackBar(SnackBar(
@@ -171,32 +185,130 @@ class _PlanTabState extends State<PlanTab> {
     }
   }
 
-  /// Auto-Plan — fills the selected day's agenda from the active program
-  /// (today's session at 18:00). Real data only; no invention.
+  /// Auto-Plan — plans the FULL day, both agenda buckets, like the prototype
+  /// autoPlan (JS 1656–1671): 4 workout blocks (Mobility · today's program
+  /// session · Walk · Stretch) + 4 nutrition meals. The program block is the
+  /// only real-data-dependent one and is skipped when no program is active.
+  /// Blocks already planned are skipped instead of duplicated.
   Future<void> _autoPlan() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final title = _active?.today?.title ??
-        (_active?.program?.title != null ? 'Workout' : null);
-    if (title == null) {
-      messenger.showSnackBar(
-          const SnackBar(content: Text('Pick a program first — then Auto-Plan can fill your day.')));
-      return;
-    }
     final day = _ymd(_selectedDay);
     final existing = _planned[day] ?? const <PlannedWorkoutEntry>[];
-    if (existing.any((e) => e.title == title && !e.completed)) {
-      messenger.showSnackBar(const SnackBar(content: Text('Already planned for this day.')));
-      return;
+    bool has(String bucket, String title) =>
+        existing.any((e) => e.agendaType == bucket && e.title == title);
+
+    final today = _active?.today;
+    final session =
+        (_active?.program != null && today != null && today.title.isNotEmpty)
+            ? today
+            : null;
+
+    final blocks = <
+        ({
+      String bucket,
+      String time,
+      String title,
+      String sub,
+      ActivityKind kind
+    })>[
+      (
+        bucket: 'workout',
+        time: '07:30',
+        title: 'Mobility',
+        sub: '10 min warm-up',
+        kind: ActivityKind.gym
+      ),
+      if (session != null)
+        (
+          bucket: 'workout',
+          time: '08:00',
+          title: session.title,
+          sub: 'Week ${session.week}${session.isDeload ? ' · Deload' : ''}',
+          kind: ActivityKind.gym
+        ),
+      (
+        bucket: 'workout',
+        time: '12:30',
+        title: 'Walk',
+        sub: '6,000 steps',
+        kind: ActivityKind.walk
+      ),
+      (
+        bucket: 'workout',
+        time: '18:30',
+        title: 'Stretch',
+        sub: 'Cool-down + mobility',
+        kind: ActivityKind.gym
+      ),
+      (
+        bucket: 'nutrition',
+        time: '08:30',
+        title: 'Breakfast',
+        sub: 'Oats & fruit',
+        kind: ActivityKind.other
+      ),
+      (
+        bucket: 'nutrition',
+        time: '13:00',
+        title: 'Lunch',
+        sub: 'Chicken & rice',
+        kind: ActivityKind.other
+      ),
+      (
+        bucket: 'nutrition',
+        time: '16:30',
+        title: 'Snack',
+        sub: 'Protein shake',
+        kind: ActivityKind.other
+      ),
+      (
+        bucket: 'nutrition',
+        time: '19:30',
+        title: 'Dinner',
+        sub: 'Salmon & greens',
+        kind: ActivityKind.other
+      ),
+    ];
+
+    final base = DateTime.now().millisecondsSinceEpoch;
+    var i = 0;
+    for (final b in blocks) {
+      if (has(b.bucket, b.title)) continue;
+      await _store.addPlannedWorkout(PlannedWorkoutEntry(
+        id: 'plan_${base}_${i++}',
+        dayYmd: day,
+        title: b.title,
+        kind: b.kind,
+        time: b.time,
+        sub: b.sub,
+        agendaType: b.bucket,
+      ));
     }
-    await _store.addPlannedWorkout(PlannedWorkoutEntry(
-      id: 'plan_${DateTime.now().millisecondsSinceEpoch}',
-      dayYmd: day,
-      title: title,
-      kind: ActivityKind.gym,
-      time: '18:00',
-    ));
-    messenger.showSnackBar(const SnackBar(content: Text('Added to agenda')));
+    if (!mounted) return;
+    _toast('Your full day is planned ✨');
     _load();
+  }
+
+  /// Split-card tap — prototype setSplit (JS 1757): activates the split
+  /// IMMEDIATELY (defaults; the API needs no extra input), toasts
+  /// '<name> set as active' and jumps back to the Today tab.
+  Future<void> _activateSplit(ProgramSummary t) async {
+    if (_starting) return;
+    setState(() => _starting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _programs.startProgram(templateId: t.id);
+      if (!mounted) return;
+      _toast('${t.title} set as active');
+      setState(() => _tab = 0);
+      await _load();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: ZveltTokens.error,
+      ));
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
   }
 
   Future<void> _openAddSheet() async {
@@ -370,6 +482,9 @@ class _PlanTabState extends State<PlanTab> {
                     style: ZType.h2.copyWith(fontSize: 25),
                   ),
                   const SizedBox(height: 12),
+                  // Prototype chip is the muscle-focus text (apFocus, HTML 334).
+                  // MaterializedExercise carries no muscle-group data, so the
+                  // week/deload chip is the honest real-data substitution.
                   if (hasProgram && today != null)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
@@ -486,9 +601,11 @@ class _PlanTabState extends State<PlanTab> {
             ),
             child: Row(
               children: [
+                // Prototype modeOn (JS 1951): icon inherits the label color
+                // (currentColor = --txt), not the accent.
                 Icon(icon,
                     size: 14,
-                    color: _mode == i ? ZveltTokens.brand : ZveltTokens.text3),
+                    color: _mode == i ? ZveltTokens.text : ZveltTokens.text3),
                 const SizedBox(width: 5),
                 Text(label,
                     style: ZType.bodyS.copyWith(
@@ -551,12 +668,10 @@ class _PlanTabState extends State<PlanTab> {
   }
 
   Widget _dateRow() {
-    final today = DateUtils.dateOnly(DateTime.now());
     final sel = _selectedDay;
     const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    final label = sel == today
-        ? 'Today, ${mo[sel.month - 1]} ${sel.day}'
-        : '${mo[sel.month - 1]} ${sel.day}';
+    // Prototype planDateLabel (JS 1969–1971): '23 May, 2026'.
+    final label = '${sel.day} ${mo[sel.month - 1]}, ${sel.year}';
 
     Widget navBtn(IconData icon, VoidCallback onTap) => InkWell(
           onTap: onTap,
@@ -612,7 +727,11 @@ class _PlanTabState extends State<PlanTab> {
   Widget _stripCell(DateTime day, String label, DateTime today) {
     final selected = day == _selectedDay;
     final entries = _planned[_ymd(day)] ?? const <PlannedWorkoutEntry>[];
-    final hasWorkout = entries.any((e) => e.kind != ActivityKind.gym || true);
+    // Prototype p.hasW / p.hasN (HTML 356–358): one small icon per agenda
+    // bucket, stacked in a column, accent on the selected day.
+    final hasW = entries.any((e) => e.agendaType == 'workout');
+    final hasN = entries.any((e) => e.agendaType == 'nutrition');
+    final iconColor = selected ? ZveltTokens.brand : ZveltTokens.text3;
 
     return InkWell(
       onTap: () => setState(() => _selectedDay = day),
@@ -637,13 +756,17 @@ class _PlanTabState extends State<PlanTab> {
             const SizedBox(height: 2),
             Text(label,
                 style: ZType.monoXS.copyWith(fontSize: 11)),
+            const SizedBox(height: 2),
             SizedBox(
-              height: 14,
-              child: entries.isNotEmpty && hasWorkout
-                  ? Icon(AppIcons.gym,
-                      size: 12,
-                      color: selected ? ZveltTokens.brand : ZveltTokens.text3)
-                  : null,
+              height: 29, // 12 + 5 gap + 12 — keeps all cells equal height.
+              child: Column(
+                children: [
+                  if (hasW) Icon(AppIcons.gym, size: 12, color: iconColor),
+                  if (hasW && hasN) const SizedBox(height: 5),
+                  if (hasN)
+                    Icon(AppIcons.restaurant, size: 12, color: iconColor),
+                ],
+              ),
             ),
           ],
         ),
@@ -826,7 +949,6 @@ class _PlanTabState extends State<PlanTab> {
         borderRadius: BorderRadius.circular(ZveltTokens.rCardSm),
         child: Container(
           clipBehavior: Clip.antiAlias,
-          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment(-1, -0.3),
@@ -842,35 +964,54 @@ class _PlanTabState extends State<PlanTab> {
                   spreadRadius: -8),
             ],
           ),
-          child: Row(
+          child: Stack(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Decorative white circle (HTML 394): 120px, rgba(255,255,255,.14),
+              // offset -24/-24 top-right, clipped by the card.
+              Positioned(
+                right: -24,
+                top: -24,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: const BoxDecoration(
+                      shape: BoxShape.circle, color: Color(0x24FFFFFF)),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
                   children: [
-                    Text('Build a program with AI',
-                        style: ZType.bodyL.copyWith(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: ZveltTokens.onBrand)),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Tell it your goal — judo grip, a dunk, a big squat — it writes the plan.',
-                      style: ZType.bodyS.copyWith(
-                          fontSize: 12, color: const Color(0xEBFFFFFF)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Build a program with AI',
+                              style: ZType.bodyL.copyWith(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: ZveltTokens.onBrand)),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Tell it your goal — judo grip, a dunk, a big squat — it writes the plan.',
+                            style: ZType.bodyS.copyWith(
+                                fontSize: 12, color: const Color(0xEBFFFFFF)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 13),
+                    Container(
+                      width: 46,
+                      height: 46,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                          shape: BoxShape.circle, color: Color(0x38FFFFFF)),
+                      child: const Icon(AppIcons.sparkles,
+                          size: 24, color: ZveltTokens.onBrand),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 13),
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                    shape: BoxShape.circle, color: Color(0x38FFFFFF)),
-                child: const Icon(AppIcons.sparkles,
-                    size: 24, color: ZveltTokens.onBrand),
               ),
             ],
           ),
@@ -893,8 +1034,7 @@ class _PlanTabState extends State<PlanTab> {
         );
 
     return InkWell(
-      onTap: () => Navigator.of(context).push<void>(MaterialPageRoute<void>(
-          builder: (_) => ProgramDetailScreen(templateId: t.id))),
+      onTap: () => _activateSplit(t),
       borderRadius: BorderRadius.circular(ZveltTokens.rBox),
       child: Container(
         width: double.infinity,

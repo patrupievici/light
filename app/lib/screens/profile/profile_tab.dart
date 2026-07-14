@@ -1,9 +1,15 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../services/auth_service.dart';
+import '../../services/health_service.dart';
+import '../../services/integrations_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/settings_store.dart';
 import '../../theme/app_icons.dart';
@@ -12,7 +18,8 @@ import '../../theme/zvelt_theme_notifier.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
 import '../ai/ai_chat_screen.dart';
 import '../analytics/progress_hub_screen.dart';
-import 'account_settings_screen.dart';
+import '../onboarding/light_onboarding_flow.dart';
+import '../onboarding/onboarding_keys.dart';
 import 'integrations_screen.dart';
 
 /// PROFILE — 1:1 with the ZVELT handoff prototype (screen A7).
@@ -23,9 +30,9 @@ import 'integrations_screen.dart';
 /// Account, Help & Feedback, AI Companion, About ZVELT, Request a Feature,
 /// Report a Bug. Nothing else.
 ///
-/// The settings gear and Preferences both open the prototype's
-/// `sheetSettings` (Units · Notifications · Haptics · Rest sound · Sign out —
-/// all persisted; Units actually converts via [UnitsNotifier]).
+/// Sheets (all prototype 1:1): sheetSettings (Units · Notifications · Haptics ·
+/// Rest timer sound · Replay intro tour · Sign out), sheetEdit, sheetDevice,
+/// sheetPremium, sheetAccount, sheetHelp, sheetAbout, sheetFeature, sheetBug.
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key, required this.onLogout});
   final Future<void> Function() onLogout;
@@ -39,6 +46,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
   String _name = 'Athlete';
   String _email = '';
+  DateTime? _memberSince;
   bool _loading = true;
 
   @override
@@ -52,11 +60,14 @@ class _ProfileTabState extends State<ProfileTab> {
       final me = await _profile.getMe();
       if (!mounted) return;
       final profile = me?['profile'] as Map<String, dynamic>?;
+      final createdRaw = me?['createdAt'] ?? profile?['createdAt'];
       setState(() {
         _name = (profile?['displayName'] as String?)?.trim().isNotEmpty == true
             ? (profile!['displayName'] as String).trim()
             : 'Athlete';
         _email = (me?['email'] as String?)?.trim() ?? '';
+        _memberSince =
+            createdRaw is String ? DateTime.tryParse(createdRaw) : null;
         _loading = false;
       });
     } catch (_) {
@@ -66,13 +77,30 @@ class _ProfileTabState extends State<ProfileTab> {
 
   // ─── actions ──────────────────────────────────────────────────────────────
   void _openSettingsSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _SettingsSheet(onLogout: _confirmLogout),
-    );
+    _sheet(_SettingsSheet(onLogout: _confirmLogout));
+  }
+
+  void _openEditSheet() {
+    _sheet(_EditProfileSheet(
+      initialName: _name,
+      initialEmail: _email,
+      onSaved: () {
+        _load();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Profile updated')));
+      },
+    ));
+  }
+
+  void _openAccountSheet() {
+    _sheet(_AccountSheet(
+      name: _name,
+      email: _email,
+      memberSince: _memberSince,
+      onEditProfile: _openEditSheet,
+      onLogout: _confirmLogout,
+    ));
   }
 
   Future<void> _confirmLogout() async {
@@ -219,8 +247,7 @@ class _ProfileTabState extends State<ProfileTab> {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: () =>
-                        _push(AccountSettingsScreen(onLogout: widget.onLogout)),
+                    onTap: _openEditSheet,
                     borderRadius: BorderRadius.circular(18),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -248,7 +275,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: InkWell(
-                    onTap: () => _push(const IntegrationsScreen()),
+                    onTap: () => _sheet(const _DeviceSheet()),
                     borderRadius: BorderRadius.circular(18),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -352,7 +379,7 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
           ),
-          // Appearance row
+          // Appearance row — prototype leading glyph is a sun/brightness icon.
           Padding(
             padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
             child: Container(
@@ -365,7 +392,7 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
               child: Row(
                 children: [
-                  Icon(AppIcons.moon, size: 20, color: ZveltTokens.text),
+                  Icon(AppIcons.sun, size: 20, color: ZveltTokens.text),
                   const SizedBox(width: 13),
                   Expanded(
                     child: Text('Appearance',
@@ -429,9 +456,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     accent: true, onTap: () => _push(const ProgressHubScreen())),
                 _row(AppIcons.settings_sliders, 'Preferences',
                     onTap: _openSettingsSheet),
-                _row(AppIcons.user, 'Account',
-                    onTap: () =>
-                        _push(AccountSettingsScreen(onLogout: widget.onLogout))),
+                _row(AppIcons.user, 'Account', onTap: _openAccountSheet),
                 _row(AppIcons.interrogation, 'Help & Feedback',
                     onTap: () => _sheet(const _HelpSheet())),
                 _row(AppIcons.sparkles, 'AI Companion',
@@ -441,13 +466,18 @@ class _ProfileTabState extends State<ProfileTab> {
                 _row(AppIcons.bulb, 'Request a Feature',
                     onTap: () => _sheet(const _FeedbackSheet(
                         title: 'Request a Feature',
-                        hint: 'What should ZVELT do next?',
+                        subtitle: 'What would make ZVELT better for you?',
+                        hint: "Describe the feature you'd love to see…",
+                        ctaLabel: 'Submit request',
                         subject: 'Feature request'))),
                 _row(AppIcons.bug, 'Report a Bug',
                     onTap: () => _sheet(const _FeedbackSheet(
                         title: 'Report a Bug',
-                        hint: 'What happened? What did you expect?',
-                        subject: 'Bug report'))),
+                        subtitle: 'Tell us what went wrong so we can fix it',
+                        hint: 'What happened? What did you expect instead?…',
+                        ctaLabel: 'Send report',
+                        subject: 'Bug report',
+                        showVersionChip: true))),
               ],
             ),
           ),
@@ -504,7 +534,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         fontSize: 14.5, fontWeight: FontWeight.w600)),
               ),
               Icon(AppIcons.angle_small_right,
-                  size: 17, color: ZveltTokens.text4),
+                  size: 17, color: ZveltTokens.text3),
             ],
           ),
         ),
@@ -514,7 +544,8 @@ class _ProfileTabState extends State<ProfileTab> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// sheetSettings — Units · Notifications · Haptics · Rest sound · Sign out
+// sheetSettings — Units · Notifications · Haptics · Rest timer sound ·
+// Replay intro tour · Sign out (HTML 1042-1057)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SettingsSheet extends StatefulWidget {
@@ -563,86 +594,85 @@ class _SettingsSheetState extends State<_SettingsSheet> {
     } catch (_) {/* best-effort */}
   }
 
+  /// Relaunch the light onboarding flow ("intro tour"). The flow re-derives
+  /// its own completion key on finish, so replaying is safe for the same user.
+  Future<void> _replayTour() async {
+    final nav = Navigator.of(context);
+    String uid = '';
+    try {
+      uid = await AuthService().getStoredUserId() ?? '';
+    } catch (_) {/* offline — replay as guest key */}
+    if (!mounted) return;
+    Navigator.of(context).pop(); // close the sheet first
+    nav.push<void>(MaterialPageRoute<void>(
+      builder: (ctx) => LightOnboardingFlow(
+        completionKey:
+            '${kOnboarding2CompletedKey}_${uid.isEmpty ? 'guest' : uid}',
+        startAuthenticated: true,
+        onComplete: () => Navigator.of(ctx).pop(),
+      ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: ZveltTokens.sheetGrad,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(ZveltTokens.rSheet)),
-        border: Border.all(color: ZveltTokens.border),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+    return _SheetShell(
+      title: 'Settings',
+      maxHeightFactor: 0.92,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 14),
-              decoration: BoxDecoration(
-                color: ZveltTokens.track,
-                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Text('Settings', style: ZType.h4.copyWith(fontSize: 19)),
-              const Spacer(),
-              InkWell(
-                onTap: () => Navigator.of(context).pop(),
-                customBorder: const CircleBorder(),
-                child: Icon(AppIcons.cross_small,
-                    size: 22, color: ZveltTokens.text2),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Units — actually converts (UnitsNotifier drives kg/lb app-wide).
-          Text('UNITS', style: ZType.eyebrow),
-          const SizedBox(height: 8),
+          // Units — sentence-case 12px label (prototype line 1046), segments
+          // "Kilograms (kg)" / "Pounds (lb)" (line 1047). Actually converts
+          // app-wide via [UnitsNotifier].
+          Text('Units',
+              style: ZType.bodyS
+                  .copyWith(fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 9),
           ValueListenableBuilder<String>(
             valueListenable: UnitsNotifier.system,
             builder: (context, system, _) {
               Widget item(String label, String value) => Expanded(
                     child: InkWell(
                       onTap: () => UnitsNotifier.set(value),
-                      borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                      borderRadius: BorderRadius.circular(11),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 9),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: system == value
                               ? ZveltTokens.brand
-                              : ZveltTokens.chip,
-                          borderRadius:
-                              BorderRadius.circular(ZveltTokens.rControl),
-                          border: system == value
-                              ? null
-                              : Border.all(color: ZveltTokens.borderStrong),
-                          boxShadow:
-                              system == value ? ZveltTokens.glowSm : null,
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(11),
                         ),
                         child: Text(label,
-                            style: ZType.bodyM.copyWith(
-                                fontWeight: FontWeight.w700,
+                            style: ZType.bodyS.copyWith(
+                                fontSize: 13,
+                                fontWeight: system == value
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
                                 color: system == value
                                     ? ZveltTokens.onBrand
-                                    : ZveltTokens.text)),
+                                    : ZveltTokens.text2)),
                       ),
                     ),
                   );
-              return Row(children: [
-                item('Kilograms', 'metric'),
-                const SizedBox(width: 8),
-                item('Pounds', 'imperial'),
-              ]);
+              return Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.chip,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rChip),
+                  border: Border.all(color: ZveltTokens.border),
+                ),
+                child: Row(children: [
+                  item('Kilograms (kg)', 'metric'),
+                  const SizedBox(width: 4),
+                  item('Pounds (lb)', 'imperial'),
+                ]),
+              );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           _toggleRow('Notifications', _notifications, (v) {
             setState(() => _notifications = v);
             _save(_kNotif, v);
@@ -651,11 +681,49 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             setState(() => _haptics = v);
             _save(_kHaptics, v);
           }),
-          _toggleRow('Rest sound', _restSound, (v) {
+          _toggleRow('Rest timer sound', _restSound, (v) {
             setState(() => _restSound = v);
             _save(_kRestSound, v);
           }),
-          const SizedBox(height: 16),
+          const SizedBox(height: 9),
+          // Replay intro tour (prototype line 1053).
+          InkWell(
+            onTap: _replayTour,
+            borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+            child: Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+              decoration: BoxDecoration(
+                gradient: ZveltTokens.surface2Grad,
+                borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                border: Border.all(color: ZveltTokens.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: ZveltTokens.brandTint,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: ZveltTokens.brand.withValues(alpha: 0.3)),
+                    ),
+                    child: const Icon(AppIcons.refresh,
+                        size: 17, color: ZveltTokens.brand),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('Replay intro tour',
+                      style: ZType.bodyM.copyWith(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Sign out — red-tinted treatment (prototype line 1054).
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -667,9 +735,13 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                       widget.onLogout();
                     },
               style: FilledButton.styleFrom(
-                backgroundColor: ZveltTokens.chip,
+                backgroundColor: ZveltTokens.error.withValues(alpha: 0.12),
                 foregroundColor: ZveltTokens.error,
-                side: BorderSide(color: ZveltTokens.borderStrong),
+                side: BorderSide(
+                    color: ZveltTokens.error.withValues(alpha: 0.4)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                ),
               ),
               child: const Text('Sign out'),
             ),
@@ -681,9 +753,9 @@ class _SettingsSheetState extends State<_SettingsSheet> {
 
   Widget _toggleRow(String label, bool value, ValueChanged<bool> onChanged) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
         decoration: BoxDecoration(
           gradient: ZveltTokens.surface2Grad,
           borderRadius: BorderRadius.circular(ZveltTokens.rControl),
@@ -694,9 +766,9 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             Expanded(
               child: Text(label,
                   style: ZType.bodyM.copyWith(
-                      fontSize: 13.5, fontWeight: FontWeight.w700)),
+                      fontSize: 14.5, fontWeight: FontWeight.w600)),
             ),
-            Switch(value: value, onChanged: _ready ? onChanged : null),
+            _BrandSwitch(value: value, onChanged: _ready ? onChanged : null),
           ],
         ),
       ),
@@ -704,8 +776,515 @@ class _SettingsSheetState extends State<_SettingsSheet> {
   }
 }
 
+/// 44×26 brand-styled switch (prototype JS 2076-2077): accent track when on,
+/// neutral track when off, 20px white knob.
+class _BrandSwitch extends StatelessWidget {
+  const _BrandSwitch({required this.value, required this.onChanged});
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      toggled: value,
+      child: GestureDetector(
+        onTap: onChanged == null ? null : () => onChanged!(!value),
+        child: AnimatedContainer(
+          duration: ZMotion.quick,
+          curve: ZMotion.emphasized,
+          width: 44,
+          height: 26,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: value ? ZveltTokens.brand : ZveltTokens.track,
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: AnimatedAlign(
+            duration: ZMotion.quick,
+            curve: ZMotion.emphasized,
+            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: ZveltTokens.onBrand,
+                boxShadow: [
+                  BoxShadow(
+                      color: Color(0x4D000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 2)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// sheetPremium — plan toggle + benefits (purchases are backend-TBD)
+// sheetEdit — Edit Profile (HTML 946-960)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({
+    required this.initialName,
+    required this.initialEmail,
+    required this.onSaved,
+  });
+  final String initialName;
+  final String initialEmail;
+  final VoidCallback onSaved;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController _nameCtrl =
+      TextEditingController(text: widget.initialName);
+  late final TextEditingController _emailCtrl =
+      TextEditingController(text: widget.initialEmail);
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty || name.length > 40) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Name must be 1–40 characters.'),
+          backgroundColor: ZveltTokens.error));
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ProfileService().updateProfile(displayName: name);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      widget.onSaved();
+    } on ProfileUpdateException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.message), backgroundColor: ZveltTokens.error));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Update failed. Try again.'),
+          backgroundColor: ZveltTokens.error));
+    }
+  }
+
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(text,
+            style: ZType.bodyS
+                .copyWith(fontSize: 12, fontWeight: FontWeight.w600)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return _SheetShell(
+      title: 'Edit Profile',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _label('Name'),
+          TextField(
+            controller: _nameCtrl,
+            maxLength: 40,
+            style:
+                ZType.bodyM.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+            decoration:
+                const InputDecoration(hintText: 'Your name', counterText: ''),
+          ),
+          const SizedBox(height: 16),
+          _label('Email'),
+          // Email changes aren't supported by PATCH /v1/me/profile — render
+          // read-only with a subtle note instead of pretending to save it.
+          TextField(
+            controller: _emailCtrl,
+            readOnly: true,
+            style: ZType.bodyM.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: ZveltTokens.text3),
+            decoration: const InputDecoration(hintText: 'you@email.com'),
+          ),
+          const SizedBox(height: 6),
+          Text("Email can't be changed yet.",
+              style: ZType.bodyS
+                  .copyWith(fontSize: 11.5, color: ZveltTokens.text3)),
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: FilledButton(
+              onPressed: _saving ? null : _save,
+              child: const Text('Save changes'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// sheetAccount — Account (HTML 1267-1283)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AccountSheet extends StatelessWidget {
+  const _AccountSheet({
+    required this.name,
+    required this.email,
+    required this.memberSince,
+    required this.onEditProfile,
+    required this.onLogout,
+  });
+  final String name;
+  final String email;
+  final DateTime? memberSince;
+  final VoidCallback onEditProfile;
+  final Future<void> Function() onLogout;
+
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  Widget _infoRow(String label, String value, {bool accent = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surface2Grad,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        child: Row(
+          children: [
+            Text(label,
+                style: ZType.bodyS
+                    .copyWith(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            Flexible(
+              child: Text(value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: accent
+                      ? ZType.bodyM.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: ZveltTokens.brand)
+                      : ZType.bodyM.copyWith(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final since = memberSince;
+    return _SheetShell(
+      title: 'Account',
+      maxHeightFactor: 0.9,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _infoRow('Name', name),
+          if (email.isNotEmpty) _infoRow('Email', email),
+          // 'Member since' only when the backend exposes a creation date —
+          // never fabricate one.
+          if (since != null)
+            _infoRow(
+                'Member since', '${_months[since.month - 1]} ${since.year}'),
+          _infoRow('Current plan', 'Free', accent: true),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 48,
+            child: FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onEditProfile();
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: ZveltTokens.chip,
+                foregroundColor: ZveltTokens.text,
+                side: BorderSide(color: ZveltTokens.borderStrong),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                textStyle: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w800),
+              ),
+              child: const Text('Edit profile'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 48,
+            child: FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onLogout();
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: ZveltTokens.error.withValues(alpha: 0.1),
+                foregroundColor: ZveltTokens.error,
+                side: BorderSide(
+                    color: ZveltTokens.error.withValues(alpha: 0.35)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                textStyle: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w800),
+              ),
+              child: const Text('Sign out'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// sheetDevice — Connect a device (HTML 1227-1244), fed by real data:
+// native health permission state + GET /v1/integrations provider list.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ProviderRow {
+  const _ProviderRow(this.id, this.name, this.sub);
+  final String id;
+  final String name;
+  final String sub;
+}
+
+class _DeviceSheet extends StatefulWidget {
+  const _DeviceSheet();
+
+  @override
+  State<_DeviceSheet> createState() => _DeviceSheetState();
+}
+
+class _DeviceSheetState extends State<_DeviceSheet> {
+  // Same provider set the Integrations screen renders (Terra wearable cloud).
+  static const _cloudProviders = [
+    _ProviderRow('strava', 'Strava', 'Import runs and rides from Strava'),
+    _ProviderRow('garmin', 'Garmin Connect', 'Forerunner / Fenix'),
+    _ProviderRow('fitbit', 'Fitbit / Pixel Watch', 'Activity, sleep & vitals'),
+    _ProviderRow('whoop', 'WHOOP', 'Strain, recovery & sleep'),
+    _ProviderRow('oura', 'Oura', 'Sleep, readiness & activity'),
+    _ProviderRow('polar', 'Polar Flow', 'Workouts & heart-rate data'),
+    _ProviderRow('coros', 'COROS', 'Activities & training data'),
+    _ProviderRow('suunto', 'Suunto', 'Endurance workouts'),
+    _ProviderRow('withings', 'Withings', 'Scale, sleep & heart health'),
+    _ProviderRow('amazfit', 'Amazfit / Zepp', 'Health data from Zepp'),
+    _ProviderRow('huawei', 'Huawei Health', 'Cloud sync & bridge'),
+    _ProviderRow('wahoo', 'Wahoo ELEMNT', 'Rides & workouts'),
+  ];
+
+  Set<String> _connected = {};
+  bool _aggregatorConfigured = false;
+  bool? _nativeHealthConnected;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final result = await IntegrationsService().listIntegrations();
+      if (!mounted) return;
+      setState(() {
+        _connected = result.connected;
+        _aggregatorConfigured = result.aggregatorConfigured;
+      });
+    } catch (_) {/* offline — pills default to Connect */}
+    if (!kIsWeb) {
+      try {
+        _nativeHealthConnected =
+            await HealthService.instance.hasPermissions();
+      } catch (_) {
+        _nativeHealthConnected = false;
+      }
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _connectNativeHealth() async {
+    final granted = await HealthService.instance.requestPermissions();
+    if (granted) {
+      await HealthService.instance.backfillRecentOnFirstGrant();
+    }
+    if (!mounted) return;
+    setState(() => _nativeHealthConnected = granted);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      content: Text(granted
+          ? 'Connected — recent health data is ready.'
+          : 'Permission denied. You can re-try anytime in Settings.'),
+    ));
+  }
+
+  /// Cloud providers use backend OAuth — the full flow (auth-url, sync,
+  /// disconnect) lives on the Integrations screen, so deep actions push it.
+  void _openIntegrations() {
+    final nav = Navigator.of(context);
+    nav.pop();
+    nav.push<void>(
+        MaterialPageRoute<void>(builder: (_) => const IntegrationsScreen()));
+  }
+
+  void _onCloudTap(String provider) {
+    if (!_aggregatorConfigured && provider != 'strava') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text('Coming soon — wearable cloud linking is on the way'),
+      ));
+      return;
+    }
+    _openIntegrations();
+  }
+
+  Widget _pill({required bool connected, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+        decoration: BoxDecoration(
+          color: connected
+              ? ZveltTokens.success.withValues(alpha: 0.15)
+              : ZveltTokens.brand,
+          borderRadius: BorderRadius.circular(13),
+          border: connected
+              ? Border.all(color: ZveltTokens.success.withValues(alpha: 0.4))
+              : null,
+        ),
+        child: Text(connected ? 'Connected' : 'Connect',
+            style: ZType.bodyS.copyWith(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color:
+                    connected ? ZveltTokens.success : ZveltTokens.onBrand)),
+      ),
+    );
+  }
+
+  Widget _deviceRow({
+    required String name,
+    required String sub,
+    required bool connected,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.surface2Grad,
+          borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+          border: Border.all(color: ZveltTokens.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ZveltTokens.chip,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(AppIcons.stopwatch,
+                  size: 20, color: ZveltTokens.brand),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ZType.bodyM.copyWith(
+                          fontSize: 14.5, fontWeight: FontWeight.w700)),
+                  Text(sub,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ZType.bodyS.copyWith(fontSize: 11.5)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _pill(connected: connected, onTap: onTap),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isApple = !kIsWeb && Platform.isIOS;
+    const showNative = !kIsWeb;
+    return _SheetShell(
+      title: 'Connect a device',
+      subtitle: 'Sync workouts, heart rate & recovery',
+      maxHeightFactor: 0.88,
+      child: _loading
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(
+                  child: CircularProgressIndicator(color: ZveltTokens.brand)),
+            )
+          : Column(
+              children: [
+                if (showNative)
+                  _deviceRow(
+                    name: isApple ? 'Apple Health' : 'Health Connect',
+                    sub: 'Steps, heart rate, sleep & workouts',
+                    connected: _nativeHealthConnected == true,
+                    onTap: _nativeHealthConnected == true
+                        ? _openIntegrations
+                        : _connectNativeHealth,
+                  ),
+                for (final p in _cloudProviders)
+                  _deviceRow(
+                    name: p.name,
+                    sub: p.sub,
+                    connected: _connected.contains(p.id),
+                    onTap: _connected.contains(p.id)
+                        ? _openIntegrations
+                        : () => _onCloudTap(p.id),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// sheetPremium — benefits-first + Monthly/Annual price cards (HTML 1245-1266)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _PremiumSheet extends StatefulWidget {
@@ -716,126 +1295,166 @@ class _PremiumSheet extends StatefulWidget {
 }
 
 class _PremiumSheetState extends State<_PremiumSheet> {
-  bool _annual = true;
+  bool _annual = true; // prototype default: annual selected
+
+  static const _benefits = [
+    'Unlimited goal-based AI programs',
+    'AI meal plans for your diet',
+    'Advanced progress analytics',
+    'Unlimited challenges & custom fasting',
+  ];
+
+  Widget _priceCard({
+    required bool selected,
+    required VoidCallback onTap,
+    required String label,
+    required String price,
+    required String sub,
+    bool saveBadge = false,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected
+                ? ZveltTokens.brand.withValues(alpha: 0.12)
+                : ZveltTokens.chip,
+            borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+            border: selected
+                ? Border.all(color: ZveltTokens.brand, width: 1.5)
+                : Border.all(color: ZveltTokens.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(label,
+                      style: ZType.bodyS.copyWith(
+                          fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  if (saveBadge) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: ZveltTokens.success.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                            color:
+                                ZveltTokens.success.withValues(alpha: 0.3)),
+                      ),
+                      child: Text('SAVE 30%',
+                          style: ZType.bodyS.copyWith(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: ZveltTokens.success)),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(price,
+                  style: ZType.h3.copyWith(fontSize: 22)),
+              const SizedBox(height: 1),
+              Text(sub,
+                  style: ZType.bodyS.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: ZveltTokens.text3)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: ZveltTokens.sheetGrad,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(ZveltTokens.rSheet)),
-        border: Border.all(color: ZveltTokens.border),
+    return _SheetShell(
+      title: 'ZVELT Premium',
+      leading: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          gradient: ZveltTokens.gradAccent,
+          borderRadius: BorderRadius.circular(13),
+          boxShadow: ZveltTokens.glowSm,
+        ),
+        child:
+            const Icon(AppIcons.crown, size: 21, color: ZveltTokens.onBrand),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+      maxHeightFactor: 0.92,
+      footer: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: FilledButton(
+          onPressed: () {
+            // Purchases aren't wired yet (RevenueCat pending) — be honest.
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text('Coming soon — purchases open at launch'),
+            ));
+          },
+          child: Text(_annual
+              ? 'Start free trial · then \$6.99/mo'
+              : 'Start free trial · then \$9.99/mo'),
+        ),
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 14),
-              decoration: BoxDecoration(
-                color: ZveltTokens.track,
-                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: ZveltTokens.gradAccent,
-                  borderRadius: BorderRadius.circular(13),
-                  boxShadow: ZveltTokens.glowSm,
-                ),
-                child: const Icon(AppIcons.crown,
-                    size: 20, color: ZveltTokens.onBrand),
-              ),
-              const SizedBox(width: 11),
-              Text('ZVELT Premium', style: ZType.h4.copyWith(fontSize: 19)),
-              const Spacer(),
-              InkWell(
-                onTap: () => Navigator.of(context).pop(),
-                customBorder: const CircleBorder(),
-                child: Icon(AppIcons.cross_small,
-                    size: 22, color: ZveltTokens.text2),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              for (final (label, annual) in const [
-                ('Monthly', false),
-                ('Annual · save 40%', true)
-              ]) ...[
-                Expanded(
-                  child: InkWell(
-                    onTap: () => setState(() => _annual = annual),
-                    borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: _annual == annual
-                            ? ZveltTokens.brand
-                            : ZveltTokens.chip,
-                        borderRadius:
-                            BorderRadius.circular(ZveltTokens.rControl),
-                        border: _annual == annual
-                            ? null
-                            : Border.all(color: ZveltTokens.borderStrong),
-                      ),
-                      child: Text(label,
-                          style: ZType.bodyS.copyWith(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: _annual == annual
-                                  ? ZveltTokens.onBrand
-                                  : ZveltTokens.text)),
-                    ),
-                  ),
-                ),
-                if (!annual) const SizedBox(width: 8),
-              ],
-            ],
-          ),
-          const SizedBox(height: 16),
-          for (final b in const [
-            'Unlimited exercise ranks & explainability',
-            'AI program builder + weekly meal plans',
-            'Advanced progress analytics',
-          ])
+          // Benefits first — accent-tinted check chips (prototype order).
+          for (final b in _benefits)
             Padding(
-              padding: const EdgeInsets.only(bottom: 9),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
-                  const Icon(AppIcons.check,
-                      size: 16, color: ZveltTokens.success),
-                  const SizedBox(width: 9),
-                  Expanded(child: Text(b, style: ZType.bodyS)),
+                  Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: ZveltTokens.brandTint,
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Icon(AppIcons.check,
+                        size: 13, color: ZveltTokens.brand),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Text(b,
+                        style: ZType.bodyM.copyWith(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                  ),
                 ],
               ),
             ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: FilledButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content:
-                        Text('Purchases open at launch — you\'re early 🎉')));
-              },
-              child: Text(_annual ? 'Upgrade · Annual' : 'Upgrade · Monthly'),
-            ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _priceCard(
+                selected: !_annual,
+                onTap: () => setState(() => _annual = false),
+                label: 'Monthly',
+                price: '\$9.99',
+                sub: 'per month',
+              ),
+              const SizedBox(width: 10),
+              _priceCard(
+                selected: _annual,
+                onTap: () => setState(() => _annual = true),
+                label: 'Annual',
+                price: '\$6.99',
+                sub: 'per month, billed yearly',
+                saveBadge: true,
+              ),
+            ],
           ),
         ],
       ),
@@ -844,52 +1463,154 @@ class _PremiumSheetState extends State<_PremiumSheet> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// sheetHelp / sheetFeature / sheetBug / sheetAbout
+// sheetHelp — QUICK ANSWERS + SEND FEEDBACK (HTML 1284-1300)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _HelpSheet extends StatelessWidget {
+class _HelpSheet extends StatefulWidget {
   const _HelpSheet();
+
+  @override
+  State<_HelpSheet> createState() => _HelpSheetState();
+}
+
+class _HelpSheetState extends State<_HelpSheet> {
+  final _feedbackCtrl = TextEditingController();
+  final _expanded = <bool>[false, false];
+
+  static const _faqs = [
+    (
+      'How does the AI Coach work?',
+      'Tell it a goal and it builds a progressive multi-week program that drops into Plan Your Day.'
+    ),
+    (
+      'Does run tracking need a watch?',
+      'No — your phone GPS covers the live map, distance and pace. A watch or strap adds heart rate.'
+    ),
+  ];
+
+  @override
+  void dispose() {
+    _feedbackCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final body = _feedbackCtrl.text.trim();
+    if (body.isEmpty) return; // never submit empty
+    final info = await PackageInfo.fromPlatform();
+    final text =
+        '[ZVELT Feedback] v${info.version}+${info.buildNumber}\n\n$body';
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    // Share sheet — the user picks email/messaging; nothing is invented.
+    await SharePlus.instance.share(ShareParams(text: text));
+  }
+
+  Widget _eyebrow(String text) => Text(text,
+      style: ZType.eyebrow.copyWith(color: ZveltTokens.text3));
+
+  Widget _faqCard(int index) {
+    final (q, a) = _faqs[index];
+    final open = _expanded[index];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () => setState(() => _expanded[index] = !open),
+        borderRadius: BorderRadius.circular(ZveltTokens.rChip),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+          decoration: BoxDecoration(
+            gradient: ZveltTokens.surface2Grad,
+            borderRadius: BorderRadius.circular(ZveltTokens.rChip),
+            border: Border.all(color: ZveltTokens.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(q,
+                        style: ZType.bodyM.copyWith(
+                            fontSize: 13.5, fontWeight: FontWeight.w700)),
+                  ),
+                  Icon(
+                      open
+                          ? AppIcons.angle_small_up
+                          : AppIcons.angle_small_down,
+                      size: 16,
+                      color: ZveltTokens.text3),
+                ],
+              ),
+              if (open) ...[
+                const SizedBox(height: 9),
+                Text(a, style: ZType.bodyS.copyWith(fontSize: 12.5)),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return _SheetShell(
       title: 'Help & Feedback',
+      maxHeightFactor: 0.9,
+      footer: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: FilledButton(
+          onPressed: _send,
+          child: const Text('Send feedback'),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final (q, a) in const [
-            ('How do ranks work?',
-                'Every WORK set in 1–12 reps counts. Your best e1RM per exercise is compared to athletes in your weight class.'),
-            ('Does tracking work offline?',
-                'Yes — workouts, food and cardio log offline and sync when you reconnect.'),
-            ('How is my streak counted?',
-                'Any completed workout or saved cardio session marks the day as trained.'),
-          ])
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(q,
-                      style: ZType.bodyM.copyWith(
-                          fontSize: 13.5, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 3),
-                  Text(a, style: ZType.bodyS.copyWith(fontSize: 12.5)),
-                ],
-              ),
-            ),
+          _eyebrow('QUICK ANSWERS'),
+          const SizedBox(height: 9),
+          _faqCard(0),
+          _faqCard(1),
+          const SizedBox(height: 16),
+          _eyebrow('SEND FEEDBACK'),
+          const SizedBox(height: 9),
+          TextField(
+            controller: _feedbackCtrl,
+            minLines: 3,
+            maxLines: 5,
+            style: ZType.bodyM.copyWith(fontSize: 13.5),
+            decoration: const InputDecoration(
+                hintText: 'Tell us what would make ZVELT better…'),
+          ),
         ],
       ),
     );
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// sheetFeature / sheetBug — subtitle + exact placeholders + CTA labels
+// (HTML 1320-1342); bug variant shows the "App version attached" info chip.
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _FeedbackSheet extends StatefulWidget {
-  const _FeedbackSheet(
-      {required this.title, required this.hint, required this.subject});
+  const _FeedbackSheet({
+    required this.title,
+    required this.subtitle,
+    required this.hint,
+    required this.ctaLabel,
+    required this.subject,
+    this.showVersionChip = false,
+  });
   final String title;
+  final String subtitle;
   final String hint;
+  final String ctaLabel;
   final String subject;
+  final bool showVersionChip;
 
   @override
   State<_FeedbackSheet> createState() => _FeedbackSheetState();
@@ -897,6 +1618,17 @@ class _FeedbackSheet extends StatefulWidget {
 
 class _FeedbackSheetState extends State<_FeedbackSheet> {
   final _ctrl = TextEditingController();
+  String _version = '';
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.showVersionChip) {
+      PackageInfo.fromPlatform().then((info) {
+        if (mounted) setState(() => _version = info.version);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -920,22 +1652,47 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
   Widget build(BuildContext context) {
     return _SheetShell(
       title: widget.title,
+      subtitle: widget.subtitle,
       child: Column(
         children: [
           TextField(
             controller: _ctrl,
             maxLines: 5,
             minLines: 4,
-            style: ZType.bodyM,
+            style: ZType.bodyM.copyWith(fontSize: 13.5),
             decoration: InputDecoration(hintText: widget.hint),
           ),
-          const SizedBox(height: 16),
+          if (widget.showVersionChip) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+              decoration: BoxDecoration(
+                gradient: ZveltTokens.surface2Grad,
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: ZveltTokens.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(AppIcons.exclamation,
+                      size: 16, color: ZveltTokens.text2),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                        'App version ${_version.isEmpty ? '…' : _version} attached automatically',
+                        style: ZType.bodyS.copyWith(fontSize: 11.5)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             height: 50,
             child: FilledButton(
               onPressed: _send,
-              child: const Text('Send'),
+              child: Text(widget.ctaLabel),
             ),
           ),
         ],
@@ -943,6 +1700,10 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// sheetAbout — centered logo + tagline + link rows (HTML 1301-1319)
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _AboutSheet extends StatefulWidget {
   const _AboutSheet();
@@ -958,9 +1719,7 @@ class _AboutSheetState extends State<_AboutSheet> {
   void initState() {
     super.initState();
     PackageInfo.fromPlatform().then((info) {
-      if (mounted) {
-        setState(() => _version = 'v${info.version} (${info.buildNumber})');
-      }
+      if (mounted) setState(() => _version = info.version);
     });
   }
 
@@ -971,71 +1730,170 @@ class _AboutSheetState extends State<_AboutSheet> {
     } catch (_) {/* best-effort */}
   }
 
+  Widget _linkRow(String label, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: ZveltTokens.surface2Grad,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: ZveltTokens.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(label,
+                    style: ZType.bodyM.copyWith(
+                        fontSize: 13.5, fontWeight: FontWeight.w700)),
+              ),
+              Icon(AppIcons.angle_small_right,
+                  size: 17, color: ZveltTokens.text3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return _SheetShell(
       title: 'About ZVELT',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          const SizedBox(height: 2),
+          Column(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 58,
+                height: 58,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: ZveltTokens.gradAccent,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: ZveltTokens.glowSm,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: ZveltTokens.glowMd,
                 ),
-                child: const Icon(AppIcons.sparkles,
-                    size: 22, color: ZveltTokens.onBrand),
+                child: const Icon(AppIcons.star,
+                    size: 30, color: ZveltTokens.onBrand),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('ZVELT',
-                      style: ZType.h4.copyWith(letterSpacing: 2.5)),
-                  Text(_version.isEmpty ? '…' : _version,
-                      style: ZType.monoXS),
-                ],
+              const SizedBox(height: 14),
+              Text('ZVELT',
+                  style: ZType.h3
+                      .copyWith(fontSize: 21, letterSpacing: 3.4)),
+              const SizedBox(height: 4),
+              Text(_version.isEmpty ? '…' : 'Version $_version',
+                  style: ZType.bodyS.copyWith(
+                      fontSize: 12.5, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Your AI-assisted coach for training, nutrition and recovery — calm, premium and athlete-built.',
+                  textAlign: TextAlign.center,
+                  style: ZType.bodyS.copyWith(fontSize: 13.5, height: 1.55),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          InkWell(
-            onTap: () => _open('https://zvelt.app/privacy'),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('Privacy Policy',
-                  style: ZType.bodyM.copyWith(color: ZveltTokens.brand)),
-            ),
-          ),
-          InkWell(
-            onTap: () => _open('https://zvelt.app/terms'),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('Terms of Service',
-                  style: ZType.bodyM.copyWith(color: ZveltTokens.brand)),
-            ),
-          ),
+          const SizedBox(height: 20),
+          _linkRow('Privacy Policy', () => _open('https://zvelt.app/privacy')),
+          _linkRow('Terms of Service', () => _open('https://zvelt.app/terms')),
         ],
       ),
     );
   }
 }
 
-/// Shared sheet chrome: grabber + title row with ✕.
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared sheet chrome: grabber + (leading?) title/subtitle row with ✕,
+// optional scrollable body (maxHeightFactor) and pinned footer.
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _SheetShell extends StatelessWidget {
-  const _SheetShell({required this.title, required this.child});
+  const _SheetShell({
+    required this.title,
+    this.subtitle,
+    this.leading,
+    required this.child,
+    this.footer,
+    this.maxHeightFactor,
+  });
   final String title;
+  final String? subtitle;
+  final Widget? leading;
   final Widget child;
+
+  /// Rendered below the (scrollable) body, pinned — e.g. a CTA button.
+  final Widget? footer;
+
+  /// When set, the sheet caps at this fraction of the screen height and the
+  /// body scrolls (prototype max-height 88–92%).
+  final double? maxHeightFactor;
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    Widget body = child;
+    if (maxHeightFactor != null) {
+      body = Flexible(child: SingleChildScrollView(child: child));
+    }
+    Widget column = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: ZveltTokens.track,
+              borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            if (leading != null) ...[leading!, const SizedBox(width: 11)],
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: ZType.h4.copyWith(fontSize: 19)),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(subtitle!,
+                        style: ZType.bodyS.copyWith(fontSize: 12)),
+                  ],
+                ],
+              ),
+            ),
+            InkWell(
+              onTap: () => Navigator.of(context).pop(),
+              customBorder: const CircleBorder(),
+              child: Icon(AppIcons.cross_small,
+                  size: 22, color: ZveltTokens.text2),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        body,
+        if (footer != null) ...[const SizedBox(height: 14), footer!],
+      ],
+    );
+    if (maxHeightFactor != null) {
+      column = ConstrainedBox(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * maxHeightFactor!),
+        child: column,
+      );
+    }
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
       child: Container(
@@ -1046,37 +1904,7 @@ class _SheetShell extends StatelessWidget {
           border: Border.all(color: ZveltTokens.border),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 14),
-                decoration: BoxDecoration(
-                  color: ZveltTokens.track,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Text(title, style: ZType.h4.copyWith(fontSize: 19)),
-                const Spacer(),
-                InkWell(
-                  onTap: () => Navigator.of(context).pop(),
-                  customBorder: const CircleBorder(),
-                  child: Icon(AppIcons.cross_small,
-                      size: 22, color: ZveltTokens.text2),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            child,
-          ],
-        ),
+        child: column,
       ),
     );
   }

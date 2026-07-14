@@ -1,12 +1,18 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:zvelt_app/theme/app_icons.dart';
 
 import '../../theme/zvelt_tokens.dart';
+import '../../services/_crash_reporter.dart';
 import '../../services/ai_chat_service.dart';
+import '../../services/profile_service.dart';
 import '../../services/workout_service.dart';
 import '../workouts/workout_tracker_screen.dart';
 
-/// Chat AI prin backend DeepSeek (todo #31 / #26).
+/// AI Coach screen — prototype "AI Coach" (HTML 417–434, composer 648–654).
+/// Pushed as a full route (allowed deviation); visuals match the prototype:
+/// gradient sparkles header tile, Suggested chips, floating glass composer.
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
 
@@ -22,25 +28,43 @@ class _AiChatScreenState extends State<AiChatScreen> {
   bool _busy = false;
   String? _lastPrompt;
 
-  /// Design's COACH_PROMPTS — shown as chips until the first user message.
-  static const _suggestedPrompts = [
-    'Am I recovered enough to train?',
-    'What should I eat today?',
-    'Plan my training week',
-    'Review my bench form',
+  /// Suggested chips (HTML 430) — label shown on the chip → preset actually
+  /// sent on tap (JS 2215: askFast sends "How's my fast going?").
+  static const List<(String, String)> _suggested = [
+    ("What's my workout today?", "What's my workout today?"),
+    ("How's my fast?", "How's my fast going?"),
+    ('Suggest a lunch', 'Suggest a lunch'),
   ];
+
+  static const String _greetingTail =
+      "I'm your ZVELT coach. Ask me about workouts, meals or your fasting window.";
 
   @override
   void initState() {
     super.initState();
-    // Local seed greeting (design's coachSeed). Honest copy: it promises
-    // personalization (true — the backend reads profile + training data),
-    // it does NOT claim to have already analyzed anything.
-    _msgs.add(_Msg(
-      role: 'assistant',
-      text: "Hey 👋 I'm your Zvelt coach. I can read your profile, training "
-          'settings and recovery data. What do you want to tackle today?',
-    ));
+    // Seed greeting (JS 1431). Name-less fallback first; upgraded with the
+    // real first name from ProfileService as soon as /me resolves.
+    _msgs.add(_Msg(role: 'assistant', text: 'Hey! $_greetingTail'));
+    _loadGreetingName();
+  }
+
+  Future<void> _loadGreetingName() async {
+    Map<String, dynamic>? me;
+    try {
+      me = await ProfileService().getMe();
+    } catch (_) {
+      me = null;
+    }
+    if (!mounted || me == null) return;
+    final profile = me['profile'] as Map<String, dynamic>?;
+    final display = (profile?['displayName'] as String?)?.trim();
+    if (display == null || display.isEmpty) return;
+    final first = display.split(RegExp(r'\s+')).first;
+    if (first.isEmpty) return;
+    // Index 0 is always the seed (only errors are ever removed).
+    setState(() {
+      _msgs[0] = _Msg(role: 'assistant', text: 'Hey $first! $_greetingTail');
+    });
   }
 
   @override
@@ -50,10 +74,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
     super.dispose();
   }
 
-  Future<void> _send({String? retryPrompt}) async {
-    final text = retryPrompt ?? _ctrl.text.trim();
+  Future<void> _send({String? retryPrompt, String? preset}) async {
+    final text = retryPrompt ?? preset ?? _ctrl.text.trim();
     if (text.isEmpty || text.length > 300) return;
-    if (retryPrompt == null) _ctrl.clear();
+    if (retryPrompt == null && preset == null) _ctrl.clear();
     _lastPrompt = text;
     setState(() {
       // Drop any prior error card so the retry replaces it.
@@ -139,7 +163,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ? 'Zvelt is taking a moment to think. Try again.'
           : "Couldn't reach the coach right now.";
       setState(() => _msgs.add(_Msg(role: 'error', text: msg, isTimeout: e.isTimeout)));
-    } catch (e) {
+    } catch (e, st) {
+      reportError(e, st, reason: 'ai_chat:send');
       if (!mounted) return;
       setState(() => _msgs.add(_Msg(role: 'error', text: "Couldn't reach the coach right now.")));
     } finally {
@@ -148,241 +173,338 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
-  /// Design: suggested prompts visible only while the thread is fresh
-  /// (just the seed greeting, no user message yet).
-  bool get _showPrompts =>
-      !_busy && !_msgs.any((m) => m.role == 'user');
-
   void _scrollBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+        _scroll.animateTo(_scroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
-      // Design header: "Coach Zvelt" + green "AI · always on" status row.
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Coach Zvelt',
-              style: TextStyle(
-                fontFamily: ZveltTokens.fontPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: ZveltTokens.text,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Row(
-              mainAxisSize: MainAxisSize.min,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
               children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    color: ZveltTokens.success,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                const Text(
-                  'AI · always on',
-                  style: TextStyle(
-                    fontFamily: ZveltTokens.fontPrimary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: ZveltTokens.success,
+                _header(),
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scroll,
+                    // Bubble column: prototype padding 20/20/0 (HTML 425);
+                    // bottom inset clears the floating composer.
+                    padding: EdgeInsets.fromLTRB(
+                        20, 20, 20, 90 + (keyboardOpen ? 0 : safeBottom)),
+                    // messages + typing indicator + trailing Suggested block
+                    // (always visible per prototype, HTML 430).
+                    itemCount: _msgs.length + (_busy ? 1 : 0) + 1,
+                    itemBuilder: (_, i) {
+                      final tail = _msgs.length + (_busy ? 1 : 0);
+                      if (i == tail) return _suggestedBlock();
+                      if (_busy && i == _msgs.length) {
+                        return const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: _TypingDots(),
+                          ),
+                        );
+                      }
+                      final m = _msgs[i];
+                      if (m.role == 'error') {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _ErrorCard(
+                            message: m.text,
+                            isTimeout: m.isTimeout,
+                            onRetry: _busy || _lastPrompt == null
+                                ? null
+                                : () => _send(retryPrompt: _lastPrompt),
+                          ),
+                        );
+                      }
+                      return _bubble(m);
+                    },
                   ),
                 ),
               ],
             ),
-          ],
+          ),
+          // Floating liquid-glass composer (HTML 649–653) anchored above the
+          // bottom safe area (pushed screen — no nav bar underneath).
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: keyboardOpen ? 10 : safeBottom + 12,
+            child: _composer(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Header row (HTML 419–421): circle back (app idiom) + 42×42 gradient
+  /// sparkles tile + "ZVELT Coach" / "● Online · AI-assisted".
+  Widget _header() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 22, 0),
+      child: Row(
+        children: [
+          _CircleBack(onTap: () => Navigator.of(context).maybePop()),
+          const SizedBox(width: 11),
+          Container(
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(ZveltTokens.rChip),
+              gradient: ZveltTokens.gradAccentDeep,
+              boxShadow: ZveltTokens.glowMd,
+            ),
+            child: const Icon(AppIcons.sparkles,
+                color: ZveltTokens.onBrand, size: 22),
+          ),
+          const SizedBox(width: 11),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('ZVELT Coach', style: ZType.h4),
+              const SizedBox(height: 1),
+              Text(
+                '● Online · AI-assisted',
+                style: ZType.monoS
+                    .copyWith(color: ZveltTokens.brand, height: 1.2),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Chat bubble (JS 2042–2051): user = accent bg, radius 20/20/6/20, no
+  /// border, max-w 78%, brand glow; AI = surface2 + border, radius 20/20/20/6,
+  /// max-w 82%. Text 13.5 w500 lh1.45. No timestamps (prototype has none).
+  Widget _bubble(_Msg m) {
+    final user = m.role == 'user';
+    final w = MediaQuery.sizeOf(context).width;
+    return Align(
+      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+        constraints: BoxConstraints(maxWidth: w * (user ? 0.78 : 0.82)),
+        decoration: user
+            ? BoxDecoration(
+                color: ZveltTokens.brand,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                  bottomRight: Radius.circular(6),
+                  bottomLeft: Radius.circular(20),
+                ),
+                // Prototype: 0 6px 16px rgba(240,120,12,.3) — brandGlow base
+                // color at the prototype's softer .3 alpha (JS 2049).
+                boxShadow: [
+                  BoxShadow(
+                      color: ZveltTokens.brandGlow.withValues(alpha: 0.3),
+                      offset: const Offset(0, 6),
+                      blurRadius: 16),
+                ],
+              )
+            : BoxDecoration(
+                color: ZveltTokens.surface2,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                  bottomLeft: Radius.circular(6),
+                ),
+                border: Border.all(color: ZveltTokens.border),
+              ),
+        child: Text(
+          m.text,
+          style: ZType.bodyM.copyWith(
+            fontSize: 13.5,
+            height: 1.45,
+            color: user ? ZveltTokens.onBrand : ZveltTokens.text,
+          ),
         ),
       ),
-      body: Column(
+    );
+  }
+
+  /// "Suggested" label + 3 glass chips (HTML 430) — always visible; a tap
+  /// sends the preset as a real message (JS 2215).
+  Widget _suggestedBlock() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              'AI trainer responses are personalized from your profile, training settings, and current workout suggestion. Max 300 chars/message.',
-              style: TextStyle(color: ZveltTokens.text2, fontSize: 11, height: 1.45),
-            ),
+            padding: const EdgeInsets.only(left: 4),
+            child: Text('Suggested',
+                style: ZType.monoS.copyWith(color: ZveltTokens.text3)),
           ),
-          Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.all(16),
-              // +1 slot for the suggested-prompt chips while the thread is
-              // fresh (design: show only at the start, hide after the first
-              // user message).
-              itemCount: _msgs.length + (_busy ? 1 : 0) + (_showPrompts ? 1 : 0),
-              itemBuilder: (_, i) {
-                if (_showPrompts && i == _msgs.length + (_busy ? 1 : 0)) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final p in _suggestedPrompts)
-                          GestureDetector(
-                            onTap: _busy
-                                ? null
-                                : () {
-                                    _ctrl.text = p;
-                                    _send();
-                                  },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: ZveltTokens.s4, vertical: ZveltTokens.s2),
-                              decoration: BoxDecoration(
-                                color: ZveltTokens.brandTint,
-                                borderRadius: BorderRadius.circular(ZveltTokens.rPill),
-                              ),
-                              child: Text(
-                                p,
-                                style: const TextStyle(
-                                  fontFamily: ZveltTokens.fontPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: ZveltTokens.brandDeep,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                }
-                if (_busy && i == _msgs.length) {
-                  return const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: 10),
-                      child: _TypingDots(),
-                    ),
-                  );
-                }
-                final m = _msgs[i];
-                if (m.role == 'error') {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _ErrorCard(
-                      message: m.text,
-                      isTimeout: m.isTimeout,
-                      onRetry: _busy || _lastPrompt == null
-                          ? null
-                          : () => _send(retryPrompt: _lastPrompt),
-                    ),
-                  );
-                }
-                final user = m.role == 'user';
-                return Align(
-                  alignment: user ? Alignment.centerRight : Alignment.centerLeft,
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final (label, preset) in _suggested)
+                GestureDetector(
+                  onTap: _busy ? null : () => _send(preset: preset),
                   child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.85),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 9),
                     decoration: BoxDecoration(
-                      color: user ? ZveltTokens.brand : ZveltTokens.surface,
-                      borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+                      color: ZveltTokens.chip,
+                      borderRadius:
+                          BorderRadius.circular(ZveltTokens.rControl),
                       border: Border.all(color: ZveltTokens.border),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          m.text,
-                          style: TextStyle(
-                            color: user ? ZveltTokens.onBrand : ZveltTokens.text,
-                            fontSize: 15,
-                            height: 1.45,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        // Design: time under the bubble text (real client-side
-                        // send/receive moment).
-                        Text(
-                          m.timeLabel,
-                          style: TextStyle(
-                            color: (user ? ZveltTokens.onBrand : ZveltTokens.text3)
-                                .withValues(alpha: user ? 0.7 : 1.0),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      label,
+                      style: ZType.monoS.copyWith(
+                          fontSize: 12.5,
+                          color: ZveltTokens.text,
+                          height: 1.2),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+            ],
           ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.paddingOf(context).bottom + 12),
+        ],
+      ),
+    );
+  }
+
+  /// Floating glass pill composer (HTML 649–653): blur 24 + navBg fill,
+  /// radius 26, border, "Ask your coach…", 40×40 circular gradient send.
+  Widget _composer() {
+    return Container(
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.all(Radius.circular(ZveltTokens.rCardLg)),
+        boxShadow: ZveltTokens.shadowFloat,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(ZveltTokens.rCardLg),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+              sigmaX: ZveltTokens.glassBlur, sigmaY: ZveltTokens.glassBlur),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 7, 7, 7),
+            decoration: BoxDecoration(
+              color: ZveltTokens.navBg,
+              borderRadius: BorderRadius.circular(ZveltTokens.rCardLg),
+              border: Border.all(color: ZveltTokens.border),
+            ),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _ctrl,
-                    maxLength: 300,
-                    maxLines: 3,
-                    minLines: 1,
-                    style: TextStyle(color: ZveltTokens.text),
+                    maxLength: 300, // cap enforced silently (no counter)
+                    maxLines: 1,
+                    textInputAction: TextInputAction.send,
+                    cursorColor: ZveltTokens.brand,
+                    style: ZType.bodyM
+                        .copyWith(color: ZveltTokens.text, height: 1.3),
                     decoration: InputDecoration(
-                      hintText: 'Ask about training, nutrition…',
-                      counterStyle: TextStyle(color: ZveltTokens.text2, fontSize: 11),
+                      isDense: true,
+                      filled: false,
+                      counterText: '',
+                      hintText: 'Ask your coach…',
+                      hintStyle: ZType.bodyM
+                          .copyWith(color: ZveltTokens.text3, height: 1.3),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
                     ),
                     onSubmitted: (_) => _busy ? null : _send(),
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: _busy ? null : _send,
-                  icon: const Icon(AppIcons.paper_plane),
-                  style: IconButton.styleFrom(
-                    backgroundColor: ZveltTokens.brand,
-                    foregroundColor: ZveltTokens.onBrand,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+                const SizedBox(width: 9),
+                GestureDetector(
+                  onTap: _busy ? null : _send,
+                  child: Opacity(
+                    opacity: _busy ? 0.6 : 1,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: ZveltTokens.gradAccentDeep,
+                        boxShadow: ZveltTokens.glowMd,
+                      ),
+                      child: const Icon(AppIcons.paper_plane,
+                          color: ZveltTokens.onBrand, size: 18),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _Msg {
-  _Msg({required this.role, required this.text, this.isTimeout = false})
-      : at = DateTime.now();
+  _Msg({required this.role, required this.text, this.isTimeout = false});
   final String role; // 'user' | 'assistant' | 'error'
   final String text;
   final bool isTimeout;
-
-  /// Client-side timestamp (design shows times under bubbles) — stamped at
-  /// creation, so it's the real send/receive moment, nothing invented.
-  final DateTime at;
-
-  String get timeLabel =>
-      '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
 }
 
-/// Three animated dots shown while awaiting AI reply. Appears within one frame
-/// (<100ms) thanks to the synchronous setState() in [_send].
+/// 40×40 circular back button — app idiom for pushed screens.
+class _CircleBack extends StatelessWidget {
+  const _CircleBack({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ZveltTokens.surface,
+      shape: const CircleBorder(),
+      shadowColor: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: ZveltTokens.surface,
+          shape: BoxShape.circle,
+          boxShadow: ZveltTokens.shadowCard,
+        ),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Icon(
+              AppIcons.angle_small_left,
+              color: ZveltTokens.text2,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Three animated dots shown while awaiting AI reply, styled as an AI bubble.
 class _TypingDots extends StatefulWidget {
   const _TypingDots();
 
@@ -404,10 +526,15 @@ class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderState
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
       decoration: BoxDecoration(
-        color: ZveltTokens.surface,
-        borderRadius: BorderRadius.circular(ZveltTokens.rLg),
+        color: ZveltTokens.surface2,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+          bottomLeft: Radius.circular(6),
+        ),
         border: Border.all(color: ZveltTokens.border),
       ),
       child: AnimatedBuilder(
@@ -464,7 +591,8 @@ class _ErrorCard extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: ZveltTokens.text, fontSize: 13, height: 1.4),
+              style: ZType.bodyS
+                  .copyWith(color: ZveltTokens.text, height: 1.4),
             ),
           ),
           TextButton(

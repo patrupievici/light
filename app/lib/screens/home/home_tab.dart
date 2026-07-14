@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../models/activity_kind.dart';
 import '../../services/activity_calendar_store.dart';
+import '../../services/background_tracking_service.dart';
 import '../../services/feed_refresh_notifier.dart';
 import '../../services/nutrition_service.dart';
 import '../../services/profile_service.dart';
@@ -20,8 +24,9 @@ import 'consistency_screen.dart';
 ///
 /// Blocks, in order (nothing else):
 ///  ① Header — "Today ▾" (day menu) · avatar (→ Profile) · streak badge
-///  ② Cardio resume banner — conditional (no persisted live-cardio state yet,
-///     so it stays absent — the prototype rule is "never show when inactive")
+///  ② Cardio resume banner — conditional; shows only while
+///     [BackgroundTrackingService] reports a live in-process session (the
+///     prototype rule is "never show when inactive")
 ///  ③ START A SESSION eyebrow + History › (→ Cardio history)
 ///  ④ Run / Ride tiles (→ Cardio tracking)
 ///  ⑤⑥ Consistency title + card (→ Streak Calendar)
@@ -70,8 +75,13 @@ class _HomeTabState extends State<HomeTab> {
   int _weekGoal = 5;
   _Last14 _last14 = _Last14.empty;
   int _newPrs = 0;
+  int? _avgBurnCal;
   double? _bodyweightKg;
   List<double> _bodyweightTrend = const [];
+
+  // ② Live cardio session (resume banner) — real tracking-service state only.
+  StreamSubscription<TrackingStats>? _liveSub;
+  TrackingStats? _liveStats;
 
   @override
   void initState() {
@@ -79,11 +89,17 @@ class _HomeTabState extends State<HomeTab> {
     FeedRefreshNotifier.instance
         .notifier(RefreshScope.home)
         .addListener(_onHomeBump);
+    final snap = BackgroundTrackingService.instance.getCurrentStats();
+    if (snap.isTracking) _liveStats = snap;
+    _liveSub = BackgroundTrackingService.instance.statsStream.listen((s) {
+      if (mounted) setState(() => _liveStats = s);
+    });
     _load();
   }
 
   @override
   void dispose() {
+    _liveSub?.cancel();
     FeedRefreshNotifier.instance
         .notifier(RefreshScope.home)
         .removeListener(_onHomeBump);
@@ -116,6 +132,9 @@ class _HomeTabState extends State<HomeTab> {
       _safe(_stats.getRecentPrs(days: 30)),
       _safe(_nutrition.loadNutritionHistory(days: 14)),
       _safe(SharedPreferences.getInstance()),
+      // Manual day marks (Consistency calendar) — same trained-day source
+      // ConsistencyScreen unions in, so streak math never desyncs.
+      _safe(ActivityCalendarStore().loadAll()),
     ]);
     if (!mounted) return;
 
@@ -127,8 +146,11 @@ class _HomeTabState extends State<HomeTab> {
     final nutritionHistory = (results[4] as List<NutritionDaySnapshot>?) ??
         const <NutritionDaySnapshot>[];
     final prefs = results[5] as SharedPreferences?;
+    final dayMarks =
+        (results[6] as Map<String, List<ActivityKind>>?) ?? const {};
 
-    // Trained days = completed gym sessions (LOCAL day) + cardio days.
+    // Trained days = completed gym sessions (LOCAL day) + cardio days +
+    // manual calendar marks (kept in sync with ConsistencyScreen).
     final completedWorkouts = (workoutsRes?.data ?? const <WorkoutDto>[])
         .where((w) => w.status != 'draft')
         .toList()
@@ -137,6 +159,8 @@ class _HomeTabState extends State<HomeTab> {
       for (final w in completedWorkouts)
         _ymd(DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal())),
       for (final e in cardioByDay.entries)
+        if (e.value.isNotEmpty) e.key,
+      for (final e in dayMarks.entries)
         if (e.value.isNotEmpty) e.key,
     };
 
@@ -149,6 +173,32 @@ class _HomeTabState extends State<HomeTab> {
     ];
     final profileBodyweight = _asDouble(profile?['bodyweightKg']);
 
+    // Avg Burn — MET estimate per cardio session (last 14 sessions), same
+    // formula as ProgressScreen's "Calories burned" chart, with the user's
+    // real bodyweight (fallback 70 kg only when no weight exists).
+    final burnBodyweight = weightTrend.isNotEmpty
+        ? weightTrend.last
+        : (profileBodyweight ?? 70.0);
+    final cardioSessions = <(String, ManualCardioSession)>[
+      for (final e in cardioByDay.entries)
+        for (final s in e.value) (e.key, s),
+    ]..sort((a, b) => b.$1.compareTo(a.$1));
+    var burnTotal = 0.0;
+    var burnCount = 0;
+    for (final (_, s) in cardioSessions.take(14)) {
+      final mins = s.durationMin;
+      if (mins == null || mins <= 0) continue;
+      final met = switch (s.kind) {
+        ActivityKind.cycle => 6.0,
+        ActivityKind.swim => 7.0,
+        ActivityKind.walk => 4.0,
+        _ => 9.0,
+      };
+      burnTotal += met * burnBodyweight * (mins / 60);
+      burnCount++;
+    }
+    final avgBurn = burnCount == 0 ? null : (burnTotal / burnCount).round();
+
     setState(() {
       _loading = false;
       _avatarInitial =
@@ -159,6 +209,7 @@ class _HomeTabState extends State<HomeTab> {
       _weekGoal = (prefs?.getInt(_kWeeklyGoalPref) ?? 5).clamp(1, 7);
       _last14 = _Last14.fromWorkouts(completedWorkouts.take(14));
       _newPrs = recentPrs.length;
+      _avgBurnCal = avgBurn;
       _bodyweightKg =
           weightTrend.isNotEmpty ? weightTrend.last : profileBodyweight;
       _bodyweightTrend = weightTrend;
@@ -297,6 +348,8 @@ class _HomeTabState extends State<HomeTab> {
               ),
               children: [
                 _header(),
+                if (_liveStats?.isTracking ?? false)
+                  _resumeBanner(_liveStats!),
                 _sessionHeader(),
                 _cardioTiles(),
                 _sectionTitle('Consistency', topPad: 18),
@@ -373,29 +426,90 @@ class _HomeTabState extends State<HomeTab> {
             ),
           ),
           const SizedBox(width: 9),
-          InkWell(
-            onTap: _openStreakCalendar,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: const Color(0x26F5820A),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0x6BF5820A)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(AppIcons.flame, size: 16, color: ZveltTokens.brand),
-                  const SizedBox(width: 5),
-                  Text('$_streakCur',
-                      style: ZType.bodyM.copyWith(
-                          color: ZveltTokens.brand, fontWeight: FontWeight.w800)),
-                ],
-              ),
+          // Static pill — the prototype's streak badge has NO action; the
+          // Consistency card below is the way into the calendar.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0x26F5820A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0x6BF5820A)),
+            ),
+            child: Row(
+              children: [
+                const Icon(AppIcons.flame, size: 16, color: ZveltTokens.brand),
+                const SizedBox(width: 5),
+                Text('$_streakCur',
+                    style: ZType.bodyM.copyWith(
+                        color: ZveltTokens.brand, fontWeight: FontWeight.w800)),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // ② Cardio resume banner — only while a live session is tracking
+  // (prototype `cardioActive` → `resumeCardioScreen`, HTML 87–93).
+  Widget _resumeBanner(TrackingStats live) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: InkWell(
+        onTap: _resumeCardio,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          decoration: BoxDecoration(
+            gradient: ZveltTokens.gradAccentDeep,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: ZveltTokens.glowLg,
+          ),
+          child: Row(
+            children: [
+              const _PulsingDot(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Cardio in progress',
+                        style: ZType.monoXS.copyWith(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xD9FFFFFF))),
+                    const SizedBox(height: 1),
+                    Text(
+                        '${live.durationLabel} · ${live.distanceKm.toStringAsFixed(2)} km',
+                        style: ZType.num_.copyWith(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: ZveltTokens.onBrand)),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0x38FFFFFF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('Resume',
+                    style: ZType.bodyS.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: ZveltTokens.onBrand)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _resumeCardio() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const OutdoorTrackScreen()),
     );
   }
 
@@ -767,13 +881,15 @@ class _HomeTabState extends State<HomeTab> {
                         Text(s.trendLabel,
                             style: ZType.bodyS.copyWith(fontSize: 12.5)),
                         const SizedBox(width: 7),
+                        // Constant right-chevron in the orange circle — the
+                        // prototype never swaps this glyph by trend (HTML 139).
                         Container(
                           width: 20,
                           height: 20,
                           alignment: Alignment.center,
                           decoration: const BoxDecoration(
                               color: ZveltTokens.brand, shape: BoxShape.circle),
-                          child: Icon(s.trendIcon,
+                          child: const Icon(AppIcons.angle_small_right,
                               size: 11, color: ZveltTokens.onBrand),
                         ),
                       ],
@@ -847,10 +963,10 @@ class _HomeTabState extends State<HomeTab> {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text(s.avgBurnCal == null ? '—' : '${s.avgBurnCal}',
+                Text(_avgBurnCal == null ? '—' : '$_avgBurnCal',
                     style: ZType.h2.copyWith(
                         fontSize: 24, color: ZveltTokens.brand)),
-                if (s.avgBurnCal != null) ...[
+                if (_avgBurnCal != null) ...[
                   const SizedBox(width: 3),
                   Text('cal',
                       style: ZType.monoXS.copyWith(fontWeight: FontWeight.w700)),
@@ -969,7 +1085,6 @@ class _Last14 {
     required this.sessionCount,
     required this.totalDuration,
     required this.trendLabel,
-    required this.trendIcon,
   });
 
   final double volumeKg;
@@ -977,15 +1092,11 @@ class _Last14 {
   final int sessionCount;
   final Duration totalDuration;
   final String trendLabel;
-  final IconData trendIcon;
 
   Duration? get avgSession =>
       sessionCount == 0 || totalDuration == Duration.zero
           ? null
           : Duration(seconds: totalDuration.inSeconds ~/ sessionCount);
-
-  /// No calorie source for gym sessions yet — honest placeholder.
-  int? get avgBurnCal => null;
 
   static const empty = _Last14(
     volumeKg: 0,
@@ -993,7 +1104,6 @@ class _Last14 {
     sessionCount: 0,
     totalDuration: Duration.zero,
     trendLabel: 'No workouts yet',
-    trendIcon: AppIcons.angle_small_right,
   );
 
   static _Last14 fromWorkouts(Iterable<WorkoutDto> workouts) {
@@ -1008,14 +1118,12 @@ class _Last14 {
       final d = end.difference(w.startedAt);
       if (!d.isNegative && d <= const Duration(hours: 24)) dur += d;
     }
-    final trend = _trendFor(bars);
     return _Last14(
       volumeKg: volume,
       volumeBars: bars,
       sessionCount: list.length,
       totalDuration: dur,
-      trendLabel: trend.$1,
-      trendIcon: trend.$2,
+      trendLabel: _trendFor(bars),
     );
   }
 
@@ -1030,17 +1138,59 @@ class _Last14 {
     return sum;
   }
 
-  static (String, IconData) _trendFor(List<double> bars) {
+  static String _trendFor(List<double> bars) {
     final nonZero = bars.where((v) => v > 0).length;
-    if (nonZero < 4) return ('Training Stable', AppIcons.angle_small_right);
+    if (nonZero < 4) return 'Training Stable';
     final mid = bars.length ~/ 2;
     final prior = bars.take(mid).fold<double>(0, (a, b) => a + b);
     final latest = bars.skip(mid).fold<double>(0, (a, b) => a + b);
-    if (prior <= 0) return ('Trending Up', AppIcons.arrow_small_up);
+    if (prior <= 0) return 'Trending Up';
     final pct = (latest - prior) / prior;
-    if (pct < -0.12) return ('Trending Down', AppIcons.arrow_small_down);
-    if (pct > 0.12) return ('Trending Up', AppIcons.arrow_small_up);
-    return ('Training Stable', AppIcons.angle_small_right);
+    if (pct < -0.12) return 'Trending Down';
+    if (pct > 0.12) return 'Trending Up';
+    return 'Training Stable';
+  }
+}
+
+/// White live dot with a soft ring, gently pulsing (prototype banner dot,
+/// HTML 89).
+class _PulsingDot extends StatefulWidget {
+  const _PulsingDot();
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 1, end: 0.45)
+          .animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+      child: Container(
+        width: 11,
+        height: 11,
+        decoration: const BoxDecoration(
+          color: ZveltTokens.onBrand,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(color: Color(0x47FFFFFF), spreadRadius: 4),
+          ],
+        ),
+      ),
+    );
   }
 }
 

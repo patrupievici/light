@@ -104,6 +104,21 @@ class FastingService {
     return s;
   }
 
+  /// Patch the window and/or start time of the CURRENT state without
+  /// toggling it — used by the fasting sheet so protocol/start edits apply
+  /// immediately even mid-fast (prototype setFastWindow/onFastStart: the
+  /// ring retargets live instead of requiring a fresh start).
+  Future<FastingState> update({int? protocolHours, DateTime? startAt}) async {
+    final cur = await load();
+    final s = FastingState(
+      active: cur.active,
+      protocolHours: protocolHours ?? cur.protocolHours,
+      startMs: startAt?.millisecondsSinceEpoch ?? cur.startMs,
+    );
+    await save(s);
+    return s;
+  }
+
   Future<FastingState> end() async {
     final cur = await load();
     final s = FastingState(active: false, protocolHours: cur.protocolHours);

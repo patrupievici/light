@@ -67,10 +67,11 @@ class _FeedTabState extends State<FeedTab> {
   /// Best-effort "You won · 1st of 6" lines per completed challenge.
   Map<String, String> _completedResult = const {};
 
-  // Hero challenge standings (best-effort).
-  List<(String, num)> _standings = const [];
+  // Hero challenge standings (best-effort). (name, pts, userId)
+  List<(String, num, String?)> _standings = const [];
   int? _myRank;
   num? _myPts;
+  num? _myWorkouts;
 
   @override
   void initState() {
@@ -177,25 +178,30 @@ class _FeedTabState extends State<FeedTab> {
     final rows = (raw['data'] as List<dynamic>? ?? const [])
         .whereType<Map>()
         .toList();
-    final parsed = <(String, num)>[];
+    final parsed = <(String, num, String?)>[];
     int? myRank;
     num? myPts;
+    num? myWorkouts;
     for (var i = 0; i < rows.length; i++) {
       final m = Map<String, dynamic>.from(rows[i]);
       final name = (m['displayName'] ?? m['name'] ?? m['username'] ?? 'Athlete')
           .toString();
       final pts = (m['total'] ?? m['points'] ?? m['score'] ?? 0) as num;
-      parsed.add((name, pts));
       final uid = (m['userId'] ?? m['id'])?.toString();
+      parsed.add((name, pts, uid));
       if (uid != null && uid == _meId) {
         myRank = (m['rank'] as num?)?.toInt() ?? i + 1;
         myPts = pts;
+        // 4th hero stat — only when the payload really carries it.
+        final w = m['workouts'] ?? m['sessions'] ?? m['workoutCount'];
+        if (w is num) myWorkouts = w;
       }
     }
     setState(() {
       _standings = parsed;
       _myRank = myRank;
       _myPts = myPts;
+      _myWorkouts = myWorkouts;
     });
   }
 
@@ -441,7 +447,8 @@ class _FeedTabState extends State<FeedTab> {
     if (_myRank != null && _myRank! > 1 && _standings.length >= _myRank!) {
       final above = _standings[_myRank! - 2];
       final need = (above.$2 - (_myPts ?? 0)).clamp(0, double.infinity);
-      chaseLine = 'You need ${need.round()} pts to overtake ${above.$1}';
+      chaseLine =
+          'You need ${_fmtNum(need.round())} pts to overtake ${above.$1}';
     }
 
     Widget stat(String v, String l) => Column(
@@ -533,7 +540,12 @@ class _FeedTabState extends State<FeedTab> {
                           stat('#$_myRank', 'rank'),
                           const SizedBox(width: 14),
                         ],
-                        if (_myPts != null) stat('${_myPts!.round()}', 'pts'),
+                        if (_myWorkouts != null) ...[
+                          stat(_fmtNum(_myWorkouts!.round()), 'workouts'),
+                          const SizedBox(width: 14),
+                        ],
+                        if (_myPts != null)
+                          stat(_fmtNum(_myPts!.round()), 'pts'),
                       ],
                     ),
                     if (pct != null) ...[
@@ -600,36 +612,44 @@ class _FeedTabState extends State<FeedTab> {
       child: Column(
         children: [
           for (var i = 0; i < _standings.length && i < 3; i++) ...[
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: ZveltTokens.surface2Grad,
-                borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-                border: Border.all(color: ZveltTokens.border),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 20,
-                    child: Text('${i + 1}',
-                        style: ZType.bodyM.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: ZveltTokens.brand)),
-                  ),
-                  Expanded(
-                    child: Text(_standings[i].$1,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: ZType.bodyM
-                            .copyWith(fontWeight: FontWeight.w700)),
-                  ),
-                  Text('${_standings[i].$2.round()} pts',
-                      style: ZType.bodyS.copyWith(
-                          fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
+            Builder(builder: (_) {
+              // Prototype JS 2020-2021: "You" row gets the orange tint +
+              // border; other rows use the plain chip bg, radius 14.
+              final isMe = _meId != null && _standings[i].$3 == _meId;
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+                decoration: BoxDecoration(
+                  color: isMe ? const Color(0x24F5820A) : ZveltTokens.chip,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rChip),
+                  border: Border.all(
+                      color: isMe
+                          ? const Color(0x66F5820A)
+                          : ZveltTokens.border),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      child: Text('${i + 1}',
+                          style: ZType.bodyM.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: ZveltTokens.brand)),
+                    ),
+                    Expanded(
+                      child: Text(_standings[i].$1,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ZType.bodyM
+                              .copyWith(fontWeight: FontWeight.w700)),
+                    ),
+                    Text('${_fmtNum(_standings[i].$2.round())} pts',
+                        style: ZType.bodyS.copyWith(
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              );
+            }),
             if (i < 2 && i < _standings.length - 1) const SizedBox(height: 8),
           ],
         ],
@@ -710,7 +730,7 @@ class _FeedTabState extends State<FeedTab> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                     shape: BoxShape.circle, color: _avatarColor(name)),
-                child: Text(name[0].toUpperCase(),
+                child: Text(_initials(name),
                     style: ZType.bodyM.copyWith(
                         fontWeight: FontWeight.w800,
                         color: ZveltTokens.onBrand)),
@@ -1002,7 +1022,7 @@ class _FeedTabState extends State<FeedTab> {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                       shape: BoxShape.circle, color: _avatarColor(from)),
-                  child: Text(from[0].toUpperCase(),
+                  child: Text(_initials(from),
                       style: ZType.bodyS.copyWith(
                           fontWeight: FontWeight.w800,
                           color: ZveltTokens.onBrand)),
@@ -1078,10 +1098,13 @@ class _FeedTabState extends State<FeedTab> {
 
   // ─── PRS ──────────────────────────────────────────────────────────────────
   List<Widget> _prBlocks() {
-    final cats = <String>{'All', for (final p in _prs) p.exerciseName};
-    final shown = _prCat == 'All'
+    // Prototype JS 2022: fixed category chips. All current PR data is
+    // strength PRs, so All/Strength show the real list; the other
+    // categories show the honest empty card until data exists.
+    const cats = ['All', 'Strength', 'Volume', 'Reps', 'Streaks', 'Body'];
+    final shown = _prCat == 'All' || _prCat == 'Strength'
         ? _prs
-        : _prs.where((p) => p.exerciseName == _prCat).toList();
+        : const <RecentPr>[];
 
     return [
       SizedBox(
@@ -1090,7 +1113,7 @@ class _FeedTabState extends State<FeedTab> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
           children: [
-            for (final c in cats.take(8))
+            for (final c in cats)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: InkWell(
@@ -1392,7 +1415,6 @@ class _FeedTabState extends State<FeedTab> {
         borderRadius: BorderRadius.circular(ZveltTokens.rControl),
         border: Border.all(
             color: isMe ? const Color(0x66F5820A) : ZveltTokens.border),
-        boxShadow: e.rank == 1 ? ZveltTokens.glowSm : null,
       ),
       child: Row(
         children: [
@@ -1404,15 +1426,18 @@ class _FeedTabState extends State<FeedTab> {
                     fontWeight: FontWeight.w800,
                     color: ZveltTokens.brand)),
           ),
+          // Prototype JS 2016: uniform 46px solid per-user color circle.
           Container(
-            width: e.rank == 1 ? 40 : 34,
-            height: e.rank == 1 ? 40 : 34,
+            width: 46,
+            height: 46,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(
-                shape: BoxShape.circle, gradient: ZveltTokens.gradAccentDeep),
-            child: Text(e.label.isEmpty ? 'A' : e.label[0].toUpperCase(),
-                style: ZType.bodyS.copyWith(
-                    fontWeight: FontWeight.w800, color: ZveltTokens.onBrand)),
+            decoration: BoxDecoration(
+                shape: BoxShape.circle, color: _avatarColor(e.label)),
+            child: Text(_initials(e.label),
+                style: ZType.bodyM.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: ZveltTokens.onBrand)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1422,7 +1447,7 @@ class _FeedTabState extends State<FeedTab> {
                 style: ZType.bodyM.copyWith(
                     fontSize: 14.5, fontWeight: FontWeight.w700)),
           ),
-          Text('${e.lpSeason} pts',
+          Text('${_fmtNum(e.lpSeason)} pts',
               style: ZType.bodyS.copyWith(
                   fontSize: 12.5, fontWeight: FontWeight.w700)),
         ],
@@ -1767,6 +1792,16 @@ class _FeedTabState extends State<FeedTab> {
         ),
       ),
     );
+  }
+
+  /// Two-letter initials from the first two name words (prototype: AR, MI,
+  /// CD, MA…); single-word names fall back to the first letter.
+  static String _initials(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (parts.isEmpty) return 'A';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
   static String _fmtNum(int v) {

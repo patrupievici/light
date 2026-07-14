@@ -172,6 +172,47 @@ class IntegrationsService {
     }
   }
 
+  /// GET /v1/integrations — the connected provider ids plus whether the
+  /// wearable cloud aggregator (Terra) is configured server-side.
+  ///
+  /// Same payload the Integrations screen consumes; used by the profile
+  /// "Connect a device" sheet to render real Connect/Connected pill states.
+  Future<({Set<String> connected, bool aggregatorConfigured})>
+      listIntegrations() async {
+    final uri = Uri.parse('$v1Base/integrations');
+    try {
+      final res = await _client
+          .get(uri, headers: await _headers(json: false))
+          .timeout(_defaultTimeout);
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw IntegrationsException(
+          _extractMessage(res.body) ?? 'Failed to load integrations',
+          res.statusCode,
+        );
+      }
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final list = data['integrations'] as List<dynamic>? ?? const [];
+      // Parse defensively — a single malformed row must not abort the map.
+      final connected = <String>{};
+      for (final e in list) {
+        if (e is! Map) continue;
+        final provider = e['provider'] as String?;
+        if (provider != null) connected.add(provider);
+      }
+      final agg = data['aggregator'];
+      return (
+        connected: connected,
+        aggregatorConfigured: agg is Map && agg['configured'] == true,
+      );
+    } on IntegrationsException {
+      rethrow;
+    } on TimeoutException {
+      throw IntegrationsException('Integrations load timed out', null);
+    } catch (e) {
+      throw IntegrationsException('Network error: $e', null);
+    }
+  }
+
   String? _extractMessage(String body) {
     try {
       final v = jsonDecode(body);

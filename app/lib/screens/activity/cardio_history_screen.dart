@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../models/activity_kind.dart';
 import '../../services/activity_calendar_store.dart';
+import '../../services/nutrition_service.dart';
+import '../../services/profile_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
 
 /// CARDIO HISTORY — 1:1 with the ZVELT handoff prototype (`screenCardioHist`,
 /// HTML 908–945): totals row, "Distance by session" bar chart (last 7),
 /// ALL ACTIVITIES session rows. Data = the real manual-cardio store the Home
-/// weekly card reads (`ActivityCalendarStore.loadManualSessions`).
+/// weekly card reads (`ActivityCalendarStore.loadManualSessions`). Bar / row
+/// taps open the activity-detail screen (prototype `actDetail`, HTML
+/// 1167–1209) with the stats the store really has + Share.
 class CardioHistoryScreen extends StatefulWidget {
   const CardioHistoryScreen({super.key});
 
@@ -20,12 +25,17 @@ class _CardioSession {
   const _CardioSession({
     required this.day,
     required this.kind,
+    required this.bodyweightKg,
     this.distanceKm,
     this.durationMin,
   });
 
   final DateTime day;
   final ActivityKind kind;
+
+  /// User's real bodyweight at load time (profile / nutrition logs);
+  /// 70 kg only when no weight exists anywhere.
+  final double bodyweightKg;
   final double? distanceKm;
   final int? durationMin;
 
@@ -41,12 +51,13 @@ class _CardioSession {
         return 'Walking';
       case ActivityKind.run:
       case ActivityKind.gym:
-      case ActivityKind.other:
         return 'Running';
+      case ActivityKind.other:
+        return 'Cardio';
     }
   }
 
-  /// Same MET estimate the outdoor tracker shows (~70 kg default bodyweight).
+  /// MET estimate using the user's real bodyweight.
   int get kcalEstimate {
     final mins = durationMin;
     if (mins == null || mins <= 0) return 0;
@@ -63,7 +74,7 @@ class _CardioSession {
       case ActivityKind.other:
         met = 9.0;
     }
-    return (met * 70 * (mins / 60)).round();
+    return (met * bodyweightKg * (mins / 60)).round();
   }
 
   /// Pace (`m:ss /km`) for foot sports, speed (`km/h`) for rides — the
@@ -117,8 +128,30 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
     _load();
   }
 
+  /// Latest logged weight (nutrition) → profile bodyweight → 70 kg.
+  Future<double> _loadBodyweight() async {
+    try {
+      final hist =
+          await NutritionService.instance.loadNutritionHistory(days: 14);
+      final logged = [
+        for (final d in hist)
+          if (d.weightKg != null && d.weightKg! > 0) d.weightKg!,
+      ];
+      if (logged.isNotEmpty) return logged.last;
+    } catch (_) {/* fall through to profile */}
+    try {
+      final me = await ProfileService().getMe();
+      final profile = me?['profile'] as Map<String, dynamic>?;
+      final raw = profile?['bodyweightKg'];
+      final kg = raw is num ? raw.toDouble() : double.tryParse('$raw');
+      if (kg != null && kg > 0) return kg;
+    } catch (_) {/* fall through to default */}
+    return 70;
+  }
+
   Future<void> _load() async {
     try {
+      final bodyweight = await _loadBodyweight();
       final byDay = await ActivityCalendarStore().loadManualSessions();
       final all = <_CardioSession>[];
       byDay.forEach((dayKey, sessions) {
@@ -128,6 +161,7 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
           all.add(_CardioSession(
             day: day,
             kind: s.kind,
+            bodyweightKg: bodyweight,
             distanceKm: s.distanceKm,
             durationMin: s.durationMin,
           ));
@@ -402,95 +436,207 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
     );
   }
 
-  /// Compact real-stats detail (the prototype's activity-detail overlay needs
-  /// per-km splits the manual store doesn't record — this shows every stat we
-  /// truly have).
+  /// Prototype `openActDetail` (HTML 1167–1209) — full activity-detail screen
+  /// with big stats + Share. Splits / route / HR / elevation are omitted: the
+  /// manual store records none of those, and fabricating them is off-limits.
   void _openDetail(_CardioSession s) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.fromLTRB(
-            20, 10, 20, MediaQuery.paddingOf(context).bottom + 24),
-        decoration: BoxDecoration(
-          gradient: ZveltTokens.sheetGrad,
-          color: ZveltTokens.surface,
-          borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(ZveltTokens.rSheet)),
-          border: Border.all(color: ZveltTokens.border),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: ZveltTokens.track,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+          builder: (_) => _ActivityDetailScreen(session: s)),
+    );
+  }
+}
+
+/// Activity detail (prototype `actDetail`, HTML 1167–1209): header with the
+/// activity icon + "{type} · {km} km", stat tiles (Distance / Duration /
+/// Pace-or-Speed / Calories) and the accent "Share activity" button. Only the
+/// stats the manual store truly records are shown — no fabricated splits.
+class _ActivityDetailScreen extends StatelessWidget {
+  const _ActivityDetailScreen({required this.session});
+
+  final _CardioSession session;
+
+  Future<void> _share() async {
+    final s = session;
+    final parts = <String>[
+      s.typeLabel,
+      if (s.distanceKm != null) '${s.distanceKm!.toStringAsFixed(1)} km',
+      if ((s.durationMin ?? 0) > 0) s.durLabel,
+      if (s.metric != '--') s.metric,
+      if (s.kcalEstimate > 0) '${s.kcalEstimate} kcal',
+    ];
+    await SharePlus.instance.share(
+      ShareParams(text: '${parts.join(' · ')} — tracked with ZVELT'),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = session;
+    final topPad = MediaQuery.paddingOf(context).top;
+    final bottomPad = MediaQuery.paddingOf(context).bottom;
+    final dist = s.distanceKm?.toStringAsFixed(1);
+
+    return Scaffold(
+      backgroundColor: ZveltTokens.bg,
+      body: Column(
+        children: [
+          // Header — back circle + activity icon + title/sub (HTML 1170–1176)
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, topPad + 12, 20, 12),
+            child: Row(
               children: [
+                _CircleButton(
+                  icon: AppIcons.angle_small_left,
+                  onTap: () => Navigator.of(context).maybePop(),
+                ),
+                const SizedBox(width: 12),
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 44,
+                  height: 44,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: ZveltTokens.chip,
-                    borderRadius: BorderRadius.circular(13),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child:
-                      Icon(s.kind.icon, size: 21, color: ZveltTokens.brand),
+                  child: Icon(s.kind.icon, size: 22, color: ZveltTokens.brand),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dist == null ? s.typeLabel : '${s.typeLabel} · $dist km',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZType.h4.copyWith(fontSize: 18),
+                      ),
+                      const SizedBox(height: 2),
+                      Text('${s.dateLabel} · ${s.durLabel} · ${s.metric}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ZType.bodyS.copyWith(
+                              fontSize: 12.5, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(s.typeLabel,
-                        style:
-                            ZType.bodyL.copyWith(fontWeight: FontWeight.w800)),
-                    Text(s.dateLabel, style: ZType.bodyS),
+                    Expanded(
+                        child: _statTile('Distance', dist ?? '--',
+                            unit: dist == null ? null : 'km')),
+                    const SizedBox(width: 9),
+                    Expanded(child: _statTile('Duration', s.durLabel)),
+                  ],
+                ),
+                const SizedBox(height: 9),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                        child: _statTile(
+                            s.isRide ? 'Speed' : 'Pace', s.metric)),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: _statTile(
+                        'Calories',
+                        s.kcalEstimate > 0 ? '${s.kcalEstimate}' : '--',
+                        unit: s.kcalEstimate > 0 ? 'kcal' : null,
+                        accent: true,
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                _detailStat(
-                    s.distanceKm == null
-                        ? '--'
-                        : s.distanceKm!.toStringAsFixed(1),
-                    'km'),
-                _detailStat(s.durLabel, 'time'),
-                _detailStat(s.metric, s.isRide ? 'speed' : 'pace'),
-                _detailStat(
-                    s.kcalEstimate > 0 ? '${s.kcalEstimate}' : '--', 'kcal'),
-              ],
+          ),
+          // Share activity — accent CTA (HTML 1207)
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 22),
+            child: InkWell(
+              onTap: _share,
+              borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: ZveltTokens.brand,
+                  borderRadius: BorderRadius.circular(ZveltTokens.rControl),
+                  boxShadow: ZveltTokens.glowLg,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(AppIcons.share,
+                        size: 18, color: ZveltTokens.onBrand),
+                    const SizedBox(width: 8),
+                    Text('Share activity',
+                        style: ZType.bodyL.copyWith(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: ZveltTokens.onBrand)),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _detailStat(String value, String label) => Expanded(
-        child: Column(
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(value, style: ZType.stat.copyWith(fontSize: 20)),
-            ),
-            const SizedBox(height: 3),
-            Text(label, style: ZType.monoXS),
-          ],
-        ),
-      );
+  Widget _statTile(String label, String value,
+      {String? unit, bool accent = false}) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
+      decoration: BoxDecoration(
+        gradient: ZveltTokens.surface2Grad,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: ZveltTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: ZType.bodyS.copyWith(
+                  fontSize: 11, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 3),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(value,
+                      style: ZType.stat.copyWith(
+                          fontSize: 17,
+                          color: accent
+                              ? ZveltTokens.brand
+                              : ZveltTokens.text)),
+                ),
+              ),
+              if (unit != null) ...[
+                const SizedBox(width: 4),
+                Text(unit,
+                    style: ZType.monoXS.copyWith(
+                        fontSize: 11, fontWeight: FontWeight.w700)),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _CircleButton extends StatelessWidget {

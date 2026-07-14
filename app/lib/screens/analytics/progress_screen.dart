@@ -56,6 +56,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
       _safe(ActivityCalendarStore().loadManualSessions()),
       _safe(NutritionService.instance.loadNutritionHistory(days: 60)),
       _safe(SharedPreferences.getInstance()),
+      // Manual day marks (Consistency calendar) — unioned into trained days
+      // so the Streak tile matches ConsistencyScreen.
+      _safe(ActivityCalendarStore().loadAll()),
     ]);
     if (!mounted) return;
 
@@ -68,6 +71,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final nutrition =
         (results[2] as List<NutritionDaySnapshot>?) ?? const [];
     final prefs = results[3] as SharedPreferences?;
+    final marks =
+        (results[4] as Map<String, List<ActivityKind>>?) ?? const {};
+
+    // Weight logs first — the MET burn estimate below uses the user's real
+    // bodyweight (fallback 70 kg only when no weight was ever logged).
+    final weights = [
+      for (final d in nutrition)
+        if (d.weightKg != null && d.weightKg! > 0) (d.date, d.weightKg!),
+    ];
+    final burnBodyweight = weights.isNotEmpty ? weights.last.$2 : 70.0;
 
     final burn = <String, int>{};
     cardio.forEach((day, sessions) {
@@ -81,7 +94,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ActivityKind.walk => 4.0,
           _ => 9.0,
         };
-        kcal += (met * 70 * (mins / 60)).round();
+        kcal += (met * burnBodyweight * (mins / 60)).round();
       }
       if (kcal > 0) burn[day] = (burn[day] ?? 0) + kcal;
     });
@@ -90,6 +103,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
       for (final w in workouts)
         _ymd(DateUtils.dateOnly((w.endedAt ?? w.startedAt).toLocal())),
       for (final e in cardio.entries)
+        if (e.value.isNotEmpty) e.key,
+      for (final e in marks.entries)
         if (e.value.isNotEmpty) e.key,
     };
 
@@ -102,10 +117,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
 
     // Weight: latest log + delta over the trailing 7 days.
-    final weights = [
-      for (final d in nutrition)
-        if (d.weightKg != null && d.weightKg! > 0) (d.date, d.weightKg!),
-    ];
     double? weight;
     double? weightDelta;
     if (weights.isNotEmpty) {
