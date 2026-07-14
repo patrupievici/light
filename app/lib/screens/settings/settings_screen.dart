@@ -26,6 +26,7 @@ import '../social/blocked_users_screen.dart';
 import '../social/bookmarks_screen.dart';
 import '../social/conversations_screen.dart';
 import 'account_settings_screens.dart';
+import 'delete_account_screen.dart';
 import 'language_screen.dart';
 import 'preference_settings_screens.dart';
 import 'resource_settings_screens.dart';
@@ -235,8 +236,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 subtitle: 'Match your device',
                 selected: mode == ThemeMode.system,
                 leading: const SettingsIconTile(
-                    icon: AppIcons.settings,
-                    tint: SettingsTint.blue),
+                    icon: AppIcons.settings, tint: SettingsTint.blue),
                 onTap: () => ZveltThemeNotifier.set(ThemeMode.system),
               ),
             ],
@@ -332,6 +332,33 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mounted) setState(() => _diagnostics = value);
   }
 
+  Future<void> _logout() async {
+    final ok = await settingsConfirm(
+      context,
+      title: 'Sign out?',
+      body: 'You will need to sign in again on this device.',
+      confirmLabel: 'Sign out',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await widget.onLogout();
+  }
+
+  Future<void> _deleteAccount() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => DeleteAccountScreen(
+          onAccountDeleted: () async {
+            if (!mounted) return;
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            await widget.onLogout();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _rate() async {
     var rating = 0;
     await showSettingsSheet<void>(
@@ -349,12 +376,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     IconButton(
                       tooltip: '$i stars',
                       onPressed: () => setLocal(() => rating = i),
-                      icon: Icon(
-                          i <= rating
-                              ? AppIcons.star
-                              : AppIcons.star,
-                          color: ZveltTokens.warn,
-                          size: 34),
+                      icon: Icon(i <= rating ? AppIcons.star : AppIcons.star,
+                          color: ZveltTokens.warn, size: 34),
                     ),
                 ],
               ),
@@ -582,6 +605,20 @@ class _SettingsScreenState extends State<SettingsScreen>
               onTap: _rate,
             ),
           ],
+        ),
+        const SettingsSectionTitle('Account actions'),
+        SettingsActionButton(
+          label: 'Sign out',
+          icon: AppIcons.sign_out_alt,
+          destructive: true,
+          onTap: _logout,
+        ),
+        const SizedBox(height: ZveltTokens.cardGap),
+        SettingsActionButton(
+          label: 'Delete account',
+          icon: AppIcons.trash,
+          destructive: true,
+          onTap: _deleteAccount,
         ),
         const SettingsSectionTitle('Legal'),
         SettingsCard(

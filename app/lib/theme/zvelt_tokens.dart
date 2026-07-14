@@ -30,40 +30,50 @@ class ZveltTokens {
   /// Page background base color (the two warm radial glows are painted on top
   /// by ZveltScaffold; this is the solid under them).
   static Color get bg => _d(const Color(0xFFF6F1E9), const Color(0xFF0E0A07));
+
   /// Slightly lifted page / inset block.
   static Color get bg2 => _d(const Color(0xFFF1EBE0), const Color(0xFF15100B));
+
   /// Card surface (glass-over-dark composited to an opaque warm tone; the true
   /// translucent glass is available via [surfaceGrad] + [glassBlur]).
   static Color get surface =>
       _d(const Color(0xFFFFFFFF), const Color(0xFF241A12));
+
   /// Subtle inset inside cards / dense rows.
   static Color get surface2 =>
       _d(const Color(0xFFFBF6EE), const Color(0xFF2A2018));
+
   /// Track behind progress / muted thumb.
   static Color get surface3 =>
       _d(const Color(0xFFEFE7DA), const Color(0xFF342820));
+
   /// Accent-soft warm hero surface.
   static Color get surfaceTinted =>
       _d(const Color(0xFFFFE9D2), const Color(0xFF3A2614));
 
   // ─── Text (primary / secondary / tertiary + decorative 4th) ────────────────
   static Color get text => _d(const Color(0xFF231C14), const Color(0xFFFFFFFF));
-  static Color get text2 => _d(const Color(0xFF8A7F6F), const Color(0xFF9B8F81));
-  static Color get text3 => _d(const Color(0xFFA89C8B), const Color(0xFF8A7E70));
-  static Color get text4 => _d(const Color(0xFFB9AE9C), const Color(0xFF6E6458));
+  static Color get text2 =>
+      _d(const Color(0xFF8A7F6F), const Color(0xFF9B8F81));
+  static Color get text3 =>
+      _d(const Color(0xFFA89C8B), const Color(0xFF8A7E70));
+  static Color get text4 =>
+      _d(const Color(0xFFB9AE9C), const Color(0xFF6E6458));
 
   // ─── Borders — 1px hairline on every surface (top-lit) ─────────────────────
   static Color get border =>
       _d(const Color(0x99FFFFFF), const Color(0x24FFFFFF));
   static Color get borderStrong =>
       _d(const Color(0x2E281C10), const Color(0x33FFFFFF));
+
   /// Hairline divider.
   static Color get hairline =>
       _d(const Color(0x14281C10), const Color(0x14FFFFFF));
 
   // ─── Structural neutrals (chip / track / iconBg / scrim) ───────────────────
   static Color get chip => _d(const Color(0x0D281C10), const Color(0x0DFFFFFF));
-  static Color get track => _d(const Color(0x1A281C10), const Color(0x1AFFFFFF));
+  static Color get track =>
+      _d(const Color(0x1A281C10), const Color(0x1AFFFFFF));
   static Color get iconBg =>
       _d(const Color(0x0D281C10), const Color(0x12FFFFFF));
   static Color get scrim => const Color(0x80000000);
@@ -71,15 +81,20 @@ class ZveltTokens {
   // ─── Accent — warm orange (signal only; constant across modes) ─────────────
   /// accent-primary — CTAs, active tab, selected state, ring.
   static const Color brand = Color(0xFFF5820A);
+
   /// accent-light — gradient start stop on icon squares & AI button.
   static const Color brand2 = Color(0xFFFFA430);
+
   /// ring-start — top of progress-ring gradient / halo.
   static const Color brand3 = Color(0xFFFFB24D);
+
   /// accent-deep — gradient end stop, pressed CTA.
   static const Color brandDeep = Color(0xFFEE6E08);
+
   /// accent-soft — warm orange tint (chip bg, streak badge fill).
   static Color get brandTint =>
       _d(const Color(0x24F5820A), const Color(0x26F5820A));
+
   /// warm orange glow color — rgba(240,120,12,.5).
   static const Color brandGlow = Color(0x80F0780C);
   static const Color onBrand = Color(0xFFFFFFFF);
@@ -91,6 +106,7 @@ class ZveltTokens {
   static const Color accentHover = Color(0xFFFF9A33);
   static const Color ringStart = brand3;
   static const Color ringEnd = brandDeep;
+
   /// Cycling / ride gold accent (the one sanctioned accent variant).
   static const Color cardioGold = Color(0xFFF3CE7E);
   static const Color cardioGoldDeep = Color(0xFFD79A3A);
@@ -110,6 +126,7 @@ class ZveltTokens {
   static const Color strength2 = Color(0xFFCDEFDD);
   static const Color cardio = brand; // run = orange accent
   static const Color cardio2 = Color(0xFFFBDFC2);
+
   /// challenge / gold accent.
   static const Color challenge = cardioGold;
 
@@ -160,8 +177,10 @@ class ZveltTokens {
 
   /// Screen edge padding L/R.
   static const double screenPaddingH = 20;
+
   /// Default card-to-card gap.
   static const double cardGap = 12;
+
   /// Bottom scroll inset so content clears the floating nav.
   static const double navSafeBottom = 116;
 
@@ -170,10 +189,10 @@ class ZveltTokens {
   static const double chipBlur = 8;
 
   // ─── Shadows — warm orange glow (brand) + neutral depth (structure) ────────
-  // Historical card/hero/float names kept; cards now rely on gradient + border
-  // + the bg glow, so the neutral depth is soft.
+  // Historical card/hero/float names kept. Card depth stays deliberately short
+  // so repeated surfaces remain crisp and cheap to render while scrolling.
   static const List<BoxShadow> shadowCard = [
-    BoxShadow(color: Color(0x33000000), offset: Offset(0, 6), blurRadius: 18),
+    BoxShadow(color: Color(0x38000000), offset: Offset(0, 4), blurRadius: 10),
   ];
   static const List<BoxShadow> shadowHero = [
     BoxShadow(color: Color(0x40000000), offset: Offset(0, 10), blurRadius: 28),
@@ -186,14 +205,17 @@ class ZveltTokens {
   static const List<BoxShadow> glowSm = [
     BoxShadow(color: Color(0x73F0780C), offset: Offset(0, 5), blurRadius: 12),
   ];
+
   /// Orange glow — primary CTA, streak circle, logo mark.
   static const List<BoxShadow> glowMd = [
     BoxShadow(color: Color(0x80F0780C), offset: Offset(0, 6), blurRadius: 16),
   ];
+
   /// Orange glow — large CTA, premium banner.
   static const List<BoxShadow> glowLg = [
     BoxShadow(color: Color(0x66F0780C), offset: Offset(0, 10), blurRadius: 24),
   ];
+
   /// Center AI nav button glow.
   static const List<BoxShadow> glowAi = [
     BoxShadow(color: Color(0x99EE6E08), offset: Offset(0, 10), blurRadius: 24),
@@ -203,6 +225,7 @@ class ZveltTokens {
         blurRadius: 1,
         spreadRadius: -0.5),
   ];
+
   /// Alias kept for older call sites.
   static const List<BoxShadow> glowBrand = glowMd;
 
@@ -213,24 +236,28 @@ class ZveltTokens {
     end: Alignment.bottomRight,
     colors: [Color(0xFFFFA430), Color(0xFFF0720A)],
   );
+
   /// AI button, hero mini-icons (155°, #FFA630 → #EE6E08).
   static const LinearGradient gradAccentDeep = LinearGradient(
     begin: Alignment(-0.6, -1),
     end: Alignment(0.6, 1),
     colors: [Color(0xFFFFA630), brandDeep],
   );
+
   /// Active banners / live pills (100°, #F5820A → #EE6E08).
   static const LinearGradient gradAccentFlat = LinearGradient(
     begin: Alignment(-1, -0.2),
     end: Alignment(1, 0.2),
     colors: [brand, brandDeep],
   );
+
   /// Progress-ring gradient (#FFB24D → #EE6E08).
   static const LinearGradient gradRing = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [ringStart, ringEnd],
   );
+
   /// Cycling / ride gold (#F3CE7E → #D79A3A).
   static const LinearGradient gradCardio = LinearGradient(
     begin: Alignment.topLeft,
@@ -242,20 +269,23 @@ class ZveltTokens {
   static const LinearGradient gradBtn = gradAccentFlat;
   static const LinearGradient gradHero = gradAccentDeep;
 
-  // ─── Glass surface gradients (translucent; for BackdropFilter cards) ───────
+  // ─── Matte-glass surfaces ─────────────────────────────────────────────────
+  // These are nearly opaque on purpose. Very transparent warm gradients were
+  // exposing background colour bands on some Android GPUs. A quiet neutral
+  // highlight keeps the material depth without a BackdropFilter per list row.
   static LinearGradient get surfaceGrad => LinearGradient(
-        begin: const Alignment(-0.6, -1),
-        end: const Alignment(0.6, 1),
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
         colors: isDark
-            ? const [Color(0x6B544537), Color(0x3D18120D)]
-            : const [Color(0x75FFFFFF), Color(0x75FFFFFF)],
+            ? const [Color(0xF2252423), Color(0xED181818)]
+            : const [Color(0xF7FFFFFF), Color(0xF0F5F5F5)],
       );
   static LinearGradient get surface2Grad => LinearGradient(
-        begin: const Alignment(-0.6, -1),
-        end: const Alignment(0.6, 1),
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
         colors: isDark
-            ? const [Color(0x665A4939), Color(0x3D1C150F)]
-            : const [Color(0x94FFFFFF), Color(0x94FFFFFF)],
+            ? const [Color(0xF52B2927), Color(0xF01E1D1C)]
+            : const [Color(0xFAFFFFFF), Color(0xF2F7F7F7)],
       );
   static LinearGradient get heroGrad => LinearGradient(
         begin: const Alignment(-0.7, -1),
@@ -273,7 +303,8 @@ class ZveltTokens {
             ? const [Color(0xFF241A12), Color(0xFF130D09)]
             : const [Color(0xFFFFFFFF), Color(0xFFF3ECE1)],
       );
-  static Color get navBg => _d(const Color(0xB8FFFFFF), const Color(0x9E1A140F));
+  static Color get navBg =>
+      _d(const Color(0xB8FFFFFF), const Color(0x9E1A140F));
 
   // ─── App background (base gradient + two warm radial glows) ────────────────
   static LinearGradient get appBg => LinearGradient(
@@ -283,9 +314,11 @@ class ZveltTokens {
             ? const [Color(0xFF100B08), Color(0xFF070504)]
             : const [Color(0xFFF8F5F0), Color(0xFFEBE4D9)],
       );
+
   /// Large amber glow, top-right, behind content.
   static Color get glowTopRight =>
       _d(const Color(0x8CFCC48A), const Color(0x94965A1A));
+
   /// Orange glow, bottom-center, behind content + nav.
   static Color get glowBottom =>
       _d(const Color(0x33F5963C), const Color(0x47F58214));
@@ -317,7 +350,11 @@ class ZType {
 
   /// Display / big stat — 32/800 tight. Bodyweight, hero metrics.
   static TextStyle get display => _m(
-      size: 32, weight: FontWeight.w800, tracking: -0.6, height: 1.0, tabular: true);
+      size: 32,
+      weight: FontWeight.w800,
+      tracking: -0.6,
+      height: 1.0,
+      tabular: true);
 
   /// Clean sans heading — section headers.
   static TextStyle get clean =>
@@ -325,7 +362,11 @@ class ZType {
 
   /// KPI stat number — 800 tabular.
   static TextStyle get stat => _m(
-      size: 30, weight: FontWeight.w800, tracking: -0.4, height: 1.0, tabular: true);
+      size: 30,
+      weight: FontWeight.w800,
+      tracking: -0.4,
+      height: 1.0,
+      tabular: true);
 
   /// Metric readout — tabular value (pace, distance, weights).
   static TextStyle get num_ =>
@@ -346,20 +387,26 @@ class ZType {
       _m(size: 42, weight: FontWeight.w800, tracking: -0.8, height: 1.05);
   static TextStyle get displayM =>
       _m(size: 34, weight: FontWeight.w800, tracking: -0.5, height: 1.08);
+
   /// Screen greeting ("Today").
   static TextStyle get h1 =>
       _m(size: 26, weight: FontWeight.w800, tracking: -0.3, height: 1.1);
+
   /// Screen title ("Nutrition").
   static TextStyle get h2 =>
       _m(size: 24, weight: FontWeight.w800, tracking: -0.2, height: 1.12);
+
   /// Section title ("Consistency", "Muscles").
   static TextStyle get h3 =>
       _m(size: 21, weight: FontWeight.w800, tracking: -0.2, height: 1.2);
+
   /// Sheet / card title.
   static TextStyle get h4 =>
       _m(size: 18, weight: FontWeight.w800, tracking: -0.1, height: 1.25);
-  static TextStyle get bodyL => _m(size: 15, weight: FontWeight.w600, height: 1.5);
-  static TextStyle get bodyM => _m(size: 14, weight: FontWeight.w500, height: 1.5);
+  static TextStyle get bodyL =>
+      _m(size: 15, weight: FontWeight.w600, height: 1.5);
+  static TextStyle get bodyM =>
+      _m(size: 14, weight: FontWeight.w500, height: 1.5);
   static TextStyle get bodyS => _m(
       size: 13, weight: FontWeight.w500, height: 1.5, color: ZveltTokens.text2);
   static TextStyle get monoS => _m(

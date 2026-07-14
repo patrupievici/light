@@ -9,7 +9,6 @@ import '../widgets/zvelt_main_nav_bar.dart';
 import 'ai/ai_chat_screen.dart';
 import 'home/home_tab.dart';
 import 'nutrition/nutrition_tab.dart';
-import 'settings/settings_screen.dart';
 import 'profile/profile_tab.dart';
 import 'social/notifications_screen.dart';
 import 'social/feed_tab.dart';
@@ -20,7 +19,7 @@ import '../screens/plan/plan_tab.dart' show PlanTab;
 ///
 /// The ✦ center button is not a tab — it opens the AI Coach.
 /// Profile is no longer a bottom-nav destination: it opens from the Home avatar
-/// (top-left); Settings opens from the Home gear (top-right).
+/// (top-left); Settings lives inside Profile.
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key, required this.onLogout});
 
@@ -55,7 +54,6 @@ class _MainScreenState extends State<MainScreen> {
         return HomeTab(
           onOpenProfile: _openProfile,
           onOpenNotifications: _openNotifications,
-          onOpenSettings: _openSettings,
           onOpenFood: () => _switchTo(3),
           onOpenFeed: () => _switchTo(_feedIndex),
         );
@@ -104,14 +102,6 @@ class _MainScreenState extends State<MainScreen> {
           MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
         )
         .then((_) => SocialNotificationHub.refresh());
-  }
-
-  void _openSettings() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(onLogout: widget.onLogout),
-      ),
-    );
   }
 
   @override

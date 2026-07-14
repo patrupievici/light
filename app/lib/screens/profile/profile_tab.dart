@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
-import '../../services/settings_store.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../theme/zvelt_theme_notifier.dart';
@@ -14,9 +11,8 @@ import '../../widgets/zvelt_main_nav_bar.dart';
 import '../ai/ai_chat_screen.dart';
 import '../analytics/progress_screen.dart';
 import '../login_screen.dart';
-import '../onboarding/light_onboarding_flow.dart';
-import '../onboarding/onboarding_keys.dart';
 import '../settings/delete_account_screen.dart';
+import '../settings/settings_screen.dart';
 
 /// PROFILE — 1:1 with the ZVELT handoff prototype (screen A7).
 ///
@@ -27,9 +23,8 @@ import '../settings/delete_account_screen.dart';
 /// Preferences, Account, Help & Feedback, AI Companion, About ZVELT,
 /// Request a Feature, Report a Bug. Nothing else.
 ///
-/// Sheets (all prototype 1:1): sheetSettings (Units · Notifications · Haptics ·
-/// Rest timer sound · Replay intro tour · Sign out), sheetEdit, sheetPremium,
-/// sheetAccount, sheetHelp, sheetAbout, sheetFeature, sheetBug.
+/// Settings opens the complete shared hub; the remaining profile actions use
+/// focused sheets for edit, account, help, about and feedback.
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key, required this.onLogout});
   final Future<void> Function() onLogout;
@@ -78,9 +73,7 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   // ─── actions ──────────────────────────────────────────────────────────────
-  void _openSettingsSheet() {
-    _sheet(_SettingsSheet(onLogout: _confirmLogout));
-  }
+  void _openSettings() => _push(SettingsScreen(onLogout: widget.onLogout));
 
   void _openEditSheet() {
     _sheet(_EditProfileSheet(
@@ -222,7 +215,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 Text('Profile', style: ZType.h2),
                 const Spacer(),
-                _iconBtn(AppIcons.settings, 'Settings', _openSettingsSheet),
+                _iconBtn(AppIcons.settings, 'Settings', _openSettings),
                 const SizedBox(width: 9),
                 _iconBtn(AppIcons.sign_out_alt, 'Sign out', _confirmLogout),
               ],
@@ -486,7 +479,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 _row(AppIcons.chart_line_up, 'Progress',
                     accent: true, onTap: () => _push(const ProgressScreen())),
                 _row(AppIcons.settings_sliders, 'Preferences',
-                    onTap: _openSettingsSheet),
+                    onTap: _openSettings),
                 _row(AppIcons.user, 'Account', onTap: _openAccountSheet),
                 _row(AppIcons.interrogation, 'Help & Feedback',
                     onTap: () => _sheet(const _HelpSheet())),
@@ -567,286 +560,6 @@ class _ProfileTabState extends State<ProfileTab> {
               Icon(AppIcons.angle_small_right,
                   size: 17, color: ZveltTokens.text3),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// sheetSettings — Units · Notifications · Haptics · Rest timer sound ·
-// Replay intro tour · Sign out (HTML 1042-1057)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _SettingsSheet extends StatefulWidget {
-  const _SettingsSheet({required this.onLogout});
-  final Future<void> Function() onLogout;
-
-  @override
-  State<_SettingsSheet> createState() => _SettingsSheetState();
-}
-
-class _SettingsSheetState extends State<_SettingsSheet> {
-  static const _kNotif = 'zvelt_pref_notifications';
-  static const _kHaptics = 'zvelt_pref_haptics';
-  static const _kRestSound = 'zvelt_pref_rest_sound';
-
-  bool _notifications = true;
-  bool _haptics = true;
-  bool _restSound = false;
-  bool _ready = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final p = await SharedPreferences.getInstance();
-      if (!mounted) return;
-      setState(() {
-        _notifications = p.getBool(_kNotif) ?? true;
-        _haptics = p.getBool(_kHaptics) ?? true;
-        _restSound = p.getBool(_kRestSound) ?? false;
-        _ready = true;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _ready = true);
-    }
-  }
-
-  Future<void> _save(String key, bool value) async {
-    try {
-      final p = await SharedPreferences.getInstance();
-      await p.setBool(key, value);
-    } catch (_) {/* best-effort */}
-  }
-
-  /// Relaunch the light onboarding flow ("intro tour"). The flow re-derives
-  /// its own completion key on finish, so replaying is safe for the same user.
-  Future<void> _replayTour() async {
-    final nav = Navigator.of(context);
-    String uid = '';
-    try {
-      uid = await AuthService().getStoredUserId() ?? '';
-    } catch (_) {/* offline — replay as guest key */}
-    if (!mounted) return;
-    Navigator.of(context).pop(); // close the sheet first
-    nav.push<void>(MaterialPageRoute<void>(
-      builder: (ctx) => LightOnboardingFlow(
-        completionKey:
-            '${kOnboarding2CompletedKey}_${uid.isEmpty ? 'guest' : uid}',
-        startAuthenticated: true,
-        onComplete: () => Navigator.of(ctx).pop(),
-      ),
-    ));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _SheetShell(
-      title: 'Settings',
-      maxHeightFactor: 0.92,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Units — sentence-case 12px label (prototype line 1046), segments
-          // "Kilograms (kg)" / "Pounds (lb)" (line 1047). Actually converts
-          // app-wide via [UnitsNotifier].
-          Text('Units',
-              style: ZType.bodyS
-                  .copyWith(fontSize: 12, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 9),
-          ValueListenableBuilder<String>(
-            valueListenable: UnitsNotifier.system,
-            builder: (context, system, _) {
-              Widget item(String label, String value) => Expanded(
-                    child: InkWell(
-                      onTap: () => UnitsNotifier.set(value),
-                      borderRadius: BorderRadius.circular(11),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 9),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: system == value
-                              ? ZveltTokens.brand
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                        child: Text(label,
-                            style: ZType.bodyS.copyWith(
-                                fontSize: 13,
-                                fontWeight: system == value
-                                    ? FontWeight.w700
-                                    : FontWeight.w600,
-                                color: system == value
-                                    ? ZveltTokens.onBrand
-                                    : ZveltTokens.text2)),
-                      ),
-                    ),
-                  );
-              return Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: ZveltTokens.chip,
-                  borderRadius: BorderRadius.circular(ZveltTokens.rChip),
-                  border: Border.all(color: ZveltTokens.border),
-                ),
-                child: Row(children: [
-                  item('Kilograms (kg)', 'metric'),
-                  const SizedBox(width: 4),
-                  item('Pounds (lb)', 'imperial'),
-                ]),
-              );
-            },
-          ),
-          const SizedBox(height: 18),
-          _toggleRow('Notifications', _notifications, (v) {
-            setState(() => _notifications = v);
-            _save(_kNotif, v);
-          }),
-          _toggleRow('Haptics', _haptics, (v) {
-            setState(() => _haptics = v);
-            _save(_kHaptics, v);
-          }),
-          _toggleRow('Rest timer sound', _restSound, (v) {
-            setState(() => _restSound = v);
-            _save(_kRestSound, v);
-          }),
-          const SizedBox(height: 9),
-          // Replay intro tour (prototype line 1053).
-          InkWell(
-            onTap: _replayTour,
-            borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: ZveltTokens.surface2Grad,
-                borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-                border: Border.all(color: ZveltTokens.border),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: ZveltTokens.brandTint,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: ZveltTokens.brand.withValues(alpha: 0.3)),
-                    ),
-                    child: const Icon(AppIcons.refresh,
-                        size: 17, color: ZveltTokens.brand),
-                  ),
-                  const SizedBox(width: 12),
-                  Text('Replay intro tour',
-                      style: ZType.bodyM
-                          .copyWith(fontSize: 14, fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // Sign out — red-tinted treatment (prototype line 1054).
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: FilledButton(
-              onPressed: !_ready
-                  ? null
-                  : () {
-                      Navigator.of(context).pop();
-                      widget.onLogout();
-                    },
-              style: FilledButton.styleFrom(
-                backgroundColor: ZveltTokens.error.withValues(alpha: 0.12),
-                foregroundColor: ZveltTokens.error,
-                side:
-                    BorderSide(color: ZveltTokens.error.withValues(alpha: 0.4)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-                ),
-              ),
-              child: const Text('Sign out'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _toggleRow(String label, bool value, ValueChanged<bool> onChanged) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-        decoration: BoxDecoration(
-          gradient: ZveltTokens.surface2Grad,
-          borderRadius: BorderRadius.circular(ZveltTokens.rControl),
-          border: Border.all(color: ZveltTokens.border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(label,
-                  style: ZType.bodyM
-                      .copyWith(fontSize: 14.5, fontWeight: FontWeight.w600)),
-            ),
-            _BrandSwitch(value: value, onChanged: _ready ? onChanged : null),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 44×26 brand-styled switch (prototype JS 2076-2077): accent track when on,
-/// neutral track when off, 20px white knob.
-class _BrandSwitch extends StatelessWidget {
-  const _BrandSwitch({required this.value, required this.onChanged});
-  final bool value;
-  final ValueChanged<bool>? onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      toggled: value,
-      child: GestureDetector(
-        onTap: onChanged == null ? null : () => onChanged!(!value),
-        child: AnimatedContainer(
-          duration: ZMotion.quick,
-          curve: ZMotion.emphasized,
-          width: 44,
-          height: 26,
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            color: value ? ZveltTokens.brand : ZveltTokens.track,
-            borderRadius: BorderRadius.circular(13),
-          ),
-          child: AnimatedAlign(
-            duration: ZMotion.quick,
-            curve: ZMotion.emphasized,
-            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: ZveltTokens.onBrand,
-                boxShadow: [
-                  BoxShadow(
-                      color: Color(0x4D000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 2)),
-                ],
-              ),
-            ),
           ),
         ),
       ),

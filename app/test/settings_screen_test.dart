@@ -69,6 +69,9 @@ void main() {
       'Privacy',
       'Data',
       'Resources',
+      'Account actions',
+      'Sign out',
+      'Delete account',
       'Legal',
       'Enable diagnostics'
     ]) {
@@ -80,6 +83,27 @@ void main() {
       }
       expect(find.text(label), findsOneWidget);
     }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('delete account is directly below sign out', (tester) async {
+    await pumpSettings(tester);
+    final list = find.byType(Scrollable).first;
+    for (var attempt = 0;
+        attempt < 12 && find.text('Delete account').evaluate().isEmpty;
+        attempt++) {
+      await tester.drag(list, const Offset(0, -420));
+      await tester.pumpAndSettle();
+    }
+
+    final signOut = find.text('Sign out');
+    final deleteAccount = find.text('Delete account');
+    expect(signOut, findsOneWidget);
+    expect(deleteAccount, findsOneWidget);
+    expect(
+      tester.getTopLeft(signOut).dy,
+      lessThan(tester.getTopLeft(deleteAccount).dy),
+    );
     expect(tester.takeException(), isNull);
   });
 

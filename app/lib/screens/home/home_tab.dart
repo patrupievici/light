@@ -18,7 +18,6 @@ import '../../widgets/zvelt_main_nav_bar.dart';
 import '../activity/cardio_history_screen.dart';
 import '../analytics/progress_screen.dart';
 import '../outdoor/outdoor_track_screen.dart';
-import '../workouts/workout_tracker_screen.dart';
 import 'consistency_screen.dart';
 
 /// HOME / TODAY — 1:1 with the ZVELT handoff prototype (`zvelt-home-ux`).
@@ -43,14 +42,12 @@ class HomeTab extends StatefulWidget {
     super.key,
     this.onOpenProfile,
     this.onOpenNotifications,
-    this.onOpenSettings,
     this.onOpenFood,
     this.onOpenFeed,
   });
 
   final VoidCallback? onOpenProfile;
   final VoidCallback? onOpenNotifications;
-  final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenFood;
   final VoidCallback? onOpenFeed;
 
@@ -68,7 +65,6 @@ class _HomeTabState extends State<HomeTab> {
 
   bool _loading = true;
   bool _dayMenuOpen = false;
-  bool _startingStrengthWorkout = false;
 
   String _avatarInitial = 'A';
   Set<String> _trainedDayKeys = const {};
@@ -303,34 +299,6 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Future<void> _startStrengthWorkout() async {
-    if (_startingStrengthWorkout) return;
-    setState(() => _startingStrengthWorkout = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final workout = await _workouts.createWorkout(label: 'Strength workout');
-      if (!mounted) return;
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => WorkoutTrackerScreen(
-            workoutId: workout.id,
-            onComplete: _load,
-          ),
-        ),
-      );
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(
-        content: Text(e.toString().replaceFirst('Exception: ', '')),
-        backgroundColor: ZveltTokens.error,
-      ));
-    } finally {
-      if (mounted) {
-        setState(() => _startingStrengthWorkout = false);
-        await _load();
-      }
-    }
-  }
-
   Future<void> _editBodyweight() async {
     final messenger = ScaffoldMessenger.of(context);
     final nextKg = await showModalBottomSheet<double>(
@@ -383,7 +351,6 @@ class _HomeTabState extends State<HomeTab> {
                 _header(),
                 if (_liveStats?.isTracking ?? false) _resumeBanner(_liveStats!),
                 _sessionHeader(),
-                _strengthWorkoutCta(),
                 _cardioTiles(),
                 _sectionTitle('Consistency', topPad: 18),
                 _consistencyCard(),
@@ -483,11 +450,6 @@ class _HomeTabState extends State<HomeTab> {
                         color: ZveltTokens.brand, fontWeight: FontWeight.w800)),
               ],
             ),
-          ),
-          IconButton(
-            tooltip: 'Settings',
-            onPressed: widget.onOpenSettings,
-            icon: Icon(AppIcons.settings, color: ZveltTokens.text2),
           ),
         ],
       ),
@@ -680,39 +642,6 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   // ④ Run / Ride tiles
-  Widget _strengthWorkoutCta() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 11, 20, 0),
-      child: SizedBox(
-        width: double.infinity,
-        height: 52,
-        child: FilledButton.icon(
-          onPressed: _startingStrengthWorkout ? null : _startStrengthWorkout,
-          icon: _startingStrengthWorkout
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    color: ZveltTokens.onBrand,
-                  ),
-                )
-              : const Icon(AppIcons.gym),
-          label: Text(
-            _startingStrengthWorkout
-                ? 'Starting strength workout...'
-                : 'Start strength workout',
-          ),
-          style: FilledButton.styleFrom(
-            backgroundColor: ZveltTokens.brand,
-            foregroundColor: ZveltTokens.onBrand,
-            textStyle: ZType.bodyM.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _cardioTiles() {
     Widget tile({
       required String label,

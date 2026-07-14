@@ -15,7 +15,9 @@ import 'package:zvelt_app/theme/zvelt_tokens.dart';
 /// sRGB 8-bit channel → linearised component, per WCAG relative-luminance def.
 double _linearize(int channel8bit) {
   final c = channel8bit / 255.0;
-  return c <= 0.03928 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
+  return c <= 0.03928
+      ? c / 12.92
+      : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
 }
 
 /// WCAG relative luminance of a color (0.2126 R + 0.7152 G + 0.0722 B linear).
@@ -24,7 +26,9 @@ double _luminance(Color color) {
   final r = (argb >> 16) & 0xFF;
   final g = (argb >> 8) & 0xFF;
   final b = argb & 0xFF;
-  return 0.2126 * _linearize(r) + 0.7152 * _linearize(g) + 0.0722 * _linearize(b);
+  return 0.2126 * _linearize(r) +
+      0.7152 * _linearize(g) +
+      0.0722 * _linearize(b);
 }
 
 /// WCAG contrast ratio: (L_lighter + 0.05) / (L_darker + 0.05).
@@ -36,6 +40,16 @@ double _contrast(Color a, Color b) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+int _channelSpread(Color color) {
+  final argb = color.toARGB32();
+  final channels = <int>[
+    (argb >> 16) & 0xFF,
+    (argb >> 8) & 0xFF,
+    argb & 0xFF,
+  ];
+  return channels.reduce(math.max) - channels.reduce(math.min);
+}
+
 void main() {
   group('ZveltTokens muted-text contrast (WCAG AA)', () {
     // Both themes are first-class now (light + premium dark), so check each.
@@ -43,7 +57,9 @@ void main() {
 
     for (final dark in [false, true]) {
       final mode = dark ? 'dark' : 'light';
-      test('[$mode] text meets 4.5:1 against both bg and surface (normal-text AA)', () {
+      test(
+          '[$mode] text meets 4.5:1 against both bg and surface (normal-text AA)',
+          () {
         ZveltTokens.isDark = dark;
         expect(
           _contrast(ZveltTokens.text, ZveltTokens.bg),
@@ -57,7 +73,8 @@ void main() {
         );
       });
 
-      test('[$mode] text2 meets 3:1 against both bg and surface (large/UI AA)', () {
+      test('[$mode] text2 meets 3:1 against both bg and surface (large/UI AA)',
+          () {
         ZveltTokens.isDark = dark;
         expect(
           _contrast(ZveltTokens.text2, ZveltTokens.bg),
@@ -72,7 +89,8 @@ void main() {
       });
     }
 
-    test('contrast helper matches a hand-computed reference (black on white)', () {
+    test('contrast helper matches a hand-computed reference (black on white)',
+        () {
       // Pure black on pure white is exactly 21:1 — sanity-checks the formula so
       // a bug in _luminance/_contrast can't make the guards pass vacuously.
       expect(
@@ -80,5 +98,33 @@ void main() {
         closeTo(21.0, 0.01),
       );
     });
+  });
+
+  group('ZveltTokens matte-card surfaces', () {
+    tearDown(() => ZveltTokens.isDark = false);
+
+    for (final dark in [false, true]) {
+      final mode = dark ? 'dark' : 'light';
+      test('[$mode] card gradients stay neutral and nearly opaque', () {
+        ZveltTokens.isDark = dark;
+        final colors = <Color>[
+          ...ZveltTokens.surfaceGrad.colors,
+          ...ZveltTokens.surface2Grad.colors,
+        ];
+
+        for (final color in colors) {
+          expect(
+            _channelSpread(color),
+            lessThanOrEqualTo(4),
+            reason: '[$mode] card tint must not introduce colour bands',
+          );
+          expect(
+            (color.toARGB32() >> 24) & 0xFF,
+            greaterThanOrEqualTo(0xED),
+            reason: '[$mode] card material must hide GPU/background banding',
+          );
+        }
+      });
+    }
   });
 }
