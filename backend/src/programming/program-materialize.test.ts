@@ -17,6 +17,7 @@ function metaForDay(templateId: string, dayInRotation: number): Record<string, R
     out[s.slotKey] = {
       exerciseId: `id_${s.slotKey}`,
       name: s.exercise,
+      equipment: 'barbell',
       movementPattern: 'squat', // a rampable pattern so warmups generate
       rankModel: 'WEIGHTED',
       category: 'strength',

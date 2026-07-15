@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeProgramAdvance,
+  programSlotLoad,
   programExerciseDefaultsFor,
   readState,
   type ProgramState,
@@ -49,6 +50,60 @@ describe('programExerciseDefaultsFor', () => {
       movementPattern: 'horizontal_pull',
       rankModel: 'WEIGHTED',
     })
+  })
+})
+
+describe('programSlotLoad', () => {
+  const noHistory = {
+    suggestedWeightKg: null,
+    suggestedReps: 8,
+    source: 'no_history' as const,
+    reason: 'First time on this lift.',
+  }
+
+  it('gives a conservative first-session load to a weighted catalog exercise', () => {
+    expect(programSlotLoad(
+      noHistory,
+      {
+        exerciseId: 'bench',
+        name: 'Bench Press',
+        equipment: 'barbell',
+        movementPattern: 'horizontal_push',
+        rankModel: 'WEIGHTED',
+        category: 'strength',
+      },
+      { level: 'beginner', bodyweightKg: 80 },
+    )).toMatchObject({ suggestedWeightKg: 32.5, suggestedReps: 8 })
+  })
+
+  it('keeps bodyweight slots unloaded', () => {
+    expect(programSlotLoad(
+      noHistory,
+      {
+        exerciseId: 'pull-up',
+        name: 'Pull-up',
+        equipment: 'bodyweight',
+        movementPattern: 'vertical_pull',
+        rankModel: 'BW_REPS',
+        category: 'bodyweight',
+      },
+      { level: 'beginner', bodyweightKg: 80 },
+    ).suggestedWeightKg).toBeNull()
+  })
+
+  it('never replaces a history-driven load', () => {
+    expect(programSlotLoad(
+      { ...noHistory, suggestedWeightKg: 72.5, source: 'progression' },
+      {
+        exerciseId: 'squat',
+        name: 'Squat',
+        equipment: 'barbell',
+        movementPattern: 'squat',
+        rankModel: 'WEIGHTED',
+        category: 'strength',
+      },
+      { level: 'intermediate', bodyweightKg: 80 },
+    ).suggestedWeightKg).toBe(72.5)
   })
 })
 

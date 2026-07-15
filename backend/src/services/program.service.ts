@@ -4,7 +4,11 @@ import {
   normalizeExerciseName,
   resolveExerciseByName,
 } from '../lib/exercise-resolver'
-import { computeProgressiveLoads, type ProgressionLevel } from '../lib/progressive-overload'
+import {
+  computeProgressiveLoads,
+  type OverloadDecision,
+  type ProgressionLevel,
+} from '../lib/progressive-overload'
 import {
   getProgramTemplate,
   programTemplateSummaries,
@@ -23,6 +27,7 @@ import { trainingMaxFromOneRm, incrementTrainingMax } from '../programming/progr
 import { exerciseFitsUserEquipment } from '../programming/equipment-compatibility'
 import { rankSubstitutes, type SubstitutionExercise } from '../lib/exercise-substitution'
 import { createWorkoutFromPlanned } from './planned-workout-converter.service'
+import { heuristicWeightKg } from './workout-generator.service'
 
 /** First GIF URL from a media[] payload, or null. */
 function firstGifUrl(media: unknown[] | undefined): string | null {
@@ -152,14 +157,63 @@ export function computeProgramAdvance(
   return { sessionIndex: nextSessionIndex, tm, currentWeek: Math.min(nextWeek, totalWeeks), status }
 }
 
-async function levelFor(userId: string): Promise<ProgressionLevel> {
-  const tp = await prisma.userTrainingProfile.findUnique({
-    where: { userId },
-    select: { trainingLevel: true },
-  })
+type ProgramTrainingContext = {
+  level: ProgressionLevel
+  bodyweightKg: number | null
+}
+
+async function trainingContextFor(userId: string): Promise<ProgramTrainingContext> {
+  const [tp, profile] = await Promise.all([
+    prisma.userTrainingProfile.findUnique({
+      where: { userId },
+      select: { trainingLevel: true },
+    }),
+    prisma.userProfile.findUnique({
+      where: { userId },
+      select: { bodyweightKg: true },
+    }),
+  ])
   const lvl = (tp?.trainingLevel ?? '').toLowerCase()
-  if (lvl === 'beginner' || lvl === 'advanced') return lvl
-  return 'intermediate'
+  const level: ProgressionLevel = lvl === 'beginner' || lvl === 'advanced' ? lvl : 'intermediate'
+  return {
+    level,
+    bodyweightKg: profile?.bodyweightKg == null ? null : Number(profile.bodyweightKg),
+  }
+}
+
+/** Apply the documented first-session fallback when progressive overload has no history. */
+export function programSlotLoad(
+  decision: OverloadDecision,
+  meta: ResolvedSlotMeta,
+  context: ProgramTrainingContext,
+): SlotLoad {
+  if (decision.suggestedWeightKg != null) {
+    return {
+      suggestedWeightKg: decision.suggestedWeightKg,
+      suggestedReps: decision.suggestedReps,
+      reason: decision.reason,
+    }
+  }
+
+  const estimatedWeightKg = heuristicWeightKg({
+    pattern: meta.movementPattern ?? '',
+    equipment: meta.equipment,
+    bodyweightKg: context.bodyweightKg,
+    trainingLevel: context.level,
+  })
+  if (estimatedWeightKg <= 0) {
+    return {
+      suggestedWeightKg: decision.suggestedWeightKg,
+      suggestedReps: decision.suggestedReps,
+      reason: decision.reason,
+    }
+  }
+
+  return {
+    suggestedWeightKg: estimatedWeightKg,
+    suggestedReps: decision.suggestedReps,
+    reason: `First-session estimate from bodyweight and ${context.level} level; start conservatively and leave 2-3 reps in reserve.`,
+  }
 }
 
 export async function startProgram(
@@ -442,6 +496,7 @@ export async function materializeCurrentDay(userId: string, program: ProgramRow)
   const day = tpl.days[dayInRotation]
 
   const tags = parseEquipmentTags(program.equipmentTags)
+  const trainingContextPromise = trainingContextFor(userId)
 
   // Resolve every slot's exercise name → catalog row.
   const resolved = await Promise.all(day.slots.map(async (s) => ({ slot: s, ex: await resolveProgramExerciseByName(s.exercise) })))
@@ -481,6 +536,7 @@ export async function materializeCurrentDay(userId: string, program: ProgramRow)
     meta[slot.slotKey] = {
       exerciseId,
       name,
+      equipment: row?.equipment ?? null,
       movementPattern: row?.movementPattern ?? null,
       rankModel: row?.rankModel ?? null,
       category: row?.category ?? null,
@@ -491,17 +547,16 @@ export async function materializeCurrentDay(userId: string, program: ProgramRow)
   const loadSlots = day.slots.filter((s) => s.sets.kind !== 'wave')
   const loads: Record<string, SlotLoad> = {}
   if (loadSlots.length) {
-    const level = await levelFor(userId)
+    const context = await trainingContextPromise
     const inputs = loadSlots.map((s) => ({
       exerciseId: meta[s.slotKey].exerciseId,
       prescribedReps: s.sets.kind === 'straight' ? s.sets.reps : s.sets.kind === 'range' ? s.sets.maxReps : 8,
     }))
-    const decisions = await computeProgressiveLoads(userId, inputs, level, {
+    const decisions = await computeProgressiveLoads(userId, inputs, context.level, {
       progressionScheme: program.progressionScheme,
     })
     loadSlots.forEach((s, i) => {
-      const d = decisions[i]
-      loads[s.slotKey] = { suggestedWeightKg: d.suggestedWeightKg, suggestedReps: d.suggestedReps, reason: d.reason }
+      loads[s.slotKey] = programSlotLoad(decisions[i], meta[s.slotKey], context)
     })
   }
 

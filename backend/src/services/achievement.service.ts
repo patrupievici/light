@@ -105,19 +105,22 @@ export async function checkAndAward(
     check('rank_diamond', maxLp >= 500)
   }
 
-  const distinctExercises = await prisma.workoutExercise.groupBy({
-    by: ['exerciseId'],
-    where: { workout: { userId } },
-  })
+  const [distinctExercises, workoutStreak, isSeasonTop10] = await Promise.all([
+    prisma.workoutExercise.groupBy({
+      by: ['exerciseId'],
+      where: { workout: { userId } },
+    }),
+    getWorkoutDayStreak(userId),
+    isUserInSeasonTop10(userId),
+  ])
   check('exercises_5', distinctExercises.length >= 5)
 
-  const workoutStreak = await getWorkoutDayStreak(userId)
   check('streak_3', workoutStreak >= 3)
   check('streak_7', workoutStreak >= 7)
   check('streak_30', workoutStreak >= 30)
   check('streak_100', workoutStreak >= 100)
 
-  check('rank_top10', await isUserInSeasonTop10(userId))
+  check('rank_top10', isSeasonTop10)
 
   const steps = opts?.stepsToday
   if (steps != null && Number.isFinite(steps) && steps >= 10_000) {

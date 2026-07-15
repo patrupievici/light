@@ -875,74 +875,93 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       },
     })
 
-    await prisma.plannedWorkout.updateMany({
-      where: {
-        userId,
-        day: ymdLocal(updated.startedAt),
-        kind: 'gym',
-        status: 'pending',
-      },
-      data: { status: 'completed' },
-    })
-
     let gameXp = gameXpPayload(profile?.gameXpTotal ?? 0)
+    let profileXpWrite: PromiseLike<unknown> = Promise.resolve(null)
     if (profile) {
       const newTotal = profile.gameXpTotal + sessionXp
-      await prisma.userProfile.update({
+      profileXpWrite = prisma.userProfile.update({
         where: { userId },
         data: { gameXpTotal: newTotal },
       })
       gameXp = gameXpPayload(newTotal)
     }
 
-    await prisma.analyticsEvent.create({
-      data: { userId, eventName: 'workout_completed' },
-    })
+    await Promise.all([
+      prisma.plannedWorkout.updateMany({
+        where: {
+          userId,
+          day: ymdLocal(updated.startedAt),
+          kind: 'gym',
+          status: 'pending',
+        },
+        data: { status: 'completed' },
+      }),
+      profileXpWrite,
+      prisma.analyticsEvent.create({
+        data: { userId, eventName: 'workout_completed' },
+      }),
+    ])
 
     // Calculează rangurile la complete (ca la post) — ca Rank tab să se actualizeze
-    try {
-      await computeRanks(userId, workoutId)
-    } catch (err: any) {
-      app.log.warn({ err, userId, workoutId }, 'Ranking skip la complete (ex: BW_REQUIRED)')
-    }
+    const enrichedWorkoutPromise = enrichWorkoutWithExerciseMedia(updated as any)
+    const rankingPromise = (async () => {
+      try {
+        await computeRanks(userId, workoutId)
+      } catch (err: any) {
+        app.log.warn({ err, userId, workoutId }, 'Ranking skip la complete (ex: BW_REQUIRED)')
+      }
+    })()
 
     // Auto-update the user's active challenge standings from this workout.
-    try {
-      await recomputeUserChallenges(userId)
-    } catch (err: any) {
-      app.log.warn({ err, userId }, 'Challenge recompute skipped after workout complete')
-    }
-
-    let newAchievementKeys: string[] = []
-    try {
-      newAchievementKeys = await checkAndAward(userId)
-    } catch (err: any) {
-      app.log.warn({ err, userId }, 'checkAndAward failed after workout complete')
-    }
+    const challengePromise = (async () => {
+      try {
+        await recomputeUserChallenges(userId)
+      } catch (err: any) {
+        app.log.warn({ err, userId }, 'Challenge recompute skipped after workout complete')
+      }
+    })()
 
     // Adaptive loop: record per-lift autoregulation state from what was just
     // logged (weight/reps/RPE → progress/hold/deload decision) and bust the
     // stale daily-suggestion cache so the next suggestion reflects this session.
     // Best-effort; never blocks completion.
-    try {
-      const tp = await prisma.userTrainingProfile.findUnique({
-        where: { userId },
-        select: { trainingLevel: true },
-      })
-      const level: ProgressionLevel =
-        tp?.trainingLevel === 'advanced'
-          ? 'advanced'
-          : tp?.trainingLevel === 'beginner'
-            ? 'beginner'
-            : 'intermediate'
-      await recordWorkoutProgress(userId, updated as any, level)
-      await clearWorkoutSuggestionCache(userId)
-    } catch (err: any) {
-      app.log.warn({ err, userId, workoutId }, 'adaptive progress record failed')
-    }
+    const adaptivePromise = (async () => {
+      try {
+        const tp = await prisma.userTrainingProfile.findUnique({
+          where: { userId },
+          select: { trainingLevel: true },
+        })
+        const level: ProgressionLevel =
+          tp?.trainingLevel === 'advanced'
+            ? 'advanced'
+            : tp?.trainingLevel === 'beginner'
+              ? 'beginner'
+              : 'intermediate'
+        await recordWorkoutProgress(userId, updated as any, level)
+        await clearWorkoutSuggestionCache(userId)
+      } catch (err: any) {
+        app.log.warn({ err, userId, workoutId }, 'adaptive progress record failed')
+      }
+    })()
+
+    await rankingPromise
+    const achievementPromise = (async (): Promise<string[]> => {
+      try {
+        return await checkAndAward(userId)
+      } catch (err: any) {
+        app.log.warn({ err, userId }, 'checkAndAward failed after workout complete')
+        return []
+      }
+    })()
+    const [, , newAchievementKeys, enrichedWorkout] = await Promise.all([
+      challengePromise,
+      adaptivePromise,
+      achievementPromise,
+      enrichedWorkoutPromise,
+    ])
 
     return reply.send({
-      workout: await enrichWorkoutWithExerciseMedia(updated as any),
+      workout: enrichedWorkout,
       newAchievements: newAchievementKeys,
       xpGain: sessionXp,
       // Surfaced so the UI can show "×1.22 age bonus" on the XP screen —

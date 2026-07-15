@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import type { PrismaPromise } from '@prisma/client'
 import { getCanonicalBodyweightKg } from '../lib/bodyweight'
 import { isSrAnomaly } from './anti-cheat.service'
 
@@ -302,6 +303,22 @@ export async function computeRanks(
   if (!workout) throw new Error('WORKOUT_NOT_FOUND')
 
   const results: RankResult[] = []
+  const rankableExerciseIds = workout.exercises
+    .filter((we) => we.exercise.isRanked && (we.exercise.rankModel === 'WEIGHTED' || we.exercise.rankModel === 'BW_REPS'))
+    .map((we) => we.exerciseId)
+  const [previousRanks, activeSeason] = await Promise.all([
+    prisma.userExerciseRank.findMany({
+      where: { userId, exerciseId: { in: rankableExerciseIds } },
+    }),
+    prisma.season.findFirst({
+      where: {
+        startsAt: { lte: new Date() },
+        endsAt: { gte: new Date() },
+      },
+    }),
+  ])
+  const previousRankByExerciseId = new Map(previousRanks.map((rank) => [rank.exerciseId, rank]))
+  const writes: PrismaPromise<unknown>[] = []
 
   for (const we of workout.exercises) {
     const ex = we.exercise
@@ -318,9 +335,7 @@ export async function computeRanks(
     const newLp = srToLP(sr, ex.name, ex.rankModel)
     const tier = lpToTier(newLp)
 
-    const prevRank = await prisma.userExerciseRank.findUnique({
-      where: { userId_exerciseId: { userId, exerciseId: we.exerciseId } },
-    })
+    const prevRank = previousRankByExerciseId.get(we.exerciseId)
 
     const prevLp = prevRank?.lpTotal ?? 0
     const lpDelta = newLp - prevLp
@@ -329,21 +344,23 @@ export async function computeRanks(
     // Single source of truth for the >20% SR-jump heuristic (anti-cheat.service).
     const isAnomaly = isSrAnomaly(sr, prevSr)
 
-    await prisma.userExerciseRank.upsert({
-      where: { userId_exerciseId: { userId, exerciseId: we.exerciseId } },
-      update: {
-        bestE1rmKg: bestE1rm,
-        strengthRatio: sr,
-        lpTotal: Math.max(newLp, prevLp),
-      },
-      create: {
-        userId,
-        exerciseId: we.exerciseId,
-        bestE1rmKg: bestE1rm,
-        strengthRatio: sr,
-        lpTotal: newLp,
-      },
-    })
+    writes.push(
+      prisma.userExerciseRank.upsert({
+        where: { userId_exerciseId: { userId, exerciseId: we.exerciseId } },
+        update: {
+          bestE1rmKg: bestE1rm,
+          strengthRatio: sr,
+          lpTotal: Math.max(newLp, prevLp),
+        },
+        create: {
+          userId,
+          exerciseId: we.exerciseId,
+          bestE1rmKg: bestE1rm,
+          strengthRatio: sr,
+          lpTotal: newLp,
+        },
+      }),
+    )
 
     results.push({
       exerciseId: we.exerciseId,
@@ -363,20 +380,18 @@ export async function computeRanks(
     .reduce((sum, r) => sum + r.lpDelta, 0)
 
   const seasonLpDelta = Math.max(0, overallLpDelta)
-  const activeSeason = await prisma.season.findFirst({
-    where: {
-      startsAt: { lte: new Date() },
-      endsAt: { gte: new Date() },
-    },
-  })
 
   if (activeSeason && seasonLpDelta > 0) {
-    await prisma.userSeasonStat.upsert({
-      where: { seasonId_userId: { seasonId: activeSeason.id, userId } },
-      update: { lpSeason: { increment: seasonLpDelta } },
-      create: { seasonId: activeSeason.id, userId, lpSeason: seasonLpDelta },
-    })
+    writes.push(
+      prisma.userSeasonStat.upsert({
+        where: { seasonId_userId: { seasonId: activeSeason.id, userId } },
+        update: { lpSeason: { increment: seasonLpDelta } },
+        create: { seasonId: activeSeason.id, userId, lpSeason: seasonLpDelta },
+      }),
+    )
   }
+
+  if (writes.length > 0) await prisma.$transaction(writes)
 
   return { results, overallLpDelta, seasonLpDelta }
 }

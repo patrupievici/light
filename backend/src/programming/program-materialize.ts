@@ -21,6 +21,7 @@ import type { ProgramTemplate, ProgramSlot } from './program-templates'
 export type ResolvedSlotMeta = {
   exerciseId: string | null
   name: string
+  equipment: string | null
   movementPattern: string | null
   rankModel: string | null
   category: string | null

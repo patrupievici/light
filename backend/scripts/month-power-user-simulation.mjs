@@ -178,6 +178,17 @@ async function completeProgramWorkout(programId, day, counters) {
     workoutResponse.status === 200 && exercises.length > 0 && setCount > 0,
     `exercises=${exercises.length} sets=${setCount}`,
   )
+  const weightedWorkSets = exercises.flatMap((exercise) =>
+    exercise.exercise?.rankModel === 'WEIGHTED'
+      ? (exercise.sets ?? []).filter((set) => set.tag === 'WORK')
+      : [],
+  )
+  const zeroLoadCount = weightedWorkSets.filter((set) => Number(set.weightKg) <= 0).length
+  requireCheck(
+    `${programId}: safe first-session loads`,
+    weightedWorkSets.length > 0 && zeroLoadCount === 0,
+    `weightedSets=${weightedWorkSets.length} zeroLoad=${zeroLoadCount}`,
+  )
 
   for (const exercise of exercises) {
     for (const set of exercise.sets ?? []) {
