@@ -2,14 +2,14 @@
 
 Audit date: 2026-07-15
 
-Audited code revision: `08960ce3fd7ccf94353d5c98894d29cb31b9266b`
+Audited code revision: `bd4c6b097fa41fdb9713af5ae54f185a952be063`
 
 Production API: `https://light-l6en.onrender.com`
 Scope: Flutter client, Fastify/Prisma backend, PostgreSQL migrations, Android release artifacts, Android emulator, production API, privacy, security, accessibility, UX, product and operational launch readiness.
 
 ## 1. Executive Summary
 
-ZVELT is materially stronger than the first audit. The previously identified critical dependency vulnerability, private-media bypass, incomplete account erasure, nutrition target mismatch, theme navigation reset, red Flutter suite, misleading Premium action, unlabeled controls and inaccessible guest-account flow have been repaired and retested. This follow-up also removes the redundant Home settings/strength controls, consolidates every setting under Profile and replaces the colour-banded card material with stable neutral matte surfaces.
+ZVELT is materially stronger than the first audit. The previously identified critical dependency vulnerability, private-media bypass, incomplete account erasure, nutrition target mismatch, theme navigation reset, stale mounted-tab appearance, red Flutter suite, misleading Premium action, unlabeled controls and inaccessible guest-account flow have been repaired and retested. This follow-up also removes the redundant Home settings/strength controls, consolidates every setting under Profile and replaces the colour-banded card material with stable neutral matte surfaces.
 
 The current Android/backend candidate is suitable for an internal or tightly monitored closed beta. It is not yet ready for a public cross-platform launch tomorrow. The remaining launch blockers are concentrated outside the now-stable core API: iOS Firebase configuration is placeholder-only, no iOS release was built or device-tested, RevenueCat billing is absent, store submission was not performed, and Health/Strava/Google/camera/background behavior has not been validated on representative physical devices.
 
@@ -30,6 +30,7 @@ No Critical issue remains in the audited Android/backend path. Four unconditiona
 - Synchronized nutrition preferences and canonical targets with the backend; stale or partial weekly plans regenerate.
 - Fixed AI Coach so normal questions never create/open a workout as a side effect.
 - Removed navigator reset on theme change and removed the global text-scale cap.
+- Repaired live theme propagation for mounted Home, Plan, Feed and Nutrition tabs plus Profile, Settings and the Appearance sheet; Dark/Light changes now repaint without resetting tab state.
 - Added meaningful semantics and 48dp targets to the audited icon controls.
 - Kept strength workout creation in Plan while removing the redundant Home CTA requested by product ownership.
 - Removed the Home settings gear and routed both Profile settings entry points to the complete shared Settings hub.
@@ -50,7 +51,7 @@ The core Android/backend product is functional, privacy-aware and extensively te
 
 **90 / 100**
 
-The approved visual design is consistent across Home, Plan, Feed, AI, Nutrition, Profile and Settings. The diagonal colour bands reported on Home/Profile cards are gone in the installed release APK; dark and light surfaces are neutral, readable and stable. Manual portrait, landscape and 1.6x text checks found no overflow in sampled release screens. Remaining deductions cover limited 2.0x coverage, a scroll-heavy login screen and incomplete cross-platform visual validation.
+The approved visual design is consistent across Home, Plan, Feed, AI, Nutrition, Profile and Settings. The diagonal colour bands reported on Home/Profile cards are gone in the installed release APK; dark and light surfaces are neutral, readable and stable. Manual Dark -> Light -> Dark switching now keeps Home, Profile, Settings, the Appearance sheet and bottom navigation in one coherent mode without relaunching. Manual portrait, landscape and 1.6x text checks found no overflow in sampled release screens. Remaining deductions cover limited 2.0x coverage, a scroll-heavy login screen and incomplete cross-platform visual validation.
 
 ## 4. UX Score
 
@@ -74,7 +75,7 @@ Automated accessibility tests pass, audited controls have labels and 48dp target
 
 **82 / 100**
 
-Static analysis is clean, backend tests are broad, migrations are versioned, release smoke is repeatable and high-risk auth/media logic has focused regression tests. The duplicated Profile settings sheet was deleted and the visual regression contract now covers both card themes. Deductions remain for 28 direct HTTP client files, 12 `$queryRawUnsafe` call sites, 28 empty catches and some dead/incomplete feature code.
+Static analysis is clean, backend tests are broad, migrations are versioned, release smoke is repeatable and high-risk auth/media logic has focused regression tests. The duplicated Profile settings sheet was deleted; visual regression coverage now includes both card themes plus mounted-tab rebuilding with State preservation. Deductions remain for 28 direct HTTP client files, 12 `$queryRawUnsafe` call sites, 28 empty catches and some dead/incomplete feature code.
 
 ## 8. Product Score
 
@@ -92,7 +93,7 @@ Dependency audit is clean; bearer sessions, CORS, private media, deletion, token
 
 **90 / 100**
 
-Flutter tests pass `212/212`; backend tests pass `837/837`; Flutter analysis and TypeScript builds are clean; production smoke passes `113/113`; account cleanup succeeds. Reinstalling the current signed release over itself preserved the guest session. Residual risk is dominated by devices, platforms and upgrade paths not fully exercised in this Windows/Android-emulator audit.
+Flutter tests pass `213/213`; backend tests pass `837/837`; Flutter analysis and TypeScript builds are clean; production smoke passes `113/113`; account cleanup succeeds. Reinstalling the current signed release over itself preserved the guest session. Residual risk is dominated by devices, platforms and upgrade paths not fully exercised in this Windows/Android-emulator audit.
 
 ## 11. Launch Readiness Score
 
@@ -109,7 +110,7 @@ Flutter tests pass `212/212`; backend tests pass `837/837`; Flutter analysis and
 | Accessibility | 3 | Labels/targets and scaling are good; full TalkBack/VoiceOver remains |
 | Performance | 3 | No per-card blur; physical-device profiling remains |
 | Responsive design | 3 | Narrow-phone/golden checks pass; full 2.0x matrix remains |
-| Theming | 4 | Shared tokens, dark/light parity and neutral-card regression pass |
+| Theming | 4 | Shared tokens, live dark/light propagation and neutral-card regression pass |
 | Anti-patterns | 3 | Colour bands are gone; the product still uses a card-heavy vocabulary |
 | **Total** | **16/20** | **Good** |
 
@@ -120,7 +121,7 @@ Anti-pattern verdict: **Pass with restraint recommended**. The release no longer
 | Check | Result |
 | --- | --- |
 | `flutter analyze` | Pass, no issues |
-| Flutter test suite | Pass, 34 files, 212 tests |
+| Flutter test suite | Pass, 213 tests |
 | Backend TypeScript build | Pass, including `prisma generate` |
 | Backend test suite | Pass, 67 files, 837 tests |
 | Prisma schema validation | Pass |
@@ -128,14 +129,15 @@ Anti-pattern verdict: **Pass with restraint recommended**. The release no longer
 | Full backend dependency audit | 0 vulnerabilities |
 | Production smoke, production API | 113/113 pass, 0 fail, owner/viewer/guest accounts cleaned |
 | APK release build | Pass, 115,956,697 bytes |
-| AAB release build | Pass, 77,401,699 bytes |
-| APK SHA-256 | `4F48E5582BF73440BB894CB4AE70A40F467CFC4150FF745B11C1CDD456832236` |
-| AAB SHA-256 | `375CE026022F6F035BFF204807F2D866A28AEA5F23CB23E1E5ED3A52758C1C03` |
+| AAB release build | Pass, 77,401,625 bytes |
+| APK SHA-256 | `8532E0C0B1F52D137ACD92AA4B3327065FA1A633DD76DDD3E921D6B219A7C1CE` |
+| AAB SHA-256 | `B166031FD52222EB03204DB38A549640F872EE9E31D90A3A225061ACB0CA4900` |
 | Android signing | Pass, signer `CN=Zvelt, OU=Mobile, O=Zvelt, C=RO` |
-| Manual emulator screens | Home, Profile and Profile Settings in dark/light; account actions and support footer; prior full-route matrix retained |
+| Manual emulator screens | Release APK Dark -> Light -> Dark without relaunch; Home, Profile, Settings and Appearance sheet recolour coherently; prior full-route matrix retained |
 | UI hierarchy contract | Home exposes no Settings gear/strength CTA; Delete account follows Sign out; support/footer controls are reachable |
 | Release reinstall | Pass: signed release installed with `adb install -r`, guest session preserved on restart |
 | Card material regression | Pass: dark/light gradients constrained to neutral channels and alpha >= `0xED` |
+| Theme-state regression | Pass: mounted tabs rebuild on appearance changes without losing local State; unvisited tabs remain lazy |
 | Offline restart | Pass: authenticated cached Home remained usable; requests failed without crash |
 | Rotation | Pass on sampled landscape screen |
 | Text scale | Pass at 1.6x on sampled Home/onboarding screens |
