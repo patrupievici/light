@@ -1,3 +1,7 @@
+import com.android.build.api.dsl.LibraryExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+
 allprojects {
     repositories {
         google()
@@ -23,6 +27,26 @@ subprojects {
             if (requested.group == "androidx.glance" && requested.name == "glance-appwidget") {
                 useVersion("1.1.1")
                 because("Glance 1.3+ alpha requires compileSdk 37 and AGP 9.1")
+            }
+            if (requested.group == "androidx.work" && requested.name.startsWith("work-runtime")) {
+                useVersion("2.11.2")
+                because("home_widget declares 2.+; pin the current stable release instead of resolving an alpha")
+            }
+        }
+    }
+}
+
+subprojects {
+    if (name == "home_widget") {
+        afterEvaluate {
+            extensions.configure<LibraryExtension> {
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
+            }
+            tasks.withType<KotlinJvmCompile>().configureEach {
+                compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
             }
         }
     }
