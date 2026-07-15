@@ -295,19 +295,28 @@ export async function statsRoutes(app: FastifyInstance) {
         tag: 'WORK',
         isCompleted: true,
         weightKg: { gt: 0 },
-        createdAt: { gte: start, lt: end },
         workoutExercise: {
-          workout: { userId, status: { in: ['completed', 'posted'] } },
+          workout: {
+            userId,
+            status: { in: ['completed', 'posted'] },
+            startedAt: { gte: start, lt: end },
+          },
         },
       },
-      select: { weightKg: true, reps: true, createdAt: true },
+      select: {
+        weightKg: true,
+        reps: true,
+        workoutExercise: {
+          select: { workout: { select: { startedAt: true } } },
+        },
+      },
     })
 
     // Aggregate per UTC day. We use UTC for storage; UI can shift to local on
     // render. Going local server-side would explode index complexity.
     const byDay = new Map<string, number>()
     for (const s of sets) {
-      const day = s.createdAt.toISOString().slice(0, 10)
+      const day = s.workoutExercise.workout.startedAt.toISOString().slice(0, 10)
       const vol = Number(s.weightKg) * s.reps
       byDay.set(day, (byDay.get(day) ?? 0) + vol)
     }
@@ -360,10 +369,17 @@ export async function statsRoutes(app: FastifyInstance) {
           select: {
             exerciseId: true,
             exercise: { select: { name: true } },
+            workout: { select: { startedAt: true } },
           },
         },
       },
-      orderBy: { createdAt: 'asc' },
+    })
+
+    sets.sort((a, b) => {
+      const workoutOrder =
+        a.workoutExercise.workout.startedAt.getTime() -
+        b.workoutExercise.workout.startedAt.getTime()
+      return workoutOrder !== 0 ? workoutOrder : a.createdAt.getTime() - b.createdAt.getTime()
     })
 
     // Track running max per (exerciseId, reps). A set is a PR iff its weight
@@ -383,15 +399,16 @@ export async function statsRoutes(app: FastifyInstance) {
       const key = `${eid}::${s.reps}`
       const prev = maxByExRep.get(key) ?? 0
       const w = Number(s.weightKg)
+      const workoutAt = s.workoutExercise.workout.startedAt
       if (w > prev) {
-        if (s.createdAt >= windowSince) {
+        if (workoutAt >= windowSince) {
           prs.push({
             exerciseId: eid,
             exerciseName: s.workoutExercise.exercise.name,
             weightKg: w,
             reps: s.reps,
             previousBestKg: prev,
-            date: s.createdAt.toISOString(),
+            date: workoutAt.toISOString(),
           })
         }
         maxByExRep.set(key, w)

@@ -13,7 +13,11 @@ import {
   ActivityFileParseError,
   MAX_IMPORT_POINTS,
 } from '../lib/activity-file-import'
-import { buildActivityFeed } from '../lib/activity-normalize'
+import {
+  buildActivityFeed,
+  canonicalGpsType,
+  normalizeGpsActivity,
+} from '../lib/activity-normalize'
 
 /** Data civilă (YYYY-MM-DD) în offset-ul clientului (minute față de UTC). */
 function ymdFromUtcWithOffset(d: Date, offsetMin: number): string {
@@ -664,6 +668,7 @@ export function fuzzRoutePoints(
 }
 
 const GpsActivitySchema = z.object({
+  activity_type: z.enum(['run', 'ride', 'bike', 'cycle', 'walk', 'swim', 'cardio']).optional(),
   route_points: z.array(z.unknown()).max(100_000).optional(),
   distance_m: z.number().min(0).max(500_000).optional(),
   duration_s: z.number().int().min(0).max(86_400).optional(),
@@ -685,6 +690,7 @@ const ImportActivitySchema = z
     contentBase64: z.string().min(1).max(16_000_000).optional(),
     filename: z.string().max(256).optional(),
     visibility: z.enum(ACTIVITY_VISIBILITIES).optional(),
+    activity_type: z.enum(['run', 'ride', 'bike', 'cycle', 'walk', 'swim', 'cardio']).optional(),
   })
   .refine((b) => b.content != null || b.contentBase64 != null, {
     message: 'content or contentBase64 required',
@@ -736,10 +742,12 @@ export async function activitiesRoutes(app: FastifyInstance) {
 
     const routePoints = normalizeRoutePoints(body.route_points)
     const visibility = normalizeVisibility(body.visibility)
+    const activityType = canonicalGpsType(body.activity_type)
 
     const activity = await prisma.gpsActivity.create({
       data: {
         userId,
+        activityType,
         routePoints,
         distanceM,
         durationS,
@@ -777,6 +785,7 @@ export async function activitiesRoutes(app: FastifyInstance) {
     return reply.code(201).send({
       activity: {
         id: activity.id,
+        type: normalizeGpsActivity(activity).type,
         distanceM: activity.distanceM,
         durationS: activity.durationS,
         calories: activity.calories,
@@ -892,10 +901,12 @@ export async function activitiesRoutes(app: FastifyInstance) {
 
     const routePoints = normalizeRoutePoints(trimmed)
     const visibility = normalizeVisibility(body.visibility)
+    const activityType = canonicalGpsType(body.activity_type)
 
     const activity = await prisma.gpsActivity.create({
       data: {
         userId,
+        activityType,
         routePoints,
         distanceM,
         durationS,
@@ -928,6 +939,7 @@ export async function activitiesRoutes(app: FastifyInstance) {
     return reply.code(201).send({
       activity: {
         id: activity.id,
+        type: normalizeGpsActivity(activity).type,
         format: parsedFile.format,
         distanceM: activity.distanceM,
         durationS: activity.durationS,
@@ -959,6 +971,7 @@ export async function activitiesRoutes(app: FastifyInstance) {
         select: {
           id: true,
           userId: true,
+          activityType: true,
           distanceM: true,
           durationS: true,
           calories: true,
@@ -1047,6 +1060,7 @@ export async function activitiesRoutes(app: FastifyInstance) {
       activity: {
         id: activity.id,
         userId: activity.userId,
+        type: normalizeGpsActivity(activity).type,
         distanceM: activity.distanceM,
         durationS: activity.durationS,
         calories: activity.calories,
@@ -1139,15 +1153,31 @@ export async function activitiesRoutes(app: FastifyInstance) {
     const startPad = new Date(start.getTime() - padMs)
     const endPad = new Date(end.getTime() + padMs)
 
-    const workouts = await prisma.workout.findMany({
-      where: {
-        userId,
-        status: { in: ['completed', 'posted'] },
-        startedAt: { gte: startPad, lte: endPad },
-      },
-      select: { id: true, startedAt: true },
-      orderBy: { startedAt: 'asc' },
-    })
+    const [workouts, gpsActivities] = await Promise.all([
+      prisma.workout.findMany({
+        where: {
+          userId,
+          status: { in: ['completed', 'posted'] },
+          startedAt: { gte: startPad, lte: endPad },
+        },
+        select: { id: true, startedAt: true },
+        orderBy: { startedAt: 'asc' },
+      }),
+      prisma.gpsActivity.findMany({
+        where: { userId, startedAt: { gte: startPad, lte: endPad } },
+        select: {
+          id: true,
+          userId: true,
+          activityType: true,
+          distanceM: true,
+          durationS: true,
+          calories: true,
+          startedAt: true,
+          endedAt: true,
+        },
+        orderBy: { startedAt: 'asc' },
+      }),
+    ])
 
     const days: Record<
       string,
@@ -1164,6 +1194,13 @@ export async function activitiesRoutes(app: FastifyInstance) {
       if (!days[key]) days[key] = { types: [], workoutIds: [], planned: [] }
       if (!days[key].types.includes('gym')) days[key].types.push('gym')
       days[key].workoutIds.push(w.id)
+    }
+    for (const activity of gpsActivities) {
+      const key = ymdFromUtcWithOffset(activity.startedAt, tzOffset)
+      if (!key.startsWith(month)) continue
+      if (!days[key]) days[key] = { types: [], workoutIds: [], planned: [] }
+      const type = normalizeGpsActivity(activity).type
+      if (!days[key].types.includes(type)) days[key].types.push(type)
     }
 
     const planned = await prisma.plannedWorkout.findMany({

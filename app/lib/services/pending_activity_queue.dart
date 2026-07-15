@@ -215,6 +215,7 @@ class PendingActivityQueue {
     final sender = _sender;
     if (sender != null) return sender(e);
     return ActivityService().saveActivity(
+      mode: e.mode,
       routePoints: e.routePoints,
       distanceM: e.distanceM,
       durationS: e.durationS,

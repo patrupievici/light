@@ -251,6 +251,7 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
     Object? err; // 4xx only — a payload the server will never accept
     try {
       final saved = await ActivityService().saveActivity(
+        mode: _mode,
         routePoints: route,
         distanceM: _tracker.meters,
         durationS: _elapsedSec,
@@ -419,106 +420,106 @@ class _OutdoorTrackScreenState extends State<OutdoorTrackScreen> {
         _confirmDiscardRecording();
       },
       child: Scaffold(
-      backgroundColor: ZveltTokens.bg,
-      body: _locBusy
-          ? const Center(
-              child: CircularProgressIndicator(color: ZveltTokens.brand))
-          : Stack(
-              fit: StackFit.expand,
-              children: [
-                // ── Full-bleed map ────────────────────────────────────────
-                FlutterMap(
-                  mapController: _map,
-                  options: MapOptions(
-                    initialCenter: _center,
-                    initialZoom: 16,
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all,
-                    ),
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: kMapTileUrl,
-                      userAgentPackageName: 'com.lunaoscar.zvelt',
-                    ),
-                    if (_tracker.points.isNotEmpty)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: _tracker.points,
-                            strokeWidth: 5,
-                            gradientColors: kRouteGradient,
-                          ),
-                        ],
+        backgroundColor: ZveltTokens.bg,
+        body: _locBusy
+            ? const Center(
+                child: CircularProgressIndicator(color: ZveltTokens.brand))
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  // ── Full-bleed map ────────────────────────────────────────
+                  FlutterMap(
+                    mapController: _map,
+                    options: MapOptions(
+                      initialCenter: _center,
+                      initialZoom: 16,
+                      interactionOptions: const InteractionOptions(
+                        flags: InteractiveFlag.all,
                       ),
-                    if (_tracker.points.isNotEmpty)
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: _tracker.points.last,
-                            width: 36,
-                            height: 36,
-                            child: Icon(
-                              _mode == 'bike'
-                                  ? AppIcons.bike
-                                  : AppIcons.running,
-                              color: ZveltTokens.brand,
-                              size: 32,
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-
-                // ── Floating top bar: back · mode · recenter ──────────────
-                Positioned(
-                  top: topPad + 8,
-                  left: 12,
-                  right: 12,
-                  child: Row(
+                    ),
                     children: [
-                      _RoundMapButton(
-                        icon: AppIcons.arrow_small_left,
-                        tooltip: 'Back',
-                        onTap: () => Navigator.of(context).maybePop(),
+                      TileLayer(
+                        urlTemplate: kMapTileUrl,
+                        userAgentPackageName: 'com.lunaoscar.zvelt',
                       ),
-                      const SizedBox(width: 10),
-                      _ModeToggle(
-                        mode: _mode,
-                        enabled: !_tracking,
-                        onChanged: (m) => setState(() => _mode = m),
-                      ),
-                      const Spacer(),
-                      _RoundMapButton(
-                        icon: AppIcons.location_alt,
-                        tooltip: 'Recenter',
-                        onTap: _recenter,
-                      ),
+                      if (_tracker.points.isNotEmpty)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: _tracker.points,
+                              strokeWidth: 5,
+                              gradientColors: kRouteGradient,
+                            ),
+                          ],
+                        ),
+                      if (_tracker.points.isNotEmpty)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _tracker.points.last,
+                              width: 36,
+                              height: 36,
+                              child: Icon(
+                                _mode == 'bike'
+                                    ? AppIcons.bike
+                                    : AppIcons.running,
+                                color: ZveltTokens.brand,
+                                size: 32,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
-                ),
 
-                // ── Metric cards overlaid on the map (Razvan's design) ────
-                Positioned(
-                  top: topPad + 64,
-                  left: 12,
-                  child: MapMetricsOverlay(
-                    distanceM: _tracker.meters,
-                    elapsed: Duration(seconds: _elapsedSec),
-                    elevGainM: _tracker.elevGainM,
+                  // ── Floating top bar: back · mode · recenter ──────────────
+                  Positioned(
+                    top: topPad + 8,
+                    left: 12,
+                    right: 12,
+                    child: Row(
+                      children: [
+                        _RoundMapButton(
+                          icon: AppIcons.arrow_small_left,
+                          tooltip: 'Back',
+                          onTap: () => Navigator.of(context).maybePop(),
+                        ),
+                        const SizedBox(width: 10),
+                        _ModeToggle(
+                          mode: _mode,
+                          enabled: !_tracking,
+                          onChanged: (m) => setState(() => _mode = m),
+                        ),
+                        const Spacer(),
+                        _RoundMapButton(
+                          icon: AppIcons.location_alt,
+                          tooltip: 'Recenter',
+                          onTap: _recenter,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
-                // ── Bottom control panel ──────────────────────────────────
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: _buildBottomPanel(),
-                ),
-              ],
-            ),
+                  // ── Metric cards overlaid on the map (Razvan's design) ────
+                  Positioned(
+                    top: topPad + 64,
+                    left: 12,
+                    child: MapMetricsOverlay(
+                      distanceM: _tracker.meters,
+                      elapsed: Duration(seconds: _elapsedSec),
+                      elevGainM: _tracker.elevGainM,
+                    ),
+                  ),
+
+                  // ── Bottom control panel ──────────────────────────────────
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildBottomPanel(),
+                  ),
+                ],
+              ),
       ),
     );
   }

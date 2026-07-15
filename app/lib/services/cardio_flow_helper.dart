@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '_crash_reporter.dart';
 import 'activity_calendar_store.dart';
 import 'activity_service.dart';
-import 'app_data_cache.dart';
 import 'offline_sync_coordinator.dart';
 import 'pending_activity_queue.dart';
 import '../models/activity_kind.dart';
@@ -32,12 +31,10 @@ class CardioFlowHelper {
   }) async {
     if (elapsedSeconds < 30 && meters < 50) return null;
     final store = ActivityCalendarStore();
-    final day = AppDataCache.localDayYmd();
-    final kind = mode == 'bike'
-        ? ActivityKind.cycle
-        : mode == 'walk'
-            ? ActivityKind.walk
-            : ActivityKind.run;
+    final localStart = (startedAt ?? DateTime.now()).toLocal();
+    final day =
+        '${localStart.year}-${localStart.month.toString().padLeft(2, '0')}-${localStart.day.toString().padLeft(2, '0')}';
+    final kind = ActivityKind.tryParse(mode) ?? ActivityKind.run;
     await store.addManualSession(
       day,
       ManualCardioSession(
@@ -56,6 +53,7 @@ class CardioFlowHelper {
       final end = endedAt ?? startedAt.add(Duration(seconds: elapsedSeconds));
       try {
         final saved = await ActivityService().saveActivity(
+          mode: mode,
           routePoints: routePoints,
           distanceM: meters,
           durationS: elapsedSeconds,
@@ -74,8 +72,7 @@ class CardioFlowHelper {
         // Offline / 5xx — durable-store the full session for later replay.
         await OfflineSyncCoordinator.instance.enqueueActivity(
           PendingActivityEntry(
-            clientActivityId:
-                'act_${DateTime.now().microsecondsSinceEpoch}',
+            clientActivityId: 'act_${DateTime.now().microsecondsSinceEpoch}',
             mode: mode,
             routePoints: routePoints,
             distanceM: meters,
@@ -110,7 +107,11 @@ class CardioFlowHelper {
   static String recapCaption(String mode, double meters, int elapsedSeconds) {
     final km = meters / 1000;
     final min = elapsedSeconds ~/ 60;
-    final label = mode == 'bike' ? 'Ride' : mode == 'walk' ? 'Walk' : 'Run';
+    final label = mode == 'bike'
+        ? 'Ride'
+        : mode == 'walk'
+            ? 'Walk'
+            : 'Run';
     if (km >= 0.05) {
       return '$label · ${km.toStringAsFixed(2)} km · $min min';
     }
@@ -131,7 +132,8 @@ class CardioFlowHelper {
     if (elapsedSeconds < 30 && meters < 50) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Session too short to save (need 30s or 50m).')),
+          const SnackBar(
+              content: Text('Session too short to save (need 30s or 50m).')),
         );
       }
       // The caller already stopped GPS before invoking this flow — finish it

@@ -37,9 +37,11 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
   Map<String, List<PlannedWorkoutEntry>> _plannedByDay = {};
   Map<String, NutritionDayEntry> _nutritionByDay = {};
   bool _loading = true;
+
   /// True after a server sync attempt failed and we're rendering cached data
   /// only — surfaces a discrete badge instead of an annoying SnackBar.
   bool _offlineCached = false;
+
   /// Avoid hammering the backend when the user pages quickly between months.
   /// Forced (pull-to-refresh) calls bypass this window. QA P1.2.
   static const Duration _kSyncThrottle = Duration(minutes: 5);
@@ -88,13 +90,16 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
     }
 
     try {
-      final days = await _activitiesApi.getCalendarMonth(_monthStr(_focusedDay), tzOffsetMinutes: tzOff);
+      final days = await _activitiesApi.getCalendarMonth(
+        _monthStr(_focusedDay),
+        tzOffsetMinutes: tzOff,
+        refresh: true,
+      );
       days.forEach((key, v) {
         final types = (v['types'] as List<dynamic>?) ?? [];
         for (final t in types) {
-          if (t == 'gym') {
-            next.putIfAbsent(key, () => {}).add(ActivityKind.gym);
-          }
+          final kind = ActivityKind.tryParse(t?.toString());
+          if (kind != null) next.putIfAbsent(key, () => {}).add(kind);
         }
         final p = (v['planned'] as List<dynamic>?) ?? const [];
         if (p.isNotEmpty) {
@@ -105,7 +110,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                   id: e['id']?.toString() ?? '',
                   dayYmd: key,
                   title: e['title']?.toString() ?? 'Planned session',
-                  kind: ActivityKind.tryParse(e['kind']?.toString()) ?? ActivityKind.gym,
+                  kind: ActivityKind.tryParse(e['kind']?.toString()) ??
+                      ActivityKind.gym,
                   completed: e['status']?.toString() == 'completed',
                 ),
               )
@@ -114,7 +120,7 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
             next.putIfAbsent(key, () => {}).add(entry.kind);
           }
         }
-        
+
         // Parse nutrition data
         final nutritionData = v['nutrition'];
         if (nutritionData != null) {
@@ -159,7 +165,7 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
     }
 
     try {
-      manualMap = await _store.loadManualSessions();
+      manualMap = await _store.loadSyncedManualSessions();
       manualMap.forEach((key, sessions) {
         next.putIfAbsent(key, () => {});
         for (final s in sessions) {
@@ -189,13 +195,15 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
     try {
       if (!force) {
         final last = await _store.getLastCalendarSync();
-        if (last != null && DateTime.now().toUtc().difference(last) < _kSyncThrottle) {
+        if (last != null &&
+            DateTime.now().toUtc().difference(last) < _kSyncThrottle) {
           return;
         }
       }
       final anchor = DateTime(_focusedDay.year, _focusedDay.month, 1);
       final from = DateTime(anchor.year, anchor.month - 2, 1);
-      final to = DateTime(anchor.year, anchor.month + 3, 0); // last day of +2 month
+      final to =
+          DateTime(anchor.year, anchor.month + 3, 0); // last day of +2 month
       final dates = await _workouts.getWorkoutCalendar(from: from, to: to);
       if (dates.isEmpty) {
         // 404 / empty range — backend may not have the endpoint yet. Still a
@@ -246,7 +254,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
       context: context,
       backgroundColor: ZveltTokens.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -256,8 +265,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    ZveltTokens.s5, ZveltTokens.s2, ZveltTokens.s5, ZveltTokens.s3),
+                padding: const EdgeInsets.fromLTRB(ZveltTokens.s5,
+                    ZveltTokens.s2, ZveltTokens.s5, ZveltTokens.s3),
                 child: Text(
                   'Log activity',
                   style: TextStyle(
@@ -267,10 +276,13 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                   ),
                 ),
               ),
-              ...ActivityKind.values.where((k) => k != ActivityKind.gym).map((k) {
+              ...ActivityKind.values
+                  .where((k) => k != ActivityKind.gym)
+                  .map((k) {
                 return ListTile(
                   leading: Icon(k.icon, color: k.color),
-                  title: Text(k.label, style: TextStyle(color: ZveltTokens.text)),
+                  title:
+                      Text(k.label, style: TextStyle(color: ZveltTokens.text)),
                   onTap: () => Navigator.pop(ctx, k),
                 );
               }),
@@ -287,7 +299,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
 
   Widget _macroBadge(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s2, vertical: ZveltTokens.s1),
+      padding: const EdgeInsets.symmetric(
+          horizontal: ZveltTokens.s2, vertical: ZveltTokens.s1),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(ZveltTokens.rSm),
@@ -315,7 +328,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) => AlertDialog(
           backgroundColor: ZveltTokens.surface,
-          title: Text('Log cardio session', style: TextStyle(color: ZveltTokens.text)),
+          title: Text('Log cardio session',
+              style: TextStyle(color: ZveltTokens.text)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -332,7 +346,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                   decoration: const InputDecoration(labelText: 'Type'),
                   items: ActivityKind.values
                       .where((k) => k != ActivityKind.gym)
-                      .map((k) => DropdownMenuItem(value: k, child: Text(k.label)))
+                      .map((k) =>
+                          DropdownMenuItem(value: k, child: Text(k.label)))
                       .toList(),
                   onChanged: (v) {
                     if (v != null) setSt(() => selected = v);
@@ -340,7 +355,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                 ),
                 TextField(
                   controller: distCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   style: TextStyle(color: ZveltTokens.text),
                   decoration: const InputDecoration(labelText: 'Distance (km)'),
                 ),
@@ -348,14 +364,19 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                   controller: durCtrl,
                   keyboardType: TextInputType.number,
                   style: TextStyle(color: ZveltTokens.text),
-                  decoration: const InputDecoration(labelText: 'Duration (min)'),
+                  decoration:
+                      const InputDecoration(labelText: 'Duration (min)'),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
           ],
         ),
       ),
@@ -389,7 +410,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
       context: context,
       backgroundColor: ZveltTokens.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(ZveltTokens.rXl)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -439,11 +461,14 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            _macroBadge('🥩 ${nutrition.proteinG}g protein', ZveltTokens.info),
+                            _macroBadge('🥩 ${nutrition.proteinG}g protein',
+                                ZveltTokens.info),
                             const SizedBox(width: 6),
-                            _macroBadge('🌾 ${nutrition.carbsG}g carbs', ZveltTokens.warn),
+                            _macroBadge('🌾 ${nutrition.carbsG}g carbs',
+                                ZveltTokens.warn),
                             const SizedBox(width: 6),
-                            _macroBadge('🥑 ${nutrition.fatG}g fat', ZveltTokens.sleep),
+                            _macroBadge(
+                                '🥑 ${nutrition.fatG}g fat', ZveltTokens.sleep),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -460,7 +485,10 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (kinds.isEmpty && sessions.isEmpty && planned.isEmpty && nutrition == null)
+                if (kinds.isEmpty &&
+                    sessions.isEmpty &&
+                    planned.isEmpty &&
+                    nutrition == null)
                   Text(
                     'No activities logged this day.',
                     style: TextStyle(color: ZveltTokens.text2),
@@ -471,13 +499,18 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(
                         p.kind.icon,
-                        color: p.completed ? ZveltTokens.success : ZveltTokens.brand,
+                        color: p.completed
+                            ? ZveltTokens.success
+                            : ZveltTokens.brand,
                       ),
-                      title: Text(p.title, style: TextStyle(color: ZveltTokens.text)),
+                      title: Text(p.title,
+                          style: TextStyle(color: ZveltTokens.text)),
                       subtitle: Text(
                         p.completed ? 'Completed' : 'Pending',
                         style: TextStyle(
-                          color: p.completed ? ZveltTokens.success : ZveltTokens.brand,
+                          color: p.completed
+                              ? ZveltTokens.success
+                              : ZveltTokens.brand,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -490,8 +523,12 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                                 ? 'Mark as not done'
                                 : 'Mark as completed',
                             icon: Icon(
-                              p.completed ? AppIcons.badge_check : AppIcons.circle,
-                              color: p.completed ? ZveltTokens.success : ZveltTokens.text2,
+                              p.completed
+                                  ? AppIcons.badge_check
+                                  : AppIcons.circle,
+                              color: p.completed
+                                  ? ZveltTokens.success
+                                  : ZveltTokens.text2,
                             ),
                             onPressed: () async {
                               Navigator.pop(ctx);
@@ -513,17 +550,20 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                                 return;
                               }
                               if (nextCompleted) {
-                                await PlannedWorkoutReminderService.instance.cancelForPlan(p.id);
+                                await PlannedWorkoutReminderService.instance
+                                    .cancelForPlan(p.id);
                               } else {
                                 await PlannedWorkoutReminderService.instance
-                                    .scheduleForPlannedEntries([p.copyWith(completed: false)]);
+                                    .scheduleForPlannedEntries(
+                                        [p.copyWith(completed: false)]);
                               }
                               await _reload();
                             },
                           ),
                           IconButton(
                             tooltip: 'Remove planned session',
-                            icon: Icon(AppIcons.cross_small, color: ZveltTokens.text2, size: 20),
+                            icon: Icon(AppIcons.cross_small,
+                                color: ZveltTokens.text2, size: 20),
                             onPressed: () async {
                               Navigator.pop(ctx);
                               try {
@@ -539,7 +579,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                                 }
                                 return;
                               }
-                              await PlannedWorkoutReminderService.instance.cancelForPlan(p.id);
+                              await PlannedWorkoutReminderService.instance
+                                  .cancelForPlan(p.id);
                               await _reload();
                             },
                           ),
@@ -553,16 +594,19 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(k.icon, color: k.color),
-                      title: Text(k.label, style: TextStyle(color: ZveltTokens.text)),
+                      title: Text(k.label,
+                          style: TextStyle(color: ZveltTokens.text)),
                       trailing: isGym
                           ? null
                           : IconButton(
                               tooltip: 'Remove activity',
-                              icon: Icon(AppIcons.cross_small, color: ZveltTokens.text2, size: 20),
+                              icon: Icon(AppIcons.cross_small,
+                                  color: ZveltTokens.text2, size: 20),
                               onPressed: () async {
                                 Navigator.pop(ctx);
                                 final manual = await _store.loadAll();
-                                final list = List<ActivityKind>.from(manual[key] ?? []);
+                                final list =
+                                    List<ActivityKind>.from(manual[key] ?? []);
                                 final idx = list.indexOf(k);
                                 if (idx >= 0) {
                                   await _store.removeAt(key, idx);
@@ -578,11 +622,15 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(s.kind.icon, color: s.kind.color),
-                      title: Text(s.kind.label, style: TextStyle(color: ZveltTokens.text)),
-                      subtitle: Text(s.subtitle, style: TextStyle(color: ZveltTokens.text2, fontSize: 12)),
+                      title: Text(s.kind.label,
+                          style: TextStyle(color: ZveltTokens.text)),
+                      subtitle: Text(s.subtitle,
+                          style: TextStyle(
+                              color: ZveltTokens.text2, fontSize: 12)),
                       trailing: IconButton(
                         tooltip: 'Remove session',
-                        icon: Icon(AppIcons.cross_small, color: ZveltTokens.text2, size: 20),
+                        icon: Icon(AppIcons.cross_small,
+                            color: ZveltTokens.text2, size: 20),
                         onPressed: () async {
                           Navigator.pop(ctx);
                           await _store.removeManualSessionAt(key, i);
@@ -642,7 +690,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
             )
           : null,
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: ZveltTokens.brand))
+          ? const Center(
+              child: CircularProgressIndicator(color: ZveltTokens.brand))
           : Column(
               children: [
                 Padding(
@@ -653,10 +702,13 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                       Expanded(child: _Legend()),
                       if (_offlineCached)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: ZveltTokens.s2, vertical: ZveltTokens.s1),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: ZveltTokens.s2,
+                              vertical: ZveltTokens.s1),
                           decoration: BoxDecoration(
                             color: ZveltTokens.text2.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(ZveltTokens.rPill),
+                            borderRadius:
+                                BorderRadius.circular(ZveltTokens.rPill),
                           ),
                           child: Text(
                             'Offline — cached',
@@ -677,25 +729,32 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                     lastDay: DateTime.utc(2032, 12, 31),
                     focusedDay: _focusedDay,
                     calendarFormat: _calendarFormat,
-                    selectedDayPredicate: (d) => _selectedDay != null && isSameDay(_selectedDay!, d),
+                    selectedDayPredicate: (d) =>
+                        _selectedDay != null && isSameDay(_selectedDay!, d),
                     eventLoader: _kindsForDay,
                     startingDayOfWeek: StartingDayOfWeek.monday,
                     calendarStyle: CalendarStyle(
                       outsideDaysVisible: false,
                       weekendTextStyle: TextStyle(color: ZveltTokens.text2),
                       defaultTextStyle: TextStyle(color: ZveltTokens.text),
-                      disabledTextStyle: TextStyle(color: ZveltTokens.text2.withValues(alpha: 0.4)),
+                      disabledTextStyle: TextStyle(
+                          color: ZveltTokens.text2.withValues(alpha: 0.4)),
                       selectedDecoration: const BoxDecoration(
                         color: ZveltTokens.brand,
                         shape: BoxShape.circle,
                       ),
-                      selectedTextStyle: const TextStyle(color: ZveltTokens.onBrand, fontWeight: FontWeight.w700),
+                      selectedTextStyle: const TextStyle(
+                          color: ZveltTokens.onBrand,
+                          fontWeight: FontWeight.w700),
                       todayDecoration: BoxDecoration(
-                        border: Border.all(color: ZveltTokens.brand, width: 1.5),
+                        border:
+                            Border.all(color: ZveltTokens.brand, width: 1.5),
                         shape: BoxShape.circle,
                       ),
-                      todayTextStyle: TextStyle(color: ZveltTokens.text, fontWeight: FontWeight.w600),
-                      defaultDecoration: const BoxDecoration(shape: BoxShape.circle),
+                      todayTextStyle: TextStyle(
+                          color: ZveltTokens.text, fontWeight: FontWeight.w600),
+                      defaultDecoration:
+                          const BoxDecoration(shape: BoxShape.circle),
                     ),
                     headerStyle: HeaderStyle(
                       formatButtonVisible: true,
@@ -705,14 +764,22 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                         color: ZveltTokens.bg2,
                         borderRadius: BorderRadius.circular(ZveltTokens.rSm),
                       ),
-                      formatButtonTextStyle: TextStyle(color: ZveltTokens.text, fontSize: 13),
-                      titleTextStyle: TextStyle(color: ZveltTokens.text, fontSize: 15, fontWeight: FontWeight.w600),
-                      leftChevronIcon: Icon(AppIcons.angle_small_left, color: ZveltTokens.text2),
-                      rightChevronIcon: Icon(AppIcons.angle_small_right, color: ZveltTokens.text2),
+                      formatButtonTextStyle:
+                          TextStyle(color: ZveltTokens.text, fontSize: 13),
+                      titleTextStyle: TextStyle(
+                          color: ZveltTokens.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600),
+                      leftChevronIcon: Icon(AppIcons.angle_small_left,
+                          color: ZveltTokens.text2),
+                      rightChevronIcon: Icon(AppIcons.angle_small_right,
+                          color: ZveltTokens.text2),
                     ),
                     daysOfWeekStyle: DaysOfWeekStyle(
-                      weekdayStyle: TextStyle(color: ZveltTokens.text2, fontSize: 12),
-                      weekendStyle: TextStyle(color: ZveltTokens.text2, fontSize: 12),
+                      weekdayStyle:
+                          TextStyle(color: ZveltTokens.text2, fontSize: 12),
+                      weekendStyle:
+                          TextStyle(color: ZveltTokens.text2, fontSize: 12),
                     ),
                     onDaySelected: (selected, focused) {
                       setState(() {
@@ -730,7 +797,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                     calendarBuilders: CalendarBuilders(
                       markerBuilder: (context, day, events) {
                         final key = _ymdLocal(day);
-                        final planned = _plannedByDay[key] ?? const <PlannedWorkoutEntry>[];
+                        final planned =
+                            _plannedByDay[key] ?? const <PlannedWorkoutEntry>[];
                         if (events.isEmpty && planned.isEmpty) return null;
                         if (planned.isNotEmpty) {
                           return Padding(
@@ -739,11 +807,14 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: planned.take(3).map((p) {
                                 return Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 1),
                                   child: Icon(
                                     p.kind.icon,
                                     size: 10,
-                                    color: p.completed ? ZveltTokens.success : ZveltTokens.brand,
+                                    color: p.completed
+                                        ? ZveltTokens.success
+                                        : ZveltTokens.brand,
                                   ),
                                 );
                               }).toList(),
@@ -756,7 +827,8 @@ class _ActivityCalendarScreenState extends State<ActivityCalendarScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: events.take(4).map((e) {
                               return Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 1.5),
                                 width: 6,
                                 height: 6,
                                 decoration: BoxDecoration(
@@ -799,7 +871,8 @@ class _Legend extends StatelessWidget {
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: BoxDecoration(color: k.color, shape: BoxShape.circle),
+                  decoration:
+                      BoxDecoration(color: k.color, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 4),
                 Text(

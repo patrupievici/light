@@ -111,8 +111,18 @@ class _CardioSession {
     if (d == today) return 'Today';
     if (d == today.subtract(const Duration(days: 1))) return 'Yesterday';
     const mo = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${mo[d.month - 1]} ${d.day}';
   }
@@ -152,7 +162,7 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
   Future<void> _load() async {
     try {
       final bodyweight = await _loadBodyweight();
-      final byDay = await ActivityCalendarStore().loadManualSessions();
+      final byDay = await ActivityCalendarStore().loadSyncedManualSessions();
       final all = <_CardioSession>[];
       byDay.forEach((dayKey, sessions) {
         final day = DateTime.tryParse(dayKey);
@@ -200,8 +210,8 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
                 ),
                 const SizedBox(width: 12),
                 Text('Cardio history',
-                    style: ZType.h2.copyWith(
-                        fontSize: 22, fontWeight: FontWeight.w800)),
+                    style: ZType.h2
+                        .copyWith(fontSize: 22, fontWeight: FontWeight.w800)),
               ],
             ),
           ),
@@ -250,8 +260,7 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: ZveltTokens.border),
               ),
-              child:
-                  Icon(AppIcons.running, size: 26, color: ZveltTokens.text2),
+              child: Icon(AppIcons.running, size: 26, color: ZveltTokens.text2),
             ),
             const SizedBox(height: 14),
             Text('No cardio sessions yet',
@@ -281,12 +290,11 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(value,
-                    style: ZType.stat.copyWith(fontSize: 26)),
+                Text(value, style: ZType.stat.copyWith(fontSize: 26)),
                 const SizedBox(height: 2),
                 Text(label,
-                    style: ZType.bodyS.copyWith(
-                        fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: ZType.bodyS
+                        .copyWith(fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -319,8 +327,8 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Distance by session',
-              style: ZType.bodyM.copyWith(
-                  fontSize: 14, fontWeight: FontWeight.w800)),
+              style: ZType.bodyM
+                  .copyWith(fontSize: 14, fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
           SizedBox(
             height: 120,
@@ -368,8 +376,8 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
           Text(s.dateLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ZType.monoXS.copyWith(
-                  fontSize: 10.5, color: ZveltTokens.text3)),
+              style: ZType.monoXS
+                  .copyWith(fontSize: 10.5, color: ZveltTokens.text3)),
         ],
       ),
     );
@@ -409,13 +417,13 @@ class _CardioHistoryScreenState extends State<CardioHistoryScreen> {
                     dist == null
                         ? s.typeLabel
                         : '${s.typeLabel} · ${dist.toStringAsFixed(1)} km',
-                    style: ZType.bodyL.copyWith(
-                        fontSize: 15, fontWeight: FontWeight.w700),
+                    style: ZType.bodyL
+                        .copyWith(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 2),
                   Text('${s.dateLabel} · ${s.durLabel} · ${s.metric}',
-                      style: ZType.bodyS.copyWith(
-                          fontSize: 12, fontWeight: FontWeight.w500)),
+                      style: ZType.bodyS
+                          .copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
@@ -507,7 +515,9 @@ class _ActivityDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        dist == null ? s.typeLabel : '${s.typeLabel} · $dist km',
+                        dist == null
+                            ? s.typeLabel
+                            : '${s.typeLabel} · $dist km',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: ZType.h4.copyWith(fontSize: 18),
@@ -548,8 +558,8 @@ class _ActivityDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(
-                          child: _statTile(
-                              s.isRide ? 'Speed' : 'Pace', s.metric)),
+                          child:
+                              _statTile(s.isRide ? 'Speed' : 'Pace', s.metric)),
                       const SizedBox(width: 9),
                       Expanded(
                         child: _statTile(
@@ -613,8 +623,8 @@ class _ActivityDetailScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: ZType.bodyS.copyWith(
-                  fontSize: 11, fontWeight: FontWeight.w600)),
+              style: ZType.bodyS
+                  .copyWith(fontSize: 11, fontWeight: FontWeight.w600)),
           const SizedBox(height: 3),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -626,16 +636,15 @@ class _ActivityDetailScreen extends StatelessWidget {
                   child: Text(value,
                       style: ZType.stat.copyWith(
                           fontSize: 17,
-                          color: accent
-                              ? ZveltTokens.brand
-                              : ZveltTokens.text)),
+                          color:
+                              accent ? ZveltTokens.brand : ZveltTokens.text)),
                 ),
               ),
               if (unit != null) ...[
                 const SizedBox(width: 4),
                 Text(unit,
-                    style: ZType.monoXS.copyWith(
-                        fontSize: 11, fontWeight: FontWeight.w700)),
+                    style: ZType.monoXS
+                        .copyWith(fontSize: 11, fontWeight: FontWeight.w700)),
               ],
             ],
           ),

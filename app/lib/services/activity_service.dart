@@ -24,22 +24,64 @@ class ActivitySaveException implements Exception {
 class SavedActivity {
   const SavedActivity({
     required this.id,
+    this.type,
     this.distanceM,
     this.durationS,
     this.recomputed = false,
   });
 
   final String id;
+  final String? type;
   final double? distanceM;
   final int? durationS;
   final bool recomputed;
 
   factory SavedActivity.fromJson(Map<String, dynamic> j) => SavedActivity(
         id: j['id'] as String? ?? '',
+        type: j['type'] as String?,
         distanceM: (j['distanceM'] as num?)?.toDouble(),
         durationS: (j['durationS'] as num?)?.toInt(),
         recomputed: j['recomputed'] as bool? ?? false,
       );
+}
+
+class ActivityFeedItem {
+  const ActivityFeedItem({
+    required this.id,
+    required this.type,
+    required this.source,
+    required this.startedAt,
+    this.distanceM,
+    this.durationS,
+    this.calories,
+  });
+
+  final String id;
+  final String type;
+  final String source;
+  final DateTime startedAt;
+  final double? distanceM;
+  final int? durationS;
+  final int? calories;
+
+  static ActivityFeedItem? tryFromJson(Map<String, dynamic> j) {
+    final id = j['id'] as String?;
+    final type = j['type'] as String?;
+    final source = j['source'] as String?;
+    final startedAt = DateTime.tryParse(j['startedAt'] as String? ?? '');
+    if (id == null || type == null || source == null || startedAt == null) {
+      return null;
+    }
+    return ActivityFeedItem(
+      id: id,
+      type: type,
+      source: source,
+      startedAt: startedAt,
+      distanceM: (j['distanceM'] as num?)?.toDouble(),
+      durationS: (j['durationS'] as num?)?.toInt(),
+      calories: (j['calories'] as num?)?.toInt(),
+    );
+  }
 }
 
 class XpBreakdownLine {
@@ -92,7 +134,8 @@ class CardioCompleteResult {
       gameXp: j['gameXp'] is Map<String, dynamic>
           ? GameXpSnapshot.fromJson(j['gameXp'] as Map<String, dynamic>)
           : null,
-      pctOfWr: (j['pctOfWr'] as num?)?.toInt() ?? (lines.isNotEmpty ? lines.first.pct : 0),
+      pctOfWr: (j['pctOfWr'] as num?)?.toInt() ??
+          (lines.isNotEmpty ? lines.first.pct : 0),
       breakdown: lines,
     );
   }
@@ -104,6 +147,27 @@ class ActivityService {
   final AuthService _auth;
 
   Future<Map<String, String>> _headers() => authedJsonHeaders(auth: _auth);
+
+  static String canonicalActivityType(String mode) {
+    switch (mode.trim().toLowerCase()) {
+      case 'bike':
+      case 'cycle':
+      case 'cycling':
+      case 'ride':
+        return 'ride';
+      case 'walk':
+      case 'walking':
+        return 'walk';
+      case 'swim':
+      case 'swimming':
+        return 'swim';
+      case 'run':
+      case 'running':
+        return 'run';
+      default:
+        return 'cardio';
+    }
+  }
 
   /// Canonical wire shape for a recorded route: `[{lat, lng, t}]` where `t` is
   /// **epoch milliseconds** — the backend's normalizeRoutePoints drops ISO
@@ -127,6 +191,7 @@ class ActivityService {
   /// the started_at→ended_at span for duration. Throws [ActivitySaveException]
   /// on 4xx (do not retry); network/5xx errors propagate for offline queueing.
   Future<SavedActivity> saveActivity({
+    required String mode,
     required List<Map<String, dynamic>> routePoints,
     required double distanceM,
     required int durationS,
@@ -140,6 +205,7 @@ class ActivityService {
           Uri.parse('$v1Base/activities'),
           headers: await _headers(),
           body: jsonEncode({
+            'activity_type': canonicalActivityType(mode),
             'route_points': routePoints,
             'distance_m': distanceM,
             'duration_s': durationS,
@@ -167,6 +233,29 @@ class ActivityService {
     throw Exception(msg); // 5xx — transient, caller may queue for replay
   }
 
+  /// Canonical cross-device history for GPS and completed strength sessions.
+  Future<List<ActivityFeedItem>> getActivityFeed() async {
+    final res = await http
+        .get(
+          Uri.parse('$v1Base/activities/feed'),
+          headers: await authedReadHeaders(auth: _auth),
+        )
+        .withTimeout();
+    if (res.statusCode != 200) {
+      throw Exception('Could not load activity history (${res.statusCode})');
+    }
+    final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+    final raw = decoded['feed'];
+    if (raw is! List) return const [];
+    return [
+      for (final item in raw)
+        if (item is Map)
+          if (ActivityFeedItem.tryFromJson(Map<String, dynamic>.from(item))
+              case final parsed?)
+            parsed,
+    ];
+  }
+
   /// POST /v1/activities/cardio/complete
   Future<CardioCompleteResult> completeCardio({
     required String mode,
@@ -191,6 +280,7 @@ class ActivityService {
       if (d is Map && d['message'] != null) throw Exception(d['message']);
       throw Exception('Could not award cardio XP (${res.statusCode})');
     }
-    return CardioCompleteResult.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    return CardioCompleteResult.fromJson(
+        jsonDecode(res.body) as Map<String, dynamic>);
   }
 }

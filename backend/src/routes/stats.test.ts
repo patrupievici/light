@@ -7,11 +7,13 @@ import Fastify from 'fastify'
 // mocking raw SQL would assert nothing about real behaviour.
 const userExerciseRankFindMany = vi.fn()
 const workoutFindMany = vi.fn()
+const workoutSetFindMany = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
     userExerciseRank: { findMany: (...a: unknown[]) => userExerciseRankFindMany(...a) },
     workout: { findMany: (...a: unknown[]) => workoutFindMany(...a) },
+    workoutSet: { findMany: (...a: unknown[]) => workoutSetFindMany(...a) },
   },
 }))
 
@@ -33,6 +35,7 @@ async function buildApp() {
 beforeEach(() => {
   userExerciseRankFindMany.mockReset()
   workoutFindMany.mockReset()
+  workoutSetFindMany.mockReset()
 })
 
 describe('GET /v1/me/stats — RPG attribute scoring', () => {
@@ -162,6 +165,76 @@ describe('GET /v1/me/stats/rank-lp — per-exercise LP snapshot', () => {
 
     expect(res.statusCode).toBe(200)
     expect((userExerciseRankFindMany.mock.calls[0][0] as { take: number }).take).toBe(30)
+    await app.close()
+  })
+})
+
+describe('historical workout chart dates', () => {
+  it('groups cumulative volume by workout startedAt', async () => {
+    workoutSetFindMany.mockResolvedValue([
+      {
+        weightKg: 100,
+        reps: 5,
+        workoutExercise: { workout: { startedAt: new Date('2026-06-15T12:00:00Z') } },
+      },
+      {
+        weightKg: 80,
+        reps: 5,
+        workoutExercise: { workout: { startedAt: new Date('2026-06-16T12:00:00Z') } },
+      },
+    ])
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'GET',
+      url: '/v1/me/stats/cumulative-volume?year=2026',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toMatchObject({ activeDays: 2, totalKg: 900 })
+    expect(res.json().data.map((point: { day: string }) => point.day)).toEqual([
+      '2026-06-15',
+      '2026-06-16',
+    ])
+    const where = workoutSetFindMany.mock.calls[0][0].where
+    expect(where.createdAt).toBeUndefined()
+    expect(where.workoutExercise.workout.startedAt).toBeDefined()
+    await app.close()
+  })
+
+  it('dates PRs by workout startedAt instead of set sync time', async () => {
+    const now = new Date()
+    const firstWorkoutAt = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
+    const secondWorkoutAt = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    workoutSetFindMany.mockResolvedValue([
+      {
+        weightKg: 80,
+        reps: 5,
+        createdAt: now,
+        workoutExercise: {
+          exerciseId: 'e1',
+          exercise: { name: 'Squat' },
+          workout: { startedAt: firstWorkoutAt },
+        },
+      },
+      {
+        weightKg: 85,
+        reps: 5,
+        createdAt: now,
+        workoutExercise: {
+          exerciseId: 'e1',
+          exercise: { name: 'Squat' },
+          workout: { startedAt: secondWorkoutAt },
+        },
+      },
+    ])
+    const app = await buildApp()
+    const res = await app.inject({ method: 'GET', url: '/v1/me/stats/recent-prs?days=30' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().data.map((pr: { date: string }) => pr.date)).toEqual([
+      secondWorkoutAt.toISOString(),
+      firstWorkoutAt.toISOString(),
+    ])
     await app.close()
   })
 })

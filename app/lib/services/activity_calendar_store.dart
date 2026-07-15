@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/activity_kind.dart';
 import '_crash_reporter.dart';
+import 'activity_service.dart';
 import 'auth_service.dart';
 import 'feed_refresh_notifier.dart';
 
@@ -54,7 +55,10 @@ class ManualCardioSession {
 
 /// Minute cardio manual agregate pe zi (pentru grafice).
 class ManualCardioDayPoint {
-  ManualCardioDayPoint({required this.date, required this.totalMinutes, required this.sessionCount});
+  ManualCardioDayPoint(
+      {required this.date,
+      required this.totalMinutes,
+      required this.sessionCount});
   final DateTime date;
   final int totalMinutes;
   final int sessionCount;
@@ -70,9 +74,11 @@ class ActivityCalendarStore {
   static const String _prefsActivity = 'zvelt_activity_calendar_v1';
   static const String _prefsManual = 'zvelt_manual_cardio_v1';
   static const String _prefsPlanned = 'zvelt_planned_workouts_v1';
+
   /// Zile cu gym sincronizate de la server (`yyyy-MM-dd`). QA P1.2 — astfel
   /// reinstall pe alt device păstrează istoricul după primul sync.
   static const String _prefsServerGymDays = 'zvelt_server_gym_days_v1';
+
   /// Timestamp ms (epoch UTC) al ultimului sync reușit cu serverul.
   static const String _prefsCalendarLastSync = 'zvelt_calendar_last_sync_v1';
 
@@ -141,7 +147,8 @@ class ActivityCalendarStore {
 
   Future<void> setLastCalendarSync(DateTime t) async {
     final p = await SharedPreferences.getInstance();
-    await p.setInt(await _calendarLastSyncKey(), t.toUtc().millisecondsSinceEpoch);
+    await p.setInt(
+        await _calendarLastSyncKey(), t.toUtc().millisecondsSinceEpoch);
   }
 
   /// Încarcă JSON brut: cheie Zvelt scoped → migrate din Forge scoped/user sau Forge global.
@@ -246,7 +253,10 @@ class ActivityCalendarStore {
       final out = <String, List<ManualCardioSession>>{};
       map.forEach((day, v) {
         if (v is! List) return;
-        final list = v.map(ManualCardioSession.fromJson).whereType<ManualCardioSession>().toList();
+        final list = v
+            .map(ManualCardioSession.fromJson)
+            .whereType<ManualCardioSession>()
+            .toList();
         if (list.isNotEmpty) out[day] = list;
       });
       return out;
@@ -256,7 +266,104 @@ class ActivityCalendarStore {
     }
   }
 
-  Future<void> addManualSession(String dayYmd, ManualCardioSession session) async {
+  static bool _looksLikeServerId(String? id) =>
+      id != null &&
+      RegExp(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+        caseSensitive: false,
+      ).hasMatch(id);
+
+  static bool _sameMetrics(
+      ManualCardioSession local, ManualCardioSession server) {
+    if (local.kind != server.kind) return false;
+    final localDistance = local.distanceKm;
+    final serverDistance = server.distanceKm;
+    final distanceMatches = localDistance == null || serverDistance == null
+        ? localDistance == serverDistance
+        : (localDistance - serverDistance).abs() <= 0.1;
+    final localDuration = local.durationMin;
+    final serverDuration = server.durationMin;
+    final durationMatches = localDuration == null || serverDuration == null
+        ? localDuration == serverDuration
+        : (localDuration - serverDuration).abs() <= 1;
+    return distanceMatches && durationMatches;
+  }
+
+  static bool _sameStartTime(String? localId, DateTime serverStart) {
+    if (localId == null) return false;
+    final millis = int.tryParse(localId);
+    if (millis == null) return false;
+    return (millis - serverStart.millisecondsSinceEpoch).abs() <= 120000;
+  }
+
+  /// Merge canonical server GPS history into the offline-first local store.
+  Future<int> mergeServerCardioActivities(
+      Iterable<ActivityFeedItem> activities) async {
+    final all = await loadManualSessions();
+    var changed = 0;
+    for (final activity in activities) {
+      if (activity.source != 'gps') continue;
+      final kind = ActivityKind.tryParse(activity.type);
+      if (kind == null || kind == ActivityKind.gym) continue;
+      final local = activity.startedAt.toLocal();
+      final day =
+          '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+      final duration = activity.durationS;
+      final incoming = ManualCardioSession(
+        id: activity.id,
+        kind: kind,
+        distanceKm:
+            activity.distanceM == null ? null : activity.distanceM! / 1000,
+        durationMin: duration == null || duration <= 0
+            ? null
+            : (duration / 60).ceil().clamp(1, 999),
+      );
+      final list = List<ManualCardioSession>.from(all[day] ?? const []);
+      var index = list.indexWhere((session) => session.id == activity.id);
+      if (index < 0) {
+        index = list.indexWhere((session) =>
+            session.id != null &&
+            !_looksLikeServerId(session.id) &&
+            (_sameStartTime(session.id, activity.startedAt) ||
+                _sameMetrics(session, incoming)));
+      }
+      if (index >= 0) {
+        final existing = list[index];
+        if (existing.id == incoming.id &&
+            existing.kind == incoming.kind &&
+            existing.distanceKm == incoming.distanceKm &&
+            existing.durationMin == incoming.durationMin) {
+          continue;
+        }
+        list[index] = incoming;
+      } else {
+        list.add(incoming);
+      }
+      all[day] = list;
+      changed++;
+    }
+    if (changed > 0) await _saveManual(all);
+    return changed;
+  }
+
+  Future<int> syncServerCardio({ActivityService? service}) async {
+    final feed = await (service ?? ActivityService()).getActivityFeed();
+    return mergeServerCardioActivities(feed);
+  }
+
+  /// Prefer server truth, but always return the local cache when offline.
+  Future<Map<String, List<ManualCardioSession>>>
+      loadSyncedManualSessions() async {
+    try {
+      await syncServerCardio();
+    } catch (e, st) {
+      reportError(e, st, reason: 'calendar:sync-server-cardio');
+    }
+    return loadManualSessions();
+  }
+
+  Future<void> addManualSession(
+      String dayYmd, ManualCardioSession session) async {
     final all = await loadManualSessions();
     final list = List<ManualCardioSession>.from(all[dayYmd] ?? []);
     // Idempotent for id-carrying sessions: a save Retry (4xx / cold backend)
@@ -321,7 +428,8 @@ class ActivityCalendarStore {
     }
   }
 
-  Future<void> replacePlannedWorkouts(Map<String, List<PlannedWorkoutEntry>> incoming) async {
+  Future<void> replacePlannedWorkouts(
+      Map<String, List<PlannedWorkoutEntry>> incoming) async {
     if (incoming.isEmpty) return;
     final all = await loadPlannedWorkouts();
     incoming.forEach((day, entries) {
@@ -365,7 +473,8 @@ class ActivityCalendarStore {
     await _savePlanned(all);
   }
 
-  Future<void> markGymPlannedCompletedForDays(Set<String> completedGymDays) async {
+  Future<void> markGymPlannedCompletedForDays(
+      Set<String> completedGymDays) async {
     if (completedGymDays.isEmpty) return;
     final all = await loadPlannedWorkouts();
     var changed = false;
@@ -395,7 +504,8 @@ class ActivityCalendarStore {
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   /// Ultimele [days] zile, ordine cronologică vechi → nou.
-  Future<List<ManualCardioDayPoint>> loadManualCardioHistory({int days = 30}) async {
+  Future<List<ManualCardioDayPoint>> loadManualCardioHistory(
+      {int days = 30}) async {
     final manual = await loadManualSessions();
     final n = days.clamp(1, 365);
     final today = DateTime.now();
@@ -409,7 +519,8 @@ class ActivityCalendarStore {
       for (final s in sessions) {
         mins += s.durationMin ?? 0;
       }
-      out.add(ManualCardioDayPoint(date: d, totalMinutes: mins, sessionCount: sessions.length));
+      out.add(ManualCardioDayPoint(
+          date: d, totalMinutes: mins, sessionCount: sessions.length));
     }
     return out;
   }
@@ -463,7 +574,9 @@ class PlannedWorkoutEntry {
     final dayYmd = (m['dayYmd'] as String?)?.trim();
     final title = (m['title'] as String?)?.trim();
     final kind = ActivityKind.tryParse(m['kind'] as String?);
-    if (id == null || dayYmd == null || title == null || kind == null) return null;
+    if (id == null || dayYmd == null || title == null || kind == null) {
+      return null;
+    }
     return PlannedWorkoutEntry(
       id: id,
       dayYmd: dayYmd,
@@ -472,9 +585,8 @@ class PlannedWorkoutEntry {
       completed: m['completed'] == true,
       time: (m['time'] as String?)?.trim(),
       sub: (m['sub'] as String?)?.trim(),
-      agendaType: (m['agendaType'] as String?) == 'nutrition'
-          ? 'nutrition'
-          : 'workout',
+      agendaType:
+          (m['agendaType'] as String?) == 'nutrition' ? 'nutrition' : 'workout',
     );
   }
 
@@ -532,7 +644,13 @@ class NutritionDayEntry {
     final carbsG = m['carbsG'] as int?;
     final fatG = m['fatG'] as int?;
     final goal = m['goal'] as String?;
-    if (calories == null || proteinG == null || carbsG == null || fatG == null || goal == null) return null;
+    if (calories == null ||
+        proteinG == null ||
+        carbsG == null ||
+        fatG == null ||
+        goal == null) {
+      return null;
+    }
     return NutritionDayEntry(
       calories: calories,
       proteinG: proteinG,

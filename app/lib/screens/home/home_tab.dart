@@ -126,7 +126,7 @@ class _HomeTabState extends State<HomeTab> {
       // Same source of truth History uses (GET /v1/workouts; page-1 cached
       // offline in WorkoutService).
       _safe(_workouts.getWorkouts(limit: 50)),
-      _safe(ActivityCalendarStore().loadManualSessions()),
+      _safe(ActivityCalendarStore().loadSyncedManualSessions()),
       _safe(_stats.getRecentPrs(days: 30)),
       _safe(_nutrition.loadNutritionHistory(days: 14)),
       _safe(SharedPreferences.getInstance()),

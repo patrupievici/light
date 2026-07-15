@@ -14,7 +14,7 @@ export type ActivityDTO = {
   /** Owner user id. */
   userId: string
   /** Canonical activity kind. 'gym' covers any completed strength workout. */
-  type: 'run' | 'ride' | 'walk' | 'cardio' | 'gym'
+  type: 'run' | 'ride' | 'walk' | 'swim' | 'cardio' | 'gym'
   /** Start instant, ISO-8601 UTC. */
   startedAt: string
   /** Elapsed seconds; null when not derivable. */
@@ -31,6 +31,7 @@ export type ActivityDTO = {
 export type NormalizableGpsActivity = {
   id: string
   userId: string
+  activityType?: string | null
   distanceM: number | null
   durationS: number | null
   calories: number | null
@@ -57,6 +58,32 @@ export type NormalizableWorkout = {
  */
 export const WALK_MAX_SPEED_MS = 2.3
 export const RUN_MAX_SPEED_MS = 6.5
+
+/** Convert client/database aliases to the canonical server activity type. */
+export function canonicalGpsType(raw: unknown): Exclude<ActivityDTO['type'], 'gym'> | null {
+  if (typeof raw !== 'string') return null
+  switch (raw.trim().toLowerCase()) {
+    case 'run':
+    case 'running':
+      return 'run'
+    case 'ride':
+    case 'bike':
+    case 'cycle':
+    case 'cycling':
+      return 'ride'
+    case 'walk':
+    case 'walking':
+    case 'hike':
+      return 'walk'
+    case 'swim':
+    case 'swimming':
+      return 'swim'
+    case 'cardio':
+      return 'cardio'
+    default:
+      return null
+  }
+}
 
 export function classifyGpsType(
   distanceM: number | null,
@@ -94,7 +121,7 @@ export function normalizeGpsActivity(a: NormalizableGpsActivity): ActivityDTO {
   return {
     id: a.id,
     userId: a.userId,
-    type: classifyGpsType(a.distanceM, durationS),
+    type: canonicalGpsType(a.activityType) ?? classifyGpsType(a.distanceM, durationS),
     startedAt: a.startedAt.toISOString(),
     durationS,
     distanceM: a.distanceM != null && a.distanceM > 0 ? a.distanceM : null,

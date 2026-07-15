@@ -1121,6 +1121,8 @@ model PostReport {
 model GpsActivity {
   id          String    @id @default(uuid())
   userId      String    @map("user_id")
+  /// Explicit sport selected by the athlete. Null only for legacy/imported rows.
+  activityType String?  @map("activity_type") @db.VarChar(16)
   routePoints Json      @default("[]") @map("route_points")
   distanceM   Float?    @map("distance_m")
   durationS   Int?      @map("duration_s")

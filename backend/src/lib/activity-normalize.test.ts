@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   classifyGpsType,
+  canonicalGpsType,
   normalizeGpsActivity,
   normalizeWorkout,
   buildActivityFeed,
@@ -49,7 +50,23 @@ describe('classifyGpsType', () => {
   })
 })
 
+describe('canonicalGpsType', () => {
+  it('normalizes cycling aliases and rejects unknown values', () => {
+    expect(canonicalGpsType('bike')).toBe('ride')
+    expect(canonicalGpsType('cycle')).toBe('ride')
+    expect(canonicalGpsType('swimming')).toBe('swim')
+    expect(canonicalGpsType('unknown')).toBeNull()
+  })
+})
+
 describe('normalizeGpsActivity', () => {
+  it('prefers the explicit sport over speed inference', () => {
+    const dto = normalizeGpsActivity(
+      gps({ activityType: 'ride', distanceM: 10_000, durationS: 3_600 }),
+    )
+    expect(dto.type).toBe('ride')
+  })
+
   it('maps a GPS activity to the canonical shape', () => {
     const dto = normalizeGpsActivity(gps())
     expect(dto).toEqual({

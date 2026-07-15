@@ -65,8 +65,21 @@ enum ActivityKind {
 
   static ActivityKind? tryParse(String? raw) {
     if (raw == null || raw.isEmpty) return null;
+    switch (raw.trim().toLowerCase()) {
+      case 'ride':
+      case 'bike':
+      case 'cycling':
+        return ActivityKind.cycle;
+      case 'running':
+        return ActivityKind.run;
+      case 'walking':
+      case 'hike':
+        return ActivityKind.walk;
+      case 'swimming':
+        return ActivityKind.swim;
+    }
     for (final e in ActivityKind.values) {
-      if (e.id == raw) return e;
+      if (e.id == raw.trim().toLowerCase()) return e;
     }
     return null;
   }
