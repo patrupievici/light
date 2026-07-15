@@ -1153,7 +1153,7 @@ export async function activitiesRoutes(app: FastifyInstance) {
     const startPad = new Date(start.getTime() - padMs)
     const endPad = new Date(end.getTime() + padMs)
 
-    const [workouts, gpsActivities] = await Promise.all([
+    const [workouts, gpsActivities, planned, nutritionDays] = await Promise.all([
       prisma.workout.findMany({
         where: {
           userId,
@@ -1176,6 +1176,20 @@ export async function activitiesRoutes(app: FastifyInstance) {
           endedAt: true,
         },
         orderBy: { startedAt: 'asc' },
+      }),
+      prisma.plannedWorkout.findMany({
+        where: {
+          userId,
+          day: { gte: month + '-01', lte: month + '-31' },
+        },
+        orderBy: [{ day: 'asc' }, { createdAt: 'asc' }],
+      }),
+      prisma.nutritionPlanDay.findMany({
+        where: {
+          userId,
+          day: { gte: month + '-01', lte: month + '-31' },
+        },
+        orderBy: { day: 'asc' },
       }),
     ])
 
@@ -1203,13 +1217,6 @@ export async function activitiesRoutes(app: FastifyInstance) {
       if (!days[key].types.includes(type)) days[key].types.push(type)
     }
 
-    const planned = await prisma.plannedWorkout.findMany({
-      where: {
-        userId,
-        day: { gte: month + '-01', lte: month + '-31' },
-      },
-      orderBy: [{ day: 'asc' }, { createdAt: 'asc' }],
-    })
     for (const p of planned) {
       if (!days[p.day]) days[p.day] = { types: [], workoutIds: [], planned: [], nutrition: undefined }
       if (!days[p.day].types.includes(p.kind)) days[p.day].types.push(p.kind)
@@ -1222,13 +1229,6 @@ export async function activitiesRoutes(app: FastifyInstance) {
     }
 
     // Add nutrition data for each day
-    const nutritionDays = await prisma.nutritionPlanDay.findMany({
-      where: {
-        userId,
-        day: { gte: month + '-01', lte: month + '-31' },
-      },
-      orderBy: { day: 'asc' },
-    })
     for (const nd of nutritionDays) {
       if (!days[nd.day]) days[nd.day] = { types: [], workoutIds: [], planned: [], nutrition: undefined }
       days[nd.day].nutrition = {

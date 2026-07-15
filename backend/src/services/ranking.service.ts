@@ -381,6 +381,23 @@ export async function computeRanks(
 
   const seasonLpDelta = Math.max(0, overallLpDelta)
 
+  if (results.some((result) => result.lpDelta > 0)) {
+    writes.push(
+      prisma.workout.update({
+        where: { id: workoutId },
+        data: { hasPr: true },
+      }),
+    )
+  }
+
+  if (results.length > 0) {
+    writes.push(
+      prisma.analyticsEvent.create({
+        data: { userId, eventName: 'rank_calculated' },
+      }),
+    )
+  }
+
   if (activeSeason && seasonLpDelta > 0) {
     writes.push(
       prisma.userSeasonStat.upsert({

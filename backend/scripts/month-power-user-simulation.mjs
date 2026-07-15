@@ -494,6 +494,13 @@ async function main() {
     record('high-volume set logging completed', counters.completedSets >= 200, `sets=${counters.completedSets}`)
     record('10 private progress posts created', counters.postsCreated === 10, `posts=${counters.postsCreated}`)
 
+    const prFeed = await api('GET', '/v1/posts/feed?kind=pr&limit=50', accessToken)
+    record(
+      'workout PR survives complete-to-post transition',
+      prFeed.status === 200 && (prFeed.body?.data?.length ?? 0) > 0,
+      `prPosts=${prFeed.body?.data?.length ?? 0}`,
+    )
+
     const workouts = await api('GET', '/v1/workouts?limit=50', accessToken)
     const completedWorkouts = (workouts.body?.data ?? []).filter(
       (workout) => workout.status === 'completed' || workout.status === 'posted',

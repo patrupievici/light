@@ -431,6 +431,7 @@ model Workout {
   id        String    @id @default(uuid())
   userId    String    @map("user_id")
   status    String    @default("draft") // draft|completed|posted
+  hasPr     Boolean   @default(false) @map("has_pr")
   startedAt DateTime  @default(now()) @map("started_at")
   endedAt   DateTime? @map("ended_at")
   timezone  String?

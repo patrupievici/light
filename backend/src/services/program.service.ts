@@ -593,7 +593,7 @@ export async function startProgramDay(userId: string, program: ProgramRow & { ti
     },
   })
 
-  const result = await createWorkoutFromPlanned(userId, planned.id)
+  const result = await createWorkoutFromPlanned(userId, planned.id, planned)
   const workoutId = (result.workout as { id?: string } | null)?.id ?? null
   return { workoutId, plannedWorkoutId: planned.id, day: built, meta: result.meta }
 }

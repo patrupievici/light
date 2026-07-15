@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { PlannedWorkout } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 
 /**
@@ -81,10 +82,14 @@ export function buildPlannedSeedSets(exercise: PlannedExercise): PlannedSeedSet[
 export async function createWorkoutFromPlanned(
   userId: string,
   plannedWorkoutId: string,
+  plannedInput?: PlannedWorkout,
 ): Promise<ConvertResult> {
-  const planned = await prisma.plannedWorkout.findFirst({
-    where: { id: plannedWorkoutId, userId },
-  })
+  const planned =
+    plannedInput?.id === plannedWorkoutId && plannedInput.userId === userId
+      ? plannedInput
+      : await prisma.plannedWorkout.findFirst({
+          where: { id: plannedWorkoutId, userId },
+        })
   if (!planned) throw new PlannedConvertError('NOT_FOUND', 'Planned workout not found')
 
   const rawExercises = Array.isArray(planned.exercisesJson) ? planned.exercisesJson : []

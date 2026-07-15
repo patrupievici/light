@@ -3,7 +3,6 @@ import type { Post } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
-import { computeRanks } from '../services/ranking.service'
 import { updateStreak } from '../services/streak.service'
 import { createNotificationSafe, NotificationType } from '../services/notification.service'
 import { decodePostPhotoBase64, deleteUploadByUrl, savePostPhoto } from '../lib/post-photo'
@@ -76,7 +75,7 @@ async function likedPostIdsFor(viewerId: string, postIds: string[]): Promise<Set
 }
 
 export async function postRoutes(app: FastifyInstance) {
-  // POST /v1/posts — posteaza workout + calculeaza ranguri
+  // POST /v1/posts - publish a completed workout and preserve its rank/PR result.
   app.post('/', { preHandler: authenticate }, async (request, reply) => {
     const { userId } = request.user
 
@@ -104,8 +103,6 @@ export async function postRoutes(app: FastifyInstance) {
         })
       }
     }
-
-    const profile = await prisma.userProfile.findUnique({ where: { userId } })
 
     /** Relații explicite — evită XOR Prisma (userId + workoutId: null) pe client vechi / ambiguu. */
     const captionDb = caption?.trim() ? caption.trim() : null
@@ -146,6 +143,7 @@ export async function postRoutes(app: FastifyInstance) {
             workout: { connect: { id: workoutId } },
             visibility,
             caption: captionDb,
+            isPr: workout.hasPr,
           },
         })
 
@@ -205,44 +203,13 @@ export async function postRoutes(app: FastifyInstance) {
       }
     }
 
-    let rankSummary = null
-    if (workoutId && profile?.bodyweightKg) {
-      try {
-        rankSummary = await computeRanks(userId, workoutId)
-      } catch (err: any) {
-        app.log.error({ err }, 'Eroare la calculul rangurilor')
-      }
-    } else if (workoutId && !profile?.bodyweightKg) {
-      app.log.info({ userId, workoutId }, 'Ranking omis: lipseste greutatea corporala (postarea a fost creata)')
-    }
-
-    // PR detection: a positive LP delta on any lift = a new personal best → flag
-    // the post so the Feed "PRs" filter (kind=pr) can surface it.
-    if (rankSummary && rankSummary.results.some((r) => r.lpDelta > 0)) {
-      try {
-        postOut = await prisma.post.update({
-          where: { id: post.id },
-          data: { isPr: true },
-        })
-      } catch (err) {
-        app.log.error({ err }, 'Eroare la marcarea PR pe postare')
-      }
-    }
-
-    // Update streak
-    const streak = await updateStreak(userId)
-
-    // Analytics
-    await prisma.analyticsEvent.create({
-      data: { userId, eventName: 'post_created' },
-    })
-    if (rankSummary) {
-      await prisma.analyticsEvent.create({
-        data: { userId, eventName: 'rank_calculated' },
-      })
-    }
-
-    return reply.code(201).send({ post: postOut, rankSummary, streak })
+    const [streak] = await Promise.all([
+      updateStreak(userId),
+      prisma.analyticsEvent.create({
+        data: { userId, eventName: 'post_created' },
+      }),
+    ])
+    return reply.code(201).send({ post: postOut, rankSummary: null, streak })
   })
 
   // GET /v1/posts/feed — feed prieteni
