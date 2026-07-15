@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/profile_service.dart';
 import '../../theme/app_icons.dart';
+import '../../theme/zvelt_theme_rebuilder.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../../theme/zvelt_theme_notifier.dart';
 import '../../widgets/zvelt_main_nav_bar.dart';
@@ -183,6 +184,10 @@ class _ProfileTabState extends State<ProfileTab> {
   // ─── build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    return ZveltThemeRebuilder(builder: _buildProfile);
+  }
+
+  Widget _buildProfile(BuildContext context) {
     final topPad = MediaQuery.paddingOf(context).top;
     final canPop = Navigator.of(context).canPop();
     return Scaffold(

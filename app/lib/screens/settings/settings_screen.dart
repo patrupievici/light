@@ -21,6 +21,7 @@ import '../../services/settings_store.dart';
 import '../../services/social_feed_service.dart';
 import '../../services/social_notification_hub.dart';
 import '../../theme/zvelt_theme_notifier.dart';
+import '../../theme/zvelt_theme_rebuilder.dart';
 import '../../theme/zvelt_tokens.dart';
 import '../social/blocked_users_screen.dart';
 import '../social/bookmarks_screen.dart';
@@ -208,40 +209,42 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _appearance() async {
     await showSettingsSheet<void>(
       context,
-      SettingsSheet(
-        title: 'Choose a theme',
-        eyebrow: 'APPEARANCE',
-        child: ValueListenableBuilder<ThemeMode>(
-          valueListenable: ZveltThemeNotifier.mode,
-          builder: (context, mode, _) => SettingsCard(
-            children: [
-              SettingsRadioRow(
-                title: 'Light',
-                subtitle: 'Bright, daytime look',
-                selected: mode == ThemeMode.light,
-                leading: const SettingsIconTile(
-                    icon: AppIcons.sun, tint: SettingsTint.amber),
-                onTap: () => ZveltThemeNotifier.set(ThemeMode.light),
-              ),
-              SettingsRadioRow(
-                title: 'Dark',
-                subtitle: 'Easy on the eyes at night',
-                selected: mode == ThemeMode.dark,
-                leading: const SettingsIconTile(
-                    icon: AppIcons.moon, tint: SettingsTint.violet),
-                onTap: () => ZveltThemeNotifier.set(ThemeMode.dark),
-              ),
-              SettingsRadioRow(
-                title: 'System',
-                subtitle: 'Match your device',
-                selected: mode == ThemeMode.system,
-                leading: const SettingsIconTile(
-                    icon: AppIcons.settings, tint: SettingsTint.blue),
-                onTap: () => ZveltThemeNotifier.set(ThemeMode.system),
-              ),
-            ],
-          ),
-        ),
+      ZveltThemeRebuilder(
+        builder: (context) {
+          final mode = ZveltThemeNotifier.mode.value;
+          return SettingsSheet(
+            title: 'Choose a theme',
+            eyebrow: 'APPEARANCE',
+            child: SettingsCard(
+              children: [
+                SettingsRadioRow(
+                  title: 'Light',
+                  subtitle: 'Bright, daytime look',
+                  selected: mode == ThemeMode.light,
+                  leading: const SettingsIconTile(
+                      icon: AppIcons.sun, tint: SettingsTint.amber),
+                  onTap: () => ZveltThemeNotifier.set(ThemeMode.light),
+                ),
+                SettingsRadioRow(
+                  title: 'Dark',
+                  subtitle: 'Easy on the eyes at night',
+                  selected: mode == ThemeMode.dark,
+                  leading: const SettingsIconTile(
+                      icon: AppIcons.moon, tint: SettingsTint.violet),
+                  onTap: () => ZveltThemeNotifier.set(ThemeMode.dark),
+                ),
+                SettingsRadioRow(
+                  title: 'System',
+                  subtitle: 'Match your device',
+                  selected: mode == ThemeMode.system,
+                  leading: const SettingsIconTile(
+                      icon: AppIcons.settings, tint: SettingsTint.blue),
+                  onTap: () => ZveltThemeNotifier.set(ThemeMode.system),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
     if (mounted) setState(() {});
@@ -434,6 +437,10 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   @override
   Widget build(BuildContext context) {
+    return ZveltThemeRebuilder(builder: _buildSettings);
+  }
+
+  Widget _buildSettings(BuildContext context) {
     return SettingsModalShell(
       title: 'Settings',
       children: [

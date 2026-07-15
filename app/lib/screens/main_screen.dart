@@ -4,7 +4,9 @@ import 'package:zvelt_app/theme/app_icons.dart';
 import '../services/push_messaging_service.dart';
 import '../services/social_notification_hub.dart';
 import '../services/settings_store.dart';
+import '../theme/zvelt_theme_rebuilder.dart';
 import '../theme/zvelt_tokens.dart';
+import '../widgets/zvelt_lazy_indexed_stack.dart';
 import '../widgets/zvelt_main_nav_bar.dart';
 import 'ai/ai_chat_screen.dart';
 import 'home/home_tab.dart';
@@ -31,7 +33,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   // 0 Home · 1 Plan · 2 Feed · 3 Nutrition. (The ✦ AI center action is not a tab.)
-  static const int _tabCount = 4;
   static const int _feedIndex = 2;
 
   int _currentIndex = 0;
@@ -41,12 +42,6 @@ class _MainScreenState extends State<MainScreen> {
   /// data survive tab switches. Tabs refresh themselves via pull-to-refresh
   /// and FeedRefreshNotifier bumps.
   final List<bool> _built = [true, false, false, false];
-  final List<Widget?> _pageCache = List<Widget?>.filled(_tabCount, null);
-
-  Widget _page(int i) {
-    if (!_built[i]) return const SizedBox.shrink();
-    return _pageCache[i] ??= _createPage(i);
-  }
 
   Widget _createPage(int i) {
     switch (i) {
@@ -58,11 +53,15 @@ class _MainScreenState extends State<MainScreen> {
           onOpenFeed: () => _switchTo(_feedIndex),
         );
       case 1:
-        return const PlanTab();
+        // Intentionally non-const: token colors are resolved during build.
+        // ignore: prefer_const_constructors
+        return PlanTab();
       case 2:
-        return const FeedTab();
+        // ignore: prefer_const_constructors
+        return FeedTab();
       case 3:
-        return const NutritionTab();
+        // ignore: prefer_const_constructors
+        return NutritionTab();
       default:
         return const SizedBox.shrink();
     }
@@ -128,11 +127,16 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ZveltThemeRebuilder(builder: _buildShell);
+  }
+
+  Widget _buildShell(BuildContext context) {
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
-      body: IndexedStack(
+      body: ZveltLazyIndexedStack(
         index: _currentIndex,
-        children: [for (var i = 0; i < _tabCount; i++) _page(i)],
+        built: _built,
+        itemBuilder: (_, index) => _createPage(index),
       ),
       bottomNavigationBar: ZveltMainNavBar(
         currentIndex: _currentIndex,
