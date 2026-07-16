@@ -274,9 +274,11 @@ class _ProfileTabState extends State<ProfileTab> {
     final canPop = Navigator.of(context).canPop();
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
-      appBar: PreferredSize(
-        preferredSize: Size.zero,
-        child: ColoredBox(color: ZveltTokens.bg),
+      appBar: AppBar(
+        toolbarHeight: 0,
+        backgroundColor: ZveltTokens.bg,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
       ),
       body: ListView(
         padding: EdgeInsets.only(

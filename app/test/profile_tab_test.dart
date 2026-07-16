@@ -36,9 +36,15 @@ void main() {
       MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightThemeData,
-        home: ProfileTab(
-          preview: true,
-          onLogout: () async {},
+        home: MediaQuery(
+          data: const MediaQueryData(
+            padding: EdgeInsets.only(top: 24),
+            viewPadding: EdgeInsets.only(top: 24),
+          ),
+          child: ProfileTab(
+            preview: true,
+            onLogout: () async {},
+          ),
         ),
       ),
     );
@@ -50,6 +56,8 @@ void main() {
     await pumpProfile(tester);
 
     expect(find.text('Profile'), findsOneWidget);
+    expect(
+        tester.getTopLeft(find.text('Profile')).dy, greaterThanOrEqualTo(24));
     expect(find.text('Settings'), findsNothing);
     expect(find.text('Preferences'), findsNothing);
 
