@@ -437,15 +437,14 @@ describe('likedByMe — every post response reports whether the VIEWER liked it'
     await app.close()
   })
 
-  it('GET /feed — seeds likedByMe per post from ONE viewer-scoped query (no N+1)', async () => {
+  it('GET /feed seeds likedByMe in the post query (no extra DB wave)', async () => {
     friendshipFindMany.mockResolvedValue([])
     postHideFindMany.mockResolvedValue([])
     userProfileFindMany.mockResolvedValue([])
     postFindMany.mockResolvedValue([
-      { ...FRIENDS_ONLY_POST, id: 'p1', userId: 'me' },
-      { ...FRIENDS_ONLY_POST, id: 'p2', userId: 'me' },
+      { ...FRIENDS_ONLY_POST, id: 'p1', userId: 'me', likes: [] },
+      { ...FRIENDS_ONLY_POST, id: 'p2', userId: 'me', likes: [{ userId: 'me' }] },
     ])
-    postLikeFindMany.mockResolvedValue([{ postId: 'p2' }]) // viewer liked only p2
 
     authedAs('me')
     const app = await buildApp()
@@ -455,13 +454,11 @@ describe('likedByMe — every post response reports whether the VIEWER liked it'
     const data = res.json().data as Array<{ id: string; likedByMe: boolean }>
     expect(data.find((p) => p.id === 'p1')!.likedByMe).toBe(false)
     expect(data.find((p) => p.id === 'p2')!.likedByMe).toBe(true)
-    // Exactly ONE like query for the whole page, scoped to the viewer.
-    expect(postLikeFindMany).toHaveBeenCalledOnce()
-    const where = (postLikeFindMany.mock.calls[0][0] as {
-      where: { userId: string; postId: { in: string[] } }
-    }).where
-    expect(where.userId).toBe('me')
-    expect(where.postId.in).toEqual(['p1', 'p2'])
+    expect(postLikeFindMany).not.toHaveBeenCalled()
+    const include = (postFindMany.mock.calls[0][0] as {
+      include: { likes: { where: { userId: string } } }
+    }).include
+    expect(include.likes.where.userId).toBe('me')
     await app.close()
   })
 
@@ -469,9 +466,14 @@ describe('likedByMe — every post response reports whether the VIEWER liked it'
     friendshipFindMany.mockResolvedValue([])
     postHideFindMany.mockResolvedValue([])
     postFindMany.mockResolvedValue([
-      { ...FRIENDS_ONLY_POST, id: 'p1', userId: 'me', visibility: 'public' },
+      {
+        ...FRIENDS_ONLY_POST,
+        id: 'p1',
+        userId: 'me',
+        visibility: 'public',
+        likes: [{ userId: 'me' }],
+      },
     ])
-    postLikeFindMany.mockResolvedValue([{ postId: 'p1' }])
 
     authedAs('me')
     const app = await buildApp()
@@ -479,6 +481,7 @@ describe('likedByMe — every post response reports whether the VIEWER liked it'
 
     expect(res.statusCode).toBe(200)
     expect(res.json().data[0].likedByMe).toBe(true)
+    expect(postLikeFindMany).not.toHaveBeenCalled()
     await app.close()
   })
 

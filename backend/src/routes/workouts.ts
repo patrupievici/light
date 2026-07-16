@@ -2,10 +2,11 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
-import { computeRanks } from '../services/ranking.service'
+import { prepareRankUpdates } from '../services/ranking.service'
 import { recomputeUserChallenges } from '../services/challenge-recalc.service'
 import { evaluateWeightJump } from '../services/anti-cheat.service'
 import {
+  achievementKeysForProgress,
   awardAchievementProgress,
   loadAchievementProgress,
 } from '../services/achievement.service'
@@ -357,18 +358,6 @@ export async function workoutRoutes(app: FastifyInstance) {
     const { userId } = request.user
     const { id: workoutId, weId } = request.params as { id: string; weId: string }
 
-    // Verifica ownership
-    const we = await prisma.workoutExercise.findFirst({
-      where: { id: weId, workoutId, workout: { userId } },
-    })
-    if (!we) {
-      return reply.code(404).send({
-        error: 'NOT_FOUND',
-        message: 'WorkoutExercise negasit',
-        requestId: request.id,
-      })
-    }
-
     const parsed = AddSetSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.code(400).send({
@@ -379,16 +368,37 @@ export async function workoutRoutes(app: FastifyInstance) {
       })
     }
 
-    // Idempotency: dacă clientSetId există deja pentru acest user, returnează setul fără să creezi unul nou.
-    if (parsed.data.clientSetId) {
-      const existing = await prisma.workoutSet.findFirst({
-        where: {
-          clientSetId: parsed.data.clientSetId,
-          workoutExercise: { workoutId, workout: { userId } },
+    // Ownership, latest index, and an optional replay lookup are independent.
+    // Fetch them in one DB wave because this endpoint runs for every logged set.
+    const [we, existing] = await Promise.all([
+      prisma.workoutExercise.findFirst({
+        where: { id: weId, workoutId, workout: { userId } },
+        select: {
+          exerciseId: true,
+          sets: {
+            orderBy: { setIndex: 'desc' },
+            take: 1,
+            select: { setIndex: true },
+          },
         },
+      }),
+      parsed.data.clientSetId
+        ? prisma.workoutSet.findFirst({
+            where: {
+              clientSetId: parsed.data.clientSetId,
+              workoutExercise: { workoutId, workout: { userId } },
+            },
+          })
+        : Promise.resolve(null),
+    ])
+    if (!we) {
+      return reply.code(404).send({
+        error: 'NOT_FOUND',
+        message: 'WorkoutExercise negasit',
+        requestId: request.id,
       })
-      if (existing) return reply.code(200).send({ set: existing, idempotent: true })
     }
+    if (existing) return reply.code(200).send({ set: existing, idempotent: true })
 
     // Anti-cheat (CLAUDE.md "Weight >2× max istoric personal + <7 zile → confirm +
     // notă obligatorie"): a WORK set whose weight is more than 2× the user's
@@ -426,27 +436,23 @@ export async function workoutRoutes(app: FastifyInstance) {
       }
     }
 
-    // Determina index-ul urmatorului set
-    const lastSet = await prisma.workoutSet.findFirst({
-      where: { workoutExerciseId: weId },
-      orderBy: { setIndex: 'desc' },
+    const setIndex = (we.sets[0]?.setIndex ?? -1) + 1
+    const createSetAt = (index: number) => prisma.workoutSet.create({
+      data: {
+        workoutExerciseId: weId,
+        setIndex: index,
+        weightKg: parsed.data.weightKg,
+        reps: parsed.data.reps,
+        rpe: parsed.data.rpe,
+        tag: parsed.data.tag,
+        isCompleted: parsed.data.isCompleted ?? true,
+        clientSetId: parsed.data.clientSetId,
+        note,
+      },
     })
-    const setIndex = (lastSet?.setIndex ?? -1) + 1
 
     try {
-      const set = await prisma.workoutSet.create({
-        data: {
-          workoutExerciseId: weId,
-          setIndex,
-          weightKg: parsed.data.weightKg,
-          reps: parsed.data.reps,
-          rpe: parsed.data.rpe,
-          tag: parsed.data.tag,
-          isCompleted: parsed.data.isCompleted ?? true,
-          clientSetId: parsed.data.clientSetId,
-          note,
-        },
-      })
+      const set = await createSetAt(setIndex)
       return reply.code(201).send({ set })
     } catch (err: any) {
       // P2002 = unique constraint. Cursă: alt request a creat deja setul între findFirst și create.
@@ -458,6 +464,24 @@ export async function workoutRoutes(app: FastifyInstance) {
           },
         })
         if (existing) return reply.code(200).send({ set: existing, idempotent: true })
+      }
+
+      // Two distinct offline items can occasionally arrive together and both
+      // observe the same latest index. Retry only that composite-index race.
+      const target = Array.isArray(err?.meta?.target)
+        ? err.meta.target.join(',')
+        : String(err?.meta?.target ?? '')
+      if (
+        err?.code === 'P2002' &&
+        (target.includes('set_index') || target.includes('setIndex'))
+      ) {
+        const latest = await prisma.workoutSet.findFirst({
+          where: { workoutExerciseId: weId },
+          orderBy: { setIndex: 'desc' },
+          select: { setIndex: true },
+        })
+        const set = await createSetAt((latest?.setIndex ?? setIndex) + 1)
+        return reply.code(201).send({ set })
       }
       throw err
     }
@@ -792,7 +816,8 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       })
     }
 
-    const [workoutFull, profile] = await Promise.all([
+    const rankNow = new Date()
+    const [workoutFull, profile, previousRanks, activeSeason] = await Promise.all([
       prisma.workout.findFirst({
         where: { id: workoutId, userId },
         include: {
@@ -803,6 +828,17 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
         },
       }),
       prisma.userProfile.findUnique({ where: { userId } }),
+      prisma.userExerciseRank.findMany({
+        where: { userId },
+        select: { exerciseId: true, lpTotal: true, strengthRatio: true },
+      }),
+      prisma.season.findFirst({
+        where: {
+          startsAt: { lte: rankNow },
+          endsAt: { gte: rankNow },
+        },
+        select: { id: true },
+      }),
     ])
     if (!workoutFull) {
       return reply.code(404).send({
@@ -864,13 +900,29 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       userXpContext,
     )
 
+    let preparedRank: ReturnType<typeof prepareRankUpdates> | null = null
+    try {
+      preparedRank = prepareRankUpdates({
+        userId,
+        profile,
+        workout: workoutFull,
+        previousRanks,
+        activeSeason,
+      })
+    } catch (err: any) {
+      app.log.warn({ err, userId, workoutId }, 'Ranking skip la complete (ex: BW_REQUIRED)')
+    }
+
     const workoutWrite = prisma.workout.update({
-      where: { id: workoutId },
+      // Extended unique filter is re-checked while PostgreSQL holds the row
+      // lock. Two rapid completes cannot both award XP/ranks.
+      where: { id: workoutId, userId, status: 'draft' },
       data: {
         status: 'completed',
         startedAt,
         endedAt,
         ...(parsed.data.timezone ? { timezone: parsed.data.timezone } : {}),
+        ...(preparedRank?.hasPr ? { hasPr: true } : {}),
       },
       include: {
         exercises: {
@@ -880,72 +932,78 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       },
     })
 
-    let gameXp = gameXpPayload(profile?.gameXpTotal ?? 0)
-    let updated: Awaited<typeof workoutWrite>
-    if (profile) {
-      const [workoutResult, , xpProfile] = await prisma.$transaction([
-        workoutWrite,
-        prisma.plannedWorkout.updateMany({
-          where: {
-            userId,
-            day: ymdLocal(startedAt),
-            kind: 'gym',
-            status: { in: ['pending', 'in_progress'] },
-          },
-          data: { status: 'completed' },
-        }),
-        prisma.userProfile.update({
-          where: { userId },
-          data: { gameXpTotal: { increment: sessionXp } },
-          select: { gameXpTotal: true },
-        }),
-        prisma.analyticsEvent.create({
-          data: { userId, eventName: 'workout_completed' },
-        }),
-      ])
-      updated = workoutResult
-      gameXp = gameXpPayload(xpProfile.gameXpTotal)
-    } else {
-      const [workoutResult] = await prisma.$transaction([
-        workoutWrite,
-        prisma.plannedWorkout.updateMany({
-          where: {
-            userId,
-            day: ymdLocal(startedAt),
-            kind: 'gym',
-            status: { in: ['pending', 'in_progress'] },
-          },
-          data: { status: 'completed' },
-        }),
-        prisma.analyticsEvent.create({
-          data: { userId, eventName: 'workout_completed' },
-        }),
-      ])
-      updated = workoutResult
-    }
-
-    // Calculează rangurile la complete (ca la post) — ca Rank tab să se actualizeze
-    const enrichedWorkoutPromise = enrichWorkoutWithExerciseMedia(updated as any)
-    const rankingPromise = (async () => {
-      try {
-        return await computeRanks(userId, workoutId, {
-          profile,
-          workout: workoutFull,
-        })
-      } catch (err: any) {
-        app.log.warn({ err, userId, workoutId }, 'Ranking skip la complete (ex: BW_REQUIRED)')
-        return null
-      }
-    })()
-
     const achievementProgressPromise = (async () => {
       try {
-        return await loadAchievementProgress(userId)
+        return await loadAchievementProgress(userId, {
+          pendingWorkoutStartedAt: startedAt,
+          activeSeasonId: activeSeason?.id ?? null,
+          projectedSeasonLpDelta: preparedRank?.result.seasonLpDelta ?? 0,
+        })
       } catch (err: any) {
-        app.log.warn({ err, userId }, 'Achievement progress load failed after workout complete')
+        app.log.warn({ err, userId }, 'Achievement progress projection failed')
         return null
       }
     })()
+
+    const plannedWorkoutWrite = prisma.plannedWorkout.updateMany({
+      where: {
+        userId,
+        day: ymdLocal(startedAt),
+        kind: 'gym',
+        status: { in: ['pending', 'in_progress'] },
+      },
+      data: { status: 'completed' },
+    })
+    const analyticsWrite = prisma.analyticsEvent.create({
+      data: { userId, eventName: 'workout_completed' },
+    })
+
+    const completionTransactionPromise = profile
+      ? prisma.$transaction([
+          workoutWrite,
+          plannedWorkoutWrite,
+          prisma.userProfile.update({
+            where: { userId },
+            data: { gameXpTotal: { increment: sessionXp } },
+            select: { gameXpTotal: true },
+          }),
+          analyticsWrite,
+          ...(preparedRank?.writes ?? []),
+        ]).then((results) => ({
+          updated: results[0] as Awaited<typeof workoutWrite>,
+          gameXp: gameXpPayload((results[2] as { gameXpTotal: number }).gameXpTotal),
+        }))
+      : prisma.$transaction([
+          workoutWrite,
+          plannedWorkoutWrite,
+          analyticsWrite,
+          ...(preparedRank?.writes ?? []),
+        ]).then((results) => ({
+          updated: results[0] as Awaited<typeof workoutWrite>,
+          gameXp: gameXpPayload(0),
+        }))
+
+    // The projected achievement snapshot and atomic completion commit are
+    // independent reads/writes, so run them in the same network window.
+    let completion: Awaited<typeof completionTransactionPromise>
+    let achievementProgress: Awaited<typeof achievementProgressPromise>
+    try {
+      [completion, achievementProgress] = await Promise.all([
+        completionTransactionPromise,
+        achievementProgressPromise,
+      ])
+    } catch (err: any) {
+      if (err?.code === 'P2025') {
+        return reply.code(400).send({
+          error: 'ALREADY_COMPLETED',
+          message: 'Workout-ul a fost deja finalizat',
+          requestId: request.id,
+        })
+      }
+      throw err
+    }
+    const { updated, gameXp } = completion
+    const enrichedBase = await enrichWorkoutWithExerciseMedia(updated as any)
 
     // Auto-update the user's active challenge standings from this workout.
     const refreshChallenges = async () => {
@@ -979,27 +1037,19 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       }
     }
 
-    const [rankResult, achievementProgress, enrichedBase] = await Promise.all([
-      rankingPromise,
-      achievementProgressPromise,
-      enrichedWorkoutPromise,
-    ])
+    const rankResult = preparedRank?.result ?? null
 
     let newAchievementKeys: string[] = []
+    let rankLpFloor = 0
     if (achievementProgress) {
-      try {
-        const rankLpFloor = rankResult?.results.reduce(
-          (max, result) => Math.max(max, result.lpTotal),
-          0,
-        ) ?? 0
-        newAchievementKeys = await awardAchievementProgress(
-          userId,
-          achievementProgress,
-          { rankLpFloor },
-        )
-      } catch (err: any) {
-        app.log.warn({ err, userId }, 'checkAndAward failed after workout complete')
-      }
+      rankLpFloor = rankResult?.results.reduce(
+        (max, result) => Math.max(max, result.lpTotal),
+        0,
+      ) ?? 0
+      newAchievementKeys = achievementKeysForProgress(
+        achievementProgress,
+        { rankLpFloor },
+      )
     }
 
     const setPr = rankResult?.results.some((result) => result.lpDelta > 0) ?? false
@@ -1007,11 +1057,24 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       ? { ...(enrichedBase as Record<string, unknown>), hasPr: true }
       : enrichedBase
 
+    const persistAchievements = async () => {
+      if (!achievementProgress || newAchievementKeys.length === 0) return
+      try {
+        await awardAchievementProgress(userId, achievementProgress, { rankLpFloor })
+      } catch (err: any) {
+        app.log.warn({ err, userId }, 'achievement persistence failed after complete')
+      }
+    }
+
     // These writes do not affect the completion payload. Starting them after
     // the socket flush keeps large challenge histories off the user path.
     reply.raw.once('finish', () => {
       setImmediate(() => {
-        void Promise.allSettled([refreshChallenges(), refreshAdaptive()])
+        void Promise.allSettled([
+          persistAchievements(),
+          refreshChallenges(),
+          refreshAdaptive(),
+        ])
       })
     })
 

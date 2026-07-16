@@ -16,19 +16,22 @@ function parseDayKey(key: string): Date {
 }
 
 /** Zile unice cu workout completed/posted, ordonate desc; streak crește cât timp gap-ul între zile consecutive ≤ grace. */
-async function getWorkoutDayStreak(userId: string): Promise<number> {
+async function getWorkoutDayStreak(
+  userId: string,
+  pendingWorkoutStartedAt?: Date,
+): Promise<number> {
   const workouts = await prisma.workout.findMany({
     where: { userId, status: { in: ['completed', 'posted'] } },
     orderBy: { startedAt: 'desc' },
     select: { startedAt: true },
     take: 400,
   })
-  if (workouts.length === 0) return 0
-
   const daySet = new Set<string>()
   for (const w of workouts) {
     daySet.add(utcDayKey(w.startedAt))
   }
+  if (pendingWorkoutStartedAt) daySet.add(utcDayKey(pendingWorkoutStartedAt))
+  if (daySet.size === 0) return 0
   const days = Array.from(daySet).sort((a, b) => b.localeCompare(a))
   let streak = 1
   for (let i = 1; i < days.length; i++) {
@@ -41,19 +44,56 @@ async function getWorkoutDayStreak(userId: string): Promise<number> {
   return streak
 }
 
-async function isUserInSeasonTop10(userId: string): Promise<boolean> {
+type SeasonStanding = { userId: string; lpSeason: number }
+
+export function isProjectedSeasonTop10(
+  userId: string,
+  top: SeasonStanding[],
+  currentLp: number | null,
+  projectedLpDelta: number,
+): boolean {
+  if (top.some((row) => row.userId === userId)) return true
+  if (currentLp == null && projectedLpDelta <= 0) return false
+  if (top.length < 10) return true
+  const projectedLp = (currentLp ?? 0) + Math.max(0, projectedLpDelta)
+  return projectedLp >= top[top.length - 1].lpSeason
+}
+
+async function isUserInSeasonTop10(
+  userId: string,
+  activeSeasonId?: string | null,
+  projectedLpDelta = 0,
+): Promise<boolean> {
+  if (activeSeasonId === null) return false
   const now = new Date()
-  const season = await prisma.season.findFirst({
-    where: { startsAt: { lte: now }, endsAt: { gte: now } },
-  })
-  if (!season) return false
-  const top = await prisma.userSeasonStat.findMany({
-    where: { seasonId: season.id },
+  const where = activeSeasonId !== undefined
+    ? { seasonId: activeSeasonId }
+    : { season: { startsAt: { lte: now }, endsAt: { gte: now } } }
+  const topPromise = prisma.userSeasonStat.findMany({
+    where,
     orderBy: { lpSeason: 'desc' },
     take: 10,
-    select: { userId: true },
+    select: { userId: true, lpSeason: true },
   })
-  return top.some((t) => t.userId === userId)
+
+  if (activeSeasonId === undefined) {
+    const top = await topPromise
+    return top.some((row) => row.userId === userId)
+  }
+
+  const [top, current] = await Promise.all([
+    topPromise,
+    prisma.userSeasonStat.findUnique({
+      where: { seasonId_userId: { seasonId: activeSeasonId, userId } },
+      select: { lpSeason: true },
+    }),
+  ])
+  return isProjectedSeasonTop10(
+    userId,
+    top,
+    current?.lpSeason ?? null,
+    projectedLpDelta,
+  )
 }
 
 export type CheckAndAwardOptions = {
@@ -73,9 +113,19 @@ export type AchievementProgressSnapshot = {
   isSeasonTop10: boolean
 }
 
+export type LoadAchievementProgressOptions = {
+  /** Draft workout being committed concurrently with this snapshot. */
+  pendingWorkoutStartedAt?: Date
+  /** Active season already loaded by the completion path; null means none. */
+  activeSeasonId?: string | null
+  /** LP that the concurrent rank transaction will add to the season. */
+  projectedSeasonLpDelta?: number
+}
+
 /** Load all independent achievement inputs concurrently. */
 export async function loadAchievementProgress(
   userId: string,
+  options: LoadAchievementProgressOptions = {},
 ): Promise<AchievementProgressSnapshot> {
   const [
     workoutCount,
@@ -102,12 +152,16 @@ export async function loadAchievementProgress(
       by: ['exerciseId'],
       where: { workout: { userId } },
     }),
-    getWorkoutDayStreak(userId),
-    isUserInSeasonTop10(userId),
+    getWorkoutDayStreak(userId, options.pendingWorkoutStartedAt),
+    isUserInSeasonTop10(
+      userId,
+      options.activeSeasonId,
+      options.projectedSeasonLpDelta,
+    ),
   ])
 
   return {
-    workoutCount,
+    workoutCount: workoutCount + (options.pendingWorkoutStartedAt ? 1 : 0),
     setCount,
     earnedKeys: new Set(earnedRows.map((u) => u.achievement.key)),
     maxLp: ranks.length > 0 ? Math.max(...ranks.map((r) => r.lpTotal)) : 0,

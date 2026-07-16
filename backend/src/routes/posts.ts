@@ -265,12 +265,15 @@ export async function postRoutes(app: FastifyInstance) {
           },
         },
         ...feedPostInclude,
+        // Filtered relation keeps likedByMe in this same DB round trip.
+        likes: { where: { userId }, select: { userId: true } },
       },
     })
 
-    // Seed the client's heart state: one findMany for the whole page (no N+1).
-    const liked = await likedPostIdsFor(userId, posts.map((p) => p.id))
-    const data = posts.map((p) => ({ ...p, likedByMe: liked.has(p.id) }))
+    const data = posts.map(({ likes, ...post }) => ({
+      ...post,
+      likedByMe: likes.length > 0,
+    }))
 
     return reply.send({ data, meta: { page, limit } })
   })
@@ -473,12 +476,14 @@ export async function postRoutes(app: FastifyInstance) {
         user: { select: { id: true, profile: { select: { displayName: true, username: true } } } },
         privacySettings: true,
         _count: { select: { likes: true, comments: true } },
+        likes: { where: { userId: me }, select: { userId: true } },
       },
     })
 
-    // Same single-query likedByMe seeding as /feed (no N+1).
-    const liked = await likedPostIdsFor(me, posts.map((p) => p.id))
-    const data = posts.map((p) => ({ ...p, likedByMe: liked.has(p.id) }))
+    const data = posts.map(({ likes, ...post }) => ({
+      ...post,
+      likedByMe: likes.length > 0,
+    }))
 
     return reply.send({ data, meta: { page, limit } })
   })

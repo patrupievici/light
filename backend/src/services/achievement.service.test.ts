@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   achievementKeysForProgress,
+  isProjectedSeasonTop10,
   type AchievementProgressSnapshot,
 } from './achievement.service'
 
@@ -47,5 +48,20 @@ describe('achievementKeysForProgress', () => {
       workoutCount: 1,
       earnedKeys: new Set(['first_workout']),
     }))).not.toContain('first_workout')
+  })
+})
+
+describe('isProjectedSeasonTop10', () => {
+  const top = Array.from({ length: 10 }, (_, index) => ({
+    userId: `u${index}`,
+    lpSeason: 1000 - index * 50,
+  }))
+
+  it('projects a user into the top 10 after the pending rank delta', () => {
+    expect(isProjectedSeasonTop10('me', top, 400, 200)).toBe(true)
+  })
+
+  it('does not invent a standing for a user with no row and no LP gain', () => {
+    expect(isProjectedSeasonTop10('me', top, null, 0)).toBe(false)
   })
 })

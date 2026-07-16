@@ -293,58 +293,45 @@ export interface ComputeRanksOptions {
   workout?: RankWorkoutContext
 }
 
-export async function computeRanks(
-  userId: string,
-  workoutId: string,
-  options: ComputeRanksOptions = {},
-): Promise<ComputeRanksResult> {
-  const profile = options.profile !== undefined
-    ? options.profile
-    : await prisma.userProfile.findUnique({ where: { userId } })
-  // Bodyweight comes from the single canonical source (lib/bodyweight) so every
-  // consumer coerces the Decimal column the same way.
+export type RankHistoryContext = {
+  exerciseId: string
+  lpTotal: number
+  strengthRatio: unknown
+}
+
+export type RankSeasonContext = { id: string } | null
+
+export interface PreparedRankUpdates {
+  result: ComputeRanksResult
+  writes: PrismaPromise<unknown>[]
+  hasPr: boolean
+}
+
+export interface PrepareRankUpdatesOptions {
+  userId: string
+  profile: RankProfileContext
+  workout: RankWorkoutContext
+  previousRanks: RankHistoryContext[]
+  activeSeason: RankSeasonContext
+}
+
+/**
+ * Build the rank result and lazy Prisma writes without executing another DB
+ * transaction. Completion can merge these writes into its own atomic commit.
+ */
+export function prepareRankUpdates({
+  userId,
+  profile,
+  workout,
+  previousRanks,
+  activeSeason,
+}: PrepareRankUpdatesOptions): PreparedRankUpdates {
   const bw = getCanonicalBodyweightKg(profile)
-  if (bw == null) {
-    throw new Error('BW_REQUIRED')
-  }
-
-  // Anti-cheat: reject impossible bodyweights instead of computing a rank from
-  // garbage. Validated server-side even though the client also range-checks.
-  if (!Number.isFinite(bw) || bw < 30 || bw > 250) {
-    throw new Error('BW_INVALID')
-  }
-
-  const workout = options.workout !== undefined
-    ? options.workout
-    : await prisma.workout.findUnique({
-        where: { id: workoutId },
-        include: {
-          exercises: {
-            include: {
-              exercise: true,
-              sets: true,
-            },
-          },
-        },
-      })
-
+  if (bw == null) throw new Error('BW_REQUIRED')
+  if (!Number.isFinite(bw) || bw < 30 || bw > 250) throw new Error('BW_INVALID')
   if (!workout) throw new Error('WORKOUT_NOT_FOUND')
 
   const results: RankResult[] = []
-  const rankableExerciseIds = workout.exercises
-    .filter((we) => we.exercise.isRanked && (we.exercise.rankModel === 'WEIGHTED' || we.exercise.rankModel === 'BW_REPS'))
-    .map((we) => we.exerciseId)
-  const [previousRanks, activeSeason] = await Promise.all([
-    prisma.userExerciseRank.findMany({
-      where: { userId, exerciseId: { in: rankableExerciseIds } },
-    }),
-    prisma.season.findFirst({
-      where: {
-        startsAt: { lte: new Date() },
-        endsAt: { gte: new Date() },
-      },
-    }),
-  ])
   const previousRankByExerciseId = new Map(previousRanks.map((rank) => [rank.exerciseId, rank]))
   const writes: PrismaPromise<unknown>[] = []
 
@@ -362,14 +349,10 @@ export async function computeRanks(
 
     const newLp = srToLP(sr, ex.name, ex.rankModel)
     const tier = lpToTier(newLp)
-
     const prevRank = previousRankByExerciseId.get(we.exerciseId)
-
     const prevLp = prevRank?.lpTotal ?? 0
     const lpDelta = newLp - prevLp
-
     const prevSr = prevRank ? Number(prevRank.strengthRatio) : 0
-    // Single source of truth for the >20% SR-jump heuristic (anti-cheat.service).
     const isAnomaly = isSrAnomaly(sr, prevSr)
 
     writes.push(
@@ -402,21 +385,12 @@ export async function computeRanks(
     })
   }
 
-  const overallLpDelta = results
+  const overallLpDelta = [...results]
     .sort((a, b) => b.lpTotal - a.lpTotal)
     .slice(0, TOP_N_EXERCISES)
-    .reduce((sum, r) => sum + r.lpDelta, 0)
-
+    .reduce((sum, result) => sum + result.lpDelta, 0)
   const seasonLpDelta = Math.max(0, overallLpDelta)
-
-  if (results.some((result) => result.lpDelta > 0)) {
-    writes.push(
-      prisma.workout.update({
-        where: { id: workoutId },
-        data: { hasPr: true },
-      }),
-    )
-  }
+  const hasPr = results.some((result) => result.lpDelta > 0)
 
   if (results.length > 0) {
     writes.push(
@@ -436,7 +410,75 @@ export async function computeRanks(
     )
   }
 
+  return {
+    result: { results, overallLpDelta, seasonLpDelta },
+    writes,
+    hasPr,
+  }
+}
+
+export async function computeRanks(
+  userId: string,
+  workoutId: string,
+  options: ComputeRanksOptions = {},
+): Promise<ComputeRanksResult> {
+  const profile = options.profile !== undefined
+    ? options.profile
+    : await prisma.userProfile.findUnique({ where: { userId } })
+  // Fail before the workout read when bodyweight is absent or invalid.
+  const bw = getCanonicalBodyweightKg(profile)
+  if (bw == null) throw new Error('BW_REQUIRED')
+  if (!Number.isFinite(bw) || bw < 30 || bw > 250) throw new Error('BW_INVALID')
+
+  const workout = options.workout !== undefined
+    ? options.workout
+    : await prisma.workout.findUnique({
+        where: { id: workoutId },
+        include: {
+          exercises: {
+            include: {
+              exercise: true,
+              sets: true,
+            },
+          },
+        },
+      })
+
+  if (!workout) throw new Error('WORKOUT_NOT_FOUND')
+
+  const rankableExerciseIds = workout.exercises
+    .filter((we) => we.exercise.isRanked && (we.exercise.rankModel === 'WEIGHTED' || we.exercise.rankModel === 'BW_REPS'))
+    .map((we) => we.exerciseId)
+  const [previousRanks, activeSeason] = await Promise.all([
+    prisma.userExerciseRank.findMany({
+      where: { userId, exerciseId: { in: rankableExerciseIds } },
+    }),
+    prisma.season.findFirst({
+      where: {
+        startsAt: { lte: new Date() },
+        endsAt: { gte: new Date() },
+      },
+    }),
+  ])
+  const prepared = prepareRankUpdates({
+    userId,
+    profile,
+    workout,
+    previousRanks,
+    activeSeason,
+  })
+  const writes = [...prepared.writes]
+
+  if (prepared.hasPr) {
+    writes.unshift(
+      prisma.workout.update({
+        where: { id: workoutId },
+        data: { hasPr: true },
+      }),
+    )
+  }
+
   if (writes.length > 0) await prisma.$transaction(writes)
 
-  return { results, overallLpDelta, seasonLpDelta }
+  return prepared.result
 }

@@ -198,7 +198,7 @@ const DAY_MS = 86_400_000
 describe('POST set — anti-cheat >2x personal-max weight jump', () => {
   beforeEach(() => {
     // Ownership check passes for every add test.
-    workoutExerciseFindFirst.mockResolvedValue({ id: 'we1', workoutId: 'w1', exerciseId: 'ex1' })
+    workoutExerciseFindFirst.mockResolvedValue({ exerciseId: 'ex1', sets: [] })
     workoutSetCreate.mockResolvedValue({
       id: 's1', setIndex: 0, weightKg: 250, reps: 3, tag: 'WORK', isCompleted: true, note: null,
     })
@@ -218,9 +218,7 @@ describe('POST set — anti-cheat >2x personal-max weight jump', () => {
   })
 
   it('ACCEPTS the same >2x jump when a note is supplied, and persists the trimmed note', async () => {
-    workoutSetFindFirst
-      .mockResolvedValueOnce({ weightKg: 100, createdAt: new Date() }) // personal max
-      .mockResolvedValueOnce(null) // lastSet → setIndex 0
+    workoutSetFindFirst.mockResolvedValueOnce({ weightKg: 100, createdAt: new Date() })
 
     const app = await buildApp()
     const res = await app.inject({
@@ -235,9 +233,10 @@ describe('POST set — anti-cheat >2x personal-max weight jump', () => {
   })
 
   it('ALLOWS a >2x jump (no note) when the personal max is OLD (>7d) — gradual progression', async () => {
-    workoutSetFindFirst
-      .mockResolvedValueOnce({ weightKg: 100, createdAt: new Date(Date.now() - 8 * DAY_MS) })
-      .mockResolvedValueOnce(null)
+    workoutSetFindFirst.mockResolvedValueOnce({
+      weightKg: 100,
+      createdAt: new Date(Date.now() - 8 * DAY_MS),
+    })
 
     const app = await buildApp()
     const res = await app.inject({ method: 'POST', url: ADD_URL, payload: { weightKg: 250, reps: 3 } })
@@ -248,9 +247,7 @@ describe('POST set — anti-cheat >2x personal-max weight jump', () => {
   })
 
   it('ALLOWS a first-ever heavy set (no personal max on record) without a note', async () => {
-    workoutSetFindFirst
-      .mockResolvedValueOnce(null) // no personal max
-      .mockResolvedValueOnce(null)
+    workoutSetFindFirst.mockResolvedValueOnce(null)
 
     const app = await buildApp()
     const res = await app.inject({ method: 'POST', url: ADD_URL, payload: { weightKg: 250, reps: 3 } })
@@ -261,9 +258,6 @@ describe('POST set — anti-cheat >2x personal-max weight jump', () => {
   })
 
   it('does NOT weight-check a WARMUP set, however heavy', async () => {
-    // No personal-max query should even run for a warmup; create proceeds.
-    workoutSetFindFirst.mockResolvedValueOnce(null) // lastSet only
-
     const app = await buildApp()
     const res = await app.inject({
       method: 'POST', url: ADD_URL, payload: { weightKg: 250, reps: 3, tag: 'WARMUP' },
@@ -271,6 +265,29 @@ describe('POST set — anti-cheat >2x personal-max weight jump', () => {
 
     expect(res.statusCode).toBe(201)
     expect(workoutSetCreate).toHaveBeenCalledOnce()
+    expect(workoutSetFindFirst).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('retries with the latest index when two distinct sets race', async () => {
+    workoutSetCreate
+      .mockRejectedValueOnce({
+        code: 'P2002',
+        meta: { target: ['workout_exercise_id', 'set_index'] },
+      })
+      .mockResolvedValueOnce({ id: 's2', setIndex: 1 })
+    workoutSetFindFirst.mockResolvedValueOnce({ setIndex: 0 })
+
+    const app = await buildApp()
+    const res = await app.inject({
+      method: 'POST',
+      url: ADD_URL,
+      payload: { weightKg: 20, reps: 10, tag: 'WARMUP' },
+    })
+
+    expect(res.statusCode).toBe(201)
+    expect(workoutSetCreate).toHaveBeenCalledTimes(2)
+    expect(workoutSetCreate.mock.calls[1][0]).toMatchObject({ data: { setIndex: 1 } })
     await app.close()
   })
 })
