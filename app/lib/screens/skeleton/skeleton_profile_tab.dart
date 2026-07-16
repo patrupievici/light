@@ -16,7 +16,6 @@ import '../analytics/progress_hub_screen.dart';
 import '../analytics/weekly_effort_screen.dart';
 import '../ai/ai_chat_screen.dart';
 import '../profile/achievements_screen.dart';
-import '../settings/settings_screen.dart';
 import '../../widgets/z/z_eyebrow.dart';
 import '../../widgets/zvelt_primary_button.dart';
 
@@ -244,20 +243,6 @@ class _SkeletonProfileTabState extends State<SkeletonProfileTab> {
                   const SizedBox(height: ZveltTokens.s2),
                   _SectionCard(children: [
                     _SectionRow(
-                      icon: AppIcons.settings,
-                      title: 'Account settings',
-                      subtitle: 'Units, privacy, notifications, logout',
-                      onTap: () async {
-                        await Navigator.of(context).push<void>(
-                          MaterialPageRoute(
-                            builder: (_) => SettingsScreen(onLogout: widget.onLogout),
-                          ),
-                        );
-                        _load();
-                      },
-                    ),
-                    _Divider(),
-                    _SectionRow(
                       icon: AppIcons.user,
                       title: 'Physical data',
                       subtitle: _weightKg != null
@@ -353,7 +338,6 @@ class _SkeletonProfileTabState extends State<SkeletonProfileTab> {
                     ),
                   ]),
                   const SizedBox(height: ZveltTokens.s6),
-                  // Logout lives in Settings only (single exit point).
                         ],  // ListView children
                       ),    // ListView
                     ),      // RefreshIndicator
@@ -536,7 +520,9 @@ class _SkeletonProfileTabState extends State<SkeletonProfileTab> {
         _showSnack("Couldn't update privacy (${res.statusCode}) — try again.");
       }
     } catch (_) {
-      if (mounted) _showSnack("Couldn't update privacy — check your connection.");
+      if (mounted) {
+        _showSnack("Couldn't update privacy — check your connection.");
+      }
     }
   }
 

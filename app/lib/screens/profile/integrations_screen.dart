@@ -123,7 +123,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
           ? (imported > 0
               ? 'Connected — recent history imported.'
               : 'Connected — recent health data is ready.')
-          : 'Permission denied. You can re-try anytime in Settings.'),
+          : 'Permission denied. You can retry later.'),
     ));
   }
 

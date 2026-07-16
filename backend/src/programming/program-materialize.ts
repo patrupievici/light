@@ -4,6 +4,7 @@ import {
   type OverloadDecision,
 } from '../lib/progressive-overload'
 import { generateWarmupSets } from '../lib/warmup'
+import { capPresetSets, MAX_PRESET_SETS_PER_EXERCISE } from '../lib/preset-set-limit'
 import { percentSetsFromTM, resolveWave, type MaterializedSet } from './program-progression'
 import type { ProgramTemplate, ProgramSlot } from './program-templates'
 
@@ -91,7 +92,11 @@ export function sessionToWeekAndDay(
   return { week, dayInRotation }
 }
 
-function warmupsFor(meta: ResolvedSlotMeta | undefined, topWeightKg: number | null): Array<{ weightKg: number; reps: number }> | undefined {
+function warmupsFor(
+  meta: ResolvedSlotMeta | undefined,
+  topWeightKg: number | null,
+  workingSetCount: number,
+): Array<{ weightKg: number; reps: number }> | undefined {
   if (!meta || topWeightKg == null || topWeightKg <= 0) return undefined
   const ramp = generateWarmupSets(topWeightKg, {
     movementPattern: meta.movementPattern,
@@ -99,7 +104,10 @@ function warmupsFor(meta: ResolvedSlotMeta | undefined, topWeightKg: number | nu
     category: meta.category,
   })
   if (ramp.length === 0) return undefined
-  return ramp.map((w) => ({ weightKg: w.weightKg, reps: w.reps }))
+  const candidates = ramp.map((w) => ({ weightKg: w.weightKg, reps: w.reps }))
+  const placeholders = Array.from({ length: workingSetCount }, () => null)
+  const limited = capPresetSets(placeholders, candidates).warmups
+  return limited.length > 0 ? limited : undefined
 }
 
 function buildWaveSlot(slot: ProgramSlot, meta: ResolvedSlotMeta | undefined, tm: Record<string, number>, weekInCycle: number): MaterializedEntry {
@@ -107,7 +115,7 @@ function buildWaveSlot(slot: ProgramSlot, meta: ResolvedSlotMeta | undefined, tm
   const tmKey = slot.tmRef ?? slot.exercise
   const tmKg = tm[tmKey] ?? null
   const steps = resolveWave(slot.sets.wave, weekInCycle)
-  const detail = percentSetsFromTM(tmKg, steps)
+  const detail = capPresetSets(percentSetsFromTM(tmKg, steps), []).workSets
   const workWeights = detail.map((d) => d.weightKg).filter((w): w is number => w != null)
   const topWeight = workWeights.length ? Math.max(...workWeights) : null
   const firstReps = detail[0]?.reps ?? 5
@@ -119,13 +127,14 @@ function buildWaveSlot(slot: ProgramSlot, meta: ResolvedSlotMeta | undefined, tm
     restSeconds: slot.restSeconds,
     suggestedWeightKg: topWeight,
     setsDetail: detail.map((d: MaterializedSet) => ({ weightKg: d.weightKg, reps: d.reps, amrap: d.amrap, pctOfTM: d.pctOfTM })),
-    warmups: slot.warmup ? warmupsFor(meta, topWeight) : undefined,
+    warmups: slot.warmup ? warmupsFor(meta, topWeight, detail.length) : undefined,
     notes: tmKg != null ? `${slot.sets.wave} · TM ${tmKg}kg` : `${slot.sets.wave} · set your 1RM to load this`,
   }
 }
 
 function buildLoadedSlot(slot: ProgramSlot, meta: ResolvedSlotMeta | undefined, load: SlotLoad | undefined, isDeload: boolean): MaterializedEntry {
-  const baseSets = slot.sets.kind === 'straight' ? slot.sets.sets : slot.sets.kind === 'range' ? slot.sets.sets : 3
+  const requestedSets = slot.sets.kind === 'straight' ? slot.sets.sets : slot.sets.kind === 'range' ? slot.sets.sets : 3
+  const baseSets = Math.min(MAX_PRESET_SETS_PER_EXERCISE, requestedSets)
   // Reps target: straight = fixed; range = climbed reps from the engine, clamped to band.
   let reps: number
   if (slot.sets.kind === 'straight') {
@@ -159,7 +168,7 @@ function buildLoadedSlot(slot: ProgramSlot, meta: ResolvedSlotMeta | undefined, 
     reps,
     restSeconds: slot.restSeconds,
     suggestedWeightKg: weight,
-    warmups: slot.warmup ? warmupsFor(meta, weight) : undefined,
+    warmups: slot.warmup ? warmupsFor(meta, weight, sets) : undefined,
     notes: note,
   }
 }

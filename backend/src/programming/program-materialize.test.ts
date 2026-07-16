@@ -6,7 +6,7 @@ import {
   type ResolvedSlotMeta,
   type SlotLoad,
 } from './program-materialize'
-import { getProgramTemplate } from './program-templates'
+import { getProgramTemplate, PROGRAM_TEMPLATES } from './program-templates'
 
 /** Build a meta map for every slot of a template day, marking compounds as weighted. */
 function metaForDay(templateId: string, dayInRotation: number): Record<string, ResolvedSlotMeta> {
@@ -66,7 +66,8 @@ describe('percentage program materialization (5/3/1 BBB)', () => {
     expect(main.setsDetail!.at(-1)!.amrap).toBe(true)
     // every working load is plate-rounded (multiple of 2.5)
     for (const s of main.setsDetail!) expect(s.weightKg! % 2.5).toBe(0)
-    expect(main.warmups && main.warmups.length).toBeTruthy()
+    expect(main.warmups).toHaveLength(2)
+    expect((main.warmups?.length ?? 0) + main.setsDetail!.length).toBeLessThanOrEqual(5)
     expect(day.isDeload).toBe(false)
 
     const bbb = day.exercises[1]
@@ -115,7 +116,7 @@ describe('linear program materialization (StrongLifts 5x5)', () => {
     expect(squat.reps).toBe(5)
     expect(squat.suggestedWeightKg).toBe(100)
     expect(squat.setsDetail).toBeUndefined() // uniform → converter expands
-    expect(squat.warmups!.length).toBeGreaterThan(0)
+    expect(squat.warmups).toBeUndefined()
     expect(day.isDeload).toBe(false) // SL has no scheduled deload
   })
 })
@@ -141,5 +142,37 @@ describe('double program deload (Upper/Lower, cadence 4)', () => {
     expect(deload.isDeload).toBe(true)
     expect(deload.exercises[0].suggestedWeightKg!).toBeLessThan(normal.exercises[0].suggestedWeightKg!)
     expect(deload.exercises[0].sets).toBeLessThan(normal.exercises[0].sets)
+  })
+})
+
+describe('program tracker set budget', () => {
+  it('keeps every exercise in every program day at five preset rows or fewer', () => {
+    for (const template of PROGRAM_TEMPLATES) {
+      const trainingMaxes = Object.fromEntries(
+        (template.trainingMaxLifts ?? []).map((name) => [name, 100]),
+      )
+
+      for (const week of [1, 2, 3, 4]) {
+        for (let dayIndex = 0; dayIndex < template.days.length; dayIndex++) {
+          const day = buildDayExercises({
+            template,
+            week,
+            dayInRotation: dayIndex,
+            tm: trainingMaxes,
+            meta: metaForDay(template.id, dayIndex),
+            loads: loadsForDay(template.id, dayIndex, 60),
+          })
+
+          for (const exercise of day.exercises) {
+            const workingSets = exercise.setsDetail?.length ?? exercise.sets
+            const totalSets = workingSets + (exercise.warmups?.length ?? 0)
+            expect(
+              totalSets,
+              `${template.id}/week-${week}/${day.dayKey}/${exercise.name}`,
+            ).toBeLessThanOrEqual(5)
+          }
+        }
+      }
+    }
   })
 })

@@ -113,7 +113,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
   static final _errorCopy = <_LoadError, (String, String, IconData, Color)>{
     // 'Go back' not 'Sign in' — the button just pops to the shell; there is
     // no in-place re-auth flow, so promising a sign-in was a dead end.
-    _LoadError.auth: ('Your session expired. Log out and back in from Settings.', 'Go back', AppIcons.lock, ZveltTokens.warn),
+    _LoadError.auth: ('Your session expired. Log out and back in from Profile.', 'Go back', AppIcons.lock, ZveltTokens.warn),
     _LoadError.server: ('Our backend hiccupped. Try again.', 'Retry', AppIcons.cloud_disabled, ZveltTokens.error),
     _LoadError.network: ('Check your connection.', 'Retry', AppIcons.cloud_disabled, ZveltTokens.warn),
     _LoadError.parse: ('Something went wrong reading the response.', 'Retry', AppIcons.picture, ZveltTokens.error),

@@ -1,10 +1,16 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../services/app_data_cache.dart';
 import '../../services/profile_service.dart';
 import '../../services/revenuecat_service.dart';
+import '../../services/settings_store.dart';
+import '../../services/social_notification_hub.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_theme_rebuilder.dart';
 import '../../theme/zvelt_tokens.dart';
@@ -14,22 +20,19 @@ import '../ai/ai_chat_screen.dart';
 import '../analytics/progress_screen.dart';
 import '../login_screen.dart';
 import '../settings/delete_account_screen.dart';
-import '../settings/settings_screen.dart';
+import '../settings/resource_settings_screens.dart';
+import '../settings/settings_kit.dart';
 
-/// PROFILE — 1:1 with the ZVELT handoff prototype (screen A7).
-///
-/// Header ("Profile" + settings gear + logout) · profile block (76px rounded
-/// avatar, name + premium crown, email) · Edit Profile button (Add Device cut
-/// for V1 — user call 2026-07-14) · Premium banner · Appearance row
-/// (Dark/Light) · rows: Progress (→ the 1:1 ProgressScreen, prototype goProg),
-/// Preferences, Account, Help & Feedback, AI Companion, About ZVELT,
-/// Request a Feature, Report a Bug. Nothing else.
-///
-/// Settings opens the complete shared hub; the remaining profile actions use
-/// focused sheets for edit, account, help, about and feedback.
+/// Profile owns account, appearance, support, legal and diagnostics controls.
+/// Focused sheets keep edit, account, premium and feedback flows in context.
 class ProfileTab extends StatefulWidget {
-  const ProfileTab({super.key, required this.onLogout});
+  const ProfileTab({
+    super.key,
+    required this.onLogout,
+    this.preview = false,
+  });
   final Future<void> Function() onLogout;
+  final bool preview;
 
   @override
   State<ProfileTab> createState() => _ProfileTabState();
@@ -43,11 +46,40 @@ class _ProfileTabState extends State<ProfileTab> {
   bool _isGuest = false;
   DateTime? _memberSince;
   bool _loading = true;
+  bool _diagnostics = false;
+  String _version = 'v1.0.0 - build 5';
 
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.preview) {
+      _loading = false;
+    } else {
+      _load();
+      _loadSupportInfo();
+    }
+  }
+
+  Future<void> _loadSupportInfo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() =>
+            _diagnostics = prefs.getBool(SettingsKeys.diagnostics) ?? false);
+      }
+    } catch (_) {
+      // The profile stays usable even if device preferences are unavailable.
+    }
+
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(
+            () => _version = 'v${info.version} - build ${info.buildNumber}');
+      }
+    } catch (_) {
+      // Keep the compile-time fallback shown above.
+    }
   }
 
   Future<void> _load() async {
@@ -75,8 +107,6 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   // ─── actions ──────────────────────────────────────────────────────────────
-  void _openSettings() => _push(SettingsScreen(onLogout: widget.onLogout));
-
   void _openPremium() => _sheet(const _PremiumSheet());
 
   void _openEditSheet() {
@@ -172,6 +202,56 @@ class _ProfileTabState extends State<ProfileTab> {
     if (ok == true && mounted) await widget.onLogout();
   }
 
+  Future<void> _clearCache() async {
+    final ok = await settingsConfirm(
+      context,
+      title: 'Clear cache and reload?',
+      body:
+          'Temporary profile, plan and image caches will be cleared. Your account and preferences stay intact.',
+      confirmLabel: 'Clear cache',
+    );
+    if (!ok) return;
+    await AppDataCache.instance.clearSessionCaches();
+    PaintingBinding.instance.imageCache
+      ..clear()
+      ..clearLiveImages();
+    await SocialNotificationHub.refresh();
+    if (!mounted) return;
+    settingsSnack(context, 'Cache cleared - data reloaded.');
+    await _load();
+  }
+
+  Future<void> _sendLogs() async {
+    try {
+      if (!kIsWeb) await FirebaseCrashlytics.instance.sendUnsentReports();
+      if (mounted) {
+        settingsSnack(context, 'Diagnostic reports sent to the developer.');
+      }
+    } catch (_) {
+      if (mounted) {
+        settingsSnack(context, 'Could not send diagnostics.', error: true);
+      }
+    }
+  }
+
+  Future<void> _setDiagnostics(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(SettingsKeys.diagnostics, value);
+    if (!kIsWeb) {
+      await FirebaseCrashlytics.instance
+          .setCrashlyticsCollectionEnabled(value && !kDebugMode);
+    }
+    if (mounted) setState(() => _diagnostics = value);
+  }
+
+  Future<void> _launch(Uri uri) async {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      settingsSnack(context, 'Could not open this link.', error: true);
+    }
+  }
+
   void _push(Widget screen) => Navigator.of(context)
       .push<void>(MaterialPageRoute<void>(builder: (_) => screen))
       .then((_) => _load());
@@ -191,13 +271,16 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Widget _buildProfile(BuildContext context) {
-    final topPad = MediaQuery.paddingOf(context).top;
     final canPop = Navigator.of(context).canPop();
     return Scaffold(
       backgroundColor: ZveltTokens.bg,
+      appBar: PreferredSize(
+        preferredSize: Size.zero,
+        child: ColoredBox(color: ZveltTokens.bg),
+      ),
       body: ListView(
         padding: EdgeInsets.only(
-          top: topPad + 8,
+          top: 8,
           bottom: ZveltMainNavBar.reservedBottomHeight(context),
         ),
         children: [
@@ -223,8 +306,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 Text('Profile', style: ZType.h2),
                 const Spacer(),
-                _iconBtn(AppIcons.settings, 'Settings', _openSettings),
-                const SizedBox(width: 9),
                 _iconBtn(AppIcons.sign_out_alt, 'Sign out', _confirmLogout),
               ],
             ),
@@ -512,8 +593,6 @@ class _ProfileTabState extends State<ProfileTab> {
                 // 1:1 Progress screen as Home's Volume card — nothing else.
                 _row(AppIcons.chart_line_up, 'Progress',
                     accent: true, onTap: () => _push(const ProgressScreen())),
-                _row(AppIcons.settings_sliders, 'Preferences',
-                    onTap: _openSettings),
                 _row(AppIcons.user, 'Account', onTap: _openAccountSheet),
                 _row(AppIcons.interrogation, 'Help & Feedback',
                     onTap: () => _sheet(const _HelpSheet())),
@@ -537,6 +616,128 @@ class _ProfileTabState extends State<ProfileTab> {
                         subject: 'Bug report',
                         showVersionChip: true))),
               ],
+            ),
+          ),
+          _buildSupportSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupportSection() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SettingsSectionTitle('Legal'),
+          SettingsCard(
+            children: [
+              SettingsRow(
+                icon: AppIcons.document,
+                tint: SettingsTint.gray,
+                title: 'Terms of Service',
+                onTap: () => _push(const LegalDocumentScreen(privacy: false)),
+              ),
+              SettingsRow(
+                icon: AppIcons.shield_check,
+                tint: SettingsTint.gray,
+                title: 'Privacy Policy',
+                onTap: () => _push(const LegalDocumentScreen(privacy: true)),
+              ),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s4),
+          SettingsActionButton(
+            label: 'Clear cache & reload all data',
+            onTap: _clearCache,
+          ),
+          const SizedBox(height: ZveltTokens.cardGap),
+          SettingsActionButton(
+            label: 'Send logs to developer',
+            onTap: _sendLogs,
+          ),
+          const SizedBox(height: ZveltTokens.cardGap),
+          SettingsCard(
+            children: [
+              SettingsSwitchRow(
+                icon: AppIcons.chart_line_up,
+                tint: SettingsTint.gray,
+                title: 'Enable diagnostics',
+                value: _diagnostics,
+                onChanged: _setDiagnostics,
+              ),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s6),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: ZveltTokens.s4,
+            runSpacing: ZveltTokens.s2,
+            children: [
+              _ProfileSocialLink(
+                label: 'Instagram',
+                onTap: () =>
+                    _launch(Uri.parse('https://instagram.com/zveltapp')),
+              ),
+              _ProfileSocialLink(
+                label: 'X',
+                onTap: () => _launch(Uri.parse('https://x.com/zveltapp')),
+              ),
+              _ProfileSocialLink(
+                label: 'YouTube',
+                onTap: () => _launch(Uri.parse('https://youtube.com/@zvelt')),
+              ),
+              _ProfileSocialLink(
+                label: 'Reddit',
+                onTap: () => _launch(Uri.parse('https://reddit.com/r/zvelt')),
+              ),
+            ],
+          ),
+          const SizedBox(height: ZveltTokens.s5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: ZveltTokens.brand,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text('Zvelt', style: ZType.h1.copyWith(fontSize: 26)),
+                const SizedBox(width: 3),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    _version,
+                    style: ZType.monoS.copyWith(color: ZveltTokens.text4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: ZveltTokens.s2),
+          Center(
+            child: Text(
+              'Made for athletes who level up.',
+              style: ZType.bodyS.copyWith(color: ZveltTokens.text4),
+            ),
+          ),
+          const SizedBox(height: ZveltTokens.s1),
+          Center(
+            child: GestureDetector(
+              onTap: () =>
+                  _launch(Uri.parse('https://www.flaticon.com/uicons')),
+              child: Text(
+                'Icons by Flaticon',
+                style: ZType.monoXS.copyWith(color: ZveltTokens.text4),
+              ),
             ),
           ),
         ],
@@ -604,6 +805,31 @@ class _ProfileTabState extends State<ProfileTab> {
 // ─────────────────────────────────────────────────────────────────────────────
 // sheetEdit — Edit Profile (HTML 946-960)
 // ─────────────────────────────────────────────────────────────────────────────
+
+class _ProfileSocialLink extends StatelessWidget {
+  const _ProfileSocialLink({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: const Size(0, 44),
+      ),
+      child: Text(
+        label,
+        style: ZType.bodyS.copyWith(
+          color: ZveltTokens.text3,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
 
 class _EditProfileSheet extends StatefulWidget {
   const _EditProfileSheet({

@@ -21,7 +21,7 @@ import '../screens/plan/plan_tab.dart' show PlanTab;
 ///
 /// The ✦ center button is not a tab — it opens the AI Coach.
 /// Profile is no longer a bottom-nav destination: it opens from the Home avatar
-/// (top-left); Settings lives inside Profile.
+/// (top-left), including account, legal and diagnostics controls.
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key, required this.onLogout});
 

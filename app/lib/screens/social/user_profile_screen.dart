@@ -252,7 +252,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         backgroundColor: ZveltTokens.surface,
         title: Text('Block this user?', style: TextStyle(color: ZveltTokens.text)),
         content: Text(
-          "You won't see $label's posts, comments, or messages. You can unblock from Settings.",
+          "You won't see $label's posts, comments, or messages. You can unblock this user later.",
           style: TextStyle(color: ZveltTokens.text2),
         ),
         actions: [
@@ -560,7 +560,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             boxShadow: ZveltTokens.shadowCard,
           ),
           child: Text(
-            "This is you. Edit profile from Settings.",
+            "This is you. Open your Profile to edit it.",
             style: TextStyle(color: ZveltTokens.text2, fontSize: 13),
           ),
         ),

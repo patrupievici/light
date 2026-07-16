@@ -263,7 +263,7 @@ class _SocialFeedPostCardState extends State<SocialFeedPostCard> {
         backgroundColor: ZveltTokens.surface,
         title: Text('Block this user?', style: TextStyle(color: ZveltTokens.text)),
         content: Text(
-          "You won't see $name's posts, comments, or messages. You can unblock from Settings.",
+          "You won't see $name's posts, comments, or messages. You can unblock this user later.",
           style: TextStyle(color: ZveltTokens.text2),
         ),
         actions: [

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { PlannedWorkout } from '@prisma/client'
 import { prisma } from '../lib/prisma'
+import { capPresetSets, MAX_PRESET_SETS_PER_EXERCISE } from '../lib/preset-set-limit'
 
 /**
  * Convert a PlannedWorkout into a tracker-ready draft workout.
@@ -52,11 +53,12 @@ export type PlannedSeedSet = {
 export function buildPlannedSeedSets(exercise: PlannedExercise): PlannedSeedSet[] {
   const cleanWeight = (weight: unknown): number =>
     typeof weight === 'number' && Number.isFinite(weight) && weight >= 0 ? weight : 0
-  const seedSets: PlannedSeedSet[] = []
+  const warmups: PlannedSeedSet[] = []
+  const workSets: PlannedSeedSet[] = []
 
   if (Array.isArray(exercise.warmups)) {
     for (const warmup of exercise.warmups) {
-      seedSets.push({
+      warmups.push({
         weightKg: cleanWeight(warmup?.weightKg),
         reps: clampInt(warmup?.reps, 1, 50, 5),
         tag: 'WARMUP',
@@ -66,22 +68,23 @@ export function buildPlannedSeedSets(exercise: PlannedExercise): PlannedSeedSet[
 
   if (Array.isArray(exercise.setsDetail) && exercise.setsDetail.length > 0) {
     for (const detail of exercise.setsDetail) {
-      seedSets.push({
+      workSets.push({
         weightKg: cleanWeight(detail?.weightKg),
         reps: clampInt(detail?.reps, 1, 50, 8),
         tag: 'WORK',
       })
     }
   } else {
-    const setCount = clampInt(exercise.sets, 1, 12, 3)
+    const setCount = clampInt(exercise.sets, 1, MAX_PRESET_SETS_PER_EXERCISE, 3)
     const reps = clampInt(exercise.reps, 1, 50, 8)
     const weightKg = cleanWeight(exercise.suggestedWeightKg)
     for (let index = 0; index < setCount; index++) {
-      seedSets.push({ weightKg, reps, tag: 'WORK' })
+      workSets.push({ weightKg, reps, tag: 'WORK' })
     }
   }
 
-  return seedSets
+  const capped = capPresetSets(workSets, warmups)
+  return [...capped.warmups, ...capped.workSets]
 }
 
 export async function createWorkoutFromPlanned(
