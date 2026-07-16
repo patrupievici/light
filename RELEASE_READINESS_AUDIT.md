@@ -2,22 +2,22 @@
 
 Audit date: 2026-07-16
 
-Audited code revision: `ea11c4a` (production API behavior verified on `cc88c3f`; `ea11c4a` only changes Android build resolution)
+Audited code revision: `9de53e0` (production `/health` verified release `9de53e06bac1`)
 
 Production API: `https://light-l6en.onrender.com`
 Scope: Flutter client, Fastify/Prisma backend, PostgreSQL migrations, Android release artifacts, Android emulator, production API, privacy, security, accessibility, UX, product and operational launch readiness.
 
 ## 1. Executive Summary
 
-ZVELT is materially stronger than the first audit. The previously identified critical dependency vulnerability, private-media bypass, incomplete account erasure, nutrition target mismatch, theme navigation reset, stale mounted-tab appearance, red Flutter suite, misleading Premium action, unlabeled controls and inaccessible guest-account flow have been repaired and retested. This follow-up also removes the redundant Home settings/strength controls, consolidates every setting under Profile and replaces the colour-banded card material with stable neutral matte surfaces.
+ZVELT is materially stronger than the first audit. The previously identified critical dependency vulnerability, private-media bypass, incomplete account erasure, nutrition target mismatch, theme navigation reset, stale mounted-tab appearance, red Flutter suite, unlabeled controls and inaccessible guest-account flow have been repaired and retested. This follow-up also removes the redundant Home settings/strength controls, consolidates every setting under Profile, replaces the colour-banded card material with stable neutral matte surfaces, and implements the RevenueCat client flow behind safe configuration gates.
 
-A production-backed 30-day power-user simulation now exercises all 11 strength programs, 30 strength sessions, 367 completed sets, 30 runs, 30 rides, 30 nutrition days, 10 workout posts, ranking, PR filtering, calendar sync and account erasure. The final run made 801 paced requests: 822 of 824 assertions passed, every response was 2xx, no rate limit or server error occurred, and cleanup succeeded. The only failed assertions were the declared latency SLOs: read p95 was 608 ms against 300 ms and write p95 was 1,136 ms against 800 ms.
+A production-backed 30-day power-user simulation now exercises all 11 strength programs, 30 strength sessions, 434 completed sets, 30 runs, 30 rides, 30 nutrition days, 10 workout posts, ranking, PR filtering, calendar sync and account erasure. The final run made 801 paced requests: 822 of 824 assertions passed, every response was 2xx, no rate limit or server error occurred, and cleanup succeeded. The only failed assertions were the declared latency SLOs: read p95 was 543 ms against 300 ms and write p95 was 983 ms against 800 ms.
 
-The audit found and closed additional release defects during that simulation: explicit run/ride type was not preserved across every surface; GPS sessions were absent from the calendar; backfilled volume and PRs used upload time; first-time programs generated 0 kg weighted sets; PR posts lost their PR state after ranking at workout completion; program creation/ranking used avoidable serial database calls; and a clean Android release build resolved an alpha WorkManager dependency that was incompatible with the plugin JVM target.
+The audit found and closed additional release defects during the simulations: explicit run/ride type was not preserved across every surface; GPS sessions were absent from the calendar; backfilled volume and PRs used upload time; first-time programs generated 0 kg weighted sets; PR posts lost their PR state; ranking, achievements, set logging and feed state used avoidable serial database calls; rapid completion could award twice; concurrent set inserts could collide; and a clean Android release build resolved an alpha WorkManager dependency incompatible with the plugin JVM target.
 
-The current Android/backend candidate is suitable for an internal or tightly monitored closed beta. It is not yet ready for a public cross-platform launch tomorrow. Functional API correctness is stable, but production latency is above its declared SLO; outside the core, iOS Firebase configuration is placeholder-only, no iOS release was built or device-tested, RevenueCat billing is absent, store submission was not performed, and Health/Strava/Google/camera/background behavior has not been validated on representative physical devices.
+The current Android/backend candidate is suitable for an internal or tightly monitored closed beta. It is not yet ready for a public cross-platform launch tomorrow. Functional API correctness is stable, but production latency remains above its declared SLO. The RevenueCat Flutter integration is complete and safely disabled without keys, but neither store products/current offering nor sandbox purchase/restore are verified. iOS still lacks real Firebase values, Apple signing/capabilities, an archive/TestFlight build and physical-device QA. Store submission and Health/Strava/Google/camera/background validation also remain open.
 
-No Critical issue remains in the audited Android/backend path. Five unconditional High launch issues remain, plus RevenueCat as a sixth High if subscriptions are part of launch. The recommendation is intentionally strict because the stated product is cross-platform and the public-launch bar includes API latency, billing, hardware integrations and both stores.
+No Critical issue remains in the audited Android/backend path. The remaining High launch issues concern iOS/store activation, physical-device evidence and production latency rather than missing core Android functionality. The recommendation is intentionally strict because the stated product is cross-platform and the public-launch bar includes billing, hardware integrations and both stores.
 
 ### Release Fixes Completed
 
@@ -52,12 +52,17 @@ No Critical issue remains in the audited Android/backend path. Five unconditiona
 - Persisted workout PR outcomes at ranking time so later posts remain visible in the PR feed without a duplicate ranking calculation.
 - Added a reusable strict 30-day production simulation with automatic GDPR cleanup and route-level latency reporting.
 - Pinned AndroidX WorkManager to stable `2.11.2` and aligned `home_widget` to JVM 17, restoring reproducible APK/AAB release builds.
+- Added `purchases_flutter 10.4.1`, stable backend-UUID RevenueCat identity, live localized offerings, monthly/annual purchase, cancellation handling, restore and entitlement `pro` state.
+- Removed fake Premium pricing/trial behavior; billing stays visibly and safely unavailable until a valid platform public SDK key and current offering exist.
+- Merged workout completion, XP, ranking, PR and season writes into one atomic transaction and projected achievements concurrently before idempotent background persistence.
+- Made workout completion race-safe and retried concurrent set-index collisions without duplicate XP, ranks or 500 responses.
+- Reduced feed/gallery liked-state reads to the main post query and reduced normal set creation from up to five sequential DB waves to two or three.
 
 ## 2. Overall Application Score
 
-**81 / 100**
+**84 / 100**
 
-The core Android/backend product is functional, privacy-aware and extensively tested. The score is held below release-ready range by measured API SLO misses, unvalidated iOS/store/hardware paths, incomplete billing and remaining architectural debt.
+The core Android/backend product is functional, privacy-aware and extensively tested. The score is held below release-ready range by measured API SLO misses, unvalidated iOS/store/hardware paths, externally unconfigured billing and remaining architectural debt.
 
 ## 3. UI Score
 
@@ -67,15 +72,15 @@ The approved visual design is consistent across Home, Plan, Feed, AI, Nutrition,
 
 ## 4. UX Score
 
-**83 / 100**
+**84 / 100**
 
 Core activation is clear: strength remains discoverable in Plan, Home is less cluttered, all settings now have one predictable home under Profile, guest users can save progress, account deletion is complete, and AI no longer redirects meal questions into workout tracking. Remaining friction includes no account-data merge into an existing account, incomplete integrations and several visible future-feature surfaces.
 
 ## 5. Performance Score
 
-**66 / 100**
+**72 / 100**
 
-Release APK/AAB builds complete, scrolling was stable on the emulator, lazy screen construction and caches are present, and production smoke completed successfully. Database batching reduced post p95 from 1,957 ms to 975 ms and program start-day p95 from 2,844 ms to 1,297 ms. The score is intentionally lower now that measurement is available: final read p95 was 608 ms versus the 300 ms SLO, write p95 was 1,136 ms versus 800 ms, and workout completion p95 remained 2,357 ms. Risk also remains around a 110.6 MB universal APK, a 73.8 MB AAB, first-launch frame skips, Skia being forced instead of Impeller and no physical low/mid-tier device profiling.
+Release APK/AAB builds complete, scrolling was stable on the emulator, lazy screen construction and caches are present, and production smoke completed successfully. Across comparable production runs, post p95 fell from 1,957 ms to 727 ms, set creation from 727 ms to 547 ms, workout completion from 2,357 ms to 1,233 ms and global write p95 from 1,871 ms to 983 ms. The declared budgets still fail: final read p95 was 543 ms versus 300 ms and write p95 was 983 ms versus 800 ms. Risk also remains around a 116.2 MB universal APK, a 75.8 MB AAB, first-launch frame skips, Skia being forced instead of Impeller and no physical low/mid-tier device profiling.
 
 ## 6. Accessibility Score
 
@@ -85,15 +90,15 @@ Automated accessibility tests pass, audited controls have labels and 48dp target
 
 ## 7. Code Quality Score
 
-**85 / 100**
+**87 / 100**
 
 Static analysis is clean, backend tests are broad, migrations are versioned, release smoke and the month simulation are repeatable, and high-risk auth/media/ranking/sync logic has focused regression tests. The duplicated Profile settings sheet was deleted; visual regression coverage includes both card themes plus mounted-tab rebuilding with State preservation. Deductions remain for 28 direct HTTP client files, 12 `$queryRawUnsafe` call sites, 28 empty catches and some dead/incomplete feature code.
 
 ## 8. Product Score
 
-**78 / 100**
+**81 / 100**
 
-Workout, all 11 programs, ranking/PR posts, social, nutrition, running, cycling, AI and account-management journeys are coherent under a full synthetic month. Product completeness is reduced by unavailable subscriptions, partial wearable/integration surfaces, English-only UI and local-only journal data.
+Workout, all 11 programs, ranking/PR posts, social, nutrition, running, cycling, AI and account-management journeys are coherent under a full synthetic month. Product completeness is reduced because subscriptions are implemented but not activated in the stores/RevenueCat dashboard, alongside partial wearable/integration surfaces, English-only UI and local-only journal data.
 
 ## 9. Security Score
 
@@ -103,13 +108,13 @@ Dependency audit is clean; bearer sessions, CORS, private media, deletion, token
 
 ## 10. Stability Score
 
-**94 / 100**
+**95 / 100**
 
-Flutter tests pass `216/216`; backend tests pass `854/854`; Flutter analysis and TypeScript builds are clean; production smoke passes `113/113` after both backend releases; the strict month simulation has zero functional failures, zero 5xx/429 and successful account cleanup. Reinstalling the current signed release over itself preserved the guest session. Residual risk is dominated by latency SLO misses plus devices, platforms and upgrade paths not fully exercised in this Windows/Android-emulator audit.
+Flutter tests pass `218/218`; backend tests pass `861/861`; Flutter analysis and TypeScript builds are clean; production smoke passes `113/113`; the strict month simulation has zero functional failures, zero 5xx/429 and successful account cleanup. Reinstalling the current signed release over itself preserved the guest session. Residual risk is dominated by latency SLO misses plus devices, platforms and upgrade paths not fully exercised in this Windows/Android-emulator audit.
 
 ## 11. Launch Readiness Score
 
-**68 / 100**
+**72 / 100**
 
 - Android closed beta: acceptable with monitoring.
 - Public Android release: close, but API SLO, physical-device and store checks remain.
@@ -133,18 +138,20 @@ Anti-pattern verdict: **Pass with restraint recommended**. The release no longer
 | Check | Result |
 | --- | --- |
 | `flutter analyze` | Pass, no issues |
-| Flutter test suite | Pass, 216 tests |
+| Flutter test suite | Pass, 218 tests |
 | Backend TypeScript build | Pass, including `prisma generate` |
-| Backend test suite | Pass, 72 files, 854 tests |
+| Backend test suite | Pass, 73 files, 861 tests |
 | Prisma schema validation | Pass |
 | Production dependency audit | 0 vulnerabilities |
 | Full backend dependency audit | 0 vulnerabilities |
-| Production smoke, production API | 113/113 pass after each final backend deploy; owner/viewer/guest accounts cleaned |
+| Production smoke, production API | 113/113 pass on `9de53e0`; owner/viewer/guest accounts cleaned |
 | Strict 30-day production simulation | 822/824 pass; only read/write latency SLO assertions fail; 801/801 responses are 2xx; cleanup succeeds |
-| APK release build | Pass, 115,973,081 bytes |
-| AAB release build | Pass, 77,403,841 bytes |
-| APK SHA-256 | `D4ABB2B82F7A8EED395D3DC328204A1AB131EF8E3417D21C605B27927C668F3D` |
-| AAB SHA-256 | `6FF2373F7E727CEDF1BD12347BB274CA141DE9E7FBEE9AE037B4E07DBEC8012B` |
+| APK release build | Pass, 121,852,472 bytes, version `1.0.0+4` |
+| AAB release build | Pass, 79,438,415 bytes, version `1.0.0+4` |
+| APK SHA-256 | `1E46E4D0450085AA541C129D553D843F0688DDD488A665765BF91566002E117B` |
+| AAB SHA-256 | `5355CA927F7898356EC48109122FDE4D5F8F2822785ADD263AAA5E7BEBC96D37` |
+| RevenueCat client | Implemented: platform key validation, backend UUID identity, live offering/prices, monthly/annual purchase, restore, cancellation and `pro` entitlement; dashboard/store sandbox remains open |
+| Current APK/AAB billing state | Deliberately disabled: artifacts were built without a RevenueCat public SDK key, so they cannot be used as billing acceptance evidence |
 | Android signing | Pass, signer `CN=Zvelt, OU=Mobile, O=Zvelt, C=RO` |
 | Manual emulator screens | Current release APK installed with `adb install -r`; Dark -> Light recolours Home, cards, icons and bottom navigation without relaunch or black remnants |
 | UI hierarchy contract | Home exposes no Settings gear/strength CTA; Delete account follows Sign out; support/footer controls are reachable |
@@ -165,21 +172,23 @@ The reusable test is `backend/scripts/month-power-user-simulation.mjs` (`npm run
 
 | Dimension | Final production result |
 | --- | --- |
-| Window | 2026-06-15 through 2026-07-14 |
-| Workload | 11/11 programs, 30 strength workouts, 367 completed sets, 30 runs, 30 rides, 30 nutrition days, 10 private workout posts |
+| Window | 2026-06-16 through 2026-07-15 |
+| Workload | 11/11 programs, 30 strength workouts, 434 completed sets, 30 runs, 30 rides, 30 nutrition days, 10 private workout posts |
 | API outcomes | 801 requests: 460 x 200, 340 x 201, 1 x 204; 0 x 4xx/5xx; 0 rate-limit retries |
 | Functional assertions | All pass: program loads, tracker payloads, workout list, explicit run/ride type, 90-item unified feed, 30-day gym/run/ride calendar, nutrition, cumulative volume, historical PR dates, ranking, PR feed and profile posts |
-| Read SLO | **Fail:** p95 608 ms, target <300 ms |
-| Write SLO | **Fail:** p95 1,136 ms, target <800 ms |
-| Slow write routes | workout complete p95 2,357 ms; program start-day p95 1,297 ms; post p95 975 ms |
+| Read SLO | **Fail:** p95 543 ms, target <300 ms |
+| Write SLO | **Fail:** p95 983 ms, target <800 ms |
+| Slow write routes | workout complete p95 1,233 ms; program start-day p95 1,166 ms; post p95 727 ms; set create p95 547 ms |
 | Cleanup | Account deletion 204; temporary production data removed |
 
-The fixes materially improved latency without changing behavior: post p95 fell from 1,957 ms to 975 ms, start-day from 2,844 ms to 1,297 ms and global write p95 from 1,871 ms to 1,136 ms between the two comparable final runs. The declared SLOs are nevertheless still unmet and remain a launch risk rather than a closed item.
+The fixes materially improved latency without changing the API contract. From the original measured baseline to the current candidate, post p95 fell from 1,957 ms to 727 ms, workout completion from 2,357 ms to 1,233 ms, start-day from 2,844 ms to 1,166 ms and global write p95 from 1,871 ms to 983 ms. In the final two directly comparable runs, set creation improved 727 -> 547 ms, workout completion 1,587 -> 1,233 ms, post creation 953 -> 727 ms, read p95 624 -> 543 ms and write p95 1,034 -> 983 ms. The declared SLOs are nevertheless still unmet and remain a launch risk rather than a closed item.
+
+Infrastructure diagnosis: warm `/health` probes are generally 39-60 ms while even small database-backed operations commonly take 350-550 ms. The production hostname resolves through Render's `gcp-us-west1` origin. The Supabase connection URL/region is intentionally not present in the repository, and the Render dashboard required an account sign-in during this audit, so a region mismatch cannot be asserted as fact. It is the strongest remaining hypothesis and must be checked in both dashboards before more application-level tuning. Co-locating the services and using Supabase's pooled URI is the next highest-impact latency action.
 
 ### Audit Limits
 
 - No macOS host was available, so iOS compilation/signing could not be performed.
-- No App Store Connect or Play Console publishing action was available in this workspace.
+- No App Store Connect, RevenueCat dashboard or Play Console publishing action was available in this workspace.
 - No representative physical iPhone or Android handset was tested.
 - The first transition from the previously installed legacy build to this release landed in onboarding once. A second release-over-release update preserved the guest session and the issue was not reproduced; a formal legacy-version upgrade matrix is still required before public rollout.
 - Google Sign-In, Strava, HealthKit, Health Connect, camera and push delivery require external accounts/hardware and were not completed end to end.
@@ -187,13 +196,13 @@ The fixes materially improved latency without changing behavior: post p95 fell f
 
 ## 12. Top 20 Highest Priority Issues
 
-### A-01: iOS Firebase configuration is placeholder-only
+### A-01: iOS Firebase and Apple capabilities are not configured
 
 - Screen: iOS startup, push notifications, Crashlytics and Google Sign-In.
-- Description: `firebase_options.dart` still contains `REPLACE_IOS_API_KEY` and `REPLACE_IOS_APP_ID`. The iOS Firebase path therefore cannot be considered operational.
+- Description: `firebase_options.dart` now accepts `FIREBASE_IOS_API_KEY` and `FIREBASE_IOS_APP_ID` at build time and fails closed when absent, but no real values or `GoogleService-Info.plist` are available. Push Notifications, APNs and In-App Purchase capabilities are also not verified in the Apple App ID/Xcode target.
 - Why it matters: A cross-platform public launch can fail at startup or silently lose push/crash telemetry on iOS.
 - Severity: **High**.
-- Steps to reproduce: Inspect `app/lib/config/firebase_options.dart`, or build/run the iOS target with current options.
+- Steps to reproduce: Build without the two Firebase dart-defines and inspect `DefaultFirebaseOptions.isConfigured`; it correctly remains false, so Firebase Messaging is skipped.
 - Suggested solution: Register the production iOS bundle in Firebase, add valid options and `GoogleService-Info.plist`, then test startup, push and Crashlytics on a physical device.
 - Estimated implementation complexity: Medium, 1-2 days plus Apple/Firebase credentials.
 
@@ -207,15 +216,15 @@ The fixes materially improved latency without changing behavior: post p95 fell f
 - Suggested solution: Run `flutter build ipa`, archive with the production team, install through TestFlight and repeat the critical-flow matrix on at least two iPhone classes.
 - Estimated implementation complexity: High, 2-5 days depending on signing status.
 
-### A-03: RevenueCat purchase, restore and entitlement flows are absent
+### A-03: RevenueCat client exists, but store products and sandbox acceptance are unverified
 
 - Screen: Profile Premium and any Pro-gated feature.
-- Description: The visible banner truthfully says purchases are unavailable and is not clickable, but no RevenueCat client dependency or operational checkout/restore flow exists. A dead `_PremiumSheet` prototype remains in source.
-- Why it matters: The stated monetization plan cannot launch, and subscription review requirements are untested.
+- Description: `purchases_flutter 10.4.1` is integrated with backend UUID identity, offering refresh, localized prices, monthly/annual purchase, cancellation handling, restore, customer-info listener and entitlement `pro`. Without a valid `appl_...`/`goog_...` public key the Premium sheet deliberately disables checkout. No evidence confirms matching active products, current offering, paid agreements, service-account linkage or sandbox transactions.
+- Why it matters: Correct client code cannot return products or pass store review until identifiers, signatures, agreements and offerings match in every external dashboard.
 - Severity: **High** if subscriptions are part of launch; otherwise Medium.
-- Steps to reproduce: Inspect `app/pubspec.yaml` and Profile; no purchase can be initiated or restored.
-- Suggested solution: Integrate RevenueCat, configure products/entitlement, implement purchase/restore/error states and validate sandbox receipts on both stores. Keep the banner disabled until complete.
-- Estimated implementation complexity: High, 3-7 days plus store configuration.
+- Steps to reproduce: Open Premium in the current build without RevenueCat dart-defines; the sheet opens but truthfully reports unavailable purchases. A store-distributed sandbox build with configured keys has not been tested.
+- Suggested solution: Complete the checklist in `docs/REVENUECAT_IOS_SETUP.md`, then verify monthly, annual, cancellation, pending payment, reinstall and restore on Play internal testing and TestFlight.
+- Estimated implementation complexity: Medium, 1-3 days plus store propagation/review time.
 
 ### A-04: Store publishing and review readiness were not executed
 
@@ -290,11 +299,11 @@ The fixes materially improved latency without changing behavior: post p95 fell f
 ### A-11: Production API misses its declared latency SLOs
 
 - Screen: Remote data flows, especially workout completion, program start-day, post creation and list/feed reads.
-- Description: A single power-user simulation, paced below rate limits and without concurrent load, measured read p95 at 608 ms against the <300 ms SLO and write p95 at 1,136 ms against <800 ms. Workout completion p95 was 2,357 ms. Batching improved all major write paths, but did not close the target.
+- Description: The latest power-user simulation, paced below rate limits and without concurrent load, measured read p95 at 543 ms against the <300 ms SLO and write p95 at 983 ms against <800 ms. Workout completion p95 is 1,233 ms after ranking/XP/PR/season writes were merged and achievement reads were projected concurrently. Program start-day remains 1,166 ms. Code changes improved the paths substantially but did not close the target.
 - Why it matters: Slow completion can look like a frozen save, encourage repeat taps and make post-workout/ranking feedback feel unreliable. Real concurrent traffic can be slower than this single-user run.
 - Severity: **High** for a public launch.
 - Steps to reproduce: Run `$env:ZVELT_STRICT='1'; npm.cmd run simulate:power-month` in `backend` against production and inspect the route latency summary.
-- Suggested solution: Co-locate Render and PostgreSQL, add per-query/APM spans, move non-response-critical ranking/challenge work to a durable job queue, cache/batch media/feed reads, then run controlled concurrent load tests until p95 budgets hold with headroom.
+- Suggested solution: First verify and co-locate Render and Supabase/PostgreSQL in the same region, use the pooled connection string, and avoid a sleeping/free production service. Add per-query/APM spans, optimize program materialization/final fetch, then run controlled concurrent load tests until p95 budgets hold with headroom.
 - Estimated implementation complexity: High, 3-7 days plus possible infrastructure migration.
 
 ### A-12: Renderer and cold-start performance are not signed off on hardware
@@ -310,7 +319,7 @@ The fixes materially improved latency without changing behavior: post p95 fell f
 ### A-13: Release artifact size needs optimization
 
 - Screen: Installation and update funnel.
-- Description: The universal APK is 110.6 MB and the AAB is 73.8 MB before store delivery splitting.
+- Description: The universal APK is 116.2 MB and the AAB is 75.8 MB before store delivery splitting.
 - Why it matters: Large downloads increase abandonment, update friction and storage complaints.
 - Severity: **Medium**.
 - Steps to reproduce: Inspect the release artifacts listed in Verification Evidence.
@@ -389,8 +398,8 @@ The fixes materially improved latency without changing behavior: post p95 fell f
 
 ## 13. Quick Wins
 
-- Add valid iOS Firebase options and fail CI when any `REPLACE_*` production value remains.
-- Remove the unreachable `_PremiumSheet` until billing is implemented.
+- Supply real iOS Firebase dart-defines/`GoogleService-Info.plist` and fail CI when a release archive has no configured iOS Firebase app.
+- Configure the RevenueCat current offering and public SDK keys, then install through each store's internal track for sandbox acceptance.
 - Reclassify expected offline `SocketException` events as breadcrumbs.
 - Add APM spans around workout completion, program materialization, streak updates and feed/media enrichment before the next optimization pass.
 - Add a CI job for `flutter analyze`, `flutter test`, backend build/test and both dependency audits.
@@ -407,7 +416,7 @@ The fixes materially improved latency without changing behavior: post p95 fell f
 - Consolidate all mobile transport behind one typed API client.
 - Implement server-assisted guest/existing-account merge with conflict resolution.
 - Add performance budgets, startup telemetry, API p95 dashboards and load tests against ranking/feed paths.
-- Complete RevenueCat and store-server notification/webhook verification.
+- Complete RevenueCat dashboard/store activation and store-server notification/webhook verification.
 - Establish physical-device and OS-version release matrices for health, camera, push and background behavior.
 - Complete localization architecture and pseudo-localization.
 
@@ -419,7 +428,7 @@ The fixes materially improved latency without changing behavior: post p95 fell f
 - 91 packages have newer versions outside current constraints; this is maintenance debt, not a confirmed vulnerability.
 - Expected offline `SocketException` paths still create nonfatal crash-reporting noise.
 - Production latency budgets are declared but not enforced by CI or deployment gates.
-- Dead Premium prototype code remains unreachable.
+- RevenueCat client behavior is tested, but dashboard/store state is still an external operational dependency.
 - Media uses the primary PostgreSQL database as an MVP durability layer.
 - Progress-photo encryption and journal sync are deferred by explicit TODOs.
 - Production smoke is scripted but not yet enforced by CI.
@@ -439,11 +448,11 @@ The fixes materially improved latency without changing behavior: post p95 fell f
 - Validate chart/map alternatives and focus order under screen readers.
 - Profile startup and animation-heavy screens on low/mid-tier GPUs before deciding the long-term renderer setting.
 - Run a size/asset audit and compress high-cost visual assets without changing the approved design.
-- Remove unreachable billing UI to reduce maintenance and accidental reactivation.
+- Validate the Premium sheet on compact devices using real long localized prices and store error states.
 
 ## 18. Missing Features Worth Considering
 
-- RevenueCat purchase, restore and entitlement management.
+- RevenueCat dashboard products/current offering, sandbox acceptance and webhook verification.
 - Guest-to-existing-account data merge.
 - Cross-device journal sync.
 - Full iOS push, HealthKit and production OAuth configuration.
@@ -454,7 +463,7 @@ The fixes materially improved latency without changing behavior: post p95 fell f
 
 ## 19. Risks That Could Affect User Reviews
 
-- iOS startup, push or OAuth failures if released with placeholder configuration.
+- iOS startup, push or OAuth failures if released without the required build-time Firebase values and Apple capabilities.
 - Camera/health/background defects that appear only on physical OEM hardware.
 - Missing subscriptions or restore purchases if marketing promises Premium at launch.
 - Large download/install size, especially on constrained devices or networks.
