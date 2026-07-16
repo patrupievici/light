@@ -2,18 +2,18 @@
 
 Audit date: 2026-07-16
 
-Audited code revision: `9de53e0` (production `/health` verified release `9de53e06bac1`)
+Audited code revision: `1e639ed` (production backend `/health` verified release `34a1f8a3925b`)
 
 Production API: `https://light-l6en.onrender.com`
 Scope: Flutter client, Fastify/Prisma backend, PostgreSQL migrations, Android release artifacts, Android emulator, production API, privacy, security, accessibility, UX, product and operational launch readiness.
 
 ## 1. Executive Summary
 
-ZVELT is materially stronger than the first audit. The previously identified critical dependency vulnerability, private-media bypass, incomplete account erasure, nutrition target mismatch, theme navigation reset, stale mounted-tab appearance, red Flutter suite, unlabeled controls and inaccessible guest-account flow have been repaired and retested. This follow-up also removes the redundant Home settings/strength controls, consolidates every setting under Profile, replaces the colour-banded card material with stable neutral matte surfaces, and implements the RevenueCat client flow behind safe configuration gates.
+ZVELT is materially stronger than the first audit. The previously identified critical dependency vulnerability, private-media bypass, incomplete account erasure, nutrition target mismatch, theme navigation reset, stale mounted-tab appearance, red Flutter suite, unlabeled controls and inaccessible guest-account flow have been repaired and retested. This follow-up also removes the redundant Home settings/strength controls and the standalone Settings route, keeps the requested controls directly in Profile, caps generated program exercises at five preset rows, replaces the colour-banded card material with stable neutral matte surfaces, and implements the RevenueCat client flow behind safe configuration gates.
 
 A production-backed 30-day power-user simulation now exercises all 11 strength programs, 30 strength sessions, 434 completed sets, 30 runs, 30 rides, 30 nutrition days, 10 workout posts, ranking, PR filtering, calendar sync and account erasure. The final run made 801 paced requests: 822 of 824 assertions passed, every response was 2xx, no rate limit or server error occurred, and cleanup succeeded. The only failed assertions were the declared latency SLOs: read p95 was 543 ms against 300 ms and write p95 was 983 ms against 800 ms.
 
-The audit found and closed additional release defects during the simulations: explicit run/ride type was not preserved across every surface; GPS sessions were absent from the calendar; backfilled volume and PRs used upload time; first-time programs generated 0 kg weighted sets; PR posts lost their PR state; ranking, achievements, set logging and feed state used avoidable serial database calls; rapid completion could award twice; concurrent set inserts could collide; and a clean Android release build resolved an alpha WorkManager dependency incompatible with the plugin JVM target.
+The audit found and closed additional release defects during the simulations and final emulator pass: explicit run/ride type was not preserved across every surface; GPS sessions were absent from the calendar; backfilled volume and PRs used upload time; first-time programs generated 0 kg weighted sets; automatic warm-ups could expand a four-work-set exercise to eight tracker rows; PR posts lost their PR state; ranking, achievements, set logging and feed state used avoidable serial database calls; rapid completion could award twice; concurrent set inserts could collide; Profile could render under the Android status bar; and a clean Android release build resolved an alpha WorkManager dependency incompatible with the plugin JVM target.
 
 The current Android/backend candidate is suitable for an internal or tightly monitored closed beta. It is not yet ready for a public cross-platform launch tomorrow. Functional API correctness is stable, but production latency remains above its declared SLO. The RevenueCat Flutter integration is complete and safely disabled without keys, but neither store products/current offering nor sandbox purchase/restore are verified. iOS still lacks real Firebase values, Apple signing/capabilities, an archive/TestFlight build and physical-device QA. Store submission and Health/Strava/Google/camera/background validation also remain open.
 
@@ -34,20 +34,21 @@ No Critical issue remains in the audited Android/backend path. The remaining Hig
 - Synchronized nutrition preferences and canonical targets with the backend; stale or partial weekly plans regenerate.
 - Fixed AI Coach so normal questions never create/open a workout as a side effect.
 - Removed navigator reset on theme change and removed the global text-scale cap.
-- Repaired live theme propagation for mounted Home, Plan, Feed and Nutrition tabs plus Profile, Settings and the Appearance sheet; Dark/Light changes now repaint without resetting tab state.
+- Repaired live theme propagation for mounted Home, Plan, Feed and Nutrition tabs plus Profile and the Appearance controls; Dark/Light changes now repaint without resetting tab state.
 - Added meaningful semantics and 48dp targets to the audited icon controls.
 - Kept strength workout creation in Plan while removing the redundant Home CTA requested by product ownership.
-- Removed the Home settings gear and routed both Profile settings entry points to the complete shared Settings hub.
-- Added `Delete account` directly below `Sign out` in Profile Settings while retaining the existing confirmed erasure flow.
-- Moved Legal, cache reload, diagnostic reporting, diagnostics consent, social links and version details into the Settings route reached from Profile.
+- Removed the Home settings gear, the Profile settings gear/Preferences row and the standalone Settings route.
+- Kept `Delete account` directly below `Sign out` in Profile > Account while retaining the existing confirmed erasure flow.
+- Moved Legal, cache reload, diagnostic reporting, diagnostics consent, social links and version details directly into Profile.
 - Replaced transparent coloured card gradients with neutral, nearly opaque matte surfaces and shorter shadows; verified dark and light themes on the Android emulator.
-- Removed 280 lines of duplicated Profile settings implementation and added ordering, narrow-screen, golden and card-neutrality regression tests.
+- Deleted the 745-line standalone Settings screen and added Profile ownership, account ordering, support reachability and status-inset regression tests.
 - Removed unnecessary Android broad media permission; retained camera permission only where required.
 - Added production release identification and a repeatable production smoke suite.
 - Preserved explicit run/ride types from Flutter through offline replay, REST storage, feed and calendar sync.
 - Merged server cardio history into the local offline-first activity store without duplicate sessions.
 - Corrected cumulative-volume and recent-PR dates to use the parent workout date instead of upload time.
 - Added safe, explainable first-session program loads while retaining 0 kg only for bodyweight/no-load exercises.
+- Capped every generated exercise at five preset rows including warm-ups, sampled oversized percentage waves without losing their final set, and migrated untouched existing program drafts down to the same limit.
 - Batched program workout/set creation and ranking writes, and parallelized independent completion/calendar work.
 - Persisted workout PR outcomes at ranking time so later posts remain visible in the PR feed without a duplicate ranking calculation.
 - Added a reusable strict 30-day production simulation with automatic GDPR cleanup and route-level latency reporting.
@@ -68,19 +69,19 @@ The core Android/backend product is functional, privacy-aware and extensively te
 
 **90 / 100**
 
-The approved visual design is consistent across Home, Plan, Feed, AI, Nutrition, Profile and Settings. The diagonal colour bands reported on Home/Profile cards are gone in the installed release APK; dark and light surfaces are neutral, readable and stable. Manual Dark -> Light -> Dark switching now keeps Home, Profile, Settings, the Appearance sheet and bottom navigation in one coherent mode without relaunching. Manual portrait, landscape and 1.6x text checks found no overflow in sampled release screens. Remaining deductions cover limited 2.0x coverage, a scroll-heavy login screen and incomplete cross-platform visual validation.
+The approved visual design is consistent across Home, Plan, Feed, AI, Nutrition and Profile. The diagonal colour bands reported on Home/Profile cards are gone in the installed release APK; dark and light surfaces are neutral, readable and stable. Manual Dark -> Light -> Dark switching now keeps Home, Profile, Appearance and bottom navigation in one coherent mode without relaunching. The final Android hierarchy places the Profile header at `y=180`, below the system status bar, and keeps scrolled content below the same inset. Manual portrait, landscape and 1.6x text checks found no overflow in sampled release screens. Remaining deductions cover limited 2.0x coverage, a scroll-heavy login screen and incomplete cross-platform visual validation.
 
 ## 4. UX Score
 
 **84 / 100**
 
-Core activation is clear: strength remains discoverable in Plan, Home is less cluttered, all settings now have one predictable home under Profile, guest users can save progress, account deletion is complete, and AI no longer redirects meal questions into workout tracking. Remaining friction includes no account-data merge into an existing account, incomplete integrations and several visible future-feature surfaces.
+Core activation is clear: strength remains discoverable in Plan, Home is less cluttered, account/appearance/support controls have one predictable home directly in Profile, guest users can save progress, account deletion is complete, and AI no longer redirects meal questions into workout tracking. Remaining friction includes no account-data merge into an existing account, incomplete integrations and several visible future-feature surfaces.
 
 ## 5. Performance Score
 
 **72 / 100**
 
-Release APK/AAB builds complete, scrolling was stable on the emulator, lazy screen construction and caches are present, and production smoke completed successfully. Across comparable production runs, post p95 fell from 1,957 ms to 727 ms, set creation from 727 ms to 547 ms, workout completion from 2,357 ms to 1,233 ms and global write p95 from 1,871 ms to 983 ms. The declared budgets still fail: final read p95 was 543 ms versus 300 ms and write p95 was 983 ms versus 800 ms. Risk also remains around a 116.2 MB universal APK, a 75.8 MB AAB, first-launch frame skips, Skia being forced instead of Impeller and no physical low/mid-tier device profiling.
+Release APK/AAB builds complete, scrolling was stable on the emulator, lazy screen construction and caches are present, and production smoke completed successfully. Across comparable production runs, post p95 fell from 1,957 ms to 727 ms, set creation from 727 ms to 547 ms, workout completion from 2,357 ms to 1,233 ms and global write p95 from 1,871 ms to 983 ms. The declared budgets still fail: final read p95 was 543 ms versus 300 ms and write p95 was 983 ms versus 800 ms. Risk also remains around a 115.3 MB universal APK, a 75.4 MB AAB, first-launch frame skips, Skia being forced instead of Impeller and no physical low/mid-tier device profiling.
 
 ## 6. Accessibility Score
 
@@ -92,7 +93,7 @@ Automated accessibility tests pass, audited controls have labels and 48dp target
 
 **87 / 100**
 
-Static analysis is clean, backend tests are broad, migrations are versioned, release smoke and the month simulation are repeatable, and high-risk auth/media/ranking/sync logic has focused regression tests. The duplicated Profile settings sheet was deleted; visual regression coverage includes both card themes plus mounted-tab rebuilding with State preservation. Deductions remain for 28 direct HTTP client files, 12 `$queryRawUnsafe` call sites, 28 empty catches and some dead/incomplete feature code.
+Static analysis is clean, backend tests are broad, migrations are versioned, release smoke and the month simulation are repeatable, and high-risk auth/media/ranking/sync logic has focused regression tests. The standalone Settings screen was deleted; Profile ownership/order/status-inset tests and an exhaustive all-program preset-row cap test now cover the final changes. Visual regression coverage also includes both card themes plus mounted-tab rebuilding with State preservation. Deductions remain for 28 direct HTTP client files, 12 `$queryRawUnsafe` call sites, 28 empty catches and some dead/incomplete feature code.
 
 ## 8. Product Score
 
@@ -110,7 +111,7 @@ Dependency audit is clean; bearer sessions, CORS, private media, deletion, token
 
 **95 / 100**
 
-Flutter tests pass `218/218`; backend tests pass `861/861`; Flutter analysis and TypeScript builds are clean; production smoke passes `113/113`; the strict month simulation has zero functional failures, zero 5xx/429 and successful account cleanup. Reinstalling the current signed release over itself preserved the guest session. Residual risk is dominated by latency SLO misses plus devices, platforms and upgrade paths not fully exercised in this Windows/Android-emulator audit.
+Flutter tests pass `215/215`; backend tests pass `864/864`; Flutter analysis and TypeScript builds are clean; production smoke passes `113/113` on backend release `34a1f8a`; the strict month simulation has zero functional failures, zero 5xx/429 and successful account cleanup. Reinstalling the current signed release over itself preserved the guest session. Residual risk is dominated by latency SLO misses plus devices, platforms and upgrade paths not fully exercised in this Windows/Android-emulator audit.
 
 ## 11. Launch Readiness Score
 
@@ -138,24 +139,26 @@ Anti-pattern verdict: **Pass with restraint recommended**. The release no longer
 | Check | Result |
 | --- | --- |
 | `flutter analyze` | Pass, no issues |
-| Flutter test suite | Pass, 218 tests |
+| Flutter test suite | Pass, 215 tests |
 | Backend TypeScript build | Pass, including `prisma generate` |
-| Backend test suite | Pass, 73 files, 861 tests |
+| Backend test suite | Pass, 73 files, 864 tests |
 | Prisma schema validation | Pass |
 | Production dependency audit | 0 vulnerabilities |
 | Full backend dependency audit | 0 vulnerabilities |
-| Production smoke, production API | 113/113 pass on `9de53e0`; owner/viewer/guest accounts cleaned |
+| Production smoke, production API | 113/113 pass on backend release `34a1f8a`; owner/viewer/guest accounts cleaned |
 | Strict 30-day production simulation | 822/824 pass; only read/write latency SLO assertions fail; 801/801 responses are 2xx; cleanup succeeds |
-| APK release build | Pass, 121,852,472 bytes, version `1.0.0+4` |
-| AAB release build | Pass, 79,438,415 bytes, version `1.0.0+4` |
-| APK SHA-256 | `1E46E4D0450085AA541C129D553D843F0688DDD488A665765BF91566002E117B` |
-| AAB SHA-256 | `5355CA927F7898356EC48109122FDE4D5F8F2822785ADD263AAA5E7BEBC96D37` |
+| APK release build | Pass, 120,933,332 bytes, version `1.0.0+5` |
+| AAB release build | Pass, 79,054,819 bytes, version `1.0.0+5` |
+| APK SHA-256 | `E8CA059DDDB569A47CA4B3B2EC809E1F745FA6E96013131A76E91F1BC61F4467` |
+| AAB SHA-256 | `36750C226EA2EC767708882F342DF72AD890B8451366D4BC973D69D093156AE2` |
 | RevenueCat client | Implemented: platform key validation, backend UUID identity, live offering/prices, monthly/annual purchase, restore, cancellation and `pro` entitlement; dashboard/store sandbox remains open |
 | Current APK/AAB billing state | Deliberately disabled: artifacts were built without a RevenueCat public SDK key, so they cannot be used as billing acceptance evidence |
 | Android signing | Pass, signer `CN=Zvelt, OU=Mobile, O=Zvelt, C=RO` |
-| Manual emulator screens | Current release APK installed with `adb install -r`; Dark -> Light recolours Home, cards, icons and bottom navigation without relaunch or black remnants |
-| UI hierarchy contract | Home exposes no Settings gear/strength CTA; Delete account follows Sign out; support/footer controls are reachable |
-| Release reinstall | Pass: signed release installed with `adb install -r`, guest session preserved on restart |
+| Manual emulator screens | Build 5 release APK installed with `adb install -r`; Dark -> Light recolours Home, cards, icons and bottom navigation without relaunch or black remnants |
+| UI hierarchy contract | No Settings/Preferences entry exists; Delete account follows Sign out; support/footer controls are reachable directly in Profile |
+| Profile system inset | Pass: Profile/Back start at `y=180` below the Android status bar; regression test supplies a 24dp top inset |
+| Program preset-row cap | Pass: all 11 templates across weeks 1-4 remain <=5 rows; production StrongLifts renders 5 rows for Squat, Bench Press and Barbell Row |
+| Release reinstall | Pass: signed build 5 installed with `adb install -r`, guest session preserved on final restart |
 | Card material regression | Pass: dark/light gradients constrained to neutral channels and alpha >= `0xED` |
 | Theme-state regression | Pass: mounted tabs rebuild on appearance changes without losing local State; unvisited tabs remain lazy |
 | Offline restart | Pass: authenticated cached Home remained usable; requests failed without crash |
@@ -182,6 +185,8 @@ The reusable test is `backend/scripts/month-power-user-simulation.mjs` (`npm run
 | Cleanup | Account deletion 204; temporary production data removed |
 
 The fixes materially improved latency without changing the API contract. From the original measured baseline to the current candidate, post p95 fell from 1,957 ms to 727 ms, workout completion from 2,357 ms to 1,233 ms, start-day from 2,844 ms to 1,166 ms and global write p95 from 1,871 ms to 983 ms. In the final two directly comparable runs, set creation improved 727 -> 547 ms, workout completion 1,587 -> 1,233 ms, post creation 953 -> 727 ms, read p95 624 -> 543 ms and write p95 1,034 -> 983 ms. The declared SLOs are nevertheless still unmet and remain a launch risk rather than a closed item.
+
+The final program-set regression iterates every day of all 11 templates for weeks 1-4 and rejects any exercise above five preset rows, including warm-ups. A production-backed StrongLifts start confirmed five visible and semantic rows for all three exercises. The QA draft was discarded afterward so it did not enter workout history.
 
 Infrastructure diagnosis: warm `/health` probes are generally 39-60 ms while even small database-backed operations commonly take 350-550 ms. The production hostname resolves through Render's `gcp-us-west1` origin. The Supabase connection URL/region is intentionally not present in the repository, and the Render dashboard required an account sign-in during this audit, so a region mismatch cannot be asserted as fact. It is the strongest remaining hypothesis and must be checked in both dashboards before more application-level tuning. Co-locating the services and using Supabase's pooled URI is the next highest-impact latency action.
 
@@ -319,7 +324,7 @@ Infrastructure diagnosis: warm `/health` probes are generally 39-60 ms while eve
 ### A-13: Release artifact size needs optimization
 
 - Screen: Installation and update funnel.
-- Description: The universal APK is 116.2 MB and the AAB is 75.8 MB before store delivery splitting.
+- Description: The universal APK is 115.3 MB and the AAB is 75.4 MB before store delivery splitting.
 - Why it matters: Large downloads increase abandonment, update friction and storage complaints.
 - Severity: **Medium**.
 - Steps to reproduce: Inspect the release artifacts listed in Verification Evidence.
@@ -378,11 +383,11 @@ Infrastructure diagnosis: warm `/health` probes are generally 39-60 ms while eve
 
 ### A-19: The shipped UI is effectively English-only
 
-- Screen: Settings > Language and all product copy.
+- Screen: Application-wide localization and all product copy.
 - Description: Only English is selectable; many strings remain outside generated localization resources.
 - Why it matters: It limits market readiness and makes later translation/layout work more expensive.
 - Severity: **Low** for an English-only launch; Enhancement otherwise.
-- Steps to reproduce: Open Language settings and inspect localization resources.
+- Steps to reproduce: Inspect the generated localization delegate/resources and traverse product copy.
 - Suggested solution: Finish string extraction, add target locales, pseudo-localization and long-copy layout tests before advertising localization.
 - Estimated implementation complexity: High, 5-10 days plus translation.
 
@@ -425,7 +430,7 @@ Infrastructure diagnosis: warm `/health` probes are generally 39-60 ms while eve
 - 28 Dart files with direct HTTP calls.
 - 12 unsafe raw-SQL API references, despite current parameter binding.
 - 28 empty catches with uneven observability.
-- 91 packages have newer versions outside current constraints; this is maintenance debt, not a confirmed vulnerability.
+- 94 packages have newer versions outside current constraints; this is maintenance debt, not a confirmed vulnerability.
 - Expected offline `SocketException` paths still create nonfatal crash-reporting noise.
 - Production latency budgets are declared but not enforced by CI or deployment gates.
 - RevenueCat client behavior is tested, but dashboard/store state is still an external operational dependency.
