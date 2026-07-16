@@ -1,10 +1,10 @@
 name: zvelt_app
 description: Zvelt — fitness app (training, nutrition, social)
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.4.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -50,6 +50,9 @@ dependencies:
   # P0.6 — production crash reporting. Required to measure crash-free
   # sessions SLO (>=99.5%). Compatible with firebase_core ^4.x and BoM 34.x.
   firebase_crashlytics: ^5.0.0
+  # RevenueCat wraps StoreKit 2 / Play Billing. Public SDK keys are injected
+  # with --dart-define; the service remains disabled when a key is absent.
+  purchases_flutter: ^10.4.1
   url_launcher: ^6.3.0
   mobile_scanner: ^7.2.0
   flutter_dotenv: ^5.2.1

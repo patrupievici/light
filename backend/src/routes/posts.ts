@@ -1,12 +1,16 @@
 import { FastifyInstance } from 'fastify'
-import type { Post } from '@prisma/client'
+import { randomUUID } from 'node:crypto'
+import type { Post, PrismaPromise } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { authenticate } from '../middleware/auth'
 import { updateStreak } from '../services/streak.service'
 import { createNotificationSafe, NotificationType } from '../services/notification.service'
 import { decodePostPhotoBase64, deleteUploadByUrl, savePostPhoto } from '../lib/post-photo'
-import { getFriendIdsAndHidden } from '../lib/friendships'
+import {
+  getFriendIdsAndHidden,
+  getVisibleFriendIdsAndHidden,
+} from '../lib/friendships'
 import { stripControlChars } from '../lib/sanitize'
 import { evaluateEditLimit } from '../services/anti-cheat.service'
 import { canViewerSeePost } from '../lib/post-visibility'
@@ -110,7 +114,10 @@ export async function postRoutes(app: FastifyInstance) {
     let post: Post
 
     if (workoutId) {
-      const workout = await prisma.workout.findFirst({ where: { id: workoutId, userId } })
+      const [workout, existingPost] = await Promise.all([
+        prisma.workout.findFirst({ where: { id: workoutId, userId } }),
+        prisma.post.findUnique({ where: { workoutId } }),
+      ])
       if (!workout) {
         return reply.code(404).send({
           error: 'NOT_FOUND',
@@ -127,7 +134,6 @@ export async function postRoutes(app: FastifyInstance) {
         })
       }
 
-      const existingPost = await prisma.post.findUnique({ where: { workoutId } })
       if (existingPost) {
         return reply.code(409).send({
           error: 'ALREADY_POSTED',
@@ -136,58 +142,61 @@ export async function postRoutes(app: FastifyInstance) {
         })
       }
 
-      post = await prisma.$transaction(async (tx) => {
-        const newPost = await tx.post.create({
+      const postId = randomUUID()
+      const writes: PrismaPromise<unknown>[] = [
+        prisma.post.create({
           data: {
+            id: postId,
             user: { connect: { id: userId } },
             workout: { connect: { id: workoutId } },
             visibility,
             caption: captionDb,
             isPr: workout.hasPr,
           },
-        })
-
-        if (privacySettings) {
-          await tx.postPrivacySetting.create({
-            data: {
-              postId: newPost.id,
-              hideWeights: privacySettings.hideWeights ?? false,
-              hideReps: privacySettings.hideReps ?? false,
-              hideBodyweight: privacySettings.hideBodyweight ?? false,
-            },
-          })
-        }
-
-        await tx.workout.update({
+        }),
+        prisma.workout.update({
           where: { id: workoutId },
           data: { status: 'posted' },
-        })
-
-        return newPost
-      })
-    } else {
-      post = await prisma.$transaction(async (tx) => {
-        const newPost = await tx.post.create({
+        }),
+      ]
+      if (privacySettings) {
+        writes.push(prisma.postPrivacySetting.create({
           data: {
-            user: { connect: { id: userId } },
-            visibility,
-            caption: captionDb,
+            postId,
+            hideWeights: privacySettings.hideWeights ?? false,
+            hideReps: privacySettings.hideReps ?? false,
+            hideBodyweight: privacySettings.hideBodyweight ?? false,
           },
-        })
-
-        if (privacySettings) {
-          await tx.postPrivacySetting.create({
+        }))
+      }
+      const [createdPost] = await prisma.$transaction(writes)
+      post = createdPost as Post
+    } else {
+      const postId = randomUUID()
+      const postWrite = prisma.post.create({
+        data: {
+          id: postId,
+          user: { connect: { id: userId } },
+          visibility,
+          caption: captionDb,
+        },
+      })
+      if (privacySettings) {
+        const [createdPost] = await prisma.$transaction([
+          postWrite,
+          prisma.postPrivacySetting.create({
             data: {
-              postId: newPost.id,
+              postId,
               hideWeights: privacySettings.hideWeights ?? false,
               hideReps: privacySettings.hideReps ?? false,
               hideBodyweight: privacySettings.hideBodyweight ?? false,
             },
-          })
-        }
-
-        return newPost
-      })
+          }),
+        ])
+        post = createdPost
+      } else {
+        post = await postWrite
+      }
     }
 
     let postOut: Post = post
@@ -224,13 +233,8 @@ export async function postRoutes(app: FastifyInstance) {
     const prOnly = query.kind === 'pr'
 
     // Gaseste prietenii acceptati + postarile ascunse
-    const { friendIds, hiddenIds } = await getFriendIdsAndHidden(userId)
-    const activityHidden = await prisma.userProfile.findMany({
-      where: { userId: { in: friendIds }, showActivityFeed: false },
-      select: { userId: true },
-    })
-    const activityHiddenIds = new Set(activityHidden.map((row) => row.userId))
-    const visibleFriendIds = friendIds.filter((id) => !activityHiddenIds.has(id))
+    const { friendIds: visibleFriendIds, hiddenIds } =
+      await getVisibleFriendIdsAndHidden(userId)
 
     // Feed = postari proprii + ale prietenilor (visibility != private), fara cele ascunse
     const posts = await prisma.post.findMany({

@@ -333,10 +333,14 @@ describe('GET /v1/posts/feed — friend-scoped, no private/stranger leakage', ()
   it('scopes the feed query to the viewer + accepted-friend IDs and excludes private posts', async () => {
     // Viewer `me` is friends with `friendA` only; `stranger` is NOT a friend.
     friendshipFindMany.mockResolvedValue([
-      { userId: 'me', friendUserId: 'friendA', status: 'accepted' },
+      {
+        userId: 'me',
+        friendUserId: 'friendA',
+        user: { profile: { showActivityFeed: true } },
+        friend: { profile: { showActivityFeed: true } },
+      },
     ])
     postHideFindMany.mockResolvedValue([]) // nothing hidden
-    userProfileFindMany.mockResolvedValue([]) // no friend has activity-feed disabled
     postFindMany.mockResolvedValue([])
 
     authedAs('me')
@@ -357,6 +361,9 @@ describe('GET /v1/posts/feed — friend-scoped, no private/stranger leakage', ()
     // ...and only non-private visibilities are surfaced.
     expect(friendBranch.visibility).toEqual({ in: ['friends', 'public'] })
     expect(friendBranch.visibility!.in).not.toContain('private')
+    // Activity sharing is selected with each friendship, so the feed does not
+    // pay for a second profile query.
+    expect(userProfileFindMany).not.toHaveBeenCalled()
 
     // The viewer's own posts are always included (separate OR branch).
     expect(where.OR.some((c) => c.userId === 'me')).toBe(true)
@@ -365,12 +372,20 @@ describe('GET /v1/posts/feed — friend-scoped, no private/stranger leakage', ()
 
   it('drops a friend who disabled activity-feed sharing from the feed scope', async () => {
     friendshipFindMany.mockResolvedValue([
-      { userId: 'me', friendUserId: 'friendA', status: 'accepted' },
-      { userId: 'me', friendUserId: 'friendB', status: 'accepted' },
+      {
+        userId: 'me',
+        friendUserId: 'friendA',
+        user: { profile: { showActivityFeed: true } },
+        friend: { profile: { showActivityFeed: true } },
+      },
+      {
+        userId: 'me',
+        friendUserId: 'friendB',
+        user: { profile: { showActivityFeed: true } },
+        friend: { profile: { showActivityFeed: false } },
+      },
     ])
     postHideFindMany.mockResolvedValue([])
-    // friendB hid their activity feed → must be removed from the visible set.
-    userProfileFindMany.mockResolvedValue([{ userId: 'friendB' }])
     postFindMany.mockResolvedValue([])
 
     authedAs('me')
@@ -384,6 +399,7 @@ describe('GET /v1/posts/feed — friend-scoped, no private/stranger leakage', ()
     const friendBranch = where.OR.find((c) => c.visibility !== undefined)!
     expect(friendBranch.userId).toEqual({ in: ['friendA'] })
     expect(friendBranch.userId!.in).not.toContain('friendB')
+    expect(userProfileFindMany).not.toHaveBeenCalled()
     await app.close()
   })
 })

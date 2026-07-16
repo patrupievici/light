@@ -5,14 +5,24 @@ const workoutFindFirst = vi.fn()
 const postFindUnique = vi.fn()
 const postCreate = vi.fn()
 const workoutUpdate = vi.fn()
+const postPrivacyCreate = vi.fn()
 const analyticsCreate = vi.fn()
 const transaction = vi.fn()
 const updateStreak = vi.fn()
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
-    workout: { findFirst: (...args: unknown[]) => workoutFindFirst(...args) },
-    post: { findUnique: (...args: unknown[]) => postFindUnique(...args) },
+    workout: {
+      findFirst: (...args: unknown[]) => workoutFindFirst(...args),
+      update: (...args: unknown[]) => workoutUpdate(...args),
+    },
+    post: {
+      findUnique: (...args: unknown[]) => postFindUnique(...args),
+      create: (...args: unknown[]) => postCreate(...args),
+    },
+    postPrivacySetting: {
+      create: (...args: unknown[]) => postPrivacyCreate(...args),
+    },
     analyticsEvent: { create: (...args: unknown[]) => analyticsCreate(...args) },
     $transaction: (...args: unknown[]) => transaction(...args),
   },
@@ -47,13 +57,14 @@ beforeEach(() => {
     isPr: data.isPr,
   }))
   workoutUpdate.mockReset().mockResolvedValue({ status: 'posted' })
+  postPrivacyCreate.mockReset().mockResolvedValue({ id: 'privacy-1' })
   analyticsCreate.mockReset().mockResolvedValue({ id: 'event-1' })
   updateStreak.mockReset().mockResolvedValue(1)
-  transaction.mockReset().mockImplementation((callback) => callback({
-    post: { create: postCreate },
-    postPrivacySetting: { create: vi.fn() },
-    workout: { update: workoutUpdate },
-  }))
+  transaction
+    .mockReset()
+    .mockImplementation((operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    )
 })
 
 describe('POST /v1/posts workout PR propagation', () => {

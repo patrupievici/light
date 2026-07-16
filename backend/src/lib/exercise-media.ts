@@ -25,7 +25,7 @@ function sqlIdent(raw: string, fallback: string): string | null {
  * Normalized exercise name (trim + lowercase) → GIF URL.
  * Second DB row keys must match Zvelt seed exercise names case-insensitively after trim.
  */
-async function lookupGifUrls(normalizedNames: string[]): Promise<Map<string, string>> {
+async function queryGifUrls(normalizedNames: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>()
   const client = getPool()
   if (!client || normalizedNames.length === 0) return out
@@ -57,6 +57,70 @@ async function lookupGifUrls(normalizedNames: string[]): Promise<Map<string, str
     }
   } catch (e) {
     console.warn('[exercise-media] GIF lookup failed:', e instanceof Error ? e.message : e)
+  }
+  return out
+}
+
+type GifCacheEntry = { url: string | null; expiresAt: number }
+
+const GIF_CACHE_TTL_MS = 6 * 60 * 60 * 1000
+const GIF_MISS_CACHE_TTL_MS = 15 * 60 * 1000
+const GIF_CACHE_MAX = 2_000
+const gifUrlCache = new Map<string, GifCacheEntry>()
+const gifUrlInFlight = new Map<string, Promise<string | null>>()
+
+function cacheGifUrl(name: string, url: string | null): string | null {
+  if (gifUrlCache.size >= GIF_CACHE_MAX) {
+    const now = Date.now()
+    for (const [key, entry] of gifUrlCache) {
+      if (entry.expiresAt <= now) gifUrlCache.delete(key)
+    }
+    while (gifUrlCache.size >= GIF_CACHE_MAX) {
+      const oldest = gifUrlCache.keys().next().value as string | undefined
+      if (!oldest) break
+      gifUrlCache.delete(oldest)
+    }
+  }
+  gifUrlCache.set(name, {
+    url,
+    expiresAt: Date.now() + (url ? GIF_CACHE_TTL_MS : GIF_MISS_CACHE_TTL_MS),
+  })
+  return url
+}
+
+/** Cache both hits and misses; coalesce overlapping lookups across requests. */
+async function lookupGifUrls(normalizedNames: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  const now = Date.now()
+  const missing: string[] = []
+
+  for (const name of [...new Set(normalizedNames.filter(Boolean))]) {
+    const cached = gifUrlCache.get(name)
+    if (cached && cached.expiresAt > now) {
+      if (cached.url) out.set(name, cached.url)
+      continue
+    }
+    if (cached) gifUrlCache.delete(name)
+    missing.push(name)
+  }
+
+  const fresh = missing.filter((name) => !gifUrlInFlight.has(name))
+  if (fresh.length > 0) {
+    const batch = queryGifUrls(fresh)
+    for (const name of fresh) {
+      const pending = batch
+        .then((rows) => cacheGifUrl(name, rows.get(name) ?? null))
+        .finally(() => gifUrlInFlight.delete(name))
+      gifUrlInFlight.set(name, pending)
+    }
+  }
+
+  const values = await Promise.all(missing.map(async (name) => ({
+    name,
+    url: await gifUrlInFlight.get(name),
+  })))
+  for (const { name, url } of values) {
+    if (url) out.set(name, url)
   }
   return out
 }

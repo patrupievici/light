@@ -1,6 +1,9 @@
 import { prisma } from '../lib/prisma'
 import type { PrismaPromise } from '@prisma/client'
-import { getCanonicalBodyweightKg } from '../lib/bodyweight'
+import {
+  getCanonicalBodyweightKg,
+  type BodyweightSource,
+} from '../lib/bodyweight'
 import { isSrAnomaly } from './anti-cheat.service'
 
 // ─── Constante ───────────────────────────────────────────────────────────────
@@ -270,11 +273,34 @@ export interface ComputeRanksResult {
   seasonLpDelta: number
 }
 
+type RankProfileContext = BodyweightSource | null
+type RankWorkoutContext = {
+  exercises: Array<{
+    exerciseId: string
+    exercise: {
+      name: string
+      rankModel: string
+      isRanked: boolean
+      bwStrengthFraction: unknown
+    }
+    sets: RankableSet[]
+  }>
+} | null
+
+export interface ComputeRanksOptions {
+  /** Reuse rows already loaded by the caller to avoid duplicate DB waves. */
+  profile?: RankProfileContext
+  workout?: RankWorkoutContext
+}
+
 export async function computeRanks(
   userId: string,
   workoutId: string,
+  options: ComputeRanksOptions = {},
 ): Promise<ComputeRanksResult> {
-  const profile = await prisma.userProfile.findUnique({ where: { userId } })
+  const profile = options.profile !== undefined
+    ? options.profile
+    : await prisma.userProfile.findUnique({ where: { userId } })
   // Bodyweight comes from the single canonical source (lib/bodyweight) so every
   // consumer coerces the Decimal column the same way.
   const bw = getCanonicalBodyweightKg(profile)
@@ -288,17 +314,19 @@ export async function computeRanks(
     throw new Error('BW_INVALID')
   }
 
-  const workout = await prisma.workout.findUnique({
-    where: { id: workoutId },
-    include: {
-      exercises: {
+  const workout = options.workout !== undefined
+    ? options.workout
+    : await prisma.workout.findUnique({
+        where: { id: workoutId },
         include: {
-          exercise: true,
-          sets: true,
+          exercises: {
+            include: {
+              exercise: true,
+              sets: true,
+            },
+          },
         },
-      },
-    },
-  })
+      })
 
   if (!workout) throw new Error('WORKOUT_NOT_FOUND')
 

@@ -60,3 +60,35 @@ export async function getFriendIdsAndHidden(
   ])
   return { friendIds, hiddenIds: hides.map((h) => h.postId) }
 }
+
+/** Feed-specific relationship read that applies each friend's activity opt-out. */
+export async function getVisibleFriendIdsAndHidden(
+  me: string,
+): Promise<{ friendIds: string[]; hiddenIds: string[] }> {
+  const [rows, hides] = await Promise.all([
+    prisma.friendship.findMany({
+      where: {
+        status: 'accepted',
+        OR: [{ userId: me }, { friendUserId: me }],
+      },
+      select: {
+        userId: true,
+        friendUserId: true,
+        user: { select: { profile: { select: { showActivityFeed: true } } } },
+        friend: { select: { profile: { select: { showActivityFeed: true } } } },
+      },
+    }),
+    prisma.postHide.findMany({
+      where: { userId: me },
+      select: { postId: true },
+    }),
+  ])
+
+  const friendIds = rows.flatMap((row) => {
+    const otherIsFriend = row.userId === me
+    const profile = otherIsFriend ? row.friend.profile : row.user.profile
+    const id = otherIsFriend ? row.friendUserId : row.userId
+    return profile?.showActivityFeed === false ? [] : [id]
+  })
+  return { friendIds, hiddenIds: hides.map((hide) => hide.postId) }
+}

@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/profile_service.dart';
+import '../../services/revenuecat_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/zvelt_theme_rebuilder.dart';
 import '../../theme/zvelt_tokens.dart';
@@ -75,6 +76,8 @@ class _ProfileTabState extends State<ProfileTab> {
 
   // ─── actions ──────────────────────────────────────────────────────────────
   void _openSettings() => _push(SettingsScreen(onLogout: widget.onLogout));
+
+  void _openPremium() => _sheet(const _PremiumSheet());
 
   void _openEditSheet() {
     _sheet(_EditProfileSheet(
@@ -324,61 +327,87 @@ class _ProfileTabState extends State<ProfileTab> {
           // Premium banner
           Padding(
             padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
-            child: Container(
-              clipBehavior: Clip.antiAlias,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment(-1, -0.3),
-                  end: Alignment(1, 0.6),
-                  stops: [0, 0.55, 1],
-                  colors: [
-                    Color(0xFFF58A11),
-                    Color(0xFFEE6E08),
-                    Color(0xFFD85F04)
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(ZveltTokens.rCard),
-                boxShadow: const [
-                  BoxShadow(
-                      color: Color(0x8CEE6E08),
-                      blurRadius: 34,
-                      offset: Offset(0, 16),
-                      spreadRadius: -8),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0x33FFFFFF),
-                      borderRadius: BorderRadius.circular(16),
+            child: ValueListenableBuilder<RevenueCatState>(
+              valueListenable: RevenueCatService.instance.state,
+              builder: (context, premium, _) {
+                final subtitle = premium.isPro
+                    ? 'Premium is active on this account.'
+                    : premium.isLoading
+                        ? 'Checking your subscription...'
+                        : premium.hasProducts
+                            ? 'Unlock programs, analytics and more.'
+                            : premium.message ??
+                                'Subscriptions are unavailable right now.';
+                return Semantics(
+                  button: true,
+                  label: 'Open ZVELT Premium',
+                  child: InkWell(
+                    onTap: _openPremium,
+                    borderRadius: BorderRadius.circular(ZveltTokens.rCard),
+                    child: Container(
+                      clipBehavior: Clip.antiAlias,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment(-1, -0.3),
+                          end: Alignment(1, 0.6),
+                          stops: [0, 0.55, 1],
+                          colors: [
+                            Color(0xFFF58A11),
+                            Color(0xFFEE6E08),
+                            Color(0xFFD85F04)
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(ZveltTokens.rCard),
+                        boxShadow: const [
+                          BoxShadow(
+                              color: Color(0x8CEE6E08),
+                              blurRadius: 34,
+                              offset: Offset(0, 16),
+                              spreadRadius: -8),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: const Color(0x33FFFFFF),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(AppIcons.crown,
+                                size: 24, color: ZveltTokens.onBrand),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('ZVELT Premium',
+                                    style: ZType.bodyL.copyWith(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                        color: ZveltTokens.onBrand)),
+                                const SizedBox(height: 3),
+                                Text(
+                                  subtitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: ZType.bodyS.copyWith(
+                                      fontSize: 12,
+                                      color: const Color(0xE6FFFFFF)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: const Icon(AppIcons.crown,
-                        size: 24, color: ZveltTokens.onBrand),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('ZVELT Premium',
-                            style: ZType.bodyL.copyWith(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: ZveltTokens.onBrand)),
-                        const SizedBox(height: 3),
-                        Text('Purchases are unavailable in this build.',
-                            style: ZType.bodyS.copyWith(
-                                fontSize: 12, color: const Color(0xE6FFFFFF))),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
           // Appearance row — prototype leading glyph is a sun/brightness icon.
@@ -873,7 +902,7 @@ class _PremiumSheet extends StatefulWidget {
 }
 
 class _PremiumSheetState extends State<_PremiumSheet> {
-  bool _annual = true; // prototype default: annual selected
+  bool _annual = true;
 
   static const _benefits = [
     'Unlimited goal-based AI programs',
@@ -882,13 +911,21 @@ class _PremiumSheetState extends State<_PremiumSheet> {
     'Unlimited challenges & custom fasting',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      RevenueCatService.instance.refresh();
+    });
+  }
+
   Widget _priceCard({
     required bool selected,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     required String label,
     required String price,
     required String sub,
-    bool saveBadge = false,
+    int? savePercent,
   }) {
     return Expanded(
       child: InkWell(
@@ -913,7 +950,7 @@ class _PremiumSheetState extends State<_PremiumSheet> {
                   Text(label,
                       style: ZType.bodyS.copyWith(
                           fontSize: 12.5, fontWeight: FontWeight.w700)),
-                  if (saveBadge) ...[
+                  if (savePercent != null) ...[
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -924,7 +961,7 @@ class _PremiumSheetState extends State<_PremiumSheet> {
                         border: Border.all(
                             color: ZveltTokens.success.withValues(alpha: 0.3)),
                       ),
-                      child: Text('SAVE 30%',
+                      child: Text('SAVE $savePercent%',
                           style: ZType.bodyS.copyWith(
                               fontSize: 9.5,
                               fontWeight: FontWeight.w800,
@@ -948,95 +985,179 @@ class _PremiumSheetState extends State<_PremiumSheet> {
     );
   }
 
+  Future<void> _purchase(bool annual) async {
+    final result = await RevenueCatService.instance.purchase(annual: annual);
+    if (!mounted || result.cancelled) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(result.message),
+        backgroundColor:
+            result.succeeded ? ZveltTokens.success : ZveltTokens.error,
+      ),
+    );
+  }
+
+  Future<void> _restore() async {
+    final result = await RevenueCatService.instance.restore();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(result.message),
+        backgroundColor:
+            result.succeeded ? ZveltTokens.success : ZveltTokens.error,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return _SheetShell(
-      title: 'ZVELT Premium',
-      leading: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          gradient: ZveltTokens.gradAccent,
-          borderRadius: BorderRadius.circular(13),
-          boxShadow: ZveltTokens.glowSm,
-        ),
-        child: const Icon(AppIcons.crown, size: 21, color: ZveltTokens.onBrand),
-      ),
-      maxHeightFactor: 0.92,
-      footer: SizedBox(
-        width: double.infinity,
-        height: 50,
-        child: FilledButton(
-          onPressed: () {
-            // Purchases aren't wired yet (RevenueCat pending) — be honest.
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              behavior: SnackBarBehavior.floating,
-              content: Text('Coming soon — purchases open at launch'),
-            ));
-          },
-          child: Text(_annual
-              ? 'Start free trial · then \$6.99/mo'
-              : 'Start free trial · then \$9.99/mo'),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Benefits first — accent-tinted check chips (prototype order).
-          for (final b in _benefits)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: ZveltTokens.brandTint,
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: const Icon(AppIcons.check,
-                        size: 13, color: ZveltTokens.brand),
-                  ),
-                  const SizedBox(width: 11),
-                  Expanded(
-                    child: Text(b,
-                        style: ZType.bodyM.copyWith(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
-                  ),
-                ],
-              ),
+    return ValueListenableBuilder<RevenueCatState>(
+      valueListenable: RevenueCatService.instance.state,
+      builder: (context, premium, _) {
+        final useAnnual = _annual &&
+            (premium.annualPackage != null || premium.monthlyPackage == null);
+        final selectedPackage =
+            useAnnual ? premium.annualPackage : premium.monthlyPackage;
+        final canPurchase = premium.isConfigured &&
+            !premium.isBusy &&
+            !premium.isPro &&
+            selectedPackage != null;
+        final ctaLabel = premium.isPro
+            ? 'Premium active'
+            : premium.isBusy
+                ? 'Contacting store...'
+                : selectedPackage == null
+                    ? 'Subscription unavailable'
+                    : 'Continue - ${selectedPackage.storeProduct.priceString} ${useAnnual ? '/ year' : '/ month'}';
+
+        return _SheetShell(
+          title: 'ZVELT Premium',
+          leading: Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: ZveltTokens.gradAccent,
+              borderRadius: BorderRadius.circular(13),
+              boxShadow: ZveltTokens.glowSm,
             ),
-          const SizedBox(height: 8),
-          // IntrinsicHeight bounds the stretch — a bare stretch Row inside a
-          // scrollable blanks release screens (flutter-layout-release-blank).
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _priceCard(
-                  selected: !_annual,
-                  onTap: () => setState(() => _annual = false),
-                  label: 'Monthly',
-                  price: '\$9.99',
-                  sub: 'per month',
-                ),
-                const SizedBox(width: 10),
-                _priceCard(
-                  selected: _annual,
-                  onTap: () => setState(() => _annual = true),
-                  label: 'Annual',
-                  price: '\$6.99',
-                  sub: 'per month, billed yearly',
-                  saveBadge: true,
-                ),
-              ],
-            ),
+            child: const Icon(AppIcons.crown,
+                size: 21, color: ZveltTokens.onBrand),
           ),
-        ],
-      ),
+          maxHeightFactor: 0.92,
+          footer: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: canPurchase ? () => _purchase(useAnnual) : null,
+                  child: premium.isBusy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        )
+                      : Text(
+                          ctaLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed:
+                    premium.isConfigured && !premium.isBusy ? _restore : null,
+                child: const Text('Restore purchases'),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (premium.isLoading) ...[
+                const LinearProgressIndicator(minHeight: 2),
+                const SizedBox(height: 16),
+              ],
+              if (premium.isPro) ...[
+                Text(
+                  'Your Premium subscription is active.',
+                  style: ZType.bodyM.copyWith(
+                    color: ZveltTokens.success,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ] else if (premium.message != null) ...[
+                Text(
+                  premium.message!,
+                  style: ZType.bodyS.copyWith(color: ZveltTokens.text2),
+                ),
+                const SizedBox(height: 16),
+              ],
+              for (final b in _benefits)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: ZveltTokens.brandTint,
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: const Icon(AppIcons.check,
+                            size: 13, color: ZveltTokens.brand),
+                      ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Text(b,
+                            style: ZType.bodyM.copyWith(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 8),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _priceCard(
+                      selected: !useAnnual && premium.monthlyPackage != null,
+                      onTap: premium.monthlyPackage == null || premium.isBusy
+                          ? null
+                          : () => setState(() => _annual = false),
+                      label: 'Monthly',
+                      price: premium.monthlyPackage?.storeProduct.priceString ??
+                          'Unavailable',
+                      sub: 'per month',
+                    ),
+                    const SizedBox(width: 10),
+                    _priceCard(
+                      selected: useAnnual && premium.annualPackage != null,
+                      onTap: premium.annualPackage == null || premium.isBusy
+                          ? null
+                          : () => setState(() => _annual = true),
+                      label: 'Annual',
+                      price: premium.annualPackage?.storeProduct.priceString ??
+                          'Unavailable',
+                      sub: 'per year',
+                      savePercent: premium.annualSavingsPercent,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

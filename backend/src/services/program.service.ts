@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto'
+import type { PlannedWorkout } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import {
   _clearExerciseResolverCache,
   normalizeExerciseName,
   resolveExerciseByName,
+  resolveExerciseByNameFromRows,
 } from '../lib/exercise-resolver'
 import {
   computeProgressiveLoads,
@@ -437,15 +440,38 @@ export function programExerciseDefaultsFor(rawName: string): ProgramExerciseDefa
   }
 }
 
-async function resolveProgramExerciseByName(rawName: string) {
-  const resolved = await resolveExerciseByName(rawName)
+/** Catalog fields needed for resolution, warmups, and equipment substitution. */
+const EX_SELECT = {
+  id: true,
+  name: true,
+  equipment: true,
+  movementPattern: true,
+  rankModel: true,
+  category: true,
+  primaryMuscle: true,
+  secondaryMuscles: true,
+  secondaryPatterns: true,
+  fatigueScore: true,
+} as const
+
+async function loadProgramCatalog() {
+  return prisma.exercise.findMany({ where: { isCustom: false }, select: EX_SELECT })
+}
+
+type ProgramCatalogRow = Awaited<ReturnType<typeof loadProgramCatalog>>[number]
+
+async function resolveProgramExerciseByName(
+  rawName: string,
+  catalog: ProgramCatalogRow[],
+) {
+  const resolved = resolveExerciseByNameFromRows(rawName, catalog)
   if (resolved) return resolved
 
   const fallback = programExerciseDefaultsFor(rawName)
-  const existing = await prisma.exercise.findFirst({
-    where: { name: { equals: fallback.name, mode: 'insensitive' }, isCustom: false },
-    select: { id: true, name: true },
-  })
+  const fallbackNorm = normalizeExerciseName(fallback.name)
+  const existing = catalog.find(
+    (row) => normalizeExerciseName(row.name) === fallbackNorm,
+  )
   if (existing) return existing
 
   const created = await prisma.exercise.create({
@@ -466,25 +492,12 @@ async function resolveProgramExerciseByName(rawName: string) {
       sourceLicense: 'zvelt',
       reviewStatus: 'fallback',
     },
-    select: { id: true, name: true },
+    select: EX_SELECT,
   })
+  catalog.push(created)
   _clearExerciseResolverCache()
   return created
 }
-
-/** Catalog fields needed for resolution, warmups, and equipment substitution. */
-const EX_SELECT = {
-  id: true,
-  name: true,
-  equipment: true,
-  movementPattern: true,
-  rankModel: true,
-  category: true,
-  primaryMuscle: true,
-  secondaryMuscles: true,
-  secondaryPatterns: true,
-  fatigueScore: true,
-} as const
 
 /** Resolve + materialize the program's CURRENT day into tracker-ready exercises. */
 export async function materializeCurrentDay(userId: string, program: ProgramRow): Promise<MaterializedDay> {
@@ -496,21 +509,30 @@ export async function materializeCurrentDay(userId: string, program: ProgramRow)
   const day = tpl.days[dayInRotation]
 
   const tags = parseEquipmentTags(program.equipmentTags)
-  const trainingContextPromise = trainingContextFor(userId)
+  const [rows, trainingContext] = await Promise.all([
+    loadProgramCatalog(),
+    trainingContextFor(userId),
+  ])
 
   // Resolve every slot's exercise name → catalog row.
-  const resolved = await Promise.all(day.slots.map(async (s) => ({ slot: s, ex: await resolveProgramExerciseByName(s.exercise) })))
-  const ids = resolved.map((x) => x.ex?.id).filter((x): x is string => !!x)
-  const rows = ids.length
-    ? await prisma.exercise.findMany({ where: { id: { in: ids } }, select: EX_SELECT })
-    : []
+  const resolvedByName = new Map<string, ProgramCatalogRow>()
+  const resolved: Array<{ slot: (typeof day.slots)[number]; ex: ProgramCatalogRow }> = []
+  for (const slot of day.slots) {
+    const key = normalizeExerciseName(slot.exercise)
+    let exercise = resolvedByName.get(key)
+    if (!exercise) {
+      exercise = await resolveProgramExerciseByName(slot.exercise, rows)
+      resolvedByName.set(key, exercise)
+    }
+    resolved.push({ slot, ex: exercise })
+  }
   const rowById = new Map(rows.map((r) => [r.id, r]))
 
   // Equipment auto-substitution: if the user selected equipment and a resolved
   // lift doesn't fit their kit, swap it for the best-ranked compatible
   // alternative. Percentage (wave) main lifts are left untouched — their load is
   // a % of a barbell training max that wouldn't transfer to a machine swap.
-  let catalog: typeof rows | null = null
+  const catalog = rows
   const meta: Record<string, ResolvedSlotMeta> = {}
   for (const { slot, ex } of resolved) {
     let exerciseId = ex?.id ?? null
@@ -519,9 +541,6 @@ export async function materializeCurrentDay(userId: string, program: ProgramRow)
 
     const swappable = tags.length > 0 && slot.sets.kind !== 'wave'
     if (swappable && row && !exerciseFitsUserEquipment(row.equipment, tags)) {
-      if (!catalog) {
-        catalog = await prisma.exercise.findMany({ where: { isCustom: false }, select: EX_SELECT })
-      }
       const best = rankSubstitutes(row as SubstitutionExercise, catalog as SubstitutionExercise[], {
         isEquipmentAvailable: (eq) => exerciseFitsUserEquipment(eq, tags),
         limit: 5,
@@ -547,7 +566,7 @@ export async function materializeCurrentDay(userId: string, program: ProgramRow)
   const loadSlots = day.slots.filter((s) => s.sets.kind !== 'wave')
   const loads: Record<string, SlotLoad> = {}
   if (loadSlots.length) {
-    const context = await trainingContextPromise
+    const context = trainingContext
     const inputs = loadSlots.map((s) => ({
       exerciseId: meta[s.slotKey].exerciseId,
       prescribedReps: s.sets.kind === 'straight' ? s.sets.reps : s.sets.kind === 'range' ? s.sets.maxReps : 8,
@@ -580,20 +599,26 @@ export async function startProgramDay(userId: string, program: ProgramRow & { ti
   const built = await materializeCurrentDay(userId, program)
 
   const now = new Date()
-  const planned = await prisma.plannedWorkout.create({
-    data: {
-      userId,
-      day: isoDay(now),
-      weekStart: mondayOf(now),
-      title: `${tpl.title} — ${built.title}`,
-      kind: 'gym',
-      status: 'pending',
-      exercisesJson: built.exercises as unknown as object,
-      notes: `Week ${built.week} of ${program.totalWeeks}${built.isDeload ? ' · deload week' : ''}`,
-    },
-  })
+  const planned: PlannedWorkout = {
+    id: randomUUID(),
+    userId,
+    day: isoDay(now),
+    weekStart: mondayOf(now),
+    title: `${tpl.title} — ${built.title}`,
+    kind: 'gym',
+    status: 'pending',
+    exercisesJson: built.exercises as unknown as PlannedWorkout['exercisesJson'],
+    notes: `Week ${built.week} of ${program.totalWeeks}${built.isDeload ? ' · deload week' : ''}`,
+    createdAt: now,
+    updatedAt: now,
+  }
 
-  const result = await createWorkoutFromPlanned(userId, planned.id, planned)
+  const result = await createWorkoutFromPlanned(
+    userId,
+    planned.id,
+    planned,
+    { insertPlanned: true },
+  )
   const workoutId = (result.workout as { id?: string } | null)?.id ?? null
   return { workoutId, plannedWorkoutId: planned.id, day: built, meta: result.meta }
 }

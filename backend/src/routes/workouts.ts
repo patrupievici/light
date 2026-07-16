@@ -5,7 +5,10 @@ import { authenticate } from '../middleware/auth'
 import { computeRanks } from '../services/ranking.service'
 import { recomputeUserChallenges } from '../services/challenge-recalc.service'
 import { evaluateWeightJump } from '../services/anti-cheat.service'
-import { checkAndAward } from '../services/achievement.service'
+import {
+  awardAchievementProgress,
+  loadAchievementProgress,
+} from '../services/achievement.service'
 import { recordWorkoutProgress } from '../services/session-reconcile.service'
 import { clearWorkoutSuggestionCache } from '../services/workout-suggestion-cache.service'
 import type { ProgressionLevel } from '../lib/progressive-overload'
@@ -789,15 +792,18 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       })
     }
 
-    const workoutFull = await prisma.workout.findFirst({
-      where: { id: workoutId, userId },
-      include: {
-        exercises: {
-          include: { exercise: true, sets: { orderBy: { setIndex: 'asc' } } },
-          orderBy: { position: 'asc' },
+    const [workoutFull, profile] = await Promise.all([
+      prisma.workout.findFirst({
+        where: { id: workoutId, userId },
+        include: {
+          exercises: {
+            include: { exercise: true, sets: { orderBy: { setIndex: 'asc' } } },
+            orderBy: { position: 'asc' },
+          },
         },
-      },
-    })
+      }),
+      prisma.userProfile.findUnique({ where: { userId } }),
+    ])
     if (!workoutFull) {
       return reply.code(404).send({
         error: 'NOT_FOUND',
@@ -830,7 +836,6 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       })
     }
 
-    const profile = await prisma.userProfile.findUnique({ where: { userId } })
     const bodyweightKg =
       profile?.bodyweightKg != null ? Number(profile.bodyweightKg) : 80
     const exercisesForXp = workoutFull.exercises.map((we) => ({
@@ -859,7 +864,7 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       userXpContext,
     )
 
-    const updated = await prisma.workout.update({
+    const workoutWrite = prisma.workout.update({
       where: { id: workoutId },
       data: {
         status: 'completed',
@@ -876,56 +881,86 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
     })
 
     let gameXp = gameXpPayload(profile?.gameXpTotal ?? 0)
-    let profileXpWrite: PromiseLike<unknown> = Promise.resolve(null)
+    let updated: Awaited<typeof workoutWrite>
     if (profile) {
-      const newTotal = profile.gameXpTotal + sessionXp
-      profileXpWrite = prisma.userProfile.update({
-        where: { userId },
-        data: { gameXpTotal: newTotal },
-      })
-      gameXp = gameXpPayload(newTotal)
+      const [workoutResult, , xpProfile] = await prisma.$transaction([
+        workoutWrite,
+        prisma.plannedWorkout.updateMany({
+          where: {
+            userId,
+            day: ymdLocal(startedAt),
+            kind: 'gym',
+            status: { in: ['pending', 'in_progress'] },
+          },
+          data: { status: 'completed' },
+        }),
+        prisma.userProfile.update({
+          where: { userId },
+          data: { gameXpTotal: { increment: sessionXp } },
+          select: { gameXpTotal: true },
+        }),
+        prisma.analyticsEvent.create({
+          data: { userId, eventName: 'workout_completed' },
+        }),
+      ])
+      updated = workoutResult
+      gameXp = gameXpPayload(xpProfile.gameXpTotal)
+    } else {
+      const [workoutResult] = await prisma.$transaction([
+        workoutWrite,
+        prisma.plannedWorkout.updateMany({
+          where: {
+            userId,
+            day: ymdLocal(startedAt),
+            kind: 'gym',
+            status: { in: ['pending', 'in_progress'] },
+          },
+          data: { status: 'completed' },
+        }),
+        prisma.analyticsEvent.create({
+          data: { userId, eventName: 'workout_completed' },
+        }),
+      ])
+      updated = workoutResult
     }
-
-    await Promise.all([
-      prisma.plannedWorkout.updateMany({
-        where: {
-          userId,
-          day: ymdLocal(updated.startedAt),
-          kind: 'gym',
-          status: 'pending',
-        },
-        data: { status: 'completed' },
-      }),
-      profileXpWrite,
-      prisma.analyticsEvent.create({
-        data: { userId, eventName: 'workout_completed' },
-      }),
-    ])
 
     // Calculează rangurile la complete (ca la post) — ca Rank tab să se actualizeze
     const enrichedWorkoutPromise = enrichWorkoutWithExerciseMedia(updated as any)
     const rankingPromise = (async () => {
       try {
-        await computeRanks(userId, workoutId)
+        return await computeRanks(userId, workoutId, {
+          profile,
+          workout: workoutFull,
+        })
       } catch (err: any) {
         app.log.warn({ err, userId, workoutId }, 'Ranking skip la complete (ex: BW_REQUIRED)')
+        return null
+      }
+    })()
+
+    const achievementProgressPromise = (async () => {
+      try {
+        return await loadAchievementProgress(userId)
+      } catch (err: any) {
+        app.log.warn({ err, userId }, 'Achievement progress load failed after workout complete')
+        return null
       }
     })()
 
     // Auto-update the user's active challenge standings from this workout.
-    const challengePromise = (async () => {
+    const refreshChallenges = async () => {
       try {
         await recomputeUserChallenges(userId)
       } catch (err: any) {
         app.log.warn({ err, userId }, 'Challenge recompute skipped after workout complete')
       }
-    })()
+    }
 
     // Adaptive loop: record per-lift autoregulation state from what was just
     // logged (weight/reps/RPE → progress/hold/deload decision) and bust the
     // stale daily-suggestion cache so the next suggestion reflects this session.
     // Best-effort; never blocks completion.
-    const adaptivePromise = (async () => {
+    const refreshAdaptive = async () => {
       try {
         const tp = await prisma.userTrainingProfile.findUnique({
           where: { userId },
@@ -942,23 +977,43 @@ You write post-workout coach commentary. Concrete, specific to the numbers the u
       } catch (err: any) {
         app.log.warn({ err, userId, workoutId }, 'adaptive progress record failed')
       }
-    })()
+    }
 
-    await rankingPromise
-    const achievementPromise = (async (): Promise<string[]> => {
-      try {
-        return await checkAndAward(userId)
-      } catch (err: any) {
-        app.log.warn({ err, userId }, 'checkAndAward failed after workout complete')
-        return []
-      }
-    })()
-    const [, , newAchievementKeys, enrichedWorkout] = await Promise.all([
-      challengePromise,
-      adaptivePromise,
-      achievementPromise,
+    const [rankResult, achievementProgress, enrichedBase] = await Promise.all([
+      rankingPromise,
+      achievementProgressPromise,
       enrichedWorkoutPromise,
     ])
+
+    let newAchievementKeys: string[] = []
+    if (achievementProgress) {
+      try {
+        const rankLpFloor = rankResult?.results.reduce(
+          (max, result) => Math.max(max, result.lpTotal),
+          0,
+        ) ?? 0
+        newAchievementKeys = await awardAchievementProgress(
+          userId,
+          achievementProgress,
+          { rankLpFloor },
+        )
+      } catch (err: any) {
+        app.log.warn({ err, userId }, 'checkAndAward failed after workout complete')
+      }
+    }
+
+    const setPr = rankResult?.results.some((result) => result.lpDelta > 0) ?? false
+    const enrichedWorkout = setPr
+      ? { ...(enrichedBase as Record<string, unknown>), hasPr: true }
+      : enrichedBase
+
+    // These writes do not affect the completion payload. Starting them after
+    // the socket flush keeps large challenge histories off the user path.
+    reply.raw.once('finish', () => {
+      setImmediate(() => {
+        void Promise.allSettled([refreshChallenges(), refreshAdaptive()])
+      })
+    })
 
     return reply.send({
       workout: enrichedWorkout,

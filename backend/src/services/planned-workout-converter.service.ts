@@ -23,6 +23,11 @@ export class PlannedConvertError extends Error {
   }
 }
 
+export type CreateWorkoutFromPlannedOptions = {
+  /** Persist a caller-built PlannedWorkout in the same transaction as the draft. */
+  insertPlanned?: boolean
+}
+
 type SeedDetail = { weightKg?: number | null; reps?: number }
 
 export type PlannedExercise = {
@@ -83,6 +88,7 @@ export async function createWorkoutFromPlanned(
   userId: string,
   plannedWorkoutId: string,
   plannedInput?: PlannedWorkout,
+  options: CreateWorkoutFromPlannedOptions = {},
 ): Promise<ConvertResult> {
   const planned =
     plannedInput?.id === plannedWorkoutId && plannedInput.userId === userId
@@ -133,7 +139,27 @@ export async function createWorkoutFromPlanned(
     })),
   )
 
+  const plannedWrite = options.insertPlanned
+    ? prisma.plannedWorkout.create({
+        data: {
+          id: planned.id,
+          userId: planned.userId,
+          day: planned.day,
+          weekStart: planned.weekStart,
+          title: planned.title,
+          kind: planned.kind,
+          status: 'in_progress',
+          exercisesJson: planned.exercisesJson ?? undefined,
+          notes: planned.notes,
+        },
+      })
+    : prisma.plannedWorkout.update({
+        where: { id: plannedWorkoutId },
+        data: { status: 'in_progress' },
+      })
+
   await prisma.$transaction([
+    plannedWrite,
     prisma.workout.create({
       data: {
         id: workoutId,
@@ -146,10 +172,6 @@ export async function createWorkoutFromPlanned(
       data: exerciseRows.map(({ exercise: _exercise, ...row }) => row),
     }),
     prisma.workoutSet.createMany({ data: setRows }),
-    prisma.plannedWorkout.update({
-      where: { id: plannedWorkoutId },
-      data: { status: 'in_progress' },
-    }),
   ])
 
   const [full] = await Promise.all([

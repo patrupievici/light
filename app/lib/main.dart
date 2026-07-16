@@ -31,6 +31,7 @@ import 'services/location_service.dart';
 import 'services/offline_sync_coordinator.dart';
 import 'services/push_messaging_service.dart';
 import 'services/report_outbox_service.dart';
+import 'services/revenuecat_service.dart';
 import 'services/retention_reminder_service.dart';
 import 'services/settings_store.dart';
 import 'screens/main_screen.dart';
@@ -457,6 +458,9 @@ class _AuthGateState extends State<AuthGate> {
           (prefs.getBool(_key(kOnboarding2CompletedKey)) ?? false) ||
               (prefs.getBool(_key('onboarding_v3_completed')) ?? false) ||
               (prefs.getBool(_key(kOnboardingV2CompletedKey)) ?? false);
+      if (userId.isNotEmpty) {
+        unawaited(RevenueCatService.instance.identify(userId));
+      }
     }
     if (!mounted) return;
     setState(() {
@@ -578,6 +582,7 @@ class _AuthGateState extends State<AuthGate> {
           // Drop any lingering snackbar (e.g. the race "You're in: …" toast)
           // so it doesn't carry over onto the logged-out screen.
           ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+          unawaited(RevenueCatService.instance.logOut());
           // Local-first sign-out: wipe tokens + flip the UI IMMEDIATELY.
           // Service teardown happens after, so a slow stop / dead network
           // can't make the first tap look like it did nothing (the "had to

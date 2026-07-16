@@ -12,7 +12,8 @@
 //   flutter run --dart-define=DISABLE_FCM=true
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 /// `true` → skip FCM background handler and don't start push in app (performance testing).
 const bool kFirebaseMessagingDisabled =
@@ -30,7 +31,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios.projectId.isNotEmpty &&
             ios.apiKey.isNotEmpty &&
-            !ios.apiKey.startsWith('REPLACE_');
+            ios.appId.isNotEmpty &&
+            !ios.apiKey.startsWith('REPLACE_') &&
+            !ios.appId.startsWith('REPLACE_');
       default:
         return false;
     }
@@ -41,7 +44,8 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-    throw UnsupportedError('Firebase messaging is not used on web in this project.');
+      throw UnsupportedError(
+          'Firebase messaging is not used on web in this project.');
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -74,8 +78,8 @@ class DefaultFirebaseOptions {
   /// Without these, push notifications will NOT work on iOS.
   /// The app will still run — FCM is skipped gracefully when [isConfigured] is false.
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'REPLACE_IOS_API_KEY',
-    appId: 'REPLACE_IOS_APP_ID',
+    apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_IOS_APP_ID'),
     messagingSenderId: '715817017339',
     projectId: 'zvelt-3998a',
     storageBucket: 'zvelt-3998a.firebasestorage.app',

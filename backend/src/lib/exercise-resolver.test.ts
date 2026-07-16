@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 
-import { normalizeExerciseName } from './exercise-resolver'
+import {
+  normalizeExerciseName,
+  resolveExerciseByNameFromRows,
+} from './exercise-resolver'
 
 // Note: `resolveExerciseByName` hits Prisma — skipped here to keep tests
 // pure. Tested via integration once we have a test DB set up.
@@ -43,5 +46,13 @@ describe('normalizeExerciseName', () => {
     const c = normalizeExerciseName('  Barbell-Back-Squat ')
     expect(a).toBe(b)
     expect(b).toBe(c)
+  })
+
+  it('resolves from a caller-owned rich catalog without dropping metadata', () => {
+    const rows = [
+      { id: 'bench', name: 'Barbell Bench Press', equipment: 'barbell' },
+      { id: 'row', name: 'Cable Row', equipment: 'cable' },
+    ]
+    expect(resolveExerciseByNameFromRows('Barbell-Bench-Press', rows)).toEqual(rows[0])
   })
 })
